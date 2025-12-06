@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { Canvas } from "@react-three/fiber";
+import React, { useMemo, useRef, useCallback, useState, useEffect } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { 
@@ -12,11 +12,54 @@ import {
   buildCompressionSpringGeometry,
   type CompressionSpringParams,
 } from "@/lib/spring3d/compressionSpringGeometry";
+import { Button } from "@/components/ui/button";
+import { RotateCcw } from "lucide-react";
+
+// View presets - camera positions for different views
+const VIEW_PRESETS = {
+  perspective: { position: [60, 40, 80], target: [0, 0, 25] },
+  front: { position: [0, 0, 100], target: [0, 0, 25] },      // 前视图 - 沿 Z 轴看
+  top: { position: [0, 100, 25], target: [0, 0, 25] },       // 俯视图 - 从上往下看
+  side: { position: [100, 0, 25], target: [0, 0, 25] },      // 侧视图 - 沿 X 轴看
+} as const;
+
+type ViewType = keyof typeof VIEW_PRESETS;
 
 // Spring colors
 const SPRING_COLOR = "#3b82f6"; // Blue for active coils
 const SPRING_COLOR_BOTTOMED = "#64748b"; // Gray for bottomed coils
 const END_CAP_COLOR = "#94a3b8"; // Silver for ground ends
+
+/**
+ * Camera controller component - must be inside Canvas
+ */
+function CameraController({ 
+  viewType, 
+  controlsRef 
+}: { 
+  viewType: ViewType; 
+  controlsRef: React.RefObject<any>;
+}) {
+  const { camera } = useThree();
+  
+  // Update camera when view type changes
+  useEffect(() => {
+    const preset = VIEW_PRESETS[viewType];
+    camera.position.set(...(preset.position as [number, number, number]));
+    camera.lookAt(...(preset.target as [number, number, number]));
+    camera.updateProjectionMatrix();
+    
+    // Update OrbitControls target after a small delay to ensure it's mounted
+    setTimeout(() => {
+      if (controlsRef.current) {
+        controlsRef.current.target.set(...(preset.target as [number, number, number]));
+        controlsRef.current.update();
+      }
+    }, 10);
+  }, [viewType, camera, controlsRef]);
+  
+  return null;
+}
 
 /**
  * Animated compression spring model with engineering-accurate geometry
@@ -138,6 +181,12 @@ export function CompressionSpringVisualizer() {
 
   // Note: useLanguage would require this to be a client component with LanguageProvider
   // For now, we'll use bilingual labels or just show technical symbols
+  const controlsRef = useRef<any>(null);
+  const [currentView, setCurrentView] = useState<ViewType>("perspective");
+
+  const handleViewChange = useCallback((view: ViewType) => {
+    setCurrentView(view);
+  }, []);
 
   if (!compressionDesign) {
     return (
@@ -160,6 +209,8 @@ export function CompressionSpringVisualizer() {
         camera={{ position: [60, 40, 80], fov: 45 }}
         gl={{ localClippingEnabled: true }}
       >
+        <CameraController viewType={currentView} controlsRef={controlsRef} />
+        
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 30, 20]} intensity={1.2} castShadow />
         <directionalLight position={[-15, -10, -10]} intensity={0.4} />
@@ -168,6 +219,7 @@ export function CompressionSpringVisualizer() {
         <AnimatedCompressionSpring />
         
         <OrbitControls 
+          ref={controlsRef}
           enablePan={true}
           enableZoom={true}
           enableRotate={true}
@@ -183,6 +235,47 @@ export function CompressionSpringVisualizer() {
           rotation={[Math.PI / 2, 0, 0]}
         />
       </Canvas>
+
+      {/* View selector - bottom right */}
+      <div className="absolute bottom-2 right-2 flex gap-1">
+        <Button
+          variant={currentView === "perspective" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("perspective")}
+          title="透视图 / Perspective"
+        >
+          <RotateCcw className="h-3 w-3 mr-1" />
+          3D
+        </Button>
+        <Button
+          variant={currentView === "front" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("front")}
+          title="前视图 / Front View"
+        >
+          前
+        </Button>
+        <Button
+          variant={currentView === "top" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("top")}
+          title="俯视图 / Top View"
+        >
+          顶
+        </Button>
+        <Button
+          variant={currentView === "side" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("side")}
+          title="侧视图 / Side View"
+        >
+          侧
+        </Button>
+      </div>
 
       {/* Legend overlay */}
       <div className="absolute bottom-2 left-2 rounded bg-white/90 px-2 py-1.5 text-xs shadow">

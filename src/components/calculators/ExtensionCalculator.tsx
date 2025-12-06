@@ -62,10 +62,6 @@ export function ExtensionCalculator() {
     }
   };
 
-  const handleNotSupported = () => {
-    alert("3D model for extension springs is coming soon.\n拉伸弹簧的3D模型即将上线。");
-  };
-
   const forceTesterUrl = useMemo(() => {
     const values = form.getValues();
     const params = new URLSearchParams({
@@ -81,6 +77,9 @@ export function ExtensionCalculator() {
     });
     return `/tools/force-tester?${params.toString()}`;
   }, [form]);
+
+  // Simulator URL for 3D model - same as force tester for extension springs
+  const simulatorUrl = forceTesterUrl;
 
   // Watch form values for URL generation
   const watchedValues = form.watch();
@@ -302,8 +301,8 @@ export function ExtensionCalculator() {
 
           {/* Action Buttons */}
           <div className="space-y-2">
-            <Button variant="secondary" className="w-full" disabled onClick={handleNotSupported}>
-              Generate 3D Model / 生成3D模型
+            <Button asChild variant="secondary" className="w-full" disabled={!result}>
+              <a href={simulatorUrl || "#"}>Generate 3D Model / 生成3D模型</a>
             </Button>
             <Button asChild variant="outline" className="w-full border-green-600 text-green-400 hover:bg-green-950">
               <a href={forceTesterUrl}>Send to Force Tester / 发送到力–位移测试</a>
@@ -312,7 +311,6 @@ export function ExtensionCalculator() {
               <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
             </Button>
           </div>
-          <p className="text-center text-xs text-slate-500">3D model for extension springs coming soon</p>
         </CardContent>
       </Card>
     </div>

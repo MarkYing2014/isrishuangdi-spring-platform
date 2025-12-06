@@ -101,7 +101,7 @@ export function SpringForceTesterLayout({
               <div>{currentPointCard}</div>
               
               {/* 3D Canvas */}
-              <div className="h-80 w-full rounded-lg overflow-hidden border bg-slate-50">
+              <div className="h-[420px] w-full rounded-lg overflow-hidden border bg-slate-50">
                 {visualizer}
               </div>
             </div>

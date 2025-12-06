@@ -34,7 +34,22 @@ export interface ExtensionDesignMeta {
   initialTension: number;
 }
 
-export type SpringDesignMeta = ConicalDesignMeta | CompressionDesignMeta | ExtensionDesignMeta;
+export interface TorsionDesignMeta {
+  type: "torsion";
+  wireDiameter: number;
+  meanDiameter: number;
+  activeCoils: number;
+  bodyLength: number;
+  pitch: number; // Pitch between coils (mm)
+  legLength1: number;
+  legLength2: number;
+  freeAngle: number;
+  shearModulus: number;
+  springRate: number; // N·mm per degree
+  windingDirection: "left" | "right";
+}
+
+export type SpringDesignMeta = ConicalDesignMeta | CompressionDesignMeta | ExtensionDesignMeta | TorsionDesignMeta;
 
 export interface LinearCurvePoint {
   deflection: number;
@@ -42,8 +57,8 @@ export interface LinearCurvePoint {
 }
 
 interface SpringSimulationState {
-  mode: "idle" | "conical-nonlinear" | "compression-linear" | "extension-linear";
-  springType: "compression" | "extension" | "conical" | null;
+  mode: "idle" | "conical-nonlinear" | "compression-linear" | "extension-linear" | "torsion-linear";
+  springType: "compression" | "extension" | "conical" | "torsion" | null;
   currentDeflection: number;
   maxDeflection: number;
   collapsedCoils: number;
@@ -73,6 +88,11 @@ interface SpringSimulationState {
     designMeta: ExtensionDesignMeta,
     maxDeflection: number
   ) => void;
+  initializeTorsion: (
+    curve: LinearCurvePoint[],
+    designMeta: TorsionDesignMeta,
+    maxDeflection: number
+  ) => void;
   reset: () => void;
 }
 
@@ -99,6 +119,55 @@ export function findNearestCurvePoint(
   }
   
   return nearest;
+}
+
+/**
+ * Interpolate curve point at a given deflection value.
+ * 在给定变形值处插值曲线点，用于平滑动画
+ */
+export function interpolateCurvePoint(
+  curve: ConicalNonlinearCurvePoint[],
+  targetX: number
+): ConicalNonlinearCurvePoint {
+  if (curve.length === 0) {
+    throw new Error("Curve is empty");
+  }
+  
+  if (curve.length === 1) {
+    return curve[0];
+  }
+  
+  // 找到 targetX 所在的区间
+  let lower = curve[0];
+  let upper = curve[curve.length - 1];
+  
+  for (let i = 0; i < curve.length - 1; i++) {
+    if (curve[i].x <= targetX && curve[i + 1].x >= targetX) {
+      lower = curve[i];
+      upper = curve[i + 1];
+      break;
+    }
+  }
+  
+  // 边界情况
+  if (targetX <= curve[0].x) {
+    return curve[0];
+  }
+  if (targetX >= curve[curve.length - 1].x) {
+    return curve[curve.length - 1];
+  }
+  
+  // 线性插值
+  const range = upper.x - lower.x;
+  const t = range > 0 ? (targetX - lower.x) / range : 0;
+  
+  return {
+    x: targetX,
+    load: lower.load + t * (upper.load - lower.load),
+    k: lower.k + t * (upper.k - lower.k),
+    collapsedCoils: Math.round(lower.collapsedCoils + t * (upper.collapsedCoils - lower.collapsedCoils)),
+    activeCoils: Math.round(lower.activeCoils + t * (upper.activeCoils - lower.activeCoils)),
+  };
 }
 
 /**
@@ -142,7 +211,8 @@ export const useSpringSimulationStore = create<SpringSimulationState>((set, get)
     const { curve, design } = get();
     if (!curve || !design || curve.length === 0) return;
 
-    const point = findNearestCurvePoint(curve, x);
+    // 使用插值而不是最近点，以支持平滑动画
+    const point = interpolateCurvePoint(curve, x);
     set({
       currentDeflection: point.x,
       collapsedCoils: point.collapsedCoils,
@@ -153,22 +223,49 @@ export const useSpringSimulationStore = create<SpringSimulationState>((set, get)
   },
 
   setLinearDeflection: (x: number) => {
-    const { linearCurve, design } = get();
-    if (!linearCurve || !design || linearCurve.length === 0) return;
+    const { design, maxDeflection, linearCurve } = get();
+    if (!design) return;
 
-    const point = findNearestLinearPoint(linearCurve, x);
+    const clamped = Math.min(Math.max(0, x), maxDeflection || x);
+
+    if (design.type === "compression") {
+      const springRate = (design as CompressionDesignMeta).springRate;
+      set({
+        currentDeflection: clamped,
+        currentStiffness: springRate,
+        currentLoad: springRate * clamped,
+      });
+      return;
+    }
+
+    if (design.type === "extension") {
+      const { springRate, initialTension } = design as ExtensionDesignMeta;
+      set({
+        currentDeflection: clamped,
+        currentStiffness: springRate,
+        currentLoad: initialTension + springRate * clamped,
+      });
+      return;
+    }
+
+    if (design.type === "torsion") {
+      const { springRate } = design as TorsionDesignMeta;
+      set({
+        currentDeflection: clamped,
+        currentStiffness: springRate,
+        currentLoad: springRate * clamped, // Torque = k × θ
+      });
+      return;
+    }
+
+    // Fallback to nearest point for other types if any
+    if (!linearCurve || linearCurve.length === 0) return;
+    const point = findNearestLinearPoint(linearCurve, clamped);
     if (!point) return;
-
-    // For linear springs, stiffness is constant
-    const springRate = design.type === "compression" 
-      ? (design as CompressionDesignMeta).springRate 
-      : design.type === "extension" 
-        ? (design as ExtensionDesignMeta).springRate 
-        : 0;
 
     set({
       currentDeflection: point.deflection,
-      currentStiffness: springRate,
+      currentStiffness: 0,
       currentLoad: point.load,
     });
   },
@@ -250,6 +347,30 @@ export const useSpringSimulationStore = create<SpringSimulationState>((set, get)
       currentStiffness: designMeta.springRate,
       currentLoad: initialPoint?.load ?? 0,
       initialTension: designMeta.initialTension,
+    });
+  },
+
+  initializeTorsion: (
+    curve: LinearCurvePoint[],
+    designMeta: TorsionDesignMeta,
+    maxDeflection: number
+  ) => {
+    // Start at 50% of max deflection (working angle) for better visualization
+    const midIndex = Math.floor(curve.length / 2);
+    const initialPoint = curve[midIndex] ?? curve[0];
+    set({
+      mode: "torsion-linear",
+      springType: "torsion",
+      curve: null,
+      linearCurve: curve,
+      design: designMeta,
+      maxDeflection,
+      currentDeflection: initialPoint?.deflection ?? maxDeflection / 2,
+      collapsedCoils: 0,
+      activeCoils: designMeta.activeCoils,
+      currentStiffness: designMeta.springRate,
+      currentLoad: initialPoint?.load ?? 0,
+      initialTension: 0,
     });
   },
 

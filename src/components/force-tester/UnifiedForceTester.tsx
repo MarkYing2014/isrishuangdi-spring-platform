@@ -244,10 +244,10 @@ export function UnifiedForceTester({
           </Card>
 
           {/* 3D Visualization + Current State */}
-          <div className="grid gap-4 md:grid-cols-[1fr,200px]">
+          <div className="grid gap-4 md:grid-cols-[1fr,160px]">
             {/* 3D View */}
             <Card className="overflow-hidden">
-              <div className="h-72 bg-slate-900">
+              <div className="h-[420px] bg-slate-900">
                 {visualizer || (
                   <div className="flex items-center justify-center h-full text-slate-400 text-sm">
                     {isZh ? "3D 视图" : "3D View"}
@@ -256,55 +256,55 @@ export function UnifiedForceTester({
               </div>
             </Card>
 
-            {/* Current State Panel */}
-            <Card className="bg-slate-50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">
+            {/* Current State Panel - Compact */}
+            <Card className="bg-slate-50 h-fit">
+              <CardHeader className="pb-1 pt-3 px-3">
+                <CardTitle className="text-xs font-medium text-muted-foreground">
                   {isZh ? "当前状态" : "Current State"}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div>
-                  <p className="text-xs text-muted-foreground">Δx</p>
-                  <p className="font-semibold text-blue-600">
+              <CardContent className="space-y-2 text-sm px-3 pb-3">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-xs text-muted-foreground">Δx</span>
+                  <span className="font-semibold text-blue-600">
                     {formatNumber(currentDeflection)} {geometry.type === "torsion" ? "°" : "mm"}
-                  </p>
+                  </span>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-xs text-muted-foreground">
                     {geometry.type === "torsion" ? "M" : "F"}
-                  </p>
-                  <p className="font-semibold text-green-600">
+                  </span>
+                  <span className="font-semibold text-green-600">
                     {formatNumber(currentState?.force ?? 0)} {geometry.type === "torsion" ? "N·mm" : "N"}
-                  </p>
+                  </span>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">k</p>
-                  <p className="font-medium">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-xs text-muted-foreground">k</span>
+                  <span className="font-medium">
                     {formatNumber(currentState?.stiffness ?? 0)} {geometry.type === "torsion" ? "N·mm/°" : "N/mm"}
-                  </p>
+                  </span>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">τ</p>
-                  <p className="font-medium text-purple-600">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-xs text-muted-foreground">τ</span>
+                  <span className="font-medium text-purple-600">
                     {formatNumber(currentState?.stress ?? 0)} MPa
-                  </p>
+                  </span>
                 </div>
                 {currentState?.activeCoils !== undefined && (
                   <>
-                    <div className="border-t pt-2">
-                      <p className="text-xs text-muted-foreground">
+                    <div className="border-t pt-2 flex justify-between items-baseline">
+                      <span className="text-xs text-muted-foreground">
                         {isZh ? "有效圈" : "Active"}
-                      </p>
-                      <p className="font-medium">{currentState.activeCoils}</p>
+                      </span>
+                      <span className="font-medium">{currentState.activeCoils}</span>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-xs text-muted-foreground">
                         {isZh ? "贴底圈" : "Collapsed"}
-                      </p>
-                      <p className="font-medium text-slate-500">
+                      </span>
+                      <span className="font-medium text-slate-500">
                         {currentState.collapsedCoils ?? 0}
-                      </p>
+                      </span>
                     </div>
                   </>
                 )}

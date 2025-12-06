@@ -51,6 +51,16 @@ const ConicalSpringVisualizer = dynamic(
   { ssr: false, loading: () => <div className="h-full w-full flex items-center justify-center bg-slate-900 text-slate-400 text-sm">Loading 3D...</div> }
 );
 
+const ExtensionSpringVisualizer = dynamic(
+  () => import("@/components/three/ExtensionSpringVisualizer").then(mod => mod.ExtensionSpringVisualizer),
+  { ssr: false, loading: () => <div className="h-full w-full flex items-center justify-center bg-slate-900 text-slate-400 text-sm">Loading 3D...</div> }
+);
+
+const TorsionSpringVisualizer = dynamic(
+  () => import("@/components/three/TorsionSpringVisualizer").then(mod => mod.TorsionSpringVisualizer),
+  { ssr: false, loading: () => <div className="h-full w-full flex items-center justify-center bg-slate-900 text-slate-400 text-sm">Loading 3D...</div> }
+);
+
 type SpringType = "compression" | "extension" | "torsion" | "conical";
 
 export default function SpringAnalysisPage() {
@@ -95,9 +105,9 @@ function AnalysisContent() {
   const [initialTension, setInitialTension] = useState(readParam("Fi", 5));
 
   // Torsion spring parameters
-  const [torsionBodyLength, setTorsionBodyLength] = useState(20);
-  const [legLength1, setLegLength1] = useState(readParam("L1", 30));
-  const [legLength2, setLegLength2] = useState(readParam("L2", 30));
+  const [torsionBodyLength, setTorsionBodyLength] = useState(readParam("Lb", 10));
+  const [legLength1, setLegLength1] = useState(readParam("L1", 25));
+  const [legLength2, setLegLength2] = useState(readParam("L2", 25));
 
   // Conical spring parameters
   const [largeOD, setLargeOD] = useState(readParam("D1", 30));
@@ -174,7 +184,7 @@ function AnalysisContent() {
   }, [geometry, workingConditions]);
 
   // Get store actions
-  const { initializeCompression, initializeConical, reset: resetStore } = useSpringSimulationStore();
+  const { initializeCompression, initializeConical, initializeExtension, initializeTorsion, reset: resetStore } = useSpringSimulationStore();
   
   // Global analysis store for Phase 6
   const { 
@@ -217,6 +227,32 @@ function AnalysisContent() {
         },
         maxDeflection
       );
+    } else if (springType === "extension") {
+      // For extension springs
+      const springRate = (79300 * Math.pow(wireDiameter, 4)) / (8 * Math.pow(meanDiameter, 3) * activeCoils);
+      const curve = analysisResult.forceCurve.map(p => ({
+        deflection: p.deflection,
+        load: p.force,
+      }));
+      
+      // Calculate outer diameter from mean diameter
+      const outerDiameter = meanDiameter + wireDiameter;
+      
+      initializeExtension(
+        curve,
+        {
+          type: "extension",
+          wireDiameter,
+          outerDiameter,
+          activeCoils,
+          bodyLength,
+          freeLengthInsideHooks: bodyLength,
+          initialTension,
+          shearModulus: 79300,
+          springRate,
+        },
+        maxDeflection
+      );
     } else if (springType === "conical") {
       // For conical, use the nonlinear curve if available
       const curve = analysisResult.forceCurve.map(p => ({
@@ -242,12 +278,45 @@ function AnalysisContent() {
         },
         maxDeflection
       );
+    } else if (springType === "torsion") {
+      // For torsion springs - use elastic modulus for spring rate calculation
+      // E ≈ 2.5 * G for spring steel
+      const elasticModulus = 79300 * 2.5; // ~198250 MPa
+      const springRate = (elasticModulus * Math.pow(wireDiameter, 4)) / 
+                         (64 * meanDiameter * activeCoils) * (Math.PI / 180);
+      
+      const curve = analysisResult.forceCurve.map(p => ({
+        deflection: p.deflection,
+        load: p.force,
+      }));
+      
+      // Calculate pitch from body length and active coils
+      const pitch = torsionBodyLength / activeCoils;
+      
+      initializeTorsion(
+        curve,
+        {
+          type: "torsion",
+          wireDiameter,
+          meanDiameter,
+          activeCoils,
+          bodyLength: torsionBodyLength,
+          pitch: pitch > wireDiameter ? pitch : wireDiameter, // Ensure pitch >= wire diameter
+          legLength1,
+          legLength2,
+          freeAngle: 90, // Default free angle
+          shearModulus: 79300,
+          springRate,
+          windingDirection: "right",
+        },
+        maxDeflection
+      );
     }
 
     return () => {
       // Cleanup on unmount
     };
-  }, [springType, analysisResult, wireDiameter, meanDiameter, activeCoils, freeLength, maxDeflection, largeOD, smallOD, conicalFreeLength, initializeCompression, initializeConical]);
+  }, [springType, analysisResult, wireDiameter, meanDiameter, activeCoils, freeLength, bodyLength, initialTension, maxDeflection, largeOD, smallOD, conicalFreeLength, torsionBodyLength, legLength1, legLength2, initializeCompression, initializeConical, initializeExtension, initializeTorsion]);
 
   // Handle PDF export
   const handleExportPDF = () => {
@@ -282,6 +351,10 @@ function AnalysisContent() {
         return <CompressionSpringVisualizer />;
       case "conical":
         return <ConicalSpringVisualizer />;
+      case "extension":
+        return <ExtensionSpringVisualizer />;
+      case "torsion":
+        return <TorsionSpringVisualizer />;
       default:
         return (
           <div className="h-full w-full flex items-center justify-center bg-slate-900 text-slate-400 text-sm">

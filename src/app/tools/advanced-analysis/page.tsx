@@ -67,6 +67,12 @@ import {
   type HotspotTrackingResult,
 } from '@/lib/engine/phase7';
 
+// Torsion spring advanced analysis
+import {
+  runTorsionAdvancedAnalysis,
+  type TorsionAdvancedAnalysisResult,
+} from '@/lib/engine/torsionAdvancedAnalysis';
+
 export default function AdvancedAnalysisPage() {
   const [activeTab, setActiveTab] = useState('manufacturing');
   const [isRunning, setIsRunning] = useState(false);
@@ -99,6 +105,12 @@ export default function AdvancedAnalysisPage() {
   // Check if we have valid data to analyze
   const canAnalyze = hasValidGeometry() && hasAnalysisResult() && material !== null;
 
+  // Torsion spring advanced analysis state
+  const [torsionAnalysis, setTorsionAnalysis] = useState<TorsionAdvancedAnalysisResult | null>(null);
+
+  // Check if this is a torsion spring
+  const isTorsionSpring = geometry?.type === 'torsion';
+
   // Run all Phase 6 analyses
   const runPhase6Analysis = async () => {
     if (!geometry || !analysisResult || !material || !workingConditions) return;
@@ -107,7 +119,48 @@ export default function AdvancedAnalysisPage() {
     setRunProgress(0);
 
     try {
-      // 1. Manufacturing Analysis (30%)
+      // Special handling for torsion springs
+      if (geometry.type === 'torsion') {
+        setRunProgress(20);
+        
+        const torsionGeom = geometry as any;
+        const torsionResult = runTorsionAdvancedAnalysis({
+          wireDiameter: geometry.wireDiameter,
+          meanDiameter: torsionGeom.meanDiameter,
+          activeCoils: geometry.activeCoils,
+          bodyLength: torsionGeom.bodyLength || geometry.wireDiameter * geometry.activeCoils,
+          legLength1: torsionGeom.legLength1 || 25,
+          legLength2: torsionGeom.legLength2 || 25,
+          freeAngle: torsionGeom.legAngle || 90,
+          workingAngle: workingConditions.maxDeflection || 45,
+          materialId: geometry.materialId,
+        }, 20);
+        
+        setTorsionAnalysis(torsionResult);
+        setRunProgress(50);
+        
+        // Still run some generic analyses for torsion springs
+        const shotPeeningResult = simulateShotPeening({
+          wireDiameter: geometry.wireDiameter,
+          peakStress: 600,
+          attenuationDepth: 0.1,
+          coverage: 200,
+          shotDiameter: 0.6,
+          almenIntensity: '0.25A',
+        }, material.snCurve?.tau2 || 400, analysisResult.stress.tauEffective);
+        
+        setPhase6Manufacturing({
+          coilingProcess: null as any,
+          shotPeening: shotPeeningResult,
+          scragTest: null as any,
+        });
+        
+        setRunProgress(100);
+        setIsRunning(false);
+        return;
+      }
+
+      // 1. Manufacturing Analysis (30%) - for compression/extension springs
       setRunProgress(10);
       
       const coilingResult = simulateCoilingProcess({
@@ -401,7 +454,11 @@ export default function AdvancedAnalysisPage() {
 
         {/* Manufacturing Tab */}
         <TabsContent value="manufacturing">
-          <ManufacturingTab data={phase6Manufacturing} isRunning={isRunning} />
+          {isTorsionSpring && torsionAnalysis ? (
+            <TorsionAnalysisTab data={torsionAnalysis} isRunning={isRunning} />
+          ) : (
+            <ManufacturingTab data={phase6Manufacturing} isRunning={isRunning} />
+          )}
         </TabsContent>
 
         {/* Quality Tab */}
@@ -1295,6 +1352,188 @@ function FEATab({ geometry, analysisResult, material }: any) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Torsion Spring Analysis Tab Component
+function TorsionAnalysisTab({ data, isRunning }: { data: TorsionAdvancedAnalysisResult | null; isRunning: boolean }) {
+  if (isRunning) {
+    return <LoadingCard title="扭簧高级分析" />;
+  }
+
+  if (!data) {
+    return <EmptyCard title="扭簧高级分析" message='点击"开始分析"运行扭簧高级分析' />;
+  }
+
+  const { mass, frequency, stressDistribution, dynamic, fatigue } = data;
+
+  return (
+    <div className="space-y-6">
+      {/* Overall Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            高级工程分析
+            <Badge variant={data.overallStatus === 'PASS' ? 'default' : data.overallStatus === 'CAUTION' ? 'secondary' : 'destructive'}>
+              {data.overallStatus}
+            </Badge>
+          </CardTitle>
+          <CardDescription>动力学·温度·蠕变·环境判定</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center p-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
+              <p className="text-2xl font-bold">{mass.totalMass.toFixed(2)} g</p>
+              <p className="text-xs text-muted-foreground">弹簧质量</p>
+            </div>
+            <div className="text-center p-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
+              <p className="text-2xl font-bold">{frequency.naturalFrequency.toFixed(1)} Hz</p>
+              <p className="text-xs text-muted-foreground">固有频率 fn</p>
+            </div>
+            <div className="text-center p-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
+              <p className="text-2xl font-bold">{frequency.shockWaveVelocity.toFixed(0)} m/s</p>
+              <p className="text-xs text-muted-foreground">冲击波速度</p>
+            </div>
+            <div className={`text-center p-3 rounded-lg ${
+              dynamic.riskLevel === 'LOW RISK' ? 'bg-green-50 dark:bg-green-950' :
+              dynamic.riskLevel === 'MEDIUM RISK' ? 'bg-yellow-50 dark:bg-yellow-950' :
+              'bg-red-50 dark:bg-red-950'
+            }`}>
+              <p className={`text-lg font-bold ${
+                dynamic.riskLevel === 'LOW RISK' ? 'text-green-600' :
+                dynamic.riskLevel === 'MEDIUM RISK' ? 'text-yellow-600' :
+                'text-red-600'
+              }`}>{dynamic.riskLevel}</p>
+              <p className="text-xs text-muted-foreground">智能诊断</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Stress Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">应力分布分析</CardTitle>
+            <CardDescription>弯曲应力分布与热点识别</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <DataRow label="最大应力" value={`${stressDistribution.maxStress.toFixed(0)} MPa`} />
+            <DataRow label="平均应力" value={`${stressDistribution.avgStress.toFixed(0)} MPa`} />
+            <DataRow label="应力修正系数 Ki" value={stressDistribution.stressCorrectionFactor.toFixed(3)} />
+            <DataRow 
+              label="临界区域" 
+              value={`${stressDistribution.criticalRegions}`}
+              status={stressDistribution.criticalRegions === 0 ? 'good' : 'warning'}
+            />
+            <DataRow 
+              label="热点数" 
+              value={`${stressDistribution.hotspotCount}`}
+              status={stressDistribution.hotspotCount === 0 ? 'good' : 'warning'}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Fatigue Analysis */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">疲劳与安全</CardTitle>
+            <CardDescription>疲劳寿命与安全系数</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <DataRow 
+              label="估计寿命" 
+              value={fatigue.estimatedLife >= 1e9 ? '∞ (无限)' : `${fatigue.estimatedLife.toExponential(2)} 次`}
+              status={fatigue.estimatedLife >= 1e6 ? 'good' : 'warning'}
+            />
+            <DataRow 
+              label="安全系数" 
+              value={fatigue.safetyFactor.toFixed(2)}
+              status={fatigue.safetyFactor >= 1.5 ? 'good' : fatigue.safetyFactor >= 1.0 ? 'warning' : 'bad'}
+            />
+            <DataRow label="安全率" value={`${fatigue.safetyFactorPercent.toFixed(0)}%`} />
+            <DataRow label="平均应力" value={`${fatigue.meanStress.toFixed(1)} MPa`} />
+            <DataRow label="交变应力" value={`${fatigue.alternatingStress.toFixed(1)} MPa`} />
+          </CardContent>
+        </Card>
+
+        {/* Mass & Geometry */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">质量与几何</CardTitle>
+            <CardDescription>弹簧质量分布</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <DataRow label="总质量" value={`${mass.totalMass.toFixed(2)} g`} />
+            <DataRow label="线圈质量" value={`${mass.bodyMass.toFixed(2)} g`} />
+            <DataRow label="腿1质量" value={`${mass.leg1Mass.toFixed(2)} g`} />
+            <DataRow label="腿2质量" value={`${mass.leg2Mass.toFixed(2)} g`} />
+            <DataRow label="总线长" value={`${mass.totalWireLength.toFixed(1)} mm`} />
+          </CardContent>
+        </Card>
+
+        {/* Dynamic Analysis */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">动力学分析</CardTitle>
+            <CardDescription>频率与惯性</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <DataRow label="固有频率" value={`${frequency.naturalFrequency.toFixed(1)} Hz`} />
+            <DataRow label="角频率" value={`${frequency.angularFrequency.toFixed(1)} rad/s`} />
+            <DataRow label="转动惯量" value={`${frequency.momentOfInertia.toFixed(4)} kg·mm²`} />
+            <DataRow label="扭转刚度" value={`${frequency.torsionalStiffness.toFixed(2)} N·mm/rad`} />
+          </CardContent>
+        </Card>
+
+        {/* Environmental */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">环境影响</CardTitle>
+            <CardDescription>温度与蠕变</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <DataRow label="温度影响" value={`${dynamic.temperatureEffect.toFixed(2)}%`} />
+            <DataRow label="蠕变系数" value={dynamic.creepFactor.toFixed(4)} />
+            <DataRow 
+              label="环境评级" 
+              value={dynamic.environmentalRating}
+              status={dynamic.environmentalRating === 'PASS' ? 'good' : dynamic.environmentalRating === 'CAUTION' ? 'warning' : 'bad'}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Stress Hotspots Table */}
+        <Card className="md:col-span-2 lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-base">应力热点</CardTitle>
+            <CardDescription>高应力区域位置</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xs space-y-1 max-h-40 overflow-auto">
+              <div className="grid grid-cols-3 font-medium border-b pb-1">
+                <span>位置</span>
+                <span>圈数</span>
+                <span>应力</span>
+              </div>
+              {stressDistribution.points
+                .filter(p => p.isHotspot)
+                .slice(0, 5)
+                .map((point, i) => (
+                  <div key={i} className="grid grid-cols-3 py-1">
+                    <span>θ = {point.theta.toFixed(0)}°</span>
+                    <span>{point.coilNumber.toFixed(1)}</span>
+                    <span className="text-red-600">{point.bendingStress.toFixed(0)} MPa</span>
+                  </div>
+                ))}
+              {stressDistribution.hotspotCount === 0 && (
+                <p className="text-green-600 py-2">无高应力热点 ✓</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
