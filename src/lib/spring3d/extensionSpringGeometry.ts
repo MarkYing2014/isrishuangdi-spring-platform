@@ -297,7 +297,8 @@ function buildSimpleEndHookCenterline(
 
   const transitionPts: THREE.Vector3[] = [];
   const transitionSegments = 24;
-  for (let i = 0; i <= transitionSegments; i++) {
+  // 从 i=1 开始，跳过 endPos（由 bodyHelixPts 的最后一个点提供）
+  for (let i = 1; i <= transitionSegments; i++) {
     const t = i / transitionSegments;
     transitionPts.push(
       cubicBezier(endPos, control1, control2, attachPoint, t)
@@ -310,8 +311,9 @@ function buildSimpleEndHookCenterline(
   }
 
   // ---------------------------------------------------------------
-  // 9) 最终中心线：线圈末端 → 光滑过渡 → 圆弧钩
-  //    注意：跳过圆弧的第一个点，因为它与过渡曲线的最后一个点重合
+  // 9) 最终中心线：光滑过渡 → 圆弧钩
+  //    注意：transitionPts 不包含 endPos（由 bodyHelixPts 提供）
+  //    跳过圆弧的第一个点，因为它与过渡曲线的最后一个点重合
   // ---------------------------------------------------------------
   pts.push(...transitionPts);
   pts.push(...hookLoopPts.slice(1)); // 跳过第一个点避免重复
@@ -441,28 +443,30 @@ function buildSimpleStartHookCenterline(
 
   const transitionPts: THREE.Vector3[] = [];
   const transitionSegments = 24;
-  for (let i = 0; i <= transitionSegments; i++) {
+  // 从 i=1 开始，跳过 startPos（由 bodyHelixPts[0] 提供）
+  // 到 i=transitionSegments-1 结束，跳过 attachPoint（由 hookLoopPts 提供）
+  for (let i = 1; i < transitionSegments; i++) {
     const t = i / transitionSegments;
     transitionPts.push(
       cubicBezier(startPos, control1, control2, attachPoint, t)
     );
   }
-  
-  // 确保过渡曲线的最后一个点精确等于 attachPoint
-  if (transitionPts.length > 0) {
-    transitionPts[transitionPts.length - 1].copy(attachPoint);
-  }
 
   // ---------------------------------------------------------------
-  // 9) 最终中心线：钩 → 过渡 → 线圈起点
+  // 9) 最终中心线：钩 → 过渡 → (紧邻线圈起点)
   //    注意：需要反转顺序，因为这是起始端
+  //    startHookPts 的最后一个点应该紧邻 bodyHelixPts[0]，但不包含它
   // ---------------------------------------------------------------
-  // 先添加钩（反转），再添加过渡（反转）
-  const reversedHookPts = hookLoopPts.slice(1).reverse();
-  const reversedTransitionPts = transitionPts.reverse();
+  // hookLoopPts: [attachPoint, ..., hookTip]
+  // 反转后: [hookTip, ..., attachPoint]
+  const reversedHookPts = [...hookLoopPts].reverse();
   
-  pts.push(...reversedHookPts);
-  pts.push(...reversedTransitionPts.slice(1)); // 跳过第一个点避免重复
+  // transitionPts: 不包含 startPos 和 attachPoint
+  // 反转后: 从靠近 attachPoint 到靠近 startPos
+  const reversedTransitionPts = [...transitionPts].reverse();
+  
+  pts.push(...reversedHookPts.slice(0, -1)); // 跳过最后一个点 (attachPoint)
+  pts.push(...reversedTransitionPts);        // 过渡段
 
   return pts;
 }
