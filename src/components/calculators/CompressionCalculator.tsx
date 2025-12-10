@@ -26,6 +26,13 @@ import { Label } from "@/components/ui/label";
 import { DimensionHint } from "./DimensionHint";
 import { MaterialSelector } from "./MaterialSelector";
 import { StressAnalysisCard } from "./StressAnalysisCard";
+import { 
+  useSpringDesignStore,
+  type CompressionGeometry,
+  type MaterialInfo,
+  type AnalysisResult,
+  generateDesignCode,
+} from "@/lib/stores/springDesignStore";
 
 const formSchema = z
   .object({
@@ -55,6 +62,9 @@ export function CompressionCalculator() {
   const [selectedMaterial, setSelectedMaterial] = useState<SpringMaterial>(getDefaultSpringMaterial());
   const [stressAnalysis, setStressAnalysis] = useState<StressAnalysisResult | null>(null);
   const [preloadResult, setPreloadResult] = useState<PreloadResult | null>(null);
+  
+  // 全局设计存储
+  const setDesign = useSpringDesignStore(state => state.setDesign);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as Resolver<FormValues>,
@@ -126,6 +136,21 @@ export function CompressionCalculator() {
     return `/tools/analysis?${params.toString()}`;
   }, [watchedValues, selectedMaterial]);
 
+  const cadExportUrl = useMemo(() => {
+    const params = new URLSearchParams({
+      type: "compression",
+      d: watchedValues.wireDiameter?.toString() ?? "3.2",
+      Dm: watchedValues.meanDiameter?.toString() ?? "24",
+      Na: watchedValues.activeCoils?.toString() ?? "8",
+      Nt: watchedValues.totalCoils?.toString() ?? "10",
+      L0: watchedValues.freeLength?.toString() ?? "50",
+      material: selectedMaterial.id,
+      k: result?.k?.toString() ?? "",
+      dx: watchedValues.deflection?.toString() ?? "10",
+    });
+    return `/tools/cad-export?${params.toString()}`;
+  }, [watchedValues, selectedMaterial, result]);
+
   const onSubmit: SubmitHandler<FormValues> = (values) => {
     setError(null);
     try {
@@ -168,6 +193,56 @@ export function CompressionCalculator() {
       } else {
         setPreloadResult(null);
       }
+      
+      // 写入全局 store
+      const geometry: CompressionGeometry = {
+        type: "compression",
+        wireDiameter: values.wireDiameter,
+        meanDiameter: values.meanDiameter,
+        activeCoils: values.activeCoils,
+        totalCoils: values.totalCoils,
+        freeLength: values.freeLength ?? 50,
+        topGround: values.topGround ?? false,
+        bottomGround: values.bottomGround ?? false,
+        shearModulus: selectedMaterial.shearModulus,
+        materialId: selectedMaterial.id,
+      };
+      
+      const materialInfo: MaterialInfo = {
+        id: selectedMaterial.id,
+        name: selectedMaterial.nameEn,
+        shearModulus: selectedMaterial.shearModulus,
+        elasticModulus: selectedMaterial.elasticModulus ?? 200000,
+        density: selectedMaterial.density ?? 7850,
+        tensileStrength: selectedMaterial.tensileStrength,
+        surfaceFactor: selectedMaterial.surfaceFactor,
+        tempFactor: selectedMaterial.tempFactor,
+      };
+      
+      const analysisResultData: AnalysisResult = {
+        springRate: calc.k,
+        springRateUnit: "N/mm",
+        workingLoad: calc.load,
+        shearStress: calc.shearStress,
+        wahlFactor: calc.wahlFactor,
+        springIndex: calc.springIndex,
+        staticSafetyFactor: analysis.safetyFactor.sfStatic,
+        fatigueSafetyFactor: analysis.fatigueLife?.sfInfiniteLife,
+        fatigueLife: analysis.fatigueLife?.estimatedCycles,
+        workingDeflection: values.deflection,
+        maxDeflection: values.deflection,
+      };
+      
+      setDesign({
+        springType: "compression",
+        geometry,
+        material: materialInfo,
+        analysisResult: analysisResultData,
+        meta: {
+          designCode: generateDesignCode(geometry),
+        },
+      });
+      
     } catch (err) {
       setResult(null);
       setStressAnalysis(null);
@@ -399,6 +474,9 @@ export function CompressionCalculator() {
             </Button>
             <Button asChild variant="outline" className="w-full border-blue-600 text-blue-400 hover:bg-blue-950">
               <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
+            </Button>
+            <Button asChild variant="outline" className="w-full border-purple-600 text-purple-400 hover:bg-purple-950" disabled={!result}>
+              <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
             </Button>
           </div>
         </CardContent>

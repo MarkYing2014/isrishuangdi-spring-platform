@@ -61,6 +61,7 @@ function AnimatedExtensionSpring() {
       activeCoils,
       bodyLength,
       freeLengthInsideHooks,
+      hookType,
     } = extensionDesign;
 
     const params: ExtensionSpringParams = {
@@ -71,18 +72,13 @@ function AnimatedExtensionSpring() {
       freeLengthInsideHooks,
       currentExtension: currentDeflection,
       scale,
+      hookType,
     };
 
     return buildExtensionSpringGeometry(params);
   }, [extensionDesign, currentDeflection, scale]);
 
-  if (!springGeometry || !extensionDesign) {
-    return null;
-  }
-
-  const { bodyGeometry, topHookGeometry, bottomHookGeometry, state } = springGeometry;
-
-  // Create materials
+  // Create materials - MUST be before any conditional returns to maintain hooks order
   const springMaterial = useMemo(() => {
     return new THREE.MeshStandardMaterial({
       color: SPRING_COLOR,
@@ -100,6 +96,13 @@ function AnimatedExtensionSpring() {
       side: THREE.DoubleSide,
     });
   }, []);
+
+  // Early return AFTER all hooks to maintain consistent hook order
+  if (!springGeometry || !extensionDesign) {
+    return null;
+  }
+
+  const { bodyGeometry, topHookGeometry, bottomHookGeometry, state } = springGeometry;
 
   return (
     <group>

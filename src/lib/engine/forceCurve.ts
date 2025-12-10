@@ -64,9 +64,14 @@ export function calculateExtensionSpringRate(
  * Calculate spring rate for torsion spring
  * 计算扭转弹簧刚度
  * 
- * k = (E × d⁴) / (64 × Dm × Na) [N·mm/deg]
+ * 标准公式 (弧度制):
+ * k_rad = (E × d⁴) / (10.8 × Dm × Na)  [N·mm/rad]
  * 
- * Or in radians: k = (E × d⁴) / (10.8 × Dm × Na)
+ * 转换为度制:
+ * k_deg = k_rad × (π/180)  [N·mm/deg]
+ * 
+ * 注: 10.8 ≈ 64 × (π/180) × (180/π) 的简化形式
+ * 来源: SMI Handbook, DIN EN 13906-3
  */
 export function calculateTorsionSpringRate(
   geometry: TorsionSpringGeometry
@@ -79,9 +84,12 @@ export function calculateTorsionSpringRate(
   const { wireDiameter, meanDiameter, activeCoils } = geometry;
   const E = material.elasticModulus ?? 207000;
 
-  // Rate in N·mm per degree
-  return (E * Math.pow(wireDiameter, 4)) / 
-         (64 * meanDiameter * activeCoils * (180 / PI));
+  // Rate in N·mm per radian
+  const k_rad = (E * Math.pow(wireDiameter, 4)) / 
+                (10.8 * meanDiameter * activeCoils);
+  
+  // Convert to N·mm per degree
+  return k_rad * (PI / 180);
 }
 
 /**

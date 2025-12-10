@@ -37,6 +37,7 @@ import {
 import { SpringAnalysisEngine } from "@/lib/engine/SpringAnalysisEngine";
 import { useSpringSimulationStore } from "@/lib/stores/springSimulationStore";
 import { useSpringAnalysisStore } from "@/lib/stores/springAnalysisStore";
+import { EXTENSION_HOOK_LABELS } from "@/lib/springTypes";
 import Link from "next/link";
 import { Brain } from "lucide-react";
 
@@ -87,6 +88,9 @@ function AnalysisContent() {
   // Read spring type from URL
   const urlSpringType = searchParams.get("type") as SpringType | null;
   const urlMaterial = searchParams.get("material") as SpringMaterialId | null;
+  
+  // Check if we have URL parameters (data from calculator)
+  const hasUrlParams = urlSpringType !== null;
 
   // Spring type selection
   const [springType, setSpringType] = useState<SpringType>(urlSpringType || "compression");
@@ -103,6 +107,10 @@ function AnalysisContent() {
   // Extension spring parameters
   const [bodyLength, setBodyLength] = useState(readParam("Lb", 40));
   const [initialTension, setInitialTension] = useState(readParam("Fi", 5));
+  
+  // Read hookType from URL (for extension springs)
+  const urlHookType = searchParams.get("hookType") as import("@/lib/springTypes").ExtensionHookType | null;
+  const [hookType, setHookType] = useState<import("@/lib/springTypes").ExtensionHookType>(urlHookType || "machine");
 
   // Torsion spring parameters
   const [torsionBodyLength, setTorsionBodyLength] = useState(readParam("Lb", 10));
@@ -250,6 +258,7 @@ function AnalysisContent() {
           initialTension,
           shearModulus: 79300,
           springRate,
+          hookType, // Read from URL parameter or default to "machine"
         },
         maxDeflection
       );
@@ -316,7 +325,7 @@ function AnalysisContent() {
     return () => {
       // Cleanup on unmount
     };
-  }, [springType, analysisResult, wireDiameter, meanDiameter, activeCoils, freeLength, bodyLength, initialTension, maxDeflection, largeOD, smallOD, conicalFreeLength, torsionBodyLength, legLength1, legLength2, initializeCompression, initializeConical, initializeExtension, initializeTorsion]);
+  }, [springType, analysisResult, wireDiameter, meanDiameter, activeCoils, freeLength, bodyLength, initialTension, maxDeflection, largeOD, smallOD, conicalFreeLength, torsionBodyLength, legLength1, legLength2, hookType, initializeCompression, initializeConical, initializeExtension, initializeTorsion]);
 
   // Handle PDF export
   const handleExportPDF = () => {
@@ -364,6 +373,52 @@ function AnalysisContent() {
     }
   };
 
+  // If no URL params, show prompt to go to calculator first
+  if (!hasUrlParams) {
+    return (
+      <main className="container mx-auto py-8 px-4">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold mb-2">
+            {isZh ? "弹簧工程分析" : "Spring Engineering Analysis"}
+          </h1>
+          <p className="text-muted-foreground">
+            {isZh
+              ? "完整的弹簧应力、疲劳、安全系数和屈曲分析"
+              : "Complete stress, fatigue, safety factor, and buckling analysis"}
+          </p>
+        </div>
+
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle>{isZh ? "无弹簧数据" : "No Spring Data"}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {isZh 
+                ? "请先从计算器页面定义弹簧参数，然后发送到此处进行工程分析。"
+                : "Please start from the Calculator page to define spring parameters, then send here for engineering analysis."}
+            </p>
+            
+            <div className="grid grid-cols-2 gap-3 pt-4">
+              <Button asChild variant="default">
+                <a href="/tools/calculator?tab=compression">{isZh ? "压缩弹簧" : "Compression"}</a>
+              </Button>
+              <Button asChild variant="default">
+                <a href="/tools/calculator?tab=extension">{isZh ? "拉伸弹簧" : "Extension"}</a>
+              </Button>
+              <Button asChild variant="outline">
+                <a href="/tools/calculator?tab=conical">{isZh ? "锥形弹簧" : "Conical"}</a>
+              </Button>
+              <Button asChild variant="outline">
+                <a href="/tools/calculator?tab=torsion">{isZh ? "扭转弹簧" : "Torsion"}</a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
   return (
     <main className="container mx-auto py-8 px-4">
       <div className="mb-8 flex items-start justify-between">
@@ -386,9 +441,9 @@ function AnalysisContent() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[350px,1fr]">
-        {/* Input Panel */}
+        {/* Input Panel - Read Only */}
         <div className="space-y-4">
-          {/* Spring Type Selection */}
+          {/* Spring Type - Read Only */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">
@@ -396,28 +451,16 @@ function AnalysisContent() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Tabs value={springType} onValueChange={(v) => setSpringType(v as SpringType)}>
-                <TabsList className="grid grid-cols-2 mb-4">
-                  <TabsTrigger value="compression">
-                    {isZh ? "压缩" : "Compression"}
-                  </TabsTrigger>
-                  <TabsTrigger value="extension">
-                    {isZh ? "拉伸" : "Extension"}
-                  </TabsTrigger>
-                </TabsList>
-                <TabsList className="grid grid-cols-2">
-                  <TabsTrigger value="torsion">
-                    {isZh ? "扭转" : "Torsion"}
-                  </TabsTrigger>
-                  <TabsTrigger value="conical">
-                    {isZh ? "锥形" : "Conical"}
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <div className="px-3 py-2 bg-slate-100 rounded-md text-sm font-medium">
+                {springType === "compression" && (isZh ? "压缩弹簧" : "Compression Spring")}
+                {springType === "extension" && (isZh ? "拉伸弹簧" : "Extension Spring")}
+                {springType === "torsion" && (isZh ? "扭转弹簧" : "Torsion Spring")}
+                {springType === "conical" && (isZh ? "锥形弹簧" : "Conical Spring")}
+              </div>
             </CardContent>
           </Card>
 
-          {/* Material Selection */}
+          {/* Material - Read Only */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">
@@ -425,196 +468,123 @@ function AnalysisContent() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Select value={materialId} onValueChange={(v) => setMaterialId(v as SpringMaterialId)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {materialOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {isZh ? opt.labelZh : opt.labelEn}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="px-3 py-2 bg-slate-100 rounded-md text-sm font-medium">
+                {materialOptions.find(opt => opt.value === materialId)?.[isZh ? "labelZh" : "labelEn"] || materialId}
+              </div>
             </CardContent>
           </Card>
 
-          {/* Geometry Parameters */}
+          {/* Geometry Parameters - Read Only */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">
                 {isZh ? "几何参数" : "Geometry"}
               </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {isZh ? "（从计算器传入，只读）" : "(From Calculator, Read-Only)"}
+              </p>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">d (mm)</Label>
-                  <Input
-                    type="number"
-                    value={wireDiameter}
-                    onChange={(e) => setWireDiameter(Number(e.target.value))}
-                    step={0.1}
-                  />
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">d (mm):</span>
+                <span className="font-medium">{wireDiameter}</span>
+              </div>
+              {springType !== "conical" && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Dm (mm):</span>
+                  <span className="font-medium">{meanDiameter}</span>
                 </div>
-                {springType !== "conical" && (
-                  <div>
-                    <Label className="text-xs">Dm (mm)</Label>
-                    <Input
-                      type="number"
-                      value={meanDiameter}
-                      onChange={(e) => setMeanDiameter(Number(e.target.value))}
-                      step={0.5}
-                    />
+              )}
+              {springType === "conical" && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">D1 (mm):</span>
+                    <span className="font-medium">{largeOD}</span>
                   </div>
-                )}
-                {springType === "conical" && (
-                  <>
-                    <div>
-                      <Label className="text-xs">D1 (mm)</Label>
-                      <Input
-                        type="number"
-                        value={largeOD}
-                        onChange={(e) => setLargeOD(Number(e.target.value))}
-                        step={0.5}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">D2 (mm)</Label>
-                      <Input
-                        type="number"
-                        value={smallOD}
-                        onChange={(e) => setSmallOD(Number(e.target.value))}
-                        step={0.5}
-                      />
-                    </div>
-                  </>
-                )}
-                <div>
-                  <Label className="text-xs">Na</Label>
-                  <Input
-                    type="number"
-                    value={activeCoils}
-                    onChange={(e) => setActiveCoils(Number(e.target.value))}
-                    step={0.5}
-                  />
-                </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">D2 (mm):</span>
+                    <span className="font-medium">{smallOD}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Na:</span>
+                <span className="font-medium">{activeCoils}</span>
               </div>
 
               {/* Type-specific parameters */}
               {springType === "compression" && (
-                <div>
-                  <Label className="text-xs">L0 (mm)</Label>
-                  <Input
-                    type="number"
-                    value={freeLength}
-                    onChange={(e) => setFreeLength(Number(e.target.value))}
-                    step={1}
-                  />
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">L0 (mm):</span>
+                  <span className="font-medium">{freeLength}</span>
                 </div>
               )}
 
               {springType === "extension" && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs">Lb (mm)</Label>
-                    <Input
-                      type="number"
-                      value={bodyLength}
-                      onChange={(e) => setBodyLength(Number(e.target.value))}
-                      step={1}
-                    />
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Lb (mm):</span>
+                    <span className="font-medium">{bodyLength}</span>
                   </div>
-                  <div>
-                    <Label className="text-xs">Fi (N)</Label>
-                    <Input
-                      type="number"
-                      value={initialTension}
-                      onChange={(e) => setInitialTension(Number(e.target.value))}
-                      step={0.5}
-                    />
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Fi (N):</span>
+                    <span className="font-medium">{initialTension}</span>
                   </div>
-                </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{isZh ? "钩型" : "Hook Type"}:</span>
+                    <span className="font-medium">{EXTENSION_HOOK_LABELS[hookType]?.en || hookType}</span>
+                  </div>
+                </>
               )}
 
               {springType === "torsion" && (
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <Label className="text-xs">Lb (mm)</Label>
-                    <Input
-                      type="number"
-                      value={torsionBodyLength}
-                      onChange={(e) => setTorsionBodyLength(Number(e.target.value))}
-                      step={1}
-                    />
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Lb (mm):</span>
+                    <span className="font-medium">{torsionBodyLength}</span>
                   </div>
-                  <div>
-                    <Label className="text-xs">L1 (mm)</Label>
-                    <Input
-                      type="number"
-                      value={legLength1}
-                      onChange={(e) => setLegLength1(Number(e.target.value))}
-                      step={1}
-                    />
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">L1 (mm):</span>
+                    <span className="font-medium">{legLength1}</span>
                   </div>
-                  <div>
-                    <Label className="text-xs">L2 (mm)</Label>
-                    <Input
-                      type="number"
-                      value={legLength2}
-                      onChange={(e) => setLegLength2(Number(e.target.value))}
-                      step={1}
-                    />
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">L2 (mm):</span>
+                    <span className="font-medium">{legLength2}</span>
                   </div>
-                </div>
+                </>
               )}
 
               {springType === "conical" && (
-                <div>
-                  <Label className="text-xs">L0 (mm)</Label>
-                  <Input
-                    type="number"
-                    value={conicalFreeLength}
-                    onChange={(e) => setConicalFreeLength(Number(e.target.value))}
-                    step={1}
-                  />
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">L0 (mm):</span>
+                  <span className="font-medium">{conicalFreeLength}</span>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Working Conditions */}
+          {/* Working Conditions - Read Only */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">
                 {isZh ? "工作条件" : "Working Conditions"}
               </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {isZh ? "（从计算器传入，只读）" : "(From Calculator, Read-Only)"}
+              </p>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">
-                    {springType === "torsion" ? "θ_min (°)" : "Δx_min (mm)"}
-                  </Label>
-                  <Input
-                    type="number"
-                    value={minDeflection}
-                    onChange={(e) => setMinDeflection(Number(e.target.value))}
-                    step={1}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">
-                    {springType === "torsion" ? "θ_max (°)" : "Δx_max (mm)"}
-                  </Label>
-                  <Input
-                    type="number"
-                    value={maxDeflection}
-                    onChange={(e) => setMaxDeflection(Number(e.target.value))}
-                    step={1}
-                  />
-                </div>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">
+                  {springType === "torsion" ? "θ_min (°):" : "Δx_min (mm):"}
+                </span>
+                <span className="font-medium">{minDeflection}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">
+                  {springType === "torsion" ? "θ_max (°):" : "Δx_max (mm):"}
+                </span>
+                <span className="font-medium">{maxDeflection}</span>
               </div>
             </CardContent>
           </Card>

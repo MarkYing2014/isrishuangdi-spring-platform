@@ -1,0 +1,21 @@
+{
+  "springType": "compression",
+  "geometry": {
+    "wireDiameter": 3.2,
+    "meanDiameter": 24,
+    "outerDiameter": 27.2,
+    "activeCoils": 8,
+    "totalCoils": 10,
+    "freeLength": 50,
+    "hookType": "machine",
+    "legLength1": 25,
+    "legLength2": 25,
+    "windingDirection": "right"
+  },
+  "export": {
+    "formats": [
+      "STL"
+    ],
+    "name": "preview_cea18415-fa22-4981-b10c-468bc967b099"
+  }
+}

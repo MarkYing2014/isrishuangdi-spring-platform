@@ -195,12 +195,10 @@ export function calculateTorsionFrequency(params: TorsionSpringParams): TorsionF
   const G = material?.shearModulus || 79300; // MPa
   const density = material?.density || 7850; // kg/m³
   
-  // Spring rate (N·mm/deg)
-  // k = E × d⁴ / (64 × Dm × Na) for torsion springs
-  const springRatePerDeg = (E * Math.pow(wireDiameter, 4)) / (64 * meanDiameter * activeCoils);
-  
-  // Convert to N·mm/rad
-  const springRatePerRad = springRatePerDeg * (180 / Math.PI);
+  // Spring rate (N·mm/rad) - 标准公式
+  // k_rad = E × d⁴ / (10.8 × Dm × Na)
+  // 来源: SMI Handbook, DIN EN 13906-3
+  const springRatePerRad = (E * Math.pow(wireDiameter, 4)) / (10.8 * meanDiameter * activeCoils);
   
   // Calculate moment of inertia of the legs (simplified as rods rotating about one end)
   // J = (1/3) × m × L² for a rod rotating about one end

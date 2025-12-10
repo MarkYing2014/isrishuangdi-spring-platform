@@ -54,11 +54,23 @@ Stage 3: 实现其他 Hook 类型（Extended, Crossover, Double Loop）
 
 | Hook 类型 | 英文名 | 特征 |
 |-----------|--------|------|
-| 机器钩 | Machine Hook | 环平面包含轴线，最常用 |
-| 侧钩 | Side Hook | 环平面垂直于轴线，钩在侧面 |
+| 机器钩 | Machine Hook | 环平面包含轴线，环中心在轴线上 |
+| 侧钩 | Side Hook | 环平面包含轴线，环中心在侧面 |
 | 交叉钩 | Crossover Hook | 线材跨过弹簧中心 |
-| 延长钩 | Extended Hook | 比侧钩更长 |
+| 延长钩 | Extended Hook | 类似侧钩 + 延长段 |
 | 双环钩 | Double Loop | 两个相邻的环 |
+
+### ⚠️ 核心设计原则
+
+> **所有 Hook 类型的拉力方向都必须沿着弹簧轴线！**
+> 
+> 这意味着：
+> - 环平面必须包含弹簧轴线（`loopPlaneType: "axis-plane"`）
+> - 环的开口方向朝向轴线方向
+> - 不同 Hook 类型的区别在于**环中心位置**，而不是环平面方向
+>
+> 错误理解：Side Hook 的环平面垂直于轴线 ❌
+> 正确理解：Side Hook 的环中心在侧面，但环平面仍包含轴线 ✅
 
 ---
 
@@ -541,24 +553,33 @@ src/lib/spring3d/
 ```
 制造方式：直接弯出最后一圈
 几何特征：
-- 环平面垂直于弹簧轴线
-- 环在弹簧外径的侧面
+- ⚠️ 重要：环平面仍然包含弹簧轴线（拉力方向沿轴线）
+- 环中心在弹簧外径的侧面（与 Machine Hook 的区别）
 - 弹簧体相对于钩偏移
 - 最经济的制造方式
 
-  ○───────  ← 环在侧面
- /
-○
-│
-│ ← 弹簧体
-│
+        ↑ 拉力方向（沿轴线）
+        │
+        ○ ← 环开口朝上
+       ╱ ╲
+      ╱   ╲
+     ○     │
+     │     │ ← 环中心在侧面
+     │
+   弹簧体
 ```
+
+**关键实现要点**：
+- `loopPlaneType: "axis-plane"` - 环平面包含轴线（保证拉力方向正确）
+- `centerMode: "radial-offset"` - 环中心沿径向偏移（在侧面）
+- 这与 Machine Hook 的区别仅在于环中心位置，不是环平面方向
 
 #### Extended Hook（延长钩）
 ```
 制造方式：类似 Side Hook + 延长段
 几何特征：
-- 环平面垂直于弹簧轴线
+- ⚠️ 重要：环平面仍然包含弹簧轴线（拉力方向沿轴线）
+- 环中心在弹簧外径的侧面
 - 有额外的直线延长段
 - 用于短体长钩内距
 - 最贵的制造方式
@@ -667,3 +688,113 @@ export function buildHookCenterline(
 - Hook 环与弹簧端面正交
 - 过渡段不凹进弹簧体内
 - 整体路径光滑
+
+---
+
+## 八、经验教训总结（2025-12-07）
+
+> 在实现 Machine Hook 和 Side Hook 的过程中，我们遇到了多个几何和工程问题。
+> 以下是总结的经验教训，**必须在实现其他 Hook 类型时遵守**。
+
+### 🔴 不可违反的刚性几何约束（Hard Rules）
+
+| # | 约束 | 说明 |
+|---|------|------|
+| 1 | **钩的受力方向 = 弹簧轴线** | 拉力沿 +Z / −Z，钩是轴向受拉构件 |
+| 2 | **钩弧平面包含 Z 轴** | 钩弧平面法向量 = `radialDir`（从轴线指向线圈端点） |
+| 3 | **钩弧平面与弹簧圈正交** | 从正面看：coil 是圆孔，hook 是竖着的 C / U |
+| 4 | **连接点必须相切** | 钩弧起点的切线方向 = 螺旋的真实 3D 切线方向 |
+| 5 | **过渡段不允许向 coil 内凹** | 半径约束：`r_transition ≥ meanRadius` |
+
+> ⚠️ **如果任何一条被破坏 —— 钩一定是假的**
+
+### 🟡 关键几何公式
+
+#### 1. 钩弧平面基向量
+```typescript
+// 钩弧平面包含 tangentDir 和 springAxisDir
+// 法向量 = cross(tangentDir, springAxisDir) = radialDir
+const arcU = tangentDir.clone();  // XY 平面内的切向
+const arcV = springAxisDir.clone();  // Z 轴方向
+```
+
+#### 2. 螺旋切线方向（用于相切连接）
+```typescript
+// 真实的 3D 螺旋切线（保留 Z 分量！）
+const helixTangent3D = endPos.clone().sub(prevPos).normalize();
+
+// ❌ 错误：清零 Z 分量
+// tangentApprox.z = 0;  // 这会导致连接处有折角
+```
+
+#### 3. 计算弧的起始角度（使连接点相切）
+```typescript
+// 弧的切线方向 = -sin(θ)*arcU + cos(θ)*arcV
+// 要求：弧起点切线 = helixTangent3D
+const sinTheta0 = -helixTangent3D.dot(arcU);
+const cosTheta0 = helixTangent3D.dot(arcV);
+const arcStartAngle = Math.atan2(sinTheta0, cosTheta0);
+```
+
+#### 4. 计算弧中心（使弧起点在 endPos）
+```typescript
+const arcStartPos = new THREE.Vector3()
+  .addScaledVector(arcU, sideHookRadius * Math.cos(arcStartAngle))
+  .addScaledVector(arcV, sideHookRadius * Math.sin(arcStartAngle));
+
+// 弧中心 = endPos - arcStartPos
+const hookArcCenter = endPos.clone().sub(arcStartPos);
+```
+
+### 🟢 拉簧线圈几何
+
+#### 拉簧在自由状态（Δx=0）时线圈紧密贴合
+
+```typescript
+// ❌ 错误：使用 bodyLength
+// const extendedLength = (bodyLength + currentExtension) * scale;
+
+// ✅ 正确：使用 solidBodyLength
+const solidBodyLength = activeCoils * wireDiameter;
+const extendedLength = (solidBodyLength + currentExtension) * scale;
+```
+
+| 状态 | pitch |
+|------|-------|
+| Δx = 0 | ≈ wireDiameter（线圈贴紧） |
+| Δx > 0 | 逐渐增大 |
+
+### 🟢 初始状态
+
+```typescript
+// 拉簧初始化时
+currentDeflection: 0,  // 从 0 开始，线圈紧密贴合
+currentLoad: designMeta.initialTension,  // 初始载荷 = 初张力
+```
+
+### 🔵 常见错误及修正
+
+| 错误 | 原因 | 修正 |
+|------|------|------|
+| 钩弧是水平的（躺着） | 用 `axisDir` 当平面法向量 | 用 `radialDir` 当平面法向量 |
+| 连接处有折角 | `helixTangent3D` 的 Z 分量被清零 | 保留 Z 分量 |
+| 一端正确一端错误 | Start Hook 的切线方向计算错误 | 两端都用 `endPos - prevPos` |
+| 线圈有间隙（Δx=0 时） | 使用 `bodyLength` 而不是 `solidBodyLength` | 使用 `activeCoils * wireDiameter` |
+| 初始状态有伸长 | `currentDeflection` 默认值是 `maxDeflection / 2` | 改为 `0` |
+
+### 🔵 调试技巧
+
+1. **检查钩弧平面**：从正面（沿 Z 轴）看，钩应该是竖着的 C / U 形
+2. **检查连接点**：放大连接处，确认没有折角
+3. **检查线圈间隙**：Δx = 0 时，线圈应该紧密贴合
+4. **检查两端对称性**：Start Hook 和 End Hook 应该对称
+
+### 🔵 实现新 Hook 类型的检查清单
+
+- [ ] 钩弧平面法向量 = `radialDir`
+- [ ] 钩弧平面基向量 = `tangentDir` + `springAxisDir`
+- [ ] 使用 `helixTangent3D`（保留 Z 分量）计算起始角度
+- [ ] 弧起点正好在 `endPos`
+- [ ] Start Hook 和 End Hook 的切线方向都是"离开弹簧体"的方向
+- [ ] 过渡段不凹进弹簧体内
+- [ ] 使用 `solidBodyLength` 计算 `extendedLength`

@@ -1,0 +1,22 @@
+{
+  "springType": "extension",
+  "geometry": {
+    "wireDiameter": 1.5,
+    "meanDiameter": 10.5,
+    "outerDiameter": 12,
+    "activeCoils": 10,
+    "totalCoils": 12,
+    "freeLength": 50,
+    "bodyLength": 25,
+    "hookType": "machine",
+    "legLength1": 25,
+    "legLength2": 25,
+    "windingDirection": "right"
+  },
+  "export": {
+    "formats": [
+      "STL"
+    ],
+    "name": "preview_5262ead5-d07c-450a-bf48-ead4930c1fbe"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "springType": "extension",
+  "geometry": {
+    "wireDiameter": 1.5,
+    "meanDiameter": 10.5,
+    "outerDiameter": 12,
+    "activeCoils": 10,
+    "totalCoils": 12,
+    "freeLength": 50,
+    "bodyLength": 25
+  },
+  "material": {
+    "id": "music_wire_a228",
+    "name": "Music Wire ASTM A228",
+    "shearModulus": 79300,
+    "elasticModulus": 206000,
+    "density": 7850
+  },
+  "analysis": {
+    "springRate": 4.334912536443149
+  },
+  "export": {
+    "formats": [
+      "SVG"
+    ],
+    "name": "drawing_758344db"
+  }
+}

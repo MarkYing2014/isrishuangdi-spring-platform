@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
 import { calculateExtensionSpring, type ExtensionSpringInput } from "@/lib/springMath";
@@ -9,6 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DimensionHint } from "./DimensionHint";
+import { 
+  EXTENSION_HOOK_TYPES, 
+  EXTENSION_HOOK_LABELS, 
+  type ExtensionHookType 
+} from "@/lib/springTypes";
+import { 
+  useSpringDesignStore,
+  type ExtensionGeometry,
+  type MaterialInfo,
+  type AnalysisResult,
+  generateDesignCode,
+} from "@/lib/stores/springDesignStore";
 
 interface FormValues {
   outerDiameter: number;
@@ -18,7 +30,7 @@ interface FormValues {
   freeLengthInsideHooks: number;
   shearModulus: number;
   initialTension: number;
-  hookType: string;
+  hookType: ExtensionHookType;
   workingDeflection: number;
 }
 
@@ -27,6 +39,9 @@ type CalculationResult = ReturnType<typeof calculateExtensionSpring> | null;
 export function ExtensionCalculator() {
   const [result, setResult] = useState<CalculationResult>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // 全局设计存储
+  const setDesign = useSpringDesignStore(state => state.setDesign);
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -74,6 +89,7 @@ export function ExtensionCalculator() {
       G: values.shearModulus.toString(),
       F0: values.initialTension.toString(),
       dxMax: values.workingDeflection.toString(),
+      hookType: values.hookType,  // 传递钩类型
     });
     return `/tools/force-tester?${params.toString()}`;
   }, [form]);
@@ -96,9 +112,76 @@ export function ExtensionCalculator() {
       dxMin: "0",
       dxMax: watchedValues.workingDeflection?.toString() ?? "10",
       material: "music_wire_a228",
+      hookType: watchedValues.hookType ?? "machine",
     });
     return `/tools/analysis?${params.toString()}`;
   }, [watchedValues]);
+
+  // 保存设计到全局 store 并导航到 CAD 页面
+  const saveAndNavigateToCad = useCallback(() => {
+    const values = form.getValues();
+    const meanDiameter = values.outerDiameter - values.wireDiameter;
+    
+    // 构建几何参数
+    const geometry: ExtensionGeometry = {
+      type: "extension",
+      wireDiameter: values.wireDiameter,
+      outerDiameter: values.outerDiameter,
+      meanDiameter,
+      activeCoils: values.activeCoils,
+      bodyLength: values.bodyLength,
+      freeLength: values.freeLengthInsideHooks,
+      hookType: values.hookType,
+      initialTension: values.initialTension,
+      shearModulus: values.shearModulus,
+      materialId: "music_wire_a228",
+    };
+    
+    // 构建材料信息
+    const material: MaterialInfo = {
+      id: "music_wire_a228",
+      name: "Music Wire ASTM A228",
+      shearModulus: values.shearModulus,
+      elasticModulus: 206000,
+      density: 7850,
+    };
+    
+    // 构建分析结果
+    const analysisResult: AnalysisResult = {
+      springRate: result?.springRate ?? 0,
+      springRateUnit: "N/mm",
+      workingLoad: result?.totalLoad,
+      maxDeflection: values.workingDeflection,
+    };
+    
+    // 保存到全局 store
+    setDesign({
+      springType: "extension",
+      geometry,
+      material,
+      analysisResult,
+      meta: {
+        designCode: generateDesignCode(geometry),
+      },
+    });
+  }, [form, result, setDesign]);
+
+  const cadExportUrl = useMemo(() => {
+    const meanDiameter = (watchedValues.outerDiameter ?? 20) - (watchedValues.wireDiameter ?? 2);
+    const params = new URLSearchParams({
+      type: "extension",
+      d: watchedValues.wireDiameter?.toString() ?? "2",
+      Dm: meanDiameter.toString(),
+      Na: watchedValues.activeCoils?.toString() ?? "10",
+      Lb: watchedValues.bodyLength?.toString() ?? "40",
+      Fi: watchedValues.initialTension?.toString() ?? "5",
+      material: "music_wire_a228",
+      hookType: watchedValues.hookType ?? "machine",
+      k: result?.springRate?.toString() ?? "",
+      dx: watchedValues.workingDeflection?.toString() ?? "10",
+    });
+    return `/tools/cad-export?${params.toString()}`;
+  }, [watchedValues, result]);
 
   const formatNumber = (value: number) => Number(value.toFixed(2)).toLocaleString();
 
@@ -222,7 +305,7 @@ export function ExtensionCalculator() {
               />
             </div>
 
-            {/* Hook Type */}
+            {/* Hook Type - uses EXTENSION_HOOK_TYPES from springTypes.ts */}
             <div className="space-y-2">
               <Label htmlFor="hookType">Hook Type / 钩型 <span className="text-slate-400">(reference)</span></Label>
               <select
@@ -230,11 +313,11 @@ export function ExtensionCalculator() {
                 className="w-full rounded-md border border-slate-200 bg-white p-2 text-sm"
                 {...form.register("hookType")}
               >
-                <option value="machine">Machine Hook / 机器钩</option>
-                <option value="crossover">Crossover Hook / 交叉钩</option>
-                <option value="side">Side Hook / 侧钩</option>
-                <option value="extended">Extended Hook / 延长钩</option>
-                <option value="double-loop">Double Loop / 双环钩</option>
+                {EXTENSION_HOOK_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {EXTENSION_HOOK_LABELS[type].en} / {EXTENSION_HOOK_LABELS[type].zh}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -309,6 +392,15 @@ export function ExtensionCalculator() {
             </Button>
             <Button asChild variant="outline" className="w-full border-blue-600 text-blue-400 hover:bg-blue-950">
               <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
+            </Button>
+            <Button 
+              asChild 
+              variant="outline" 
+              className="w-full border-purple-600 text-purple-400 hover:bg-purple-950" 
+              disabled={!result}
+              onClick={saveAndNavigateToCad}
+            >
+              <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
             </Button>
           </div>
         </CardContent>

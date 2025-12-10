@@ -91,7 +91,41 @@ export interface ConicalSpringDesign extends SpringDesignBase {
 // 拉伸弹簧设计
 // ============================================================================
 
-export type HookType = "german" | "english" | "machine" | "side" | "loop";
+/**
+ * Extension Spring Hook Types - Single Source of Truth
+ * 拉簧钩类型 - 单一真相源
+ * 
+ * 所有使用 Hook 类型的地方都应该引用这个定义：
+ * - Calculator 表单
+ * - ExtensionDesignMeta
+ * - ExtensionSpringParams
+ * - HookBuilder
+ */
+export const EXTENSION_HOOK_TYPES = [
+  "machine",    // Machine Hook - 机器钩（最常用，弯出 3/4 圈）
+  "side",       // Side Hook - 侧钩（环在侧面，最经济）
+  "crossover",  // Crossover Hook - 交叉钩（线材跨过中心）
+  "extended",   // Extended Hook - 延长钩（带延长段）
+  "doubleLoop", // Double Loop - 双环钩
+] as const;
+
+export type ExtensionHookType = (typeof EXTENSION_HOOK_TYPES)[number];
+
+/**
+ * Hook Type Labels for UI
+ * 钩类型标签（用于界面显示）
+ */
+export const EXTENSION_HOOK_LABELS: Record<ExtensionHookType, { en: string; zh: string }> = {
+  machine: { en: "Machine Hook", zh: "机器钩" },
+  side: { en: "Side Hook", zh: "侧钩" },
+  crossover: { en: "Crossover Hook", zh: "交叉钩" },
+  extended: { en: "Extended Hook", zh: "延长钩" },
+  doubleLoop: { en: "Double Loop", zh: "双环钩" },
+};
+
+// Legacy type alias for backward compatibility
+// 旧类型别名（向后兼容）
+export type HookType = ExtensionHookType;
 
 export interface ExtensionSpringDesign extends SpringDesignBase {
   type: "extension";
@@ -109,10 +143,12 @@ export interface ExtensionSpringDesign extends SpringDesignBase {
   freeLength?: number;
   /** Initial tension F0 in Newtons */
   initialTension?: number;
-  /** Hook type at end A */
-  hookTypeA?: HookType;
-  /** Hook type at end B */
-  hookTypeB?: HookType;
+  /** Hook type (unified, applies to both ends if A/B not specified) */
+  hookType?: ExtensionHookType;
+  /** Hook type at end A (overrides hookType) */
+  hookTypeA?: ExtensionHookType;
+  /** Hook type at end B (overrides hookType) */
+  hookTypeB?: ExtensionHookType;
   /** Hook length at end A in millimeters */
   hookLengthA?: number;
   /** Hook length at end B in millimeters */

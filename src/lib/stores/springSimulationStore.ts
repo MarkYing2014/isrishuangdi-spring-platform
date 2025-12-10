@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { ConicalNonlinearCurvePoint } from "@/lib/springMath";
+import type { ExtensionHookType } from "@/lib/springTypes";
 
 export interface ConicalDesignMeta {
   type: "conical";
@@ -32,6 +33,7 @@ export interface ExtensionDesignMeta {
   shearModulus: number;
   springRate: number;
   initialTension: number;
+  hookType: ExtensionHookType;
 }
 
 export interface TorsionDesignMeta {
@@ -331,9 +333,8 @@ export const useSpringSimulationStore = create<SpringSimulationState>((set, get)
     designMeta: ExtensionDesignMeta,
     maxDeflection: number
   ) => {
-    // Start at 50% of max deflection for better visualization
-    const midIndex = Math.floor(curve.length / 2);
-    const initialPoint = curve[midIndex] ?? curve[0];
+    // 拉簧初始状态：Δx = 0（线圈紧密贴合）
+    // 初始载荷 = 初张力
     set({
       mode: "extension-linear",
       springType: "extension",
@@ -341,11 +342,11 @@ export const useSpringSimulationStore = create<SpringSimulationState>((set, get)
       linearCurve: curve,
       design: designMeta,
       maxDeflection,
-      currentDeflection: initialPoint?.deflection ?? maxDeflection / 2,
+      currentDeflection: 0,  // 从 0 开始，线圈紧密贴合
       collapsedCoils: 0,
       activeCoils: designMeta.activeCoils,
       currentStiffness: designMeta.springRate,
-      currentLoad: initialPoint?.load ?? 0,
+      currentLoad: designMeta.initialTension,  // 初始载荷 = 初张力
       initialTension: designMeta.initialTension,
     });
   },

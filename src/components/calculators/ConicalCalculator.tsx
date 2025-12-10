@@ -100,6 +100,21 @@ export function ConicalCalculator() {
     return `/tools/analysis?${params.toString()}`;
   }, [watchedValues]);
 
+  const cadExportUrl = useMemo(() => {
+    const params = new URLSearchParams({
+      type: "conical",
+      d: watchedValues.wireDiameter?.toString() ?? "3",
+      D1: watchedValues.largeDiameter?.toString() ?? "30",
+      D2: watchedValues.smallDiameter?.toString() ?? "15",
+      Na: watchedValues.activeCoils?.toString() ?? "6",
+      L0: watchedValues.freeLength?.toString() ?? "50",
+      material: "music_wire_a228",
+      k: result?.k?.toString() ?? "",
+      dx: watchedValues.deflection?.toString() ?? "15",
+    });
+    return `/tools/cad-export?${params.toString()}`;
+  }, [watchedValues, result]);
+
   const onSubmitLinear: SubmitHandler<FormValues> = (values) => {
     setError(null);
     setMode("linear");
@@ -457,6 +472,9 @@ export function ConicalCalculator() {
             </Button>
             <Button asChild variant="outline" className="w-full border-blue-600 text-blue-400 hover:bg-blue-950">
               <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
+            </Button>
+            <Button asChild variant="outline" className="w-full border-purple-600 text-purple-400 hover:bg-purple-950" disabled={!result && !nonlinearResult}>
+              <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
             </Button>
           </div>
           <p className="text-center text-xs text-slate-500">

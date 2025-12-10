@@ -311,6 +311,24 @@ export function TorsionCalculator() {
     return `/tools/analysis?${params.toString()}`;
   }, [watchedValues, materialId]);
 
+  const cadExportUrl = useMemo(() => {
+    const meanDiameter = (watchedValues.outerDiameter ?? 15) - (watchedValues.wireDiameter ?? 1.5);
+    const params = new URLSearchParams({
+      type: "torsion",
+      d: (watchedValues.wireDiameter ?? 1.5).toString(),
+      Dm: meanDiameter.toString(),
+      Na: (watchedValues.activeCoils ?? 6).toString(),
+      L1: (watchedValues.armLength1 ?? 25).toString(),
+      L2: (watchedValues.armLength2 ?? 25).toString(),
+      Lb: (watchedValues.bodyLength ?? 10).toString(),
+      hand: watchedValues.handOfCoil ?? "right",
+      material: materialId,
+      k: results?.springRate?.toString() ?? "",
+      dx: (watchedValues.workingAngle ?? 45).toString(),
+    });
+    return `/tools/cad-export?${params.toString()}`;
+  }, [watchedValues, materialId, results]);
+
   return (
     <div className="grid gap-6 md:grid-cols-2">
       <Card>
@@ -544,6 +562,9 @@ export function TorsionCalculator() {
             </Button>
             <Button asChild variant="outline" className="w-full border-blue-600 text-blue-400 hover:bg-blue-950">
               <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
+            </Button>
+            <Button asChild variant="outline" className="w-full border-purple-600 text-purple-400 hover:bg-purple-950" disabled={!results}>
+              <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
             </Button>
           </div>
         </CardContent>

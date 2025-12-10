@@ -112,14 +112,10 @@ function AnimatedCompressionSpring() {
     return buildCompressionSpringGeometry(params, currentStiffness);
   }, [compressionDesign, currentDeflection, currentStiffness, scale]);
 
-  if (!springGeometry || !compressionDesign) {
-    return null;
-  }
-
-  const { tubeGeometry, clipPlanes, endDiscs, state } = springGeometry;
-
-  // Create material with clipping planes
+  // Create material with clipping planes - must be called unconditionally
   const springMaterial = useMemo(() => {
+    if (!springGeometry) return null;
+    const { clipPlanes, state } = springGeometry;
     const mat = new THREE.MeshStandardMaterial({
       color: state.isAtSolidHeight ? SPRING_COLOR_BOTTOMED : SPRING_COLOR,
       metalness: 0.85,
@@ -129,7 +125,14 @@ function AnimatedCompressionSpring() {
       clipShadows: true,
     });
     return mat;
-  }, [clipPlanes, state.isAtSolidHeight]);
+  }, [springGeometry]);
+
+  // Early return after all hooks
+  if (!springGeometry || !compressionDesign || !springMaterial) {
+    return null;
+  }
+
+  const { tubeGeometry, endDiscs } = springGeometry;
 
   return (
     <group>

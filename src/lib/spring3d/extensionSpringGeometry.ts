@@ -9,6 +9,8 @@
  */
 
 import * as THREE from "three";
+import type { ExtensionHookType } from "@/lib/springTypes";
+import { getHookSpec, buildHookCenterline } from "./HookBuilder";
 
 // ================================================================
 // PART #1 — Parameters Interface
@@ -29,8 +31,8 @@ export interface ExtensionSpringParams {
   currentExtension: number;
   /** Scale factor for 3D scene */
   scale: number;
-  /** Hook type: 'german' | 'english' | 'machine' | 'loop' */
-  hookType?: "german" | "english" | "machine" | "loop";
+  /** Hook type - uses ExtensionHookType from springTypes.ts */
+  hookType?: ExtensionHookType;
 }
 
 export interface ExtensionSpringState {
@@ -79,11 +81,13 @@ export function generateExtensionCenterline(
   
   // Scaled dimensions
   const R = (meanDiameter / 2) * scale;
-  const L0 = bodyLength * scale;
+  
+  // 拉簧在自由状态（Δx=0）时线圈紧密贴合
+  // solidBodyLength = activeCoils × wireDiameter（线圈贴紧时的长度）
+  // 拉伸后才出现节距
+  const solidBodyLength = activeCoils * wireDiameter * scale;
   const Δx = currentExtension * scale;
-
-  // Under extension, pitch increases
-  const extendedLength = L0 + Δx;
+  const extendedLength = solidBodyLength + Δx;
 
   // Sampling parameters
   const numSamples = Math.max(400, activeCoils * 50);
@@ -509,14 +513,20 @@ export function buildExtensionSpringGeometry(
     bodyLength, 
     currentExtension, 
     scale,
-    hookType = "german"
+    hookType = "machine"
   } = params;
 
   // === Calculate dimensions ===
   const meanDiameter = outerDiameter - wireDiameter;
   const meanRadius = (meanDiameter / 2) * scale;  // Helix radius
   const wireRadius = (wireDiameter / 2) * scale;
-  const extendedLength = (bodyLength + currentExtension) * scale;
+  
+  // 拉簧在自由状态（Δx=0）时线圈紧密贴合
+  // solidBodyLength = activeCoils × wireDiameter（线圈贴紧时的长度）
+  // 拉伸后才出现节距
+  const solidBodyLength = activeCoils * wireDiameter;
+  const extendedLength = (solidBodyLength + currentExtension) * scale;
+  
   const totalAngle = 2 * Math.PI * activeCoils;
 
   // Hook radius: slightly larger than helix radius to avoid interference
@@ -536,33 +546,55 @@ export function buildExtensionSpringGeometry(
 
   // === PART 2: Generate hook points (both ends) ===
   
-  // Hook angle in degrees
-  const hookAngleDeg = hookType === "loop" ? 300 : 270;
-  
   // Scaled dimensions for hooks
   const scaledWireDiameter = wireDiameter * scale;
-  const scaledOuterDiameter = outerDiameter * scale;
+  const scaledMeanRadius = meanRadius * scale;
   
-  // Right-hand winding (standard)
-  const isRightHand = true;
+  // Get hook specification based on hookType
+  const hookSpec = getHookSpec(hookType ?? "machine");
   
-  // --- Start Hook (底部钩) ---
-  const startHookPts = buildSimpleStartHookCenterline(
-    bodyHelixPts,
-    scaledOuterDiameter,
-    scaledWireDiameter,
-    hookAngleDeg,
-    isRightHand
-  );
+  // 根据 hookType 选择使用 HookBuilder 还是原有实现
+  // 目前 Side Hook 使用 HookBuilder，其他类型使用原有实现（已验证正确）
+  let startHookPts: THREE.Vector3[];
+  let endHookPts: THREE.Vector3[];
   
-  // --- End Hook (顶部钩) ---
-  const endHookPts = buildSimpleEndHookCenterline(
-    bodyHelixPts,
-    scaledOuterDiameter,
-    scaledWireDiameter,
-    hookAngleDeg,
-    isRightHand
-  );
+  if (hookType === "side" || hookType === "extended") {
+    // 使用 HookBuilder 生成 Side Hook / Extended Hook
+    startHookPts = buildHookCenterline(
+      "start",
+      hookSpec,
+      bodyHelixPts,
+      scaledMeanRadius,
+      scaledWireDiameter
+    );
+    endHookPts = buildHookCenterline(
+      "end",
+      hookSpec,
+      bodyHelixPts,
+      scaledMeanRadius,
+      scaledWireDiameter
+    );
+  } else {
+    // 使用原有实现（Machine Hook 等，已验证正确）
+    const scaledOuterDiameter = outerDiameter * scale;
+    const hookAngleDeg = hookType === "doubleLoop" ? 300 : 270;
+    const isRightHand = true;
+    
+    startHookPts = buildSimpleStartHookCenterline(
+      bodyHelixPts,
+      scaledOuterDiameter,
+      scaledWireDiameter,
+      hookAngleDeg,
+      isRightHand
+    );
+    endHookPts = buildSimpleEndHookCenterline(
+      bodyHelixPts,
+      scaledOuterDiameter,
+      scaledWireDiameter,
+      hookAngleDeg,
+      isRightHand
+    );
+  }
 
   // === PART 3: Combine into ONE continuous centerline ===
   // Order: start hook → body → end hook

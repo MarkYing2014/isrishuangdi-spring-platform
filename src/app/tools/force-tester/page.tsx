@@ -26,7 +26,7 @@ import {
   type ExtensionDesignMeta,
   type LinearCurvePoint,
 } from "@/lib/stores/springSimulationStore";
-import { SpringDesign, type CompressionSpringDesign } from "@/lib/springTypes";
+import { SpringDesign, type CompressionSpringDesign, type ExtensionHookType, EXTENSION_HOOK_LABELS } from "@/lib/springTypes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -125,6 +125,7 @@ function ForceTesterContent() {
   } : null;
 
   // Extension spring parameters from URL
+  const urlHookType = searchParams.get("hookType") as ExtensionHookType | null;
   const extensionParams = isExtension ? {
     outerDiameter: readParam("OD", 12),
     wireDiameter: readParam("d", 1.5),
@@ -134,6 +135,7 @@ function ForceTesterContent() {
     shearModulus: readParam("G", 79300),
     initialTension: readParam("F0", 3),
     maxDeflection: readParam("dxMax", 15),
+    hookType: urlHookType || "machine" as ExtensionHookType,
   } : null;
 
   const form = useForm<FormValues>({
@@ -362,6 +364,7 @@ function ForceTesterContent() {
         shearModulus: extensionParams.shearModulus,
         springRate,
         initialTension: extensionParams.initialTension,
+        hookType: extensionParams.hookType,  // 从 URL 参数读取
       };
       simStore.initializeExtension(curvePoints, designMeta, extensionParams.maxDeflection);
     } catch (err) {
@@ -763,6 +766,10 @@ function ForceTesterContent() {
                   <span className="text-muted-foreground">Max Extension:</span>
                   <span className="font-medium">{extensionParams.maxDeflection} mm</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Hook Type:</span>
+                  <span className="font-medium">{EXTENSION_HOOK_LABELS[extensionParams.hookType]?.en || extensionParams.hookType}</span>
+                </div>
                 <div className="flex justify-between border-t pt-2 mt-2">
                   <span className="text-muted-foreground font-medium">Spring Rate k:</span>
                   <span className="font-bold text-green-600">{formatNumber(simStore.currentStiffness)} N/mm</span>
@@ -1120,218 +1127,51 @@ function ForceTesterContent() {
     );
   }
 
-  // Default fallback render (for manual input form)
+  // Default fallback render - prompt user to go to calculator first
   return (
     <section className="space-y-6">
       <div className="space-y-3">
         <p className="text-sm uppercase tracking-[0.3em] text-primary/70">Module • Spring Force Tester</p>
         <h1 className="text-3xl font-semibold tracking-tight">Spring Force Tester</h1>
         <p className="text-muted-foreground">
-          Generate a quick force–deflection table. 生成力-位移数据表。
+          Force–deflection curve visualization. 力-位移曲线可视化。
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
-        {/* Left Panel - Manual Input Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Input Parameters / 输入参数</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-              {/* Geometry Parameters */}
-              <div className="space-y-3 pb-3 border-b">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Geometry / 几何参数</p>
-                {(
-                  [
-                    { name: "wireDiameter" as const, label: "Wire Diameter d (mm) / 线径", step: "0.1" },
-                    { name: "meanDiameter" as const, label: "Mean Diameter Dm (mm) / 中径", step: "0.1" },
-                    { name: "activeCoils" as const, label: "Active Coils Na / 有效圈数", step: "1" },
-                  ] as const
-                ).map((field) => (
-                  <div key={field.name} className="space-y-1">
-                    <Label htmlFor={field.name} className="text-xs">{field.label}</Label>
-                    <Input
-                      id={field.name}
-                      type="number"
-                      step={field.step}
-                      className="h-8"
-                      {...form.register(field.name, { valueAsNumber: true })}
-                    />
-                    {form.formState.errors[field.name] && (
-                      <p className="text-xs text-red-500">{form.formState.errors[field.name]?.message}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Material Parameters */}
-              <div className="space-y-3 pb-3 border-b">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Material / 材料</p>
-                <div className="space-y-1">
-                  <Label htmlFor="shearModulus" className="text-xs">Shear Modulus G (MPa) / 剪切模量</Label>
-                  <Input
-                    id="shearModulus"
-                    type="number"
-                    step="100"
-                    className="h-8"
-                    {...form.register("shearModulus", { valueAsNumber: true })}
-                  />
-                  {form.formState.errors.shearModulus && (
-                    <p className="text-xs text-red-500">{form.formState.errors.shearModulus?.message}</p>
-                  )}
-                  <p className="text-[10px] text-muted-foreground">
-                    常用值: 碳钢 79300, 不锈钢 69000, 磷青铜 44000
-                  </p>
-                </div>
-              </div>
-
-              {/* Working Conditions */}
-              <div className="space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Working Conditions / 工作条件</p>
-                {(
-                  [
-                    { name: "freeLength" as const, label: "Free Length L₀ (mm) / 自由高度", step: "0.1" },
-                    { name: "maxDeflection" as const, label: "Max Deflection Δxₘₐₓ (mm) / 最大压缩量", step: "0.1" },
-                    { name: "step" as const, label: "Step (mm) / 步长", step: "0.1" },
-                  ] as const
-                ).map((field) => (
-                  <div key={field.name} className="space-y-1">
-                    <Label htmlFor={field.name} className="text-xs">{field.label}</Label>
-                    <Input
-                      id={field.name}
-                      type="number"
-                      step={field.step}
-                      className="h-8"
-                      {...form.register(field.name, { valueAsNumber: true })}
-                    />
-                    {form.formState.errors[field.name] && (
-                      <p className="text-xs text-red-500">{form.formState.errors[field.name]?.message}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {error && <p className="text-sm text-red-500">{error}</p>}
-
-              <Button type="submit" className="w-full">
-                Generate Curve / 生成曲线
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          {/* Manual Visualization */}
-          {manualVisualizationEnabled && simStore.springType === "compression" && rows.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Box className="h-5 w-5" />
-                  3D Visualization / 3D 可视化
-                </CardTitle>
-                <CardDescription>
-                  Drag the slider to animate the spring compression.
-                  <br />
-                  <span className="text-slate-400">拖动滑块查看弹簧压缩动画。</span>
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {manualDeflectionNotice && (
-                  <div className="rounded-md border border-amber-400/60 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    {manualDeflectionNotice}
-                  </div>
-                )}
-
-                {/* Animation Controls */}
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant={isAnimating ? "secondary" : "default"}
-                    size="sm"
-                    onClick={toggleAnimation}
-                    className="flex items-center gap-2"
-                  >
-                    {isAnimating ? (
-                      <>
-                        <Pause className="h-4 w-4" />
-                        <span>暂停 / Pause</span>
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-4 w-4" />
-                        <span>播放 / Play</span>
-                      </>
-                    )}
-                  </Button>
-                  <span className="text-xs text-muted-foreground">
-                    {isAnimating ? "自动演示中... 拖动滑块可暂停" : "点击播放或拖动滑块手动控制"}
-                  </span>
-                </div>
-
-                <SpringDeflectionSlider
-                  min={0}
-                  max={manualMaxDeflection}
-                  value={simStore.currentDeflection}
-                  onChange={handleManualSliderChange}
-                  labelEn="Visualization Deflection Δx (mm)"
-                  labelZh="可视化压缩量 Δx (mm)"
-                />
-
-                <div className="grid gap-4 lg:grid-cols-[240px,1fr]">
-                  <CurrentPointCard
-                    deflection={simStore.currentDeflection}
-                    force={simStore.currentLoad}
-                    springRate={simStore.currentStiffness}
-                    springType="compression"
-                  />
-                  <div className="h-72 w-full rounded-lg overflow-hidden border bg-slate-50">
-                    <CompressionSpringVisualizer />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Right Panel - Chart and Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Force – Deflection Curve / 力-位移曲线</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="h-64 w-full">
-                <InteractiveForceChart
-                  data={rows}
-                  currentDeflection={manualVisualizationEnabled ? simStore.currentDeflection : 0}
-                  onDeflectionChange={manualVisualizationEnabled ? handleLinearSliderChange : undefined}
-                  xAxisLabel="Deflection (mm)"
-                  yAxisLabel="Force (N)"
-                  lineColor="#3b82f6"
-                  markerColor="#ef4444"
-                  showMarker={manualVisualizationEnabled && rows.length > 0}
-                />
-              </div>
-
-              {rows.length > 0 ? (
-                <SpringForceTable
-                  data={rows}
-                  currentDeflection={manualVisualizationEnabled ? simStore.currentDeflection : 0}
-                  onRowClick={manualVisualizationEnabled ? handleLinearSliderChange : undefined}
-                />
-              ) : (
-                <p className="text-sm text-slate-500">
-                  Fill in the form and generate a curve to inspect force levels.
-                  <br />
-                  <span className="text-xs text-slate-400">填写表单并生成曲线以查看力值。</span>
-                </p>
-              )}
-
-              <Button asChild variant="secondary" className="w-full" disabled={rows.length === 0}>
-                <a href={cadExportUrl}>Send to CAD Export / 发送到CAD导出</a>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <Card className="max-w-xl">
+        <CardHeader>
+          <CardTitle>No Spring Data / 无弹簧数据</CardTitle>
+          <CardDescription>
+            Please start from the Calculator page to define spring parameters.
+            <br />
+            <span className="text-slate-500">请先从计算器页面定义弹簧参数。</span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            This page displays force–deflection curves and 3D visualization for springs. 
+            Spring parameters must be defined in the Calculator first, then sent here for analysis.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            本页面显示弹簧的力-位移曲线和3D可视化。弹簧参数必须先在计算器中定义，然后发送到此处进行分析。
+          </p>
+          
+          <div className="grid grid-cols-2 gap-3 pt-4">
+            <Button asChild variant="default">
+              <a href="/tools/calculator?tab=compression">Compression / 压缩弹簧</a>
+            </Button>
+            <Button asChild variant="default">
+              <a href="/tools/calculator?tab=extension">Extension / 拉伸弹簧</a>
+            </Button>
+            <Button asChild variant="outline">
+              <a href="/tools/calculator?tab=conical">Conical / 锥形弹簧</a>
+            </Button>
+            <Button asChild variant="outline">
+              <a href="/tools/calculator?tab=torsion">Torsion / 扭转弹簧</a>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </section>
   );
 }

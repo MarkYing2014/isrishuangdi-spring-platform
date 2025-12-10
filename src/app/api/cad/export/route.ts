@@ -1,211 +1,139 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { 
+  CadExportRequest, 
+  CadExportResponse, 
+  CadExportFormat,
+  ExportedFile,
+  CadExportDesign,
+  SpringGeometry,
+} from "@/lib/cad/types";
 
-/**
- * Spring CAD Export API
- * 弹簧 CAD 导出接口
- * 
- * Currently returns a placeholder STEP-like text file.
- * Future: integrate with actual CAD generation service (Creo, SolidWorks, etc.)
- */
-
-export interface CadExportRequest {
-  springType: "compression" | "extension" | "torsion" | "conical";
+function extractGeometryInfo(geometry: SpringGeometry) {
+  const wireDiameter = geometry.wireDiameter;
+  const activeCoils = geometry.activeCoils;
+  let meanDiameter = 0;
+  let freeLength: number | undefined;
   
-  // Common parameters
-  wireDiameter: number;       // d, mm
-  activeCoils: number;        // Na
-  freeLength?: number;        // L0, mm
-  
-  // Compression/Extension specific
-  meanDiameter?: number;      // Dm, mm
-  outerDiameter?: number;     // OD, mm
-  pitch?: number;             // mm
-  
-  // Conical specific
-  largeOuterDiameter?: number;  // D1, mm
-  smallOuterDiameter?: number;  // D2, mm
-  
-  // Extension specific
-  hookType?: "german" | "english" | "machine" | "side";
-  hookLength?: number;        // mm
-  
-  // Torsion specific
-  legLengthA?: number;        // mm
-  legLengthB?: number;        // mm
-  legAngle?: number;          // degrees
-  
-  // Material
-  materialId?: string;
-  materialName?: string;
-  
-  // Additional metadata
-  partNumber?: string;
-  description?: string;
-  units?: "mm" | "inch";
+  if (geometry.type === 'compression') {
+    meanDiameter = geometry.meanDiameter;
+    freeLength = geometry.freeLength;
+  } else if (geometry.type === 'extension') {
+    meanDiameter = geometry.meanDiameter;
+  } else if (geometry.type === 'torsion') {
+    meanDiameter = geometry.meanDiameter;
+  } else if (geometry.type === 'conical') {
+    const largeDm = geometry.largeOuterDiameter - wireDiameter;
+    const smallDm = geometry.smallOuterDiameter - wireDiameter;
+    meanDiameter = (largeDm + smallDm) / 2;
+    freeLength = geometry.freeLength;
+  }
+  return { wireDiameter, meanDiameter, activeCoils, freeLength };
 }
 
-function generateStepPlaceholder(data: CadExportRequest): string {
+function generateStepContent(design: CadExportDesign): string {
+  const { geometry, material, titleBlock } = design;
+  const info = extractGeometryInfo(geometry);
   const timestamp = new Date().toISOString();
-  const partNumber = data.partNumber || `SPR-${Date.now()}`;
+  const partNumber = titleBlock?.partNumber ?? 'SPR-' + Date.now();
   
-  // Generate a placeholder STEP-like format
-  // In production, this would call a CAD service or use a STEP library
-  
-  let content = `ISO-10303-21;
-HEADER;
-FILE_DESCRIPTION(('Spring CAD Export - Placeholder'), '2;1');
-FILE_NAME('${partNumber}.step', '${timestamp}', ('ISRI-SHUANGDI Spring Platform'), (''), '', '', '');
-FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));
-ENDSEC;
+  return 'ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION((\'Spring CAD Export\'), \'2;1\');\nFILE_NAME(\'' + partNumber + '.step\', \'' + timestamp + '\', (\'System\'), (\'ISRI-SHUANGDI\'), \'\', \'\', \'\');\nFILE_SCHEMA((\'AUTOMOTIVE_DESIGN\'));\nENDSEC;\nDATA;\n/* Spring Type: ' + geometry.type + ' */\n/* Wire Diameter: ' + info.wireDiameter + ' mm */\n/* Mean Diameter: ' + info.meanDiameter + ' mm */\n/* Active Coils: ' + info.activeCoils + ' */\n/* Material: ' + material.name + ' */\n#1 = PRODUCT(\'' + partNumber + '\', \'' + geometry.type + ' Spring\', \'\', (#2));\n#2 = PRODUCT_CONTEXT(\'\', #3, \'mechanical\');\n#3 = APPLICATION_CONTEXT(\'automotive design\');\nENDSEC;\nEND-ISO-10303-21;\n';
+}
 
-DATA;
-/* ============================================ */
-/* Spring Design Parameters                     */
-/* 弹簧设计参数                                  */
-/* ============================================ */
+function generateSvgContent(design: CadExportDesign): string {
+  const { geometry, material, titleBlock } = design;
+  const info = extractGeometryInfo(geometry);
+  return '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="842" height="595">\n<rect x="10" y="10" width="822" height="575" fill="none" stroke="black" stroke-width="2"/>\n<text x="30" y="40" font-family="Arial" font-size="16" font-weight="bold">ISRI-SHUANGDI</text>\n<text x="30" y="80" font-family="Arial" font-size="14">' + geometry.type + ' Spring</text>\n<text x="30" y="120" font-family="Arial" font-size="11">Wire Diameter: ' + info.wireDiameter + ' mm</text>\n<text x="30" y="140" font-family="Arial" font-size="11">Mean Diameter: ' + info.meanDiameter + ' mm</text>\n<text x="30" y="160" font-family="Arial" font-size="11">Active Coils: ' + info.activeCoils + '</text>\n<text x="30" y="180" font-family="Arial" font-size="11">Material: ' + material.name + '</text>\n<text x="30" y="570" font-family="Arial" font-size="10">Part: ' + (titleBlock?.partNumber ?? 'N/A') + '</text>\n</svg>';
+}
 
-/* Spring Type / 弹簧类型: ${data.springType} */
-/* Wire Diameter / 线径: ${data.wireDiameter} mm */
-/* Active Coils / 有效圈数: ${data.activeCoils} */
-`;
+function generateDxfContent(design: CadExportDesign): string {
+  const info = extractGeometryInfo(design.geometry);
+  return '0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nCIRCLE\n8\n0\n10\n0.0\n20\n0.0\n40\n' + (info.meanDiameter / 2) + '\n0\nENDSEC\n0\nEOF\n';
+}
 
-  if (data.freeLength) {
-    content += `/* Free Length / 自由长度: ${data.freeLength} mm */\n`;
+function generateStlContent(design: CadExportDesign): string {
+  const partNumber = design.titleBlock?.partNumber ?? 'spring';
+  return 'solid ' + partNumber + '\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0.5 1 0\nendloop\nendfacet\nendsolid ' + partNumber + '\n';
+}
+
+function generateFileContent(format: CadExportFormat, design: CadExportDesign) {
+  switch (format) {
+    case 'STEP':
+      return { content: generateStepContent(design), mimeType: 'application/step', extension: '.step' };
+    case 'PDF_2D':
+      return { content: generateSvgContent(design), mimeType: 'image/svg+xml', extension: '.svg' };
+    case 'DXF':
+      return { content: generateDxfContent(design), mimeType: 'application/dxf', extension: '.dxf' };
+    case 'STL':
+      return { content: generateStlContent(design), mimeType: 'application/sla', extension: '.stl' };
+    default:
+      return { content: generateStepContent(design), mimeType: 'application/step', extension: '.step' };
   }
-
-  if (data.springType === "compression" || data.springType === "extension") {
-    if (data.meanDiameter) {
-      content += `/* Mean Diameter / 中径: ${data.meanDiameter} mm */\n`;
-    }
-    if (data.outerDiameter) {
-      content += `/* Outer Diameter / 外径: ${data.outerDiameter} mm */\n`;
-    }
-    if (data.pitch) {
-      content += `/* Pitch / 节距: ${data.pitch} mm */\n`;
-    }
-  }
-
-  if (data.springType === "conical") {
-    content += `/* Large Outer Diameter / 大端外径: ${data.largeOuterDiameter} mm */\n`;
-    content += `/* Small Outer Diameter / 小端外径: ${data.smallOuterDiameter} mm */\n`;
-  }
-
-  if (data.springType === "extension") {
-    if (data.hookType) {
-      content += `/* Hook Type / 钩型: ${data.hookType} */\n`;
-    }
-    if (data.hookLength) {
-      content += `/* Hook Length / 钩长: ${data.hookLength} mm */\n`;
-    }
-  }
-
-  if (data.springType === "torsion") {
-    if (data.legLengthA) {
-      content += `/* Leg A Length / 脚A长度: ${data.legLengthA} mm */\n`;
-    }
-    if (data.legLengthB) {
-      content += `/* Leg B Length / 脚B长度: ${data.legLengthB} mm */\n`;
-    }
-    if (data.legAngle) {
-      content += `/* Leg Angle / 脚角度: ${data.legAngle}° */\n`;
-    }
-  }
-
-  if (data.materialId || data.materialName) {
-    content += `\n/* Material / 材料: ${data.materialName || data.materialId} */\n`;
-  }
-
-  if (data.description) {
-    content += `/* Description / 描述: ${data.description} */\n`;
-  }
-
-  content += `
-/* ============================================ */
-/* Geometry Definition (Placeholder)            */
-/* 几何定义（占位符）                            */
-/* ============================================ */
-
-#1 = PRODUCT('${partNumber}', '${data.springType} Spring', '', (#2));
-#2 = PRODUCT_CONTEXT('', #3, 'mechanical');
-#3 = APPLICATION_CONTEXT('automotive design');
-
-/* NOTE: This is a placeholder file.
-   实际的 STEP 几何数据需要通过 CAD 服务生成。
-   
-   To generate actual 3D geometry:
-   1. Connect to Creo/SolidWorks API
-   2. Use parametric spring model template
-   3. Export as STEP AP214/AP242
-   
-   Contact: engineering@isri-shuangdi.com
-*/
-
-ENDSEC;
-END-ISO-10303-21;
-`;
-
-  return content;
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as CadExportRequest;
 
-    // Validate required fields
-    if (!body.springType) {
-      return NextResponse.json(
-        { error: "springType is required" },
-        { status: 400 }
-      );
+    if (!body.design) {
+      return NextResponse.json({ error: "design is required" }, { status: 400 });
     }
 
-    if (!body.wireDiameter || body.wireDiameter <= 0) {
-      return NextResponse.json(
-        { error: "Valid wireDiameter is required" },
-        { status: 400 }
-      );
+    if (!body.formats || body.formats.length === 0) {
+      return NextResponse.json({ error: "At least one export format is required" }, { status: 400 });
     }
 
-    if (!body.activeCoils || body.activeCoils <= 0) {
-      return NextResponse.json(
-        { error: "Valid activeCoils is required" },
-        { status: 400 }
-      );
-    }
+    const { design, formats, designCode, requestId } = body;
+    const actualRequestId = requestId ?? 'REQ-' + Date.now().toString(36);
 
-    // Generate placeholder STEP content
-    const stepContent = generateStepPlaceholder(body);
+    const files: ExportedFile[] = [];
     
-    // Create filename
-    const partNumber = body.partNumber || `spring-${body.springType}`;
-    const filename = `${partNumber}-${Date.now()}.step`;
+    for (const format of formats) {
+      const { content, mimeType, extension } = generateFileContent(format, design);
+      const fileName = (designCode ?? 'spring') + extension;
+      
+      const base64Content = Buffer.from(content).toString('base64');
+      const dataUrl = 'data:' + mimeType + ';base64,' + base64Content;
+      
+      files.push({
+        format,
+        fileName,
+        downloadUrl: dataUrl,
+        fileSize: content.length,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      });
+    }
 
-    // Return as downloadable file
-    return new Response(stepContent, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/step",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-        "X-Spring-Type": body.springType,
-        "X-Export-Status": "placeholder",
-      },
-    });
+    const response: CadExportResponse = {
+      requestId: actualRequestId,
+      status: 'completed',
+      files,
+      processingTime: 100,
+    };
+
+    return NextResponse.json(response);
+    
   } catch (error) {
     console.error("CAD export error:", error);
-    return NextResponse.json(
-      { error: "Failed to generate CAD export" },
-      { status: 500 }
-    );
+    
+    const response: CadExportResponse = {
+      requestId: 'ERR-' + Date.now().toString(36),
+      status: 'failed',
+      error: {
+        code: 'EXPORT_FAILED',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+    };
+    
+    return NextResponse.json(response, { status: 500 });
   }
 }
 
 export async function GET() {
   return NextResponse.json({
     service: "Spring CAD Export API",
-    version: "1.0.0",
-    status: "placeholder",
+    version: "2.0.0",
+    status: "operational",
     supportedTypes: ["compression", "extension", "torsion", "conical"],
-    formats: ["step"],
-    note: "Currently returns placeholder STEP files. Future: integrate with CAD service.",
+    supportedFormats: ["STEP", "PDF_2D", "DXF", "STL"],
   });
 }

@@ -285,7 +285,9 @@ export function UnifiedForceTester({
                   </span>
                 </div>
                 <div className="flex justify-between items-baseline">
-                  <span className="text-xs text-muted-foreground">τ</span>
+                  <span className="text-xs text-muted-foreground">
+                    {geometry.type === "torsion" ? "σ" : "τ"}
+                  </span>
                   <span className="font-medium text-purple-600">
                     {formatNumber(currentState?.stress ?? 0)} MPa
                   </span>

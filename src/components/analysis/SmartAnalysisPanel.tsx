@@ -251,7 +251,12 @@ export function SmartAnalysisPanel({
                         <tbody>
                           {stressDistribution.hotSpots.slice(0, 5).map((spot, i) => (
                             <tr key={i} className="border-b border-slate-100">
-                              <td className="py-1">θ = {(spot.theta * 180 / Math.PI).toFixed(0)}°</td>
+                              <td className="py-1">
+                                {geometry.type === "torsion" 
+                                  ? `θ = ${(spot.theta * 180 / Math.PI).toFixed(0)}°`
+                                  : `${isZh ? "圈" : "Coil"} ${spot.coilNumber.toFixed(1)}`
+                                }
+                              </td>
                               <td className="py-1 text-right">{spot.coilNumber.toFixed(1)}</td>
                               <td className="py-1 text-right text-red-600">{spot.stress.toFixed(0)} MPa</td>
                             </tr>

@@ -7,7 +7,7 @@ interface CurrentPointCardProps {
   deflection: number;
   force: number;
   springRate: number;
-  springType: "compression" | "extension" | "conical";
+  springType: "compression" | "extension" | "conical" | "torsion";
   /** For extension springs: initial tension */
   initialTension?: number;
   /** For conical springs: active coils */
@@ -33,12 +33,25 @@ export function CurrentPointCard({
     switch (springType) {
       case "extension":
         return isZh ? "伸长量 Δx" : "Extension Δx";
+      case "torsion":
+        return isZh ? "扭转角 θ" : "Rotation θ";
       case "compression":
       case "conical":
       default:
         return isZh ? "压缩量 Δx" : "Deflection Δx";
     }
   };
+
+  const getForceLabel = () => {
+    if (springType === "torsion") {
+      return isZh ? "扭矩 M" : "Torque M";
+    }
+    return isZh ? "载荷 F" : "Force F";
+  };
+
+  const getDeflectionUnit = () => springType === "torsion" ? "°" : "mm";
+  const getForceUnit = () => springType === "torsion" ? "N·mm" : "N";
+  const getRateUnit = () => springType === "torsion" ? "N·mm/°" : "N/mm";
 
   return (
     <Card className="bg-slate-50">
@@ -49,15 +62,15 @@ export function CurrentPointCard({
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <div>
             <p className="text-xs text-muted-foreground">{getDeflectionLabel()}</p>
-            <p className="font-semibold text-blue-600">{formatNumber(deflection)} mm</p>
+            <p className="font-semibold text-blue-600">{formatNumber(deflection)} {getDeflectionUnit()}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">{isZh ? "载荷 F" : "Force F"}</p>
-            <p className="font-semibold text-green-600">{formatNumber(force)} N</p>
+            <p className="text-xs text-muted-foreground">{getForceLabel()}</p>
+            <p className="font-semibold text-green-600">{formatNumber(force)} {getForceUnit()}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">{isZh ? "刚度 k" : "Spring Rate k"}</p>
-            <p className="font-semibold">{formatNumber(springRate)} N/mm</p>
+            <p className="font-semibold">{formatNumber(springRate)} {getRateUnit()}</p>
           </div>
 
           {/* Extension spring: show initial tension */}
