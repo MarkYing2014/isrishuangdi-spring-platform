@@ -1,11 +1,26 @@
 # 数据一致性待办事项
 
 > 创建日期：2025-12-07
-> 状态：✅ 已完成（2025-12-07）
+> 状态：✅ 已完成（2025-12-10 更新）
 
 ## 问题概述
 
 计算页面的数据需要正确传递到力–位移测试页面和工程分析页面，确保数据一致性。
+
+---
+
+## 2025-12-10 更新：全局 Store 统一
+
+### 问题：TorsionCalculator 和 ConicalCalculator 未调用 setDesign
+
+**已修复**：所有四个计算器现在都调用 `setDesign` 保存设计到全局 store。
+
+| 计算器 | setDesign 调用 | 状态 |
+|--------|----------------|------|
+| CompressionCalculator | ✅ onSubmit 中调用 | 已有 |
+| ExtensionCalculator | ✅ saveAndNavigateToCad 中调用 | 已有 |
+| TorsionCalculator | ✅ onSubmit 中调用 | **新增** |
+| ConicalCalculator | ✅ onSubmitLinear 中调用 | **新增** |
 
 ---
 

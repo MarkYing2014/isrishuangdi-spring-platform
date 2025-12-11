@@ -100,8 +100,16 @@ interface PreviewRequest {
     legLength1?: number;
     legLength2?: number;
     windingDirection?: "left" | "right";
+    // Torsion specific
+    freeAngle?: number;        // 两腿自由夹角（度）
+    workingAngle?: number;     // 工作扭转角（度）
+    // Conical specific
     largeOuterDiameter?: number;
     smallOuterDiameter?: number;
+    endType?: "natural" | "closed" | "closed_ground";  // 端面类型
+    // Compression specific
+    topGround?: boolean;
+    bottomGround?: boolean;
   };
 }
 
@@ -190,9 +198,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }, { status: 500 });
     }
     
-    console.log(`[FreeCAD Preview] stdout: ${stdout}`);
+    console.log(`[FreeCAD Preview] stdout:\n${stdout}`);
     if (stderr) {
-      console.error(`[FreeCAD Preview] stderr: ${stderr}`);
+      console.error(`[FreeCAD Preview] stderr:\n${stderr}`);
+    }
+    
+    // 检查是否执行了端面磨平
+    if (stdout.includes("should_grind=True")) {
+      console.log(`[FreeCAD Preview] Ground ends should be applied`);
+    }
+    if (stdout.includes("Conical spring ground ends:")) {
+      console.log(`[FreeCAD Preview] Ground ends were applied successfully`);
     }
     
     // 解析结果

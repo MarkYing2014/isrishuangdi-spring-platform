@@ -8,6 +8,8 @@ export interface ConicalSpringGeometryParams {
   smallRadius: number;      // Small end mean radius (top)
   freeLength: number;       // Free length L0 (scene height)
   activeCoils: number;      // Number of active coils Na
+  totalCoils?: number;      // Total coils Nt (default: Na + 2 for dead coils)
+  wireDiameter?: number;    // Wire diameter d (for dead coil pitch)
   samples?: number;         // Number of sample points, default 200
   currentDeflection?: number; // Current compression amount
   collapsedCoils?: number;  // Number of collapsed coils (for reference)
@@ -26,6 +28,12 @@ export interface ConicalHelixResult {
 /**
  * Generates points for a conical helix spring from bottom (large end) to top (small end).
  * 
+ * Algorithm (simplified, consistent with FreeCAD):
+ * - Conical springs typically have all active coils, no dead coil segmentation
+ * - All coils use uniform pitch: pitch = L0 / totalCoils
+ * - Radius interpolates linearly along z (large end → small end)
+ * - This avoids pitch discontinuity at dead/active coil boundaries for smoother last coil
+ * 
  * The helix is parameterized by t ∈ [0, 1]:
  * - t = 0: bottom (large radius)
  * - t = 1: top (small radius)
@@ -41,23 +49,28 @@ export function generateConicalHelixPoints(
     smallRadius,
     freeLength,
     activeCoils,
-    samples = 200,
+    totalCoils = activeCoils,  // Default: no dead coils for conical springs
+    samples = 400,
   } = params;
+
+  const L0 = freeLength;
+  const Nt = totalCoils;
+
+  // Uniform pitch (no dead coil segmentation)
+  const pitch = Nt > 0 ? L0 / Nt : L0;
 
   const points: THREE.Vector3[] = [];
 
-  // t in [0, 1], from bottom to top
   for (let i = 0; i <= samples; i++) {
     const t = i / samples;
+    const theta = 2 * Math.PI * Nt * t;
+    const n = Nt * t;  // Current coil number (0 to Nt)
+    const y = n * pitch;  // Uniform pitch, linear distribution
 
-    // Height varies linearly from 0 to freeLength
-    const y = t * freeLength;
-
-    // Radius varies linearly from largeRadius (bottom) to smallRadius (top)
-    const r = largeRadius + (smallRadius - largeRadius) * t;
-
-    // Total rotation angle: 2π * activeCoils
-    const theta = 2 * Math.PI * activeCoils * t;
+    // Axial progress 0~1 for radius interpolation
+    const u = L0 > 1e-6 ? y / L0 : 0;
+    // Radius linear interpolation: bottom large → top small
+    const r = largeRadius + (smallRadius - largeRadius) * u;
 
     const x = r * Math.cos(theta);
     const z = r * Math.sin(theta);

@@ -1,34 +1,16 @@
 "use client";
 
-import { useState, useMemo, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useMemo, useEffect, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useLanguage } from "@/components/language-context";
 import { UnifiedForceTester } from "@/components/force-tester";
 import { AdvancedAnalysisPanel } from "@/components/analysis/AdvancedAnalysisPanel";
 import { SmartAnalysisPanel } from "@/components/analysis/SmartAnalysisPanel";
 import { AdvancedSimulationPanel } from "@/components/analysis/AdvancedSimulationPanel";
 import { getMaterialOptions, type SpringMaterialId } from "@/lib/materials/springMaterials";
-import type {
-  SpringGeometry,
-  CompressionSpringGeometry,
-  ExtensionSpringGeometry,
-  TorsionSpringGeometry,
-  ConicalSpringGeometry,
-  WorkingConditions,
-} from "@/lib/engine/types";
+import type { SpringGeometry as EngineSpringGeometry, WorkingConditions } from "@/lib/engine/types";
 import {
   createReportData,
   printReport,
@@ -37,7 +19,14 @@ import {
 import { SpringAnalysisEngine } from "@/lib/engine/SpringAnalysisEngine";
 import { useSpringSimulationStore } from "@/lib/stores/springSimulationStore";
 import { useSpringAnalysisStore } from "@/lib/stores/springAnalysisStore";
-import { EXTENSION_HOOK_LABELS } from "@/lib/springTypes";
+import {
+  useSpringDesignStore,
+  type SpringGeometry as StoreSpringGeometry,
+  type MaterialInfo,
+  type AnalysisResult,
+} from "@/lib/stores/springDesignStore";
+import { convertStoreGeometryToEngine } from "@/lib/engine/geometryAdapters";
+import { EXTENSION_HOOK_LABELS, type ExtensionHookType, type SpringType } from "@/lib/springTypes";
 import Link from "next/link";
 import { Brain } from "lucide-react";
 
@@ -62,8 +51,6 @@ const TorsionSpringVisualizer = dynamic(
   { ssr: false, loading: () => <div className="h-full w-full flex items-center justify-center bg-slate-900 text-slate-400 text-sm">Loading 3D...</div> }
 );
 
-type SpringType = "compression" | "extension" | "torsion" | "conical";
-
 export default function SpringAnalysisPage() {
   return (
     <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading...</div>}>
@@ -76,148 +63,183 @@ function AnalysisContent() {
   const { language } = useLanguage();
   const isZh = language === "zh";
   const materialOptions = getMaterialOptions();
-  const searchParams = useSearchParams();
+  const designGeometry = useSpringDesignStore(state => state.geometry);
+  const designMaterial = useSpringDesignStore(state => state.material);
+  const designAnalysis = useSpringDesignStore(state => state.analysisResult);
 
-  // Helper to read URL params
-  const readParam = (key: string, fallback: number) => {
-    const raw = searchParams.get(key);
-    const parsed = raw ? Number(raw) : NaN;
-    return Number.isFinite(parsed) ? parsed : fallback;
-  };
+  if (!designGeometry || !designMaterial || !designAnalysis) {
+    return (
+      <main className="container mx-auto py-8 px-4">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold mb-2">
+            {isZh ? "弹簧工程分析" : "Spring Engineering Analysis"}
+          </h1>
+          <p className="text-muted-foreground">
+            {isZh
+              ? "请先在计算器中完成设计并保存到全局 store，再返回此处进行工程分析。"
+              : "Please finish your design in the Calculator (which saves into the global store) before running engineering analysis here."}
+          </p>
+        </div>
 
-  // Read spring type from URL
-  const urlSpringType = searchParams.get("type") as SpringType | null;
-  const urlMaterial = searchParams.get("material") as SpringMaterialId | null;
-  
-  // Check if we have URL parameters (data from calculator)
-  const hasUrlParams = urlSpringType !== null;
+        <Card className="max-w-xl">
+          <CardHeader>
+            <CardTitle>{isZh ? "未检测到设计数据" : "No Design Detected"}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <p>
+              {isZh
+                ? "当前没有有效的弹簧设计记录。请先在“弹簧计算器”输入参数并点击计算，系统会把结果保存到全局 store。"
+                : "No valid spring design is stored. Open the Calculator, enter your parameters and calculate—the system will save everything into the global store."}
+            </p>
+            <Button asChild variant="default">
+              <a href="/tools/calculator">{isZh ? "前往弹簧计算器" : "Go to Calculator"}</a>
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
 
-  // Spring type selection
-  const [springType, setSpringType] = useState<SpringType>(urlSpringType || "compression");
-  const [materialId, setMaterialId] = useState<SpringMaterialId>(urlMaterial || "music_wire_a228");
+  return (
+    <AnalysisReady
+      isZh={isZh}
+      materialOptions={materialOptions}
+      designGeometry={designGeometry}
+      designMaterial={designMaterial}
+      designAnalysis={designAnalysis}
+    />
+  );
+}
 
-  // Common parameters - read from URL if available
-  const [wireDiameter, setWireDiameter] = useState(readParam("d", 3.2));
-  const [activeCoils, setActiveCoils] = useState(readParam("Na", 8));
+interface AnalysisReadyProps {
+  isZh: boolean;
+  materialOptions: ReturnType<typeof getMaterialOptions>;
+  designGeometry: StoreSpringGeometry;
+  designMaterial: MaterialInfo;
+  designAnalysis: AnalysisResult;
+}
 
-  // Compression spring parameters
-  const [meanDiameter, setMeanDiameter] = useState(readParam("Dm", 24));
-  const [freeLength, setFreeLength] = useState(readParam("L0", 60));
+function AnalysisReady({
+  isZh,
+  materialOptions,
+  designGeometry,
+  designMaterial,
+  designAnalysis,
+}: AnalysisReadyProps) {
+  const springType = designGeometry.type;
+  const materialId = designMaterial.id;
+  const wireDiameter = designGeometry.wireDiameter;
+  const activeCoils = designGeometry.activeCoils;
+  const shearModulus = designGeometry.shearModulus ?? designMaterial.shearModulus;
+  const elasticModulus = designMaterial.elasticModulus ?? shearModulus * 2.5;
 
-  // Extension spring parameters
-  const [bodyLength, setBodyLength] = useState(readParam("Lb", 40));
-  const [initialTension, setInitialTension] = useState(readParam("Fi", 5));
-  
-  // Read hookType from URL (for extension springs)
-  const urlHookType = searchParams.get("hookType") as import("@/lib/springTypes").ExtensionHookType | null;
-  const [hookType, setHookType] = useState<import("@/lib/springTypes").ExtensionHookType>(urlHookType || "machine");
+  let meanDiameter: number | undefined;
+  let freeLength: number | undefined;
+  let bodyLength: number | undefined;
+  let initialTension: number | undefined;
+  let hookType: ExtensionHookType | undefined;
+  let outerDiameter: number | undefined;
+  let largeOD: number | undefined;
+  let smallOD: number | undefined;
+  let conicalFreeLength: number | undefined;
+  let torsionBodyLength: number | undefined;
+  let legLength1: number | undefined;
+  let legLength2: number | undefined;
 
-  // Torsion spring parameters
-  const [torsionBodyLength, setTorsionBodyLength] = useState(readParam("Lb", 10));
-  const [legLength1, setLegLength1] = useState(readParam("L1", 25));
-  const [legLength2, setLegLength2] = useState(readParam("L2", 25));
+  switch (designGeometry.type) {
+    case "compression":
+      meanDiameter = designGeometry.meanDiameter;
+      freeLength = designGeometry.freeLength;
+      break;
+    case "extension":
+      meanDiameter =
+        designGeometry.meanDiameter ??
+        (designGeometry.outerDiameter - designGeometry.wireDiameter);
+      outerDiameter = designGeometry.outerDiameter;
+      bodyLength = designGeometry.bodyLength;
+      initialTension = designGeometry.initialTension ?? designAnalysis.initialTension ?? 0;
+      hookType = designGeometry.hookType ?? "machine";
+      break;
+    case "torsion":
+      meanDiameter = designGeometry.meanDiameter;
+      torsionBodyLength =
+        designGeometry.bodyLength ?? designGeometry.activeCoils * designGeometry.wireDiameter;
+      bodyLength = torsionBodyLength;
+      legLength1 = designGeometry.legLength1;
+      legLength2 = designGeometry.legLength2;
+      break;
+    case "conical":
+      largeOD = designGeometry.largeOuterDiameter;
+      smallOD = designGeometry.smallOuterDiameter;
+      conicalFreeLength = designGeometry.freeLength;
+      freeLength = conicalFreeLength;
+      break;
+  }
 
-  // Conical spring parameters
-  const [largeOD, setLargeOD] = useState(readParam("D1", 30));
-  const [smallOD, setSmallOD] = useState(readParam("D2", 15));
-  const [conicalFreeLength, setConicalFreeLength] = useState(readParam("L0", 50));
+  const minDeflection = 0;
+  const maxDeflection = designAnalysis.maxDeflection ?? designAnalysis.workingDeflection ?? 0;
+  const torsionFreeAngle =
+    springType === "torsion"
+      ? designGeometry.freeAngle ?? designGeometry.workingAngle ?? 0
+      : 0;
+  const torsionWindingDirection =
+    springType === "torsion" ? designGeometry.windingDirection ?? "right" : "right";
 
-  // Working conditions
-  const [minDeflection, setMinDeflection] = useState(readParam("dxMin", 0));
-  const [maxDeflection, setMaxDeflection] = useState(readParam("dxMax", 20));
+  const workingConditions: WorkingConditions = useMemo(
+    () => ({
+      minDeflection,
+      maxDeflection,
+    }),
+    [minDeflection, maxDeflection]
+  );
 
-  // Build geometry based on spring type
-  const geometry: SpringGeometry = useMemo(() => {
-    switch (springType) {
-      case "compression":
-        return {
-          type: "compression",
-          wireDiameter,
-          meanDiameter,
-          activeCoils,
-          freeLength,
-          materialId,
-        } as CompressionSpringGeometry;
-      case "extension":
-        return {
-          type: "extension",
-          wireDiameter,
-          meanDiameter,
-          activeCoils,
-          bodyLength,
-          initialTension,
-          materialId,
-        } as ExtensionSpringGeometry;
-      case "torsion":
-        return {
-          type: "torsion",
-          wireDiameter,
-          meanDiameter,
-          activeCoils,
-          bodyLength: torsionBodyLength,
-          legLength1,
-          legLength2,
-          materialId,
-        } as TorsionSpringGeometry;
-      case "conical":
-        return {
-          type: "conical",
-          wireDiameter,
-          largeOuterDiameter: largeOD,
-          smallOuterDiameter: smallOD,
-          activeCoils,
-          freeLength: conicalFreeLength,
-          materialId,
-        } as ConicalSpringGeometry;
-    }
-  }, [
-    springType, wireDiameter, meanDiameter, activeCoils, freeLength,
-    bodyLength, initialTension, torsionBodyLength, legLength1, legLength2,
-    largeOD, smallOD, conicalFreeLength, materialId
-  ]);
+  const engineGeometry = useMemo(
+    () => convertStoreGeometryToEngine(designGeometry, materialId),
+    [designGeometry, materialId]
+  );
 
-  // Working conditions
-  const workingConditions: WorkingConditions = useMemo(() => ({
-    minDeflection,
-    maxDeflection,
-  }), [minDeflection, maxDeflection]);
-
-  // Calculate analysis result
   const analysisResult = useMemo(() => {
     try {
-      return SpringAnalysisEngine.analyze(geometry, workingConditions);
+      return SpringAnalysisEngine.analyze(engineGeometry, workingConditions);
     } catch {
       return null;
     }
-  }, [geometry, workingConditions]);
+  }, [engineGeometry, workingConditions]);
 
-  // Get store actions
-  const { initializeCompression, initializeConical, initializeExtension, initializeTorsion, reset: resetStore } = useSpringSimulationStore();
-  
-  // Global analysis store for Phase 6
-  const { 
-    setGeometry, 
-    setWorkingConditions, 
+  const { initializeCompression, initializeConical, initializeExtension, initializeTorsion } =
+    useSpringSimulationStore();
+
+  const {
+    setGeometry: setAnalysisGeometry,
+    setWorkingConditions,
     setMaterialId: setGlobalMaterialId,
-    setAnalysisResult 
+    setAnalysisResult,
   } = useSpringAnalysisStore();
 
-  // Sync to global analysis store when analysis result changes
   useEffect(() => {
-    if (analysisResult) {
-      setGeometry(geometry);
-      setWorkingConditions(workingConditions);
-      setGlobalMaterialId(materialId);
-      setAnalysisResult(analysisResult);
-    }
-  }, [analysisResult, geometry, workingConditions, materialId, setGeometry, setWorkingConditions, setGlobalMaterialId, setAnalysisResult]);
+    if (!analysisResult) return;
+    setAnalysisGeometry(engineGeometry);
+    setWorkingConditions(workingConditions);
+    setGlobalMaterialId(materialId);
+    setAnalysisResult(analysisResult);
+  }, [
+    analysisResult,
+    engineGeometry,
+    materialId,
+    setAnalysisGeometry,
+    setWorkingConditions,
+    setGlobalMaterialId,
+    setAnalysisResult,
+    workingConditions,
+  ]);
 
-  // Initialize spring simulation store when geometry changes
   useEffect(() => {
     if (!analysisResult) return;
 
-    if (springType === "compression") {
-      const springRate = (79300 * Math.pow(wireDiameter, 4)) / (8 * Math.pow(meanDiameter, 3) * activeCoils);
+    if (springType === "compression" && meanDiameter && freeLength !== undefined) {
+      const springRate =
+        (shearModulus * Math.pow(wireDiameter, 4)) /
+        (8 * Math.pow(meanDiameter, 3) * activeCoils);
       const curve = analysisResult.forceCurve.map(p => ({
         deflection: p.deflection,
         load: p.force,
@@ -230,22 +252,25 @@ function AnalysisContent() {
           meanDiameter,
           activeCoils,
           freeLength,
-          shearModulus: 79300,
+          shearModulus,
           springRate,
         },
         maxDeflection
       );
-    } else if (springType === "extension") {
-      // For extension springs
-      const springRate = (79300 * Math.pow(wireDiameter, 4)) / (8 * Math.pow(meanDiameter, 3) * activeCoils);
+    } else if (
+      springType === "extension" &&
+      meanDiameter &&
+      outerDiameter &&
+      bodyLength !== undefined
+    ) {
+      const springRate =
+        (shearModulus * Math.pow(wireDiameter, 4)) /
+        (8 * Math.pow(meanDiameter, 3) * activeCoils);
       const curve = analysisResult.forceCurve.map(p => ({
         deflection: p.deflection,
         load: p.force,
       }));
-      
-      // Calculate outer diameter from mean diameter
-      const outerDiameter = meanDiameter + wireDiameter;
-      
+      const effectiveHookType: ExtensionHookType = hookType ?? "machine";
       initializeExtension(
         curve,
         {
@@ -255,15 +280,19 @@ function AnalysisContent() {
           activeCoils,
           bodyLength,
           freeLengthInsideHooks: bodyLength,
-          initialTension,
-          shearModulus: 79300,
+          initialTension: initialTension ?? 0,
+          shearModulus,
           springRate,
-          hookType, // Read from URL parameter or default to "machine"
+          hookType: effectiveHookType,
         },
         maxDeflection
       );
-    } else if (springType === "conical") {
-      // For conical, use the nonlinear curve if available
+    } else if (
+      springType === "conical" &&
+      largeOD !== undefined &&
+      smallOD !== undefined &&
+      conicalFreeLength !== undefined
+    ) {
       const curve = analysisResult.forceCurve.map(p => ({
         x: p.deflection,
         deflection: p.deflection,
@@ -287,21 +316,22 @@ function AnalysisContent() {
         },
         maxDeflection
       );
-    } else if (springType === "torsion") {
-      // For torsion springs - use elastic modulus for spring rate calculation
-      // E ≈ 2.5 * G for spring steel
-      const elasticModulus = 79300 * 2.5; // ~198250 MPa
-      const springRate = (elasticModulus * Math.pow(wireDiameter, 4)) / 
-                         (64 * meanDiameter * activeCoils) * (Math.PI / 180);
-      
+    } else if (
+      springType === "torsion" &&
+      meanDiameter &&
+      torsionBodyLength !== undefined &&
+      legLength1 !== undefined &&
+      legLength2 !== undefined
+    ) {
+      const springRate =
+        ((elasticModulus * Math.pow(wireDiameter, 4)) /
+          (64 * meanDiameter * activeCoils)) *
+        (Math.PI / 180);
       const curve = analysisResult.forceCurve.map(p => ({
         deflection: p.deflection,
         load: p.force,
       }));
-      
-      // Calculate pitch from body length and active coils
       const pitch = torsionBodyLength / activeCoils;
-      
       initializeTorsion(
         curve,
         {
@@ -310,28 +340,68 @@ function AnalysisContent() {
           meanDiameter,
           activeCoils,
           bodyLength: torsionBodyLength,
-          pitch: pitch > wireDiameter ? pitch : wireDiameter, // Ensure pitch >= wire diameter
+          pitch: pitch > wireDiameter ? pitch : wireDiameter,
           legLength1,
           legLength2,
-          freeAngle: 90, // Default free angle
-          shearModulus: 79300,
+          freeAngle: torsionFreeAngle,
+          shearModulus,
           springRate,
-          windingDirection: "right",
+          windingDirection: torsionWindingDirection,
         },
         maxDeflection
       );
     }
+  }, [
+    activeCoils,
+    analysisResult,
+    bodyLength,
+    conicalFreeLength,
+    elasticModulus,
+    hookType,
+    initializeCompression,
+    initializeConical,
+    initializeExtension,
+    initializeTorsion,
+    initialTension,
+    largeOD,
+    legLength1,
+    legLength2,
+    maxDeflection,
+    meanDiameter,
+    outerDiameter,
+    shearModulus,
+    smallOD,
+    springType,
+    torsionBodyLength,
+    torsionFreeAngle,
+    torsionWindingDirection,
+    wireDiameter,
+  ]);
 
-    return () => {
-      // Cleanup on unmount
-    };
-  }, [springType, analysisResult, wireDiameter, meanDiameter, activeCoils, freeLength, bodyLength, initialTension, maxDeflection, largeOD, smallOD, conicalFreeLength, torsionBodyLength, legLength1, legLength2, hookType, initializeCompression, initializeConical, initializeExtension, initializeTorsion]);
+  if (!analysisResult) {
+    return (
+      <main className="container mx-auto py-8 px-4">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold">
+            {isZh ? "分析失败" : "Analysis Unavailable"}
+          </h1>
+          <p className="text-muted-foreground">
+            {isZh
+              ? "我们无法根据当前设计生成工程分析，请返回计算器重新计算。"
+              : "We couldn’t generate an analysis for the current design. Please return to the Calculator and run the calculation again."}
+          </p>
+        </div>
+        <Button asChild className="mt-6">
+          <Link href="/tools/calculator">{isZh ? "返回计算器" : "Back to Calculator"}</Link>
+        </Button>
+      </main>
+    );
+  }
 
-  // Handle PDF export
   const handleExportPDF = () => {
     try {
-      const results = SpringAnalysisEngine.analyze(geometry, workingConditions);
-      const reportData = createReportData(geometry, workingConditions, results, {
+      const results = SpringAnalysisEngine.analyze(engineGeometry, workingConditions);
+      const reportData = createReportData(engineGeometry, workingConditions, results, {
         language: isZh ? "zh" : "en",
       });
       printReport(reportData);
@@ -340,11 +410,10 @@ function AnalysisContent() {
     }
   };
 
-  // Handle HTML download
   const handleDownloadHTML = () => {
     try {
-      const results = SpringAnalysisEngine.analyze(geometry, workingConditions);
-      const reportData = createReportData(geometry, workingConditions, results, {
+      const results = SpringAnalysisEngine.analyze(engineGeometry, workingConditions);
+      const reportData = createReportData(engineGeometry, workingConditions, results, {
         language: "bilingual",
       });
       downloadReportHTML(reportData);
@@ -353,7 +422,6 @@ function AnalysisContent() {
     }
   };
 
-  // Get visualizer component
   const getVisualizer = () => {
     switch (springType) {
       case "compression":
@@ -366,61 +434,31 @@ function AnalysisContent() {
         return <TorsionSpringVisualizer />;
       default:
         return (
-          <div className="h-full w-full flex items-center justify-center bg-slate-900 text-slate-400 text-sm">
+          <div className="h-full w-full flex items-center justify center bg-slate-900 text-slate-400 text-sm">
             {isZh ? "3D 视图开发中" : "3D View Coming Soon"}
           </div>
         );
     }
   };
 
-  // If no URL params, show prompt to go to calculator first
-  if (!hasUrlParams) {
-    return (
-      <main className="container mx-auto py-8 px-4">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold mb-2">
-            {isZh ? "弹簧工程分析" : "Spring Engineering Analysis"}
-          </h1>
-          <p className="text-muted-foreground">
-            {isZh
-              ? "完整的弹簧应力、疲劳、安全系数和屈曲分析"
-              : "Complete stress, fatigue, safety factor, and buckling analysis"}
-          </p>
-        </div>
-
-        <Card className="max-w-xl">
-          <CardHeader>
-            <CardTitle>{isZh ? "无弹簧数据" : "No Spring Data"}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {isZh 
-                ? "请先从计算器页面定义弹簧参数，然后发送到此处进行工程分析。"
-                : "Please start from the Calculator page to define spring parameters, then send here for engineering analysis."}
-            </p>
-            
-            <div className="grid grid-cols-2 gap-3 pt-4">
-              <Button asChild variant="default">
-                <a href="/tools/calculator?tab=compression">{isZh ? "压缩弹簧" : "Compression"}</a>
-              </Button>
-              <Button asChild variant="default">
-                <a href="/tools/calculator?tab=extension">{isZh ? "拉伸弹簧" : "Extension"}</a>
-              </Button>
-              <Button asChild variant="outline">
-                <a href="/tools/calculator?tab=conical">{isZh ? "锥形弹簧" : "Conical"}</a>
-              </Button>
-              <Button asChild variant="outline">
-                <a href="/tools/calculator?tab=torsion">{isZh ? "扭转弹簧" : "Torsion"}</a>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </main>
-    );
-  }
+  const safeHookType = hookType ?? "machine";
+  const hookLabel =
+    EXTENSION_HOOK_LABELS[safeHookType]?.[isZh ? "zh" : "en"] ??
+    (isZh ? "默认钩型" : "Default Hook");
+  const displayFreeLength =
+    springType === "compression"
+      ? freeLength ?? 0
+      : springType === "conical"
+      ? conicalFreeLength ?? 0
+      : 50;
+  const estimatedSpringRate =
+    analysisResult && meanDiameter
+      ? (shearModulus * Math.pow(wireDiameter, 4)) /
+        (8 * Math.pow(meanDiameter, 3) * activeCoils)
+      : 10;
 
   return (
-    <main className="container mx-auto py-8 px-4">
+    <main className="container mx	auto py-8 px-4">
       <div className="mb-8 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold mb-2">
@@ -489,13 +527,12 @@ function AnalysisContent() {
                 <span className="text-muted-foreground">d (mm):</span>
                 <span className="font-medium">{wireDiameter}</span>
               </div>
-              {springType !== "conical" && (
+              {springType !== "conical" ? (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Dm (mm):</span>
-                  <span className="font-medium">{meanDiameter}</span>
+                  <span className="font-medium">{meanDiameter ?? "--"}</span>
                 </div>
-              )}
-              {springType === "conical" && (
+              ) : (
                 <>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">D1 (mm):</span>
@@ -532,7 +569,7 @@ function AnalysisContent() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">{isZh ? "钩型" : "Hook Type"}:</span>
-                    <span className="font-medium">{EXTENSION_HOOK_LABELS[hookType]?.en || hookType}</span>
+                    <span className="font-medium">{hookLabel}</span>
                   </div>
                 </>
               )}
@@ -604,7 +641,7 @@ function AnalysisContent() {
 
         {/* Force Tester Panel */}
         <UnifiedForceTester
-          geometry={geometry}
+          geometry={engineGeometry}
           workingConditions={workingConditions}
           visualizer={getVisualizer()}
           onExportPDF={handleExportPDF}
@@ -615,30 +652,26 @@ function AnalysisContent() {
       {analysisResult && (
         <div className="mt-6 space-y-6">
           <AdvancedAnalysisPanel
-            geometry={geometry}
+            geometry={engineGeometry}
             analysisResult={analysisResult}
-            springRate={analysisResult.geometry.springIndex > 0 ? 
-              (79300 * Math.pow(wireDiameter, 4)) / (8 * Math.pow(meanDiameter, 3) * activeCoils) : 10}
+            springRate={analysisResult.geometry.springIndex > 0 ? estimatedSpringRate : 10}
             maxStress={analysisResult.stress.tauEffective}
-            freeLength={springType === "compression" ? freeLength : 
-                        springType === "conical" ? conicalFreeLength : 50}
+            freeLength={displayFreeLength}
           />
           
           {/* Smart Diagnostics & Optimization Panel */}
           <SmartAnalysisPanel
-            geometry={geometry}
+            geometry={engineGeometry}
             analysisResult={analysisResult}
             workingConditions={workingConditions}
-            springRate={analysisResult.geometry.springIndex > 0 ? 
-              (79300 * Math.pow(wireDiameter, 4)) / (8 * Math.pow(meanDiameter, 3) * activeCoils) : 10}
+            springRate={analysisResult.geometry.springIndex > 0 ? estimatedSpringRate : 10}
             currentDeflection={maxDeflection}
           />
           
           {/* Advanced Simulation Panel (Phase 5) */}
           <AdvancedSimulationPanel
-            geometry={geometry}
-            springRate={analysisResult.geometry.springIndex > 0 ? 
-              (79300 * Math.pow(wireDiameter, 4)) / (8 * Math.pow(meanDiameter, 3) * activeCoils) : 10}
+            geometry={engineGeometry}
+            springRate={analysisResult.geometry.springIndex > 0 ? estimatedSpringRate : 10}
             maxStress={analysisResult.stress.tauEffective}
             naturalFrequency={50}
             workingConditions={workingConditions}

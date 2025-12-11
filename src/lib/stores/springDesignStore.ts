@@ -60,10 +60,16 @@ export interface TorsionGeometry {
   legLength1: number;
   legLength2: number;
   freeAngle?: number;
+  workingAngle?: number;
+  thetaDi?: number;
+  thetaDo?: number;
   windingDirection?: "left" | "right";
   shearModulus?: number;
   materialId?: SpringMaterialId;
 }
+
+/** 锥形弹簧端面类型 */
+export type ConicalEndType = "natural" | "closed" | "closed_ground";
 
 /** 锥形弹簧几何参数 */
 export interface ConicalGeometry {
@@ -72,7 +78,9 @@ export interface ConicalGeometry {
   largeOuterDiameter: number;
   smallOuterDiameter: number;
   activeCoils: number;
+  totalCoils?: number;
   freeLength: number;
+  endType?: ConicalEndType;  // 端面类型: natural=自然端, closed=并紧, closed_ground=并紧磨平
   shearModulus?: number;
   materialId?: SpringMaterialId;
 }
@@ -111,6 +119,7 @@ export interface AnalysisResult {
   // 载荷
   workingLoad?: number;  // 工作载荷 (N)
   maxLoad?: number;  // 最大载荷 (N)
+  initialTension?: number; // 初拉力 (N) - 拉簧专用
   
   // 应力
   shearStress?: number;  // 剪切应力 (MPa)

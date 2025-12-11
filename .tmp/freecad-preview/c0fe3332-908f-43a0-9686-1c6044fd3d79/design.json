@@ -1,0 +1,22 @@
+{
+  "springType": "torsion",
+  "geometry": {
+    "wireDiameter": 1.5,
+    "meanDiameter": 13.5,
+    "outerDiameter": 15,
+    "activeCoils": 6,
+    "totalCoils": 8,
+    "freeLength": 50,
+    "bodyLength": 10,
+    "hookType": "machine",
+    "legLength1": 25,
+    "legLength2": 25,
+    "windingDirection": "right"
+  },
+  "export": {
+    "formats": [
+      "STL"
+    ],
+    "name": "preview_c0fe3332-908f-43a0-9686-1c6044fd3d79"
+  }
+}

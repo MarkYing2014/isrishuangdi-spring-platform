@@ -35,6 +35,8 @@ export interface SpringPreviewParams {
   smallDiameter?: number;
   topGround?: boolean;
   bottomGround?: boolean;
+  // Torsion-specific: free leg angle in degrees
+  freeAngle?: number;
 }
 
 interface CadPreview3DProps {
@@ -66,6 +68,7 @@ export function CadPreview3D({ params, className = "" }: CadPreview3DProps) {
       freeLength = 50, shearModulus = 79300, springRate = 10,
       hookType = 'machine', initialTension = 5, bodyLength,
       legLength1 = 25, legLength2 = 25, windingDirection = 'right',
+      freeAngle = 90,
       largeDiameter, smallDiameter,
     } = params;
     
@@ -98,7 +101,7 @@ export function CadPreview3D({ params, className = "" }: CadPreview3DProps) {
         const design: TorsionDesignMeta = {
           type: 'torsion', wireDiameter, meanDiameter, activeCoils,
           bodyLength: calculatedBodyLength, pitch: wireDiameter * 1.1,
-          legLength1, legLength2, freeAngle: 90,
+          legLength1, legLength2, freeAngle,
           shearModulus, springRate, windingDirection,
         };
         initializeTorsion(curve, design, maxDeflection);

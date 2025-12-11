@@ -86,6 +86,25 @@ function AnimatedTorsionSpring() {
   }, [torsionDesign]);
 
   // Build complete spring geometry
+  // Create materials - MUST be before any early returns to follow Rules of Hooks
+  const bodyMaterial = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: BODY_COLOR,
+      metalness: 0.85,
+      roughness: 0.15,
+      side: THREE.DoubleSide,
+    });
+  }, []);
+
+  const legMaterial = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: LEG_COLOR,
+      metalness: 0.9,
+      roughness: 0.1,
+      side: THREE.DoubleSide,
+    });
+  }, []);
+
   const springGeometry = useMemo(() => {
     if (!torsionDesign) return null;
 
@@ -127,25 +146,6 @@ function AnimatedTorsionSpring() {
   }
 
   const { bodyGeometry, leg1Geometry, leg2Geometry, state } = springGeometry;
-
-  // Create materials
-  const bodyMaterial = useMemo(() => {
-    return new THREE.MeshStandardMaterial({
-      color: BODY_COLOR,
-      metalness: 0.85,
-      roughness: 0.15,
-      side: THREE.DoubleSide,
-    });
-  }, []);
-
-  const legMaterial = useMemo(() => {
-    return new THREE.MeshStandardMaterial({
-      color: LEG_COLOR,
-      metalness: 0.9,
-      roughness: 0.1,
-      side: THREE.DoubleSide,
-    });
-  }, []);
 
   return (
     <group rotation={[Math.PI / 2, 0, 0]}>

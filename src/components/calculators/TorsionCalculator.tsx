@@ -25,6 +25,13 @@ import {
   type SpringMaterial,
   getSpringMaterial 
 } from "@/lib/materials/springMaterials";
+import { 
+  useSpringDesignStore,
+  type TorsionGeometry,
+  type MaterialInfo,
+  type AnalysisResult,
+  generateDesignCode,
+} from "@/lib/stores/springDesignStore";
 
 interface FormValues {
   wireDiameter: number;        // d - 线径
@@ -239,21 +246,27 @@ function calculateTorsionSpring(
 export function TorsionCalculator() {
   const [submitted, setSubmitted] = useState(false);
   const [materialId, setMaterialId] = useState<SpringMaterialId>("music_wire_a228");
+  
+  // 全局设计存储
+  const setDesign = useSpringDesignStore(state => state.setDesign);
+  const designGeometry = useSpringDesignStore(state => state.geometry);
+  const lastTorsion = designGeometry && designGeometry.type === "torsion" ? designGeometry : null;
 
   const form = useForm<FormValues>({
     defaultValues: {
-      wireDiameter: 1.5,
-      outerDiameter: 15,
-      totalCoils: 6,
-      activeCoils: 6,
-      armLength1: 25,
-      armLength2: 25,
+      wireDiameter: lastTorsion?.wireDiameter ?? 1.5,
+      outerDiameter: lastTorsion?.outerDiameter ?? 15,
+      totalCoils: lastTorsion?.activeCoils ?? 6,
+      activeCoils: lastTorsion?.activeCoils ?? 6,
+      armLength1: lastTorsion?.legLength1 ?? 25,
+      armLength2: lastTorsion?.legLength2 ?? 25,
       loadRadius: 20,
-      bodyLength: 10,
+      bodyLength: lastTorsion?.bodyLength ?? 10,
+      // 由上次保存的 workingAngle 反推总转角，暂时全部放在 workingAngle，installAngle 保持 0
       installAngle: 0,
-      workingAngle: 45,
+      workingAngle: lastTorsion?.workingAngle ?? 45,
       pitch: 1.5,
-      handOfCoil: "right",
+      handOfCoil: lastTorsion?.windingDirection ?? "right",
     },
   });
 
@@ -282,6 +295,81 @@ export function TorsionCalculator() {
 
   const onSubmit = () => {
     setSubmitted(true);
+    
+    // 保存到全局 store
+    const values = form.getValues();
+    const material = getSpringMaterial(materialId);
+    if (!material) return;
+    
+    const meanDiameter = values.outerDiameter - values.wireDiameter;
+
+    // 将安装角 θdi、工作角 θdo 映射到几何使用的 freeAngle / workingAngle
+    const thetaDi = values.installAngle ?? 0;     // 安装扭转角 θdi
+    const thetaDo = values.workingAngle ?? 0;     // 作用扭转角 θdo
+    const thetaTot = thetaDi + thetaDo;           // 自由 → 工作 总转角
+    const thetaTarget = 0;                        // 工作状态腿夹角目标（0° = 两腿平行）
+
+    const freeAngle = thetaTot + thetaTarget;     // 自由角 θf
+    const workingAngle = thetaTot;                // 总工作角
+    
+    const geometry: TorsionGeometry = {
+      type: "torsion",
+      wireDiameter: values.wireDiameter,
+      outerDiameter: values.outerDiameter,
+      meanDiameter,
+      activeCoils: values.activeCoils,
+      bodyLength: values.bodyLength,
+      legLength1: values.armLength1,
+      legLength2: values.armLength2,
+      windingDirection: values.handOfCoil,
+      freeAngle,
+      workingAngle,
+      shearModulus: material.shearModulus,
+      materialId: material.id,
+    };
+    
+    const materialInfo: MaterialInfo = {
+      id: material.id,
+      name: material.nameEn,
+      shearModulus: material.shearModulus,
+      elasticModulus: material.elasticModulus ?? 207000,
+      density: material.density ?? 7850,
+    };
+    
+    // 计算结果（使用 results 如果已经计算）
+    const calcResults = calculateTorsionSpring(
+      values.wireDiameter,
+      values.outerDiameter,
+      values.activeCoils,
+      values.installAngle,
+      values.workingAngle,
+      values.loadRadius,
+      values.armLength1,
+      values.armLength2,
+      values.bodyLength,
+      material
+    );
+    
+    const analysisResult: AnalysisResult = {
+      springRate: calcResults.springRate,
+      springRateUnit: "N·mm/deg",
+      workingLoad: calcResults.workingForce,
+      shearStress: calcResults.bendingStress,
+      maxStress: calcResults.correctedStress,
+      springIndex: calcResults.springIndex,
+      staticSafetyFactor: calcResults.safetyFactor,
+      workingDeflection: values.workingAngle,
+    };
+    
+    setDesign({
+      springType: "torsion",
+      geometry,
+      material: materialInfo,
+      analysisResult,
+      meta: {
+        designCode: generateDesignCode(geometry),
+      },
+    });
   };
 
   const handleMaterialChange = (material: SpringMaterial) => {
@@ -291,6 +379,22 @@ export function TorsionCalculator() {
       setTimeout(() => setSubmitted(true), 0);
     }
   };
+
+  // Generate force tester URL
+  const forceTesterUrl = useMemo(() => {
+    const meanDiameter = (watchedValues.outerDiameter ?? 15) - (watchedValues.wireDiameter ?? 1.5);
+    const params = new URLSearchParams({
+      type: "torsion",
+      d: (watchedValues.wireDiameter ?? 1.5).toString(),
+      Dm: meanDiameter.toString(),
+      Na: (watchedValues.activeCoils ?? 6).toString(),
+      L1: (watchedValues.armLength1 ?? 25).toString(),
+      L2: (watchedValues.armLength2 ?? 25).toString(),
+      Lb: (watchedValues.bodyLength ?? 10).toString(),
+      dxMax: (watchedValues.workingAngle ?? 45).toString(),
+    });
+    return `/tools/force-tester?${params.toString()}`;
+  }, [watchedValues]);
 
   // Generate analysis URL with all parameters
   const analysisUrl = useMemo(() => {
@@ -434,8 +538,24 @@ export function TorsionCalculator() {
               onChange={handleMaterialChange}
             />
 
-            <Button type="submit" className="w-full">
-              Calculate / 计算
+            <Button 
+              type="submit" 
+              className="w-full transition-all duration-200 active:scale-95"
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  Calculating... / 计算中...
+                </>
+              ) : form.formState.isSubmitSuccessful && submitted ? (
+                <>
+                  <span className="mr-2">✓</span>
+                  Calculated / 已计算
+                </>
+              ) : (
+                "Calculate / 计算"
+              )}
             </Button>
           </form>
         </CardContent>
@@ -556,14 +676,34 @@ export function TorsionCalculator() {
             </p>
           )}
 
-          <div className="space-y-2 pt-2">
-            <Button asChild variant="secondary" className="w-full">
-              <a href={analysisUrl}>View 3D Model / 查看3D模型</a>
+          {/* Action Buttons - 统一的按钮样式（与其他计算器一致，4个按钮） */}
+          <div className="space-y-3 pt-2">
+            <Button 
+              asChild 
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
+            >
+              <a href={analysisUrl}>Generate 3D Model / 生成3D模型</a>
             </Button>
-            <Button asChild variant="outline" className="w-full border-blue-600 text-blue-400 hover:bg-blue-950">
+            <Button 
+              asChild 
+              variant="outline" 
+              className="w-full border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 hover:border-emerald-400 hover:text-emerald-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/10"
+            >
+              <a href={forceTesterUrl}>Send to Force Tester / 发送到力–位移测试</a>
+            </Button>
+            <Button 
+              asChild 
+              variant="outline" 
+              className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
+            >
               <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
             </Button>
-            <Button asChild variant="outline" className="w-full border-purple-600 text-purple-400 hover:bg-purple-950" disabled={!results}>
+            <Button 
+              asChild 
+              variant="outline" 
+              className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10" 
+              disabled={!results}
+            >
               <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
             </Button>
           </div>

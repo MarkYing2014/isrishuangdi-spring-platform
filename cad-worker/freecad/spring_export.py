@@ -423,50 +423,114 @@ def make_torsion_spring(params):
 
 
 # =============================================================================
-# 锥形弹簧生成器
+# 锥形弹簧生成器 (改进版 - 支持死圈、端面磨平)
 # =============================================================================
+
+def generate_conical_centerline(params):
+    """
+    锥形压簧中心线（简化版）
+    
+    算法思路:
+    - 锥形弹簧通常全部为有效圈，不需要死圈分段
+    - 所有圈使用统一节距: pitch = L0 / totalCoils
+    - 半径沿 z 线性插值 (大端 → 小端)
+    - 这样可以避免死圈/有效圈交界处的节距跳变，使末圈连接更光滑
+    """
+    d = params.get("wireDiameter", 3.0)
+    D_large_outer = params.get("largeOuterDiameter", 30.0)
+    D_small_outer = params.get("smallOuterDiameter", 15.0)
+    Na = params.get("activeCoils", 6)
+    # 锥形弹簧: totalCoils 默认等于 activeCoils (无死圈)
+    Nt = params.get("totalCoils", Na)
+    L0 = params.get("freeLength", 50.0)
+    left_handed = params.get("leftHanded", False)
+    
+    # 中径半径: 外径减掉一根线径
+    R_large = (D_large_outer - d) / 2.0
+    R_small = (D_small_outer - d) / 2.0
+    
+    # 统一节距 (无死圈分段)
+    pitch = L0 / float(Nt) if Nt > 0 else d
+    
+    sign = -1 if left_handed else 1
+    num_samples = max(400, int(Nt * 50))  # 每圈约 50 个点，足够光滑
+    
+    centerline_pts = []
+    min_z = 0.0
+    max_z = L0
+    
+    for i in range(num_samples + 1):
+        t = i / float(num_samples)  # 0~1
+        theta = 2.0 * math.pi * Nt * t * sign
+        n = Nt * t  # 当前圈数 (0~Nt)
+        z = n * pitch  # 统一节距，线性分布
+        
+        # 轴向进度 0~1，用于半径插值
+        u = z / L0 if L0 > 1e-6 else 0.0
+        # 中径半径线性插值: 底部大端 → 顶部小端
+        R = R_large + (R_small - R_large) * u
+        
+        x = R * math.cos(theta)
+        y = R * math.sin(theta)
+        
+        centerline_pts.append(App.Vector(x, y, z))
+    
+    return centerline_pts, min_z, max_z
+
 
 def make_conical_spring(params):
     """
-    生成锥形弹簧
+    生成锥形压缩弹簧实体 (改进版)
+    
+    特性:
+    - 均匀螺旋 + 半径线性插值 (无死圈分段，末圈更光滑)
+    - 支持端面磨平 (groundEnds, 默认启用)
     
     参数:
         params: {
             wireDiameter: 线径 (mm)
             largeOuterDiameter: 大端外径 (mm)
             smallOuterDiameter: 小端外径 (mm)
-            activeCoils: 有效圈数
-            freeLength: 自由长度 (mm)
+            activeCoils: 有效圈数 Na
+            totalCoils: 总圈数 Nt (可选, 默认等于 Na)
+            freeLength: 自由长度 L0 (mm)
             leftHanded: 是否左旋 (可选)
+            groundEnds: 端面磨平 (可选, 默认 True)
         }
     """
     d = params.get("wireDiameter", 3.0)
-    D1 = params.get("largeOuterDiameter", 30.0)
-    D2 = params.get("smallOuterDiameter", 15.0)
-    Na = params.get("activeCoils", 6)
-    L0 = params.get("freeLength", 50.0)
-    left_handed = params.get("leftHanded", False)
+    ground_ends = params.get("groundEnds", True)  # 默认启用端面磨平
+    D_large_outer = params.get("largeOuterDiameter", 30.0)
     
-    R1 = (D1 - d) / 2.0  # 大端中径半径
-    R2 = (D2 - d) / 2.0  # 小端中径半径
+    # 生成中心线
+    centerline_pts, min_z, max_z = generate_conical_centerline(params)
     
-    samples = int(Na * 36)
-    sign = -1 if left_handed else 1
+    # B-Spline 路径
+    path = make_bspline_from_points(centerline_pts)
     
-    # 生成锥形螺旋线点
-    conical_pts = []
-    for i in range(samples + 1):
-        t = float(i) / samples
-        theta = 2.0 * math.pi * Na * t * sign
-        z = L0 * t
-        r = R1 + (R2 - R1) * t  # 线性插值半径
-        x = r * math.cos(theta)
-        y = r * math.sin(theta)
-        conical_pts.append(App.Vector(x, y, z))
-    
-    # 创建路径并扫掠
-    path = make_bspline_from_points(conical_pts)
+    # 扫掠生成实体
     spring = sweep_circle_along_path(path, d)
+    
+    # 端面磨平 (可选)
+    if ground_ends and spring is not None:
+        grind_depth = 0.3 * d
+        box_size = D_large_outer * 3
+        box_height = d * 2
+        
+        bottom_box = Part.makeBox(
+            box_size, box_size, box_height,
+            App.Vector(-box_size/2, -box_size/2, min_z - box_height + grind_depth)
+        )
+        top_box = Part.makeBox(
+            box_size, box_size, box_height,
+            App.Vector(-box_size/2, -box_size/2, max_z - grind_depth)
+        )
+        
+        try:
+            spring = spring.cut(bottom_box)
+            spring = spring.cut(top_box)
+        except Exception as e:
+            print(f"Warning: ground end cutting failed: {e}")
     
     return spring
 

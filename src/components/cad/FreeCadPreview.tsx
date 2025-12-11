@@ -73,8 +73,13 @@ interface FreeCadPreviewProps {
     legLength1?: number;
     legLength2?: number;
     windingDirection?: "left" | "right";
+    // Conical specific
     largeOuterDiameter?: number;
     smallOuterDiameter?: number;
+    endType?: "natural" | "closed" | "closed_ground";  // 端面类型
+    // Compression specific
+    topGround?: boolean;
+    bottomGround?: boolean;
   };
   className?: string;
 }
@@ -213,13 +218,24 @@ export function FreeCadPreview({
   
   // 组件挂载时检查缓存
   useEffect(() => {
+    // Debug: log cache key on mount
+    console.log("[FreeCadPreview] Mount with cacheKey:", cacheKey);
+    console.log("[FreeCadPreview] Geometry:", JSON.stringify(geometry, null, 2));
+    
     const cached = getCachedGeometry(cacheKey);
     if (cached) {
+      console.log("[FreeCadPreview] Using cached geometry");
       setState({ status: "cached", geometry: cached });
     }
-  }, [cacheKey]);
+  }, [cacheKey, geometry]);
   
   const loadPreview = useCallback(async (forceRefresh = false) => {
+    // 如果强制刷新，清除所有缓存
+    if (forceRefresh) {
+      geometryCache.clear();  // Clear ALL cache, not just current key
+      console.log("[FreeCadPreview] ALL cache cleared, forcing refresh");
+    }
+    
     // 如果不是强制刷新，先检查缓存
     if (!forceRefresh) {
       const cached = getCachedGeometry(cacheKey);
@@ -236,6 +252,10 @@ export function FreeCadPreview({
     abortControllerRef.current = new AbortController();
     
     setState({ status: "loading", message: "Generating CAD model..." });
+    
+    // Debug: log geometry being sent
+    console.log("[FreeCadPreview] Sending geometry:", JSON.stringify(geometry, null, 2));
+    console.log("[FreeCadPreview] Cache key:", cacheKey);
     
     try {
       const response = await fetch("/api/freecad/preview", {
@@ -312,7 +332,7 @@ export function FreeCadPreview({
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => loadPreview(state.status === "success" || state.status === "cached")}
+          onClick={() => loadPreview(true)}  // Always force refresh when clicking
           disabled={state.status === "loading"}
           className="bg-white/90 hover:bg-white"
         >

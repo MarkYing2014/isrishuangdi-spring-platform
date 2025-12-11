@@ -184,7 +184,22 @@ def sweep_wire_along_path(path_shape, wire_diameter):
     circle = Part.makeCircle(radius, start_point, tangent)
     circle_wire = Part.Wire([circle])
     
-    # 方法1: makePipe (最可靠)
+    # 方法1: makePipeShell (生成有效的 Solid，支持布尔运算)
+    try:
+        solid = path_wire.makePipeShell([circle_wire], True, True)
+        print(f"makePipeShell result: ShapeType={solid.ShapeType}, Volume={solid.Volume:.2f}, isValid={solid.isValid()}")
+        if solid.isValid():
+            return solid
+        # 如果无效，尝试修复
+        fixed = solid.removeSplitter()
+        if fixed.isValid():
+            print(f"makePipeShell fixed: isValid={fixed.isValid()}")
+            return fixed
+        return solid
+    except Exception as e:
+        print(f"makePipeShell failed: {e}")
+    
+    # 方法2: makePipe (备用，可能生成无效形状)
     try:
         # makePipe 沿 spine 扫掠 profile
         pipe = path_wire.makePipe(circle_wire)
@@ -192,18 +207,11 @@ def sweep_wire_along_path(path_shape, wire_diameter):
         # 如果是 Shell，转换为 Solid
         if pipe.ShapeType == "Shell":
             solid = Part.Solid(pipe)
-            print(f"Converted to Solid: Volume={solid.Volume:.2f}")
+            print(f"Converted to Solid: Volume={solid.Volume:.2f}, isValid={solid.isValid()}")
             return solid
         return pipe
     except Exception as e:
         print(f"makePipe failed: {e}")
-    
-    # 方法2: makePipeShell
-    try:
-        solid = path_wire.makePipeShell([circle_wire], True, False)
-        return solid
-    except Exception as e:
-        print(f"makePipeShell failed: {e}")
     
     # 方法3: 使用 BRepOffsetAPI
     try:
@@ -342,34 +350,54 @@ def make_compression_spring_parametric(params):
             print(f"makeTube failed: {e}")
             raise RuntimeError("All sweep methods failed")
     
-    # === 端面磨平 (与 Three.js createClipPlanes 一致) ===
+    # === 端面磨平 (工业级稳健性) ===
     if ground_ends and spring_solid:
+        # 工程级容差 - 解决 OCC/FreeCAD 布尔运算稳健性问题
+        EPS = max(0.05 * d, 0.05)
+        
+        # 修复形状 - 提高布尔运算成功率
+        if not spring_solid.isValid():
+            print(f"[Compression] Spring shape is invalid, attempting to fix...")
+            spring_solid = spring_solid.removeSplitter()
+        
         grind_depth = 0.3 * d  # 与 Three.js 一致
         
-        bottom_cut_z = min_z + grind_depth
-        top_cut_z = max_z - grind_depth
+        # 使用中心线 Z 范围 (0 到 L0)，而不是 BoundBox
+        bottom_cut_z = grind_depth
+        top_cut_z = L0 - grind_depth
         
         box_size = Dm * 3
-        box_height = d * 2
+        box_height = d * 5  # 足够高的盒子
         
-        # 底部切割
+        # 底部切割盒 - 必须穿透弹簧实体
         bottom_box = Part.makeBox(
             box_size, box_size, box_height,
-            App.Vector(-box_size/2, -box_size/2, min_z - box_height + grind_depth)
+            App.Vector(-box_size/2, -box_size/2, grind_depth + EPS - box_height)
         )
         
-        # 顶部切割
+        # 顶部切割盒 - 必须穿透弹簧实体
         top_box = Part.makeBox(
             box_size, box_size, box_height,
-            App.Vector(-box_size/2, -box_size/2, top_cut_z)
+            App.Vector(-box_size/2, -box_size/2, L0 - grind_depth - EPS)
         )
         
         try:
-            spring_solid = spring_solid.cut(bottom_box)
-            spring_solid = spring_solid.cut(top_box)
-            print(f"Ground ends: bottom={bottom_cut_z:.2f}, top={top_cut_z:.2f}")
+            # 验证几何交集
+            bottom_common = spring_solid.common(bottom_box)
+            top_common = spring_solid.common(top_box)
+            print(f"[Compression] Common volume: bottom={bottom_common.Volume:.2f}, top={top_common.Volume:.2f}")
+            
+            cut_result = spring_solid.cut(bottom_box)
+            cut_result = cut_result.cut(top_box)
+            
+            # 如果结果是 Compound，取最大的 Solid
+            if cut_result.ShapeType == "Compound" and cut_result.Solids:
+                cut_result = max(cut_result.Solids, key=lambda s: s.Volume)
+            
+            spring_solid = cut_result
+            print(f"[Compression] Ground ends applied: bottom={bottom_cut_z:.2f}, top={top_cut_z:.2f}")
         except Exception as e:
-            print(f"Warning: Ground end cutting failed: {e}")
+            print(f"[Compression] Warning: Ground end cutting failed: {e}")
     
     return spring_solid
 
@@ -405,29 +433,44 @@ def make_compression_spring(params):
     spring_solid = sweep_wire_along_path(path, d)
     
     if ground_ends:
+        # 工程级容差 - 解决 OCC/FreeCAD 布尔运算稳健性问题
+        EPS = max(0.05 * d, 0.05)
+        
+        # 修复形状
+        if spring_solid and not spring_solid.isValid():
+            spring_solid = spring_solid.removeSplitter()
+        
         grind_depth = 0.3 * d
-        bottom_cut_z = min_z + grind_depth
-        top_cut_z = max_z - grind_depth
+        bottom_cut_z = grind_depth
+        top_cut_z = L0 - grind_depth
         
         box_size = Dm * 3
-        box_height = d * 2
+        box_height = d * 5
         
+        # 底部切割盒 - 必须穿透弹簧实体
         bottom_box = Part.makeBox(
             box_size, box_size, box_height,
-            App.Vector(-box_size/2, -box_size/2, min_z - box_height + grind_depth)
+            App.Vector(-box_size/2, -box_size/2, grind_depth + EPS - box_height)
         )
         
+        # 顶部切割盒 - 必须穿透弹簧实体
         top_box = Part.makeBox(
             box_size, box_size, box_height,
-            App.Vector(-box_size/2, -box_size/2, top_cut_z)
+            App.Vector(-box_size/2, -box_size/2, L0 - grind_depth - EPS)
         )
         
         try:
-            spring_solid = spring_solid.cut(bottom_box)
-            spring_solid = spring_solid.cut(top_box)
-            print(f"Ground ends applied: bottom={bottom_cut_z:.2f}, top={top_cut_z:.2f}")
+            cut_result = spring_solid.cut(bottom_box)
+            cut_result = cut_result.cut(top_box)
+            
+            # 如果结果是 Compound，取最大的 Solid
+            if cut_result.ShapeType == "Compound" and cut_result.Solids:
+                cut_result = max(cut_result.Solids, key=lambda s: s.Volume)
+            
+            spring_solid = cut_result
+            print(f"[Compression Fallback] Ground ends applied: bottom={bottom_cut_z:.2f}, top={top_cut_z:.2f}")
         except Exception as e:
-            print(f"Warning: Ground end cutting failed: {e}")
+            print(f"[Compression Fallback] Warning: Ground end cutting failed: {e}")
     
     return spring_solid
 
@@ -471,42 +514,7 @@ def clamp_radius(point, min_radius):
     return point
 
 
-def generate_extension_body_centerline(params):
-    """
-    生成拉簧体中心线 - 紧密螺旋
-    
-    与 Three.js extensionSpringGeometry.ts 算法一致:
-    - 自由状态节距 = 线径 (紧密贴合)
-    - 拉伸时节距增加
-    """
-    d = params.get("wireDiameter", 2.0)
-    OD = params.get("outerDiameter", 18.0)
-    Na = params.get("activeCoils", 10)
-    current_extension = params.get("currentExtension", 0.0)
-    
-    Dm = OD - d  # 中径
-    R = Dm / 2.0
-    
-    # 自由状态体长 = Na × d (紧密贴合)
-    solid_body_length = Na * d
-    
-    # 拉伸后体长
-    extended_length = solid_body_length + current_extension
-    
-    # 采样参数 (减少点数以提高扫掠成功率)
-    num_samples = max(200, int(Na * 30))
-    total_angle = 2.0 * math.pi * Na
-    
-    points = []
-    for i in range(num_samples + 1):
-        t = i / num_samples
-        theta = t * total_angle
-        z = t * extended_length
-        x = R * math.cos(theta)
-        y = R * math.sin(theta)
-        points.append(App.Vector(x, y, z))
-    
-    return points, 0.0, extended_length
+# NOTE: generate_extension_body_centerline is defined later with full Three.js alignment
 
 
 def generate_hook_loop(hook_center, hook_radius, u, v, angle_deg, start_angle=-math.pi/2, num_points=20):
@@ -663,7 +671,7 @@ def normalize_extension_params(geom: dict) -> dict:
     
     这个函数确保所有关键参数都有有效值
     """
-    import json
+    # json is already imported at module level
     print(f"[normalize] Input params: {json.dumps(geom, indent=2)}")
     
     d = geom.get("wireDiameter", 2.0)
@@ -966,88 +974,555 @@ def make_simple_hook(attach_point, body_radius, wire_diameter, hook_radius, hook
 
 
 # =============================================================================
-# 扭转弹簧生成器
+# 扭转弹簧生成器 v2（平面线圈 + 切线腿，与 Three.js 对齐）
 # =============================================================================
+
+def normalize_torsion_params(geom: dict) -> dict:
+    """
+    扭簧参数归一化：
+      - 统一 meanDiameter / outerDiameter
+      - 补全 activeCoils / legLength1 / legLength2 / windingDirection / freeAngle
+    """
+    d = geom.get("wireDiameter", 1.5)
+
+    # 圈数
+    Na = geom.get("activeCoils")
+    if Na is None or Na <= 0:
+        Na = 6
+        print(f"[torsion normalize] WARNING: activeCoils missing, use default {Na}")
+
+    # 中径：优先 meanDiameter，其次 outerDiameter - d
+    Dm = geom.get("meanDiameter")
+    OD = geom.get("outerDiameter")
+    if Dm is None or Dm <= 0.0:
+        if OD is not None and OD > 0:
+            Dm = OD - d
+            print(f"[torsion normalize] Converted outerDiameter {OD} -> meanDiameter {Dm}")
+        else:
+            Dm = 12.0
+            print(f"[torsion normalize] WARNING: meanDiameter missing, use default {Dm}")
+    if OD is None or OD <= 0.0:
+        OD = Dm + d
+
+    # 腿长
+    L1 = geom.get("legLength1", geom.get("legLength", 25.0))
+    L2 = geom.get("legLength2", geom.get("legLength", 25.0))
+
+    # 旋向
+    winding = geom.get("windingDirection", "right")
+    if winding not in ("right", "left"):
+        winding = "right"
+
+    # freeAngle 和 workingAngle（控制腿之间夹角）
+    free_angle = geom.get("freeAngle", 90.0)
+    working_angle = geom.get("workingAngle", 0.0)
+
+    result = {
+        **geom,
+        "wireDiameter": d,
+        "activeCoils": Na,
+        "meanDiameter": Dm,
+        "outerDiameter": OD,
+        "legLength1": L1,
+        "legLength2": L2,
+        "windingDirection": winding,
+        "freeAngle": free_angle,
+        "workingAngle": working_angle,
+    }
+
+    print(
+        f"[torsion normalize] d={d}, Na={Na}, Dm={Dm}, "
+        f"L1={L1}, L2={L2}, winding={winding}, freeAngle={free_angle}"
+    )
+    return result
+
+
+def normalize_angle_torsion(angle):
+    """
+    Normalize angle to (-π, π]
+    与 Three.js normalizeAngle 完全一致
+    """
+    TWO_PI = 2.0 * math.pi
+    a = angle % TWO_PI
+    if a <= -math.pi:
+        a += TWO_PI
+    if a > math.pi:
+        a -= TWO_PI
+    return a
+
+
+def calculate_torsion_total_angle(active_coils, free_angle_deg, working_angle_deg, winding_direction):
+    """
+    计算扭簧总角度，使得两条腿之间的夹角等于 freeAngle - workingAngle
+    与 Three.js calculateHelixTotalAngle 完全一致
+    
+    数学推导：
+    - Leg1 在 θ=0, 腿角度 = -90°
+    - Leg2 在 θ=totalAngle, 腿角度 = 90° - totalAngle
+    - 两腿夹角 = 180° - totalAngle (mod 360°)
+    - 要得到目标夹角: totalAngle = 180° - targetAngle (mod 360°)
+    """
+    TWO_PI = 2.0 * math.pi
+    dir_mult = -1.0 if winding_direction == "left" else 1.0
+    
+    # 当前腿间夹角（度 → 弧度）
+    current_leg_angle_rad = math.radians(free_angle_deg - working_angle_deg)
+    
+    # 基础角度（完整圈数）
+    base_angle = TWO_PI * active_coils
+    
+    # 目标结束角度 (mod 2π): θ_total ≡ π - currentLegAngle
+    target_end_angle = normalize_angle_torsion(math.pi - current_leg_angle_rad)
+    base_end_angle = normalize_angle_torsion(base_angle)
+    
+    # 额外旋转（取最小调整量）
+    extra_angle = normalize_angle_torsion(target_end_angle - base_end_angle)
+    
+    # 总角度
+    total_angle = base_angle + extra_angle
+    
+    print(f"[torsion angle] activeCoils={active_coils}, freeAngle={free_angle_deg}°")
+    print(f"[torsion angle] base={math.degrees(base_angle):.1f}°, extra={math.degrees(extra_angle):.1f}°")
+    print(f"[torsion angle] total_angle={math.degrees(total_angle):.1f}° ({total_angle/(TWO_PI):.2f} coils)")
+    
+    return total_angle * dir_mult
+
+
+def generate_torsion_body_centerline(params):
+    """
+    生成扭簧"本体"中心线（螺旋，pitch = wireDiameter）
+    
+    与 Three.js generateTorsionBodyCenterline 完全一致：
+      - 使用 calculateHelixTotalAngle 计算总角度（控制腿夹角）
+      - Z = t * L，其中 L = pitch * actualCoils
+    """
+    d = params["wireDiameter"]
+    Dm = params["meanDiameter"]
+    Na = params["activeCoils"]
+    winding = params["windingDirection"]
+    free_angle = params.get("freeAngle", 90.0)
+    working_angle = params.get("workingAngle", 0.0)
+    
+    # pitch：扭簧的节距，默认等于线径（紧密缠绕）
+    pitch = params.get("pitch", d)
+
+    R = Dm / 2.0
+    
+    # 使用 Three.js 的算法计算总角度（考虑 freeAngle 控制腿夹角）
+    total_angle = calculate_torsion_total_angle(Na, free_angle, working_angle, winding)
+    
+    # 体长 = pitch × 实际圈数
+    actual_coils = abs(total_angle) / (2.0 * math.pi)
+    body_length = pitch * actual_coils
+
+    # 采样精度：每圈约 90 个点（略高于 Three.js，提升光滑度）
+    samples_per_turn = 90
+    num_samples = max(500, int(actual_coils * samples_per_turn))
+
+    pts = []
+    for i in range(num_samples + 1):
+        t = i / num_samples
+        theta = t * total_angle
+        x = R * math.cos(theta)
+        y = R * math.sin(theta)
+        z = t * body_length  # ✅ 与 Three.js 一致：z = t * L
+        pts.append(App.Vector(x, y, z))
+
+    print(f"[torsion body] {len(pts)} points, R={R}, pitch={pitch}, bodyLength={body_length:.2f}")
+    print(f"[torsion body] actual_coils={actual_coils:.2f}")
+    return pts, total_angle
+
 
 def make_torsion_spring(params):
-    """生成扭转弹簧 (带腿)"""
-    d = params.get("wireDiameter", 1.5)
-    Dm = params.get("meanDiameter", 12.0)
-    Na = params.get("activeCoils", 6)
-    Lb = params.get("bodyLength", Na * d * 1.1)
-    L1 = params.get("legLength1", 25.0)
-    L2 = params.get("legLength2", 25.0)
-    winding = params.get("windingDirection", "right")
+    """
+    扭转弹簧 v2：
+      1. normalize_torsion_params 统一参数
+      2. generate_torsion_body_centerline 生成平面线圈中心线（Z=0）
+      3. 从起点/终点切线方向生成两条腿（直线）
+      4. 三段中心线合并后，调用 sweep_wire_along_path 一次扫掠
+
+    关键：使用 freeAngle 控制两条腿之间的夹角（与 Three.js 一致）
+    """
+    # 1) 归一化参数
+    params = normalize_torsion_params(params)
+
+    d = params["wireDiameter"]
+    L1 = params["legLength1"]
+    L2 = params["legLength2"]
+
+    # 2) 本体中心线（平面圆线圈，Z=0）
+    body_pts, total_angle = generate_torsion_body_centerline(params)
+    if len(body_pts) < 3:
+        raise RuntimeError("Not enough points for torsion spring body")
+
+    start_pos = body_pts[0]
+    end_pos = body_pts[-1]
     
-    R = Dm / 2.0
-    left_handed = (winding == "left")
+    winding = params["windingDirection"]
+    dir_mult = -1.0 if winding == "left" else 1.0
+
+    # 3) 计算切线方向（与 Three.js 完全一致）
+    # 注意：total_angle 已经包含了 dir_mult，所以计算切线时要用绝对值
+    # Three.js 在 generateLegGeometry 中使用的是 bodyEndAngle（不带 dir_mult 的原始角度）
     
-    # 螺旋体
-    helix_pts = generate_helix_points(R, Lb, Na, int(Na * 36), left_handed)
+    # 计算不带 dir_mult 的原始结束角度
+    raw_end_angle = abs(total_angle)  # 去掉方向符号
     
-    start_pos = helix_pts[0]
-    end_pos = helix_pts[-1]
+    # Leg1 at start (θ = 0)
+    # tangent at θ=0: (-sin(0), cos(0)) = (0, 1)
+    tangent1_x = 0
+    tangent1_y = 1
+    # Leg1 extends OPPOSITE to helix travel
+    leg1_dir = App.Vector(
+        -tangent1_x * dir_mult,
+        -tangent1_y * dir_mult,
+        0
+    )
     
-    # 腿1 (径向向外)
-    leg1_dir = App.Vector(start_pos.x, start_pos.y, 0)
-    if leg1_dir.Length < 1e-8:
-        leg1_dir = App.Vector(1, 0, 0)
-    leg1_dir.normalize()
+    # Leg2 at end (θ = raw_end_angle)
+    # tangent at θ: (-sin(θ), cos(θ))
+    tangent2_x = -math.sin(raw_end_angle)
+    tangent2_y = math.cos(raw_end_angle)
+    # Leg2 extends in SAME direction as helix travel
+    sign = 1.0 if winding == "right" else -1.0
+    leg2_dir = App.Vector(
+        tangent2_x * sign,
+        tangent2_y * sign,
+        0
+    )
+
+    print(f"[torsion] total_angle={math.degrees(total_angle):.1f}°, raw_end_angle={math.degrees(raw_end_angle):.1f}°")
+    print(f"[torsion] leg1_dir=({leg1_dir.x:.3f}, {leg1_dir.y:.3f}), "
+          f"leg2_dir=({leg2_dir.x:.3f}, {leg2_dir.y:.3f})")
+
+    # ===== 3. 生成两条腿的直线 Edge =====
+    leg1_end = App.Vector(start_pos.x + leg1_dir.x * L1,
+                          start_pos.y + leg1_dir.y * L1,
+                          start_pos.z)
+    leg2_end = App.Vector(end_pos.x + leg2_dir.x * L2,
+                          end_pos.y + leg2_dir.y * L2,
+                          end_pos.z)
+
+    print(f"[torsion] leg1: ({leg1_end.x:.2f},{leg1_end.y:.2f}) -> ({start_pos.x:.2f},{start_pos.y:.2f})")
+    print(f"[torsion] leg2: ({end_pos.x:.2f},{end_pos.y:.2f}) -> ({leg2_end.x:.2f},{leg2_end.y:.2f})")
+
+    # 4) 用 Edge 拼接（保持腿为直线，不被 B-Spline 弯曲）
+    # Leg1: 直线 Edge
+    leg1_edge = Part.makeLine(leg1_end, start_pos)
     
-    leg1_pts = [start_pos + leg1_dir * (L1 * t / 20) for t in range(21)]
+    # Body: B-Spline Edge
+    body_path = make_bspline_from_points(body_pts)
     
-    # 腿2 (径向向外)
-    leg2_dir = App.Vector(end_pos.x, end_pos.y, 0)
-    if leg2_dir.Length < 1e-8:
-        leg2_dir = App.Vector(1, 0, 0)
-    leg2_dir.normalize()
+    # Leg2: 直线 Edge
+    leg2_edge = Part.makeLine(end_pos, leg2_end)
+
+    # 5) 拼成 Wire：腿1 -> 线圈 -> 腿2
+    if hasattr(body_path, "Edges"):
+        edges = [leg1_edge] + list(body_path.Edges) + [leg2_edge]
+    else:
+        edges = [leg1_edge, body_path, leg2_edge]
     
-    leg2_pts = [end_pos + leg2_dir * (L2 * t / 20) for t in range(21)]
-    
-    # 合并中心线
-    leg1_pts.reverse()
-    centerline_pts = leg1_pts + helix_pts[1:] + leg2_pts[1:]
-    
-    path = make_bspline_from_points(centerline_pts)
-    spring = sweep_wire_along_path(path, d)
-    
-    return spring
+    wire = Part.Wire(edges)
+    print(f"[torsion] Wire created with {len(wire.Edges)} edges")
+
+    # 6) 扫掠
+    spring_solid = sweep_wire_along_path(wire, d)
+
+    if spring_solid is None or spring_solid.isNull():
+        raise RuntimeError("Torsion spring sweep failed")
+
+    print(f"[torsion] Generated spring: ShapeType={spring_solid.ShapeType}, "
+          f"Volume={spring_solid.Volume:.2f}, Area={spring_solid.Area:.2f}")
+    return spring_solid
 
 
 # =============================================================================
-# 锥形弹簧生成器
+# 锥形弹簧生成器 (改进版 - 支持死圈、端面磨平)
 # =============================================================================
 
-def make_conical_spring(params):
-    """生成锥形弹簧 (变径螺旋)"""
+def generate_conical_centerline(params):
+    """
+    锥形压簧中心线（简化版）
+    
+    算法思路:
+    - 锥形弹簧通常全部为有效圈，不需要死圈分段
+    - 所有圈使用统一节距: pitch = L0 / totalCoils
+    - 半径沿 z 线性插值 (大端 → 小端)
+    - 这样可以避免死圈/有效圈交界处的节距跳变，使末圈连接更光滑
+    
+    参数:
+        params: {
+            wireDiameter: 线径 (mm)
+            largeOuterDiameter: 大端外径 (mm)
+            smallOuterDiameter: 小端外径 (mm)
+            activeCoils: 有效圈数 Na
+            totalCoils: 总圈数 Nt (= Na + deadTop + deadBottom)
+            freeLength: 自由长度 L0 (mm)
+            endType: 端面形式 ("natural" | "closed" | "closed_ground")
+            leftHanded: 是否左旋 (可选)
+        }
+    
+    返回:
+        (centerline_pts, min_z, max_z)
+    
+    工业级设计 (DIN / GB 标准):
+    - Dead Coils: 密绕端圈，pitch → ε (不为0)
+    - Active Coils: 线性变径螺旋
+    - Ground: 后处理切割 (在 make_conical_spring 中执行)
+    """
     d = params.get("wireDiameter", 3.0)
-    D1 = params.get("largeOuterDiameter", 30.0)
-    D2 = params.get("smallOuterDiameter", 15.0)
+    D_large_outer = params.get("largeOuterDiameter", 30.0)
+    D_small_outer = params.get("smallOuterDiameter", 15.0)
     Na = params.get("activeCoils", 6)
+    Nt = params.get("totalCoils", Na)
     L0 = params.get("freeLength", 50.0)
+    end_type = params.get("endType", "natural")
     left_handed = params.get("leftHanded", False)
     
-    R1 = (D1 - d) / 2.0  # 大端中径半径
-    R2 = (D2 - d) / 2.0  # 小端中径半径
+    # 中径半径: 外径减掉一根线径
+    R_large = (D_large_outer - d) / 2.0
+    R_small = (D_small_outer - d) / 2.0
     
-    samples = int(Na * 36)
     sign = -1 if left_handed else 1
+    steps_per_turn = 50  # 每圈采样点数
     
-    # 锥形螺旋线 (半径线性插值)
-    conical_pts = []
-    for i in range(samples + 1):
-        t = float(i) / samples
-        theta = 2.0 * math.pi * Na * t * sign
-        z = L0 * t
-        r = R1 + (R2 - R1) * t  # 线性插值半径
-        x = r * math.cos(theta)
-        y = r * math.sin(theta)
-        conical_pts.append(App.Vector(x, y, z))
+    # ================================================================
+    # 工业级 Dead Coil 参数 (DIN 2096 / GB/T 1239)
+    # ================================================================
+    # 密绕节距: 接近线径但略小，确保密绕效果
+    # 工业标准: 死圈节距 ≈ 线径 (相邻圈接触)
+    DEAD_PITCH = d * 0.95  # 密绕节距，略小于线径避免干涉
     
-    path = make_bspline_from_points(conical_pts)
-    spring = sweep_wire_along_path(path, d)
+    # 判断是否有死圈
+    has_dead_coils = end_type in ("closed", "closed_ground")
     
-    return spring
+    if has_dead_coils:
+        # 死圈数 = (Nt - Na) / 2，每端各一半
+        total_dead_turns = max(0, Nt - Na)
+        dead_turns_per_end = total_dead_turns / 2.0
+        if dead_turns_per_end < 0.5:
+            dead_turns_per_end = 1.0  # 最少每端 1 圈死圈
+    else:
+        dead_turns_per_end = 0.0
+    
+    # 计算各段高度
+    dead_height_per_end = dead_turns_per_end * DEAD_PITCH
+    active_length = L0 - 2 * dead_height_per_end
+    
+    if active_length <= 0:
+        # 如果自由长度太短，回退到无死圈模式
+        print(f"[Conical] Warning: freeLength too short for dead coils, falling back to open end")
+        has_dead_coils = False
+        dead_turns_per_end = 0.0
+        dead_height_per_end = 0.0
+        active_length = L0
+    
+    # 活动圈节距
+    active_pitch = active_length / Na if Na > 0 else d
+    
+    print(f"[Conical] endType={end_type}, Na={Na}, Nt={Nt}")
+    print(f"[Conical] dead_turns_per_end={dead_turns_per_end:.2f}, dead_height={dead_height_per_end:.2f}")
+    print(f"[Conical] active_length={active_length:.2f}, active_pitch={active_pitch:.2f}")
+    
+    centerline_pts = []
+    current_theta = 0.0
+    current_z = 0.0
+    
+    # ================================================================
+    # 1. Bottom Dead Coil (密绕，半径 = R_large)
+    # ================================================================
+    if has_dead_coils and dead_turns_per_end > 0:
+        num_samples = max(20, int(dead_turns_per_end * steps_per_turn))
+        for i in range(num_samples + 1):
+            t = i / float(num_samples)
+            theta = current_theta + 2.0 * math.pi * dead_turns_per_end * t * sign
+            z = current_z + DEAD_PITCH * dead_turns_per_end * t
+            
+            # 底部死圈: 半径固定为大端
+            R = R_large
+            
+            x = R * math.cos(theta)
+            y = R * math.sin(theta)
+            centerline_pts.append(App.Vector(x, y, z))
+        
+        # 更新起点
+        current_theta += 2.0 * math.pi * dead_turns_per_end * sign
+        current_z += dead_height_per_end
+    
+    # ================================================================
+    # 2. Active Coils (线性变径螺旋)
+    # ================================================================
+    active_start_z = current_z
+    num_samples = max(200, int(Na * steps_per_turn))
+    
+    for i in range(num_samples + 1):
+        t = i / float(num_samples)
+        theta = current_theta + 2.0 * math.pi * Na * t * sign
+        z = current_z + active_length * t
+        
+        # 半径线性插值: 大端 → 小端
+        R = R_large + (R_small - R_large) * t
+        
+        x = R * math.cos(theta)
+        y = R * math.sin(theta)
+        
+        # 避免与底部死圈最后一点重复
+        if i > 0 or not has_dead_coils:
+            centerline_pts.append(App.Vector(x, y, z))
+    
+    # 更新起点
+    current_theta += 2.0 * math.pi * Na * sign
+    current_z += active_length
+    
+    # ================================================================
+    # 3. Top Dead Coil (密绕，半径 = R_small)
+    # ================================================================
+    if has_dead_coils and dead_turns_per_end > 0:
+        num_samples = max(20, int(dead_turns_per_end * steps_per_turn))
+        for i in range(num_samples + 1):
+            t = i / float(num_samples)
+            theta = current_theta + 2.0 * math.pi * dead_turns_per_end * t * sign
+            z = current_z + DEAD_PITCH * dead_turns_per_end * t
+            
+            # 顶部死圈: 半径固定为小端
+            R = R_small
+            
+            x = R * math.cos(theta)
+            y = R * math.sin(theta)
+            
+            # 避免与活动圈最后一点重复
+            if i > 0:
+                centerline_pts.append(App.Vector(x, y, z))
+    
+    min_z = 0.0
+    max_z = L0
+    
+    print(f"[Conical] Generated {len(centerline_pts)} centerline points")
+    
+    return centerline_pts, min_z, max_z
+
+
+def make_conical_spring(params):
+    """
+    生成锥形压缩弹簧实体 (改进版)
+    
+    特性:
+    - 均匀螺旋 + 半径线性插值 (无死圈分段，末圈更光滑)
+    - 支持端面磨平 (通过 endType 参数控制)
+    - 与 Three.js 算法风格统一
+    
+    参数:
+        params: {
+            wireDiameter: 线径 (mm)
+            largeOuterDiameter: 大端外径 (mm)
+            smallOuterDiameter: 小端外径 (mm)
+            activeCoils: 有效圈数 Na
+            totalCoils: 总圈数 Nt (可选, 默认等于 Na)
+            freeLength: 自由长度 L0 (mm)
+            leftHanded: 是否左旋 (可选)
+            endType: 端面类型 (natural/closed/closed_ground)
+            groundEnds: 端面磨平 (兼容旧参数)
+        }
+    """
+    d = params.get("wireDiameter", 3.0)
+    D_large_outer = params.get("largeOuterDiameter", 30.0)
+    
+    # 端面类型: 优先使用 endType，兼容旧的 groundEnds 参数
+    end_type = params.get("endType", "natural")
+    ground_ends_legacy = params.get("groundEnds", False)
+    # 只有 closed_ground 才磨端，或者旧参数 groundEnds=True
+    should_grind = (end_type == "closed_ground") or ground_ends_legacy
+    
+    print(f"[Conical] endType={end_type}, groundEnds={ground_ends_legacy}, should_grind={should_grind}")
+    
+    # 生成中心线
+    centerline_pts, min_z, max_z = generate_conical_centerline(params)
+    
+    print(f"Conical spring centerline: {len(centerline_pts)} points, z=[{min_z:.2f}, {max_z:.2f}]")
+    
+    # B-Spline 路径
+    path_shape = make_bspline_from_points(centerline_pts)
+    
+    # 扫掠生成实体
+    spring_solid = sweep_wire_along_path(path_shape, d)
+    
+    if spring_solid is None or spring_solid.isNull():
+        raise RuntimeError("Conical spring sweep failed")
+    
+    # 端面磨平 (只有 closed_ground 才执行)
+    if should_grind:
+        # ============================================================
+        # 工程级容差 - 解决 OCC/FreeCAD 布尔运算稳健性问题
+        # 切割盒必须"穿透"被切实体，而不是刚好对齐
+        # ============================================================
+        EPS = max(0.05 * d, 0.05)  # 工程级容差
+        
+        # 修复形状 - 提高布尔运算成功率
+        if not spring_solid.isValid():
+            print(f"[Conical] Spring shape is invalid, attempting to fix...")
+            spring_solid = spring_solid.removeSplitter()
+            print(f"[Conical] After removeSplitter: isValid={spring_solid.isValid()}")
+        
+        # 使用中心线的 min_z/max_z（而不是 BoundBox）
+        # 因为 BoundBox 包含了圆截面的延伸，不是实际的切割位置
+        # min_z 和 max_z 是中心线的 Z 范围，代表弹簧的"工程"高度
+        L0 = params.get("freeLength", 40.0)
+        
+        grind_depth = 0.3 * d
+        # 底部切割：切掉 Z < grind_depth 的部分
+        bottom_cut_z = grind_depth
+        # 顶部切割：切掉 Z > (L0 - grind_depth) 的部分
+        top_cut_z = L0 - grind_depth
+        
+        box_size = D_large_outer * 3
+        box_height = d * 5  # 足够高的盒子，确保覆盖圆截面延伸
+        
+        # 底部切割盒 - 切掉 Z < grind_depth 的部分
+        # 盒子从 Z = -很大 到 Z = grind_depth + EPS
+        bottom_box = Part.makeBox(
+            box_size, box_size, box_height,
+            App.Vector(-box_size/2, -box_size/2, grind_depth + EPS - box_height)
+        )
+        
+        # 顶部切割盒 - 切掉 Z > (L0 - grind_depth) 的部分
+        # 盒子从 Z = L0 - grind_depth - EPS 到 Z = 很大
+        top_box = Part.makeBox(
+            box_size, box_size, box_height,
+            App.Vector(-box_size/2, -box_size/2, L0 - grind_depth - EPS)
+        )
+        
+        try:
+            bb = spring_solid.BoundBox
+            print(f"[Conical] Spring BoundBox: Z={bb.ZMin:.2f} to {bb.ZMax:.2f}, isValid={spring_solid.isValid()}")
+            print(f"[Conical] Cutting at: bottom={bottom_cut_z:.2f}, top={top_cut_z:.2f}")
+            print(f"[Conical] Bottom box Z: {bottom_box.BoundBox.ZMin:.2f} to {bottom_box.BoundBox.ZMax:.2f}")
+            print(f"[Conical] Top box Z: {top_box.BoundBox.ZMin:.2f} to {top_box.BoundBox.ZMax:.2f}")
+            
+            # 验证几何交集
+            bottom_common = spring_solid.common(bottom_box)
+            top_common = spring_solid.common(top_box)
+            print(f"[Conical] Common volume: bottom={bottom_common.Volume:.2f}, top={top_common.Volume:.2f}")
+            
+            # 执行切割
+            cut_result = spring_solid.cut(bottom_box)
+            print(f"[Conical] After bottom cut: Z={cut_result.BoundBox.ZMin:.2f} to {cut_result.BoundBox.ZMax:.2f}")
+            
+            cut_result = cut_result.cut(top_box)
+            print(f"[Conical] After top cut: Z={cut_result.BoundBox.ZMin:.2f} to {cut_result.BoundBox.ZMax:.2f}")
+            
+            # 如果结果是 Compound，取最大的 Solid
+            if cut_result.ShapeType == "Compound" and cut_result.Solids:
+                cut_result = max(cut_result.Solids, key=lambda s: s.Volume)
+                print(f"[Conical] Extracted main solid: Volume={cut_result.Volume:.2f}")
+            
+            spring_solid = cut_result
+            print(f"[Conical] Ground ends applied: bottom={bottom_cut_z:.2f}, top={top_cut_z:.2f}")
+        except Exception as e:
+            import traceback
+            print(f"[Conical] Warning: ground end cutting failed: {e}")
+            traceback.print_exc()
+    
+    return spring_solid
 
 
 # =============================================================================
@@ -1590,6 +2065,7 @@ def main():
     print(f"=== Spring Export ===")
     print(f"Type: {spring_type}")
     print(f"Output: {output_dir}/{export_name}")
+    print(f"Geometry: {json.dumps(geometry, indent=2)}")
     
     # 创建文档
     doc = App.newDocument("Spring")
@@ -1639,9 +2115,9 @@ def main():
             # 使用 Mesh 模块导出，可以控制精度
             try:
                 import Mesh
-                # 高精度设置
-                linear_deflection = 0.02  # mm - 高精度
-                angular_deflection = 0.1  # radians - 高精度
+                # 预览用超高精度（在当前速度可接受的基础上再提升一档）
+                linear_deflection = 0.005  # mm - 超高精度
+                angular_deflection = 0.07  # radians - 超高精度（约4°）
                 
                 # 创建 mesh 并导出
                 mesh = Mesh.Mesh()

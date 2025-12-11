@@ -13,7 +13,8 @@ import {
   type PreloadResult,
 } from "@/lib/springMath";
 import { 
-  getDefaultSpringMaterial, 
+  getDefaultSpringMaterial,
+  getSpringMaterial,
   getSizeFactor,
   type SpringMaterial,
   type SpringMaterialId,
@@ -59,27 +60,45 @@ type CalculationResult = ReturnType<typeof calculateLoadAndStress> | null;
 export function CompressionCalculator() {
   const [result, setResult] = useState<CalculationResult>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMaterial, setSelectedMaterial] = useState<SpringMaterial>(getDefaultSpringMaterial());
   const [stressAnalysis, setStressAnalysis] = useState<StressAnalysisResult | null>(null);
   const [preloadResult, setPreloadResult] = useState<PreloadResult | null>(null);
   
   // 全局设计存储
-  const setDesign = useSpringDesignStore(state => state.setDesign);
+  const storedGeometry = useSpringDesignStore((state) => state.geometry);
+  const storedMaterial = useSpringDesignStore((state) => state.material);
+  const storedAnalysis = useSpringDesignStore((state) => state.analysisResult);
+  const setDesign = useSpringDesignStore((state) => state.setDesign);
+
+  const lastCompressionGeometry = storedGeometry?.type === "compression" ? storedGeometry : null;
+  const lastCompressionAnalysis = lastCompressionGeometry ? storedAnalysis : null;
+  const initialMaterial = useMemo(() => {
+    if (storedMaterial?.id) {
+      return getSpringMaterial(storedMaterial.id) ?? getDefaultSpringMaterial();
+    }
+    return getDefaultSpringMaterial();
+  }, [storedMaterial?.id]);
+  const [selectedMaterial, setSelectedMaterial] = useState<SpringMaterial>(initialMaterial);
+
+  const defaultDeflection = lastCompressionAnalysis?.workingDeflection ?? 10;
+  const defaultPreload =
+    lastCompressionAnalysis?.maxDeflection !== undefined && lastCompressionAnalysis?.workingDeflection !== undefined
+      ? Math.max(lastCompressionAnalysis.maxDeflection - lastCompressionAnalysis.workingDeflection, 0)
+      : 0;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as Resolver<FormValues>,
     defaultValues: {
-      wireDiameter: 3.2,
-      meanDiameter: 24,
-      activeCoils: 8,
-      totalCoils: 10,
-      shearModulus: getDefaultSpringMaterial().shearModulus,
-      freeLength: 50,
-      deflection: 10,
-      preloadDeflection: 0,
+      wireDiameter: lastCompressionGeometry?.wireDiameter ?? 3.2,
+      meanDiameter: lastCompressionGeometry?.meanDiameter ?? 24,
+      activeCoils: lastCompressionGeometry?.activeCoils ?? 8,
+      totalCoils: lastCompressionGeometry?.totalCoils ?? 10,
+      shearModulus: lastCompressionGeometry?.shearModulus ?? initialMaterial.shearModulus,
+      freeLength: lastCompressionGeometry?.freeLength ?? 50,
+      deflection: defaultDeflection,
+      preloadDeflection: defaultPreload,
       stressRatio: 0.3,
-      topGround: true,
-      bottomGround: true,
+      topGround: lastCompressionGeometry?.topGround ?? true,
+      bottomGround: lastCompressionGeometry?.bottomGround ?? true,
     },
   });
 
@@ -425,8 +444,24 @@ export function CompressionCalculator() {
               </label>
             </div>
 
-            <Button type="submit" className="w-full">
-              Calculate / 计算
+            <Button 
+              type="submit" 
+              className="w-full transition-all duration-200 active:scale-95"
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  Calculating... / 计算中...
+                </>
+              ) : form.formState.isSubmitSuccessful && result ? (
+                <>
+                  <span className="mr-2">✓</span>
+                  Calculated / 已计算
+                </>
+              ) : (
+                "Calculate / 计算"
+              )}
             </Button>
           </form>
         </CardContent>
@@ -464,18 +499,35 @@ export function CompressionCalculator() {
             </p>
           )}
 
-          {/* Action Buttons */}
-          <div className="space-y-2">
-            <Button asChild variant="secondary" className="w-full" disabled={!result}>
+          {/* Action Buttons - 重新设计的按钮样式 */}
+          <div className="space-y-3">
+            <Button 
+              asChild 
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg" 
+              disabled={!result}
+            >
               <a href={simulatorUrl || "#"}>Generate 3D Model / 生成3D模型</a>
             </Button>
-            <Button asChild variant="outline" className="w-full border-green-600 text-green-400 hover:bg-green-950">
+            <Button 
+              asChild 
+              variant="outline" 
+              className="w-full border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 hover:border-emerald-400 hover:text-emerald-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/10"
+            >
               <a href={forceTesterUrl}>Send to Force Tester / 发送到力–位移测试</a>
             </Button>
-            <Button asChild variant="outline" className="w-full border-blue-600 text-blue-400 hover:bg-blue-950">
+            <Button 
+              asChild 
+              variant="outline" 
+              className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
+            >
               <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
             </Button>
-            <Button asChild variant="outline" className="w-full border-purple-600 text-purple-400 hover:bg-purple-950" disabled={!result}>
+            <Button 
+              asChild 
+              variant="outline" 
+              className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10" 
+              disabled={!result}
+            >
               <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
             </Button>
           </div>

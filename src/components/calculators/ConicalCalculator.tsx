@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
 import {
@@ -16,15 +16,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DimensionHint } from "./DimensionHint";
+import { 
+  useSpringDesignStore,
+  type ConicalGeometry,
+  type ConicalEndType,
+  type MaterialInfo,
+  type AnalysisResult,
+  generateDesignCode,
+} from "@/lib/stores/springDesignStore";
+import {
+  getDefaultSpringMaterial,
+  getSpringMaterial,
+  type SpringMaterial,
+} from "@/lib/materials/springMaterials";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface FormValues {
   wireDiameter: number;
   largeDiameter: number;
   smallDiameter: number;
   activeCoils: number;
+  totalCoils: number;
   freeLength: number;
   shearModulus: number;
   deflection: number;
+  endType: ConicalEndType;
 }
 
 type CalculationResult = ReturnType<typeof calculateLoadAndStress> | null;
@@ -35,19 +57,36 @@ export function ConicalCalculator() {
   const [stageTransitions, setStageTransitions] = useState<ReturnType<typeof extractConicalStageTransitions> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"linear" | "nonlinear">("linear");
+  const [isCalculatingNonlinear, setIsCalculatingNonlinear] = useState(false);
+  
+  // 全局设计存储
+  const storedGeometry = useSpringDesignStore(state => state.geometry);
+  const storedMaterial = useSpringDesignStore(state => state.material);
+  const storedAnalysis = useSpringDesignStore(state => state.analysisResult);
+  const setDesign = useSpringDesignStore(state => state.setDesign);
+  const lastConicalGeometry = storedGeometry?.type === "conical" ? storedGeometry : null;
+  const lastConicalAnalysis = lastConicalGeometry ? storedAnalysis : null;
+  const initialMaterial = useMemo<SpringMaterial>(() => {
+    if (storedMaterial?.id) {
+      return getSpringMaterial(storedMaterial.id) ?? getDefaultSpringMaterial();
+    }
+    return getDefaultSpringMaterial();
+  }, [storedMaterial?.id]);
   
   // Derived: extract curve from nonlinear result
   const nonlinearCurve = nonlinearResult?.curve ?? null;
 
   const form = useForm<FormValues>({
     defaultValues: {
-      wireDiameter: 3.0,
-      largeDiameter: 30,
-      smallDiameter: 15,
-      activeCoils: 5,
-      freeLength: 40,
-      shearModulus: 79300,
-      deflection: 15,
+      wireDiameter: lastConicalGeometry?.wireDiameter ?? 3.0,
+      largeDiameter: lastConicalGeometry?.largeOuterDiameter ?? 30,
+      smallDiameter: lastConicalGeometry?.smallOuterDiameter ?? 15,
+      activeCoils: lastConicalGeometry?.activeCoils ?? 5,
+      totalCoils: lastConicalGeometry?.totalCoils ?? 7,
+      freeLength: lastConicalGeometry?.freeLength ?? 40,
+      shearModulus: lastConicalGeometry?.shearModulus ?? initialMaterial.shearModulus ?? 79300,
+      deflection: lastConicalAnalysis?.workingDeflection ?? 15,
+      endType: lastConicalGeometry?.endType ?? "closed_ground",
     },
   });
 
@@ -107,13 +146,59 @@ export function ConicalCalculator() {
       D1: watchedValues.largeDiameter?.toString() ?? "30",
       D2: watchedValues.smallDiameter?.toString() ?? "15",
       Na: watchedValues.activeCoils?.toString() ?? "6",
+      Nt: watchedValues.totalCoils?.toString() ?? "7",
       L0: watchedValues.freeLength?.toString() ?? "50",
+      endType: watchedValues.endType ?? "closed_ground",
       material: "music_wire_a228",
       k: result?.k?.toString() ?? "",
       dx: watchedValues.deflection?.toString() ?? "15",
     });
     return `/tools/cad-export?${params.toString()}`;
   }, [watchedValues, result]);
+
+  // 保存设计到全局 store
+  const saveDesignToStore = useCallback((values: FormValues, calc: CalculationResult) => {
+    const geometry: ConicalGeometry = {
+      type: "conical",
+      wireDiameter: values.wireDiameter,
+      largeOuterDiameter: values.largeDiameter,
+      smallOuterDiameter: values.smallDiameter,
+      activeCoils: values.activeCoils,
+      totalCoils: values.totalCoils,
+      freeLength: values.freeLength,
+      endType: values.endType,
+      shearModulus: values.shearModulus,
+      materialId: initialMaterial.id,
+    };
+    
+    const materialInfo: MaterialInfo = {
+      id: initialMaterial.id,
+      name: initialMaterial.nameEn,
+      shearModulus: values.shearModulus,
+      elasticModulus: initialMaterial.elasticModulus ?? 207000,
+      density: initialMaterial.density ?? 7850,
+    };
+    
+    const analysisResult: AnalysisResult = {
+      springRate: calc?.k ?? 0,
+      springRateUnit: "N/mm",
+      workingLoad: calc?.load,
+      shearStress: calc?.shearStress,
+      springIndex: calc?.springIndex,
+      wahlFactor: calc?.wahlFactor,
+      workingDeflection: values.deflection,
+    };
+    
+    setDesign({
+      springType: "conical",
+      geometry,
+      material: materialInfo,
+      analysisResult,
+      meta: {
+        designCode: generateDesignCode(geometry),
+      },
+    });
+  }, [initialMaterial, setDesign]);
 
   const onSubmitLinear: SubmitHandler<FormValues> = (values) => {
     setError(null);
@@ -135,19 +220,26 @@ export function ConicalCalculator() {
 
       const calc = calculateLoadAndStress(design, values.deflection);
       setResult(calc);
+      
+      // 保存到全局 store
+      saveDesignToStore(values, calc);
     } catch (err) {
       setResult(null);
       setError(err instanceof Error ? err.message : "Calculation failed");
     }
   };
 
-  const onCalculateNonlinear = () => {
+  const onCalculateNonlinear = async () => {
     setError(null);
     setMode("nonlinear");
     setResult(null);
+    setIsCalculatingNonlinear(true);
     const values = form.getValues();
 
     try {
+      // 模拟异步计算延迟，让用户看到加载状态
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const nlResult = calculateConicalSpringNonlinear({
         wireDiameter: values.wireDiameter,
         largeOuterDiameter: values.largeDiameter,
@@ -165,6 +257,8 @@ export function ConicalCalculator() {
       setNonlinearResult(null);
       setStageTransitions(null);
       setError(err instanceof Error ? err.message : "Nonlinear calculation failed");
+    } finally {
+      setIsCalculatingNonlinear(false);
     }
   };
 
@@ -254,6 +348,45 @@ export function ConicalCalculator() {
               />
             </div>
 
+            {/* Total Coils */}
+            <div className="space-y-2">
+              <DimensionHint
+                code="Nt"
+                label="Total Coils"
+                description="总圈数，包括两端的死圈。通常 Nt = Na + 2（两端各 1 圈死圈）。"
+              />
+              <Label htmlFor="totalCoils">Total Coils Nt / 总圈数</Label>
+              <Input
+                id="totalCoils"
+                type="number"
+                step="0.5"
+                {...form.register("totalCoils", { valueAsNumber: true })}
+              />
+            </div>
+
+            {/* End Type */}
+            <div className="space-y-2">
+              <DimensionHint
+                code="End"
+                label="End Type"
+                description="端面形式：自然端（不磨平）、并紧（密绕但不磨平）、并紧磨平（密绕且磨平）。"
+              />
+              <Label>End Type / 端面形式</Label>
+              <Select
+                value={form.watch("endType")}
+                onValueChange={(value: ConicalEndType) => form.setValue("endType", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select end type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="natural">Natural / 自然端</SelectItem>
+                  <SelectItem value="closed">Closed / 并紧</SelectItem>
+                  <SelectItem value="closed_ground">Closed & Ground / 并紧磨平</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Shear Modulus */}
             <div className="space-y-2">
               <Label htmlFor="shearModulus">Shear Modulus G (MPa) / 剪切模量</Label>
@@ -284,16 +417,53 @@ export function ConicalCalculator() {
             {error && <p className="text-sm text-red-500">{error}</p>}
 
             <div className="flex gap-2">
-              <Button type="submit" className="flex-1">
-                Linear / 线性计算
+              <Button 
+                type="submit" 
+                className={`flex-1 transition-all duration-200 active:scale-95 ${
+                  mode === "linear" && result 
+                    ? "bg-emerald-600 hover:bg-emerald-700" 
+                    : ""
+                }`}
+                disabled={form.formState.isSubmitting || isCalculatingNonlinear}
+              >
+                {form.formState.isSubmitting ? (
+                  <>
+                    <span className="animate-spin mr-2">⏳</span>
+                    计算中...
+                  </>
+                ) : mode === "linear" && result ? (
+                  <>
+                    <span className="mr-2">✓</span>
+                    Linear / 已计算
+                  </>
+                ) : (
+                  "Linear / 线性计算"
+                )}
               </Button>
               <Button
                 type="button"
-                variant="outline"
-                className="flex-1"
+                variant={mode === "nonlinear" && nonlinearResult ? "default" : "outline"}
+                className={`flex-1 transition-all duration-200 active:scale-95 ${
+                  mode === "nonlinear" && nonlinearResult 
+                    ? "bg-emerald-600 hover:bg-emerald-700" 
+                    : ""
+                }`}
                 onClick={onCalculateNonlinear}
+                disabled={isCalculatingNonlinear || form.formState.isSubmitting}
               >
-                Nonlinear / 非线性曲线
+                {isCalculatingNonlinear ? (
+                  <>
+                    <span className="animate-spin mr-2">⏳</span>
+                    计算中...
+                  </>
+                ) : mode === "nonlinear" && nonlinearResult ? (
+                  <>
+                    <span className="mr-2">✓</span>
+                    Nonlinear / 已计算
+                  </>
+                ) : (
+                  "Nonlinear / 非线性曲线"
+                )}
               </Button>
             </div>
           </form>
@@ -462,18 +632,35 @@ export function ConicalCalculator() {
             </p>
           )}
 
-          {/* Action Buttons */}
-          <div className="space-y-2">
-            <Button asChild variant="secondary" className="w-full" disabled={!result && !nonlinearCurve}>
+          {/* Action Buttons - 重新设计的按钮样式 */}
+          <div className="space-y-3">
+            <Button 
+              asChild 
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg" 
+              disabled={!result && !nonlinearCurve}
+            >
               <a href={simulatorUrl || "#"}>Generate 3D Model / 生成3D模型</a>
             </Button>
-            <Button asChild variant="outline" className="w-full border-green-600 text-green-400 hover:bg-green-950">
+            <Button 
+              asChild 
+              variant="outline" 
+              className="w-full border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 hover:border-emerald-400 hover:text-emerald-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/10"
+            >
               <a href={forceTesterUrl}>Send to Force Tester / 发送到力–位移测试</a>
             </Button>
-            <Button asChild variant="outline" className="w-full border-blue-600 text-blue-400 hover:bg-blue-950">
+            <Button 
+              asChild 
+              variant="outline" 
+              className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
+            >
               <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
             </Button>
-            <Button asChild variant="outline" className="w-full border-purple-600 text-purple-400 hover:bg-purple-950" disabled={!result && !nonlinearResult}>
+            <Button 
+              asChild 
+              variant="outline" 
+              className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10" 
+              disabled={!result && !nonlinearResult}
+            >
               <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
             </Button>
           </div>

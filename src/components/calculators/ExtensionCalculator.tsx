@@ -14,6 +14,11 @@ import {
   EXTENSION_HOOK_LABELS, 
   type ExtensionHookType 
 } from "@/lib/springTypes";
+import {
+  getDefaultSpringMaterial,
+  getSpringMaterial,
+  type SpringMaterial,
+} from "@/lib/materials/springMaterials";
 import { 
   useSpringDesignStore,
   type ExtensionGeometry,
@@ -41,21 +46,91 @@ export function ExtensionCalculator() {
   const [error, setError] = useState<string | null>(null);
   
   // 全局设计存储
-  const setDesign = useSpringDesignStore(state => state.setDesign);
+  const {
+    geometry: storedGeometry,
+    material: storedMaterial,
+    analysisResult: storedAnalysis,
+    setDesign,
+  } = useSpringDesignStore((state) => ({
+    geometry: state.geometry,
+    material: state.material,
+    analysisResult: state.analysisResult,
+    setDesign: state.setDesign,
+  }));
+
+  const lastExtensionGeometry = storedGeometry?.type === "extension" ? storedGeometry : null;
+  const initialMaterial = useMemo<SpringMaterial>(() => {
+    if (storedMaterial?.id) {
+      return getSpringMaterial(storedMaterial.id) ?? getDefaultSpringMaterial();
+    }
+    return getDefaultSpringMaterial();
+  }, [storedMaterial?.id]);
+  const defaultDeflection = storedAnalysis?.maxDeflection ?? storedAnalysis?.workingDeflection ?? 15;
 
   const form = useForm<FormValues>({
     defaultValues: {
-      outerDiameter: 12,
-      wireDiameter: 1.5,
-      activeCoils: 10,
-      bodyLength: 25,
-      freeLengthInsideHooks: 35,
-      shearModulus: 79300,
-      initialTension: 3,
-      hookType: "machine",
-      workingDeflection: 15,
+      outerDiameter: lastExtensionGeometry?.outerDiameter ?? 12,
+      wireDiameter: lastExtensionGeometry?.wireDiameter ?? 1.5,
+      activeCoils: lastExtensionGeometry?.activeCoils ?? 10,
+      bodyLength: lastExtensionGeometry?.bodyLength ?? 25,
+      freeLengthInsideHooks: lastExtensionGeometry?.freeLength ?? 35,
+      shearModulus: lastExtensionGeometry?.shearModulus ?? initialMaterial.shearModulus,
+      initialTension: lastExtensionGeometry?.initialTension ?? 3,
+      hookType: lastExtensionGeometry?.hookType ?? "machine",
+      workingDeflection: defaultDeflection,
     },
   });
+
+  const persistDesign = useCallback(
+    (values: FormValues, calc: NonNullable<CalculationResult>) => {
+      const meanDiameter = values.outerDiameter - values.wireDiameter;
+
+      const geometry: ExtensionGeometry = {
+        type: "extension",
+        wireDiameter: values.wireDiameter,
+        outerDiameter: values.outerDiameter,
+        meanDiameter,
+        activeCoils: values.activeCoils,
+        bodyLength: values.bodyLength,
+        freeLength: values.freeLengthInsideHooks,
+        hookType: values.hookType,
+        initialTension: values.initialTension,
+        shearModulus: values.shearModulus,
+        materialId: initialMaterial.id,
+      };
+
+      const material: MaterialInfo = {
+        id: initialMaterial.id,
+        name: initialMaterial.nameEn,
+        shearModulus: values.shearModulus,
+        elasticModulus: initialMaterial.elasticModulus ?? 206000,
+        density: initialMaterial.density ?? 7850,
+      };
+
+      const analysisResult: AnalysisResult = {
+        springRate: calc.springRate,
+        springRateUnit: "N/mm",
+        workingLoad: calc.totalLoad,
+        initialTension: calc.initialTension,
+        workingDeflection: calc.workingDeflection,
+        maxDeflection: values.workingDeflection,
+        shearStress: calc.shearStress,
+        springIndex: calc.springIndex,
+        wahlFactor: calc.wahlFactor,
+      };
+
+      setDesign({
+        springType: "extension",
+        geometry,
+        material,
+        analysisResult,
+        meta: {
+          designCode: generateDesignCode(geometry),
+        },
+      });
+    },
+    [initialMaterial, setDesign]
+  );
 
   const onSubmit: SubmitHandler<FormValues> = (values) => {
     setError(null);
@@ -71,6 +146,8 @@ export function ExtensionCalculator() {
 
       const calc = calculateExtensionSpring(input);
       setResult(calc);
+
+      persistDesign(values, calc);
     } catch (err) {
       setResult(null);
       setError(err instanceof Error ? err.message : "Calculation failed");
@@ -117,55 +194,6 @@ export function ExtensionCalculator() {
     return `/tools/analysis?${params.toString()}`;
   }, [watchedValues]);
 
-  // 保存设计到全局 store 并导航到 CAD 页面
-  const saveAndNavigateToCad = useCallback(() => {
-    const values = form.getValues();
-    const meanDiameter = values.outerDiameter - values.wireDiameter;
-    
-    // 构建几何参数
-    const geometry: ExtensionGeometry = {
-      type: "extension",
-      wireDiameter: values.wireDiameter,
-      outerDiameter: values.outerDiameter,
-      meanDiameter,
-      activeCoils: values.activeCoils,
-      bodyLength: values.bodyLength,
-      freeLength: values.freeLengthInsideHooks,
-      hookType: values.hookType,
-      initialTension: values.initialTension,
-      shearModulus: values.shearModulus,
-      materialId: "music_wire_a228",
-    };
-    
-    // 构建材料信息
-    const material: MaterialInfo = {
-      id: "music_wire_a228",
-      name: "Music Wire ASTM A228",
-      shearModulus: values.shearModulus,
-      elasticModulus: 206000,
-      density: 7850,
-    };
-    
-    // 构建分析结果
-    const analysisResult: AnalysisResult = {
-      springRate: result?.springRate ?? 0,
-      springRateUnit: "N/mm",
-      workingLoad: result?.totalLoad,
-      maxDeflection: values.workingDeflection,
-    };
-    
-    // 保存到全局 store
-    setDesign({
-      springType: "extension",
-      geometry,
-      material,
-      analysisResult,
-      meta: {
-        designCode: generateDesignCode(geometry),
-      },
-    });
-  }, [form, result, setDesign]);
-
   const cadExportUrl = useMemo(() => {
     const meanDiameter = (watchedValues.outerDiameter ?? 20) - (watchedValues.wireDiameter ?? 2);
     const params = new URLSearchParams({
@@ -182,6 +210,11 @@ export function ExtensionCalculator() {
     });
     return `/tools/cad-export?${params.toString()}`;
   }, [watchedValues, result]);
+
+  const handleNavigateToCad = () => {
+    if (!result) return;
+    persistDesign(form.getValues(), result);
+  };
 
   const formatNumber = (value: number) => Number(value.toFixed(2)).toLocaleString();
 
@@ -339,8 +372,24 @@ export function ExtensionCalculator() {
 
             {error && <p className="text-sm text-red-500">{error}</p>}
 
-            <Button type="submit" className="w-full">
-              Calculate / 计算
+            <Button 
+              type="submit" 
+              className="w-full transition-all duration-200 active:scale-95"
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  Calculating... / 计算中...
+                </>
+              ) : form.formState.isSubmitSuccessful && result ? (
+                <>
+                  <span className="mr-2">✓</span>
+                  Calculated / 已计算
+                </>
+              ) : (
+                "Calculate / 计算"
+              )}
             </Button>
           </form>
         </CardContent>
@@ -382,23 +431,34 @@ export function ExtensionCalculator() {
             </p>
           )}
 
-          {/* Action Buttons */}
-          <div className="space-y-2">
-            <Button asChild variant="secondary" className="w-full" disabled={!result}>
+          {/* Action Buttons - 重新设计的按钮样式 */}
+          <div className="space-y-3">
+            <Button 
+              asChild 
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg" 
+              disabled={!result}
+            >
               <a href={simulatorUrl || "#"}>Generate 3D Model / 生成3D模型</a>
-            </Button>
-            <Button asChild variant="outline" className="w-full border-green-600 text-green-400 hover:bg-green-950">
-              <a href={forceTesterUrl}>Send to Force Tester / 发送到力–位移测试</a>
-            </Button>
-            <Button asChild variant="outline" className="w-full border-blue-600 text-blue-400 hover:bg-blue-950">
-              <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
             </Button>
             <Button 
               asChild 
               variant="outline" 
-              className="w-full border-purple-600 text-purple-400 hover:bg-purple-950" 
+              className="w-full border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 hover:border-emerald-400 hover:text-emerald-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/10"
+            >
+              <a href={forceTesterUrl}>Send to Force Tester / 发送到力–位移测试</a>
+            </Button>
+            <Button 
+              asChild 
+              variant="outline" 
+              className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
+            >
+              <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10" 
               disabled={!result}
-              onClick={saveAndNavigateToCad}
+              onClick={handleNavigateToCad}
             >
               <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
             </Button>

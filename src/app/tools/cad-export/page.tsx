@@ -19,13 +19,21 @@ import {
   CAD_FORMAT_META,
 } from "@/lib/cad/types";
 import { requestCadExport } from "@/lib/cad/exportService";
-import type { CompressionSpringGeometry } from "@/lib/engine/types";
+import type {
+  CompressionSpringGeometry,
+  ExtensionSpringGeometry,
+  TorsionSpringGeometry,
+  ConicalSpringGeometry,
+  SpringGeometry as EngineSpringGeometry,
+} from "@/lib/engine/types";
 import { 
   useSpringDesignStore,
   getMeanDiameter,
   type SpringGeometry as DesignGeometry,
   type CompressionGeometry,
 } from "@/lib/stores/springDesignStore";
+import { convertStoreGeometryToEngine } from "@/lib/engine/geometryAdapters";
+import type { SpringMaterialId } from "@/lib/materials/springMaterials";
 import { generateSpringDrawingSpec } from "@/lib/drawing";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileCode, Box } from "lucide-react";
@@ -156,33 +164,57 @@ function CadExportContent() {
     ?? numberOrUndefined(searchParams.get("D1"));
   const smallDiameter = (storeGeometry?.type === "conical" ? storeGeometry.smallOuterDiameter : undefined) 
     ?? numberOrUndefined(searchParams.get("D2"));
+  const conicalTotalCoils = (storeGeometry?.type === "conical" ? storeGeometry.totalCoils : undefined)
+    ?? numberOrUndefined(searchParams.get("Nt"));
+  const conicalEndType = (storeGeometry?.type === "conical" ? storeGeometry.endType : undefined)
+    ?? (searchParams.get("endType") as "natural" | "closed" | "closed_ground" | null) ?? "closed_ground";
 
   // 构建几何参数 - 根据实际弹簧类型构建
   const geometry = useMemo(() => {
-    // 如果有 store 中的完整几何数据，直接使用
     if (storeGeometry) {
-      return storeGeometry;
+      switch (storeGeometry.type) {
+        case "conical":
+          return {
+            ...storeGeometry,
+            endType: storeGeometry.endType ?? conicalEndType,
+            totalCoils: storeGeometry.totalCoils ?? conicalTotalCoils ?? storeGeometry.activeCoils,
+          };
+        case "extension":
+          return {
+            ...storeGeometry,
+            meanDiameter: storeGeometry.meanDiameter ?? storeGeometry.outerDiameter - storeGeometry.wireDiameter,
+          };
+        case "torsion":
+          return {
+            ...storeGeometry,
+            outerDiameter: storeGeometry.outerDiameter ?? storeGeometry.meanDiameter + storeGeometry.wireDiameter,
+            freeAngle: storeGeometry.freeAngle ?? storeGeometry.workingAngle ?? 90,
+            bodyLength: storeGeometry.bodyLength ?? storeGeometry.activeCoils * storeGeometry.wireDiameter,
+          };
+        default:
+          return storeGeometry;
+      }
     }
-    
-    // 否则根据 springType 构建
+
     switch (springType) {
-      case "extension":
+      case "extension": {
+        const outer = meanDiameter + wireDiameter;
+        const body = bodyLength ?? activeCoils * wireDiameter;
         return {
           type: "extension" as const,
           wireDiameter,
-          outerDiameter: meanDiameter + wireDiameter,
           meanDiameter,
           activeCoils,
-          bodyLength: bodyLength ?? activeCoils * wireDiameter,
-          freeLength: (bodyLength ?? activeCoils * wireDiameter) + wireDiameter * 4,
+          bodyLength: body,
+          freeLength: body + wireDiameter * 4,
           hookType: hookType ?? "machine",
           initialTension: initialTension ?? 5,
         };
+      }
       case "torsion":
         return {
           type: "torsion" as const,
           wireDiameter,
-          outerDiameter: meanDiameter + wireDiameter,
           meanDiameter,
           activeCoils,
           bodyLength: activeCoils * wireDiameter * 1.1,
@@ -198,7 +230,9 @@ function CadExportContent() {
           largeOuterDiameter: largeDiameter ?? meanDiameter * 1.5,
           smallOuterDiameter: smallDiameter ?? meanDiameter * 0.5,
           activeCoils,
+          totalCoils: conicalTotalCoils ?? activeCoils,
           freeLength,
+          endType: conicalEndType,
         };
       case "compression":
       default:
@@ -214,9 +248,107 @@ function CadExportContent() {
         };
     }
   }, [
-    storeGeometry, springType, wireDiameter, meanDiameter, activeCoils, 
-    totalCoils, freeLength, bodyLength, hookType, initialTension,
-    legLength1, legLength2, windingDirection, largeDiameter, smallDiameter
+    storeGeometry,
+    springType,
+    wireDiameter,
+    meanDiameter,
+    activeCoils,
+    totalCoils,
+    freeLength,
+    bodyLength,
+    hookType,
+    initialTension,
+    legLength1,
+    legLength2,
+    windingDirection,
+    largeDiameter,
+    smallDiameter,
+    conicalTotalCoils,
+    conicalEndType,
+  ]);
+
+  const engineGeometry = useMemo<EngineSpringGeometry>(() => {
+    if (storeGeometry) {
+      return convertStoreGeometryToEngine(storeGeometry, materialId as SpringMaterialId);
+    }
+
+    switch (springType) {
+      case "extension": {
+        const body = bodyLength ?? activeCoils * wireDiameter;
+        const safeHookType =
+          hookType === "doubleLoop" ? "extended" : (hookType ?? "machine");
+        const extGeom: ExtensionSpringGeometry = {
+          type: "extension",
+          wireDiameter,
+          meanDiameter,
+          activeCoils,
+          totalCoils: activeCoils,
+          bodyLength: body,
+          initialTension: initialTension ?? 0,
+          hookType: safeHookType,
+          materialId: materialId as SpringMaterialId,
+        };
+        return extGeom;
+      }
+      case "torsion": {
+        const torGeom: TorsionSpringGeometry = {
+          type: "torsion",
+          wireDiameter,
+          meanDiameter,
+          activeCoils,
+          bodyLength: activeCoils * wireDiameter * 1.1,
+          legLength1,
+          legLength2,
+          windDirection: windingDirection,
+          materialId: materialId as SpringMaterialId,
+        };
+        return torGeom;
+      }
+      case "conical": {
+        const cnGeom: ConicalSpringGeometry = {
+          type: "conical",
+          wireDiameter,
+          largeOuterDiameter: largeDiameter ?? meanDiameter * 1.5,
+          smallOuterDiameter: smallDiameter ?? meanDiameter * 0.5,
+          activeCoils,
+          totalCoils: conicalTotalCoils ?? activeCoils,
+          freeLength,
+          materialId: materialId as SpringMaterialId,
+        };
+        return cnGeom;
+      }
+      case "compression":
+      default: {
+        const compGeom: CompressionSpringGeometry = {
+          type: "compression",
+          wireDiameter,
+          meanDiameter,
+          activeCoils,
+          totalCoils,
+          freeLength,
+          materialId: materialId as SpringMaterialId,
+        };
+        return compGeom;
+      }
+    }
+  }, [
+    storeGeometry,
+    springType,
+    wireDiameter,
+    meanDiameter,
+    activeCoils,
+    totalCoils,
+    freeLength,
+    bodyLength,
+    hookType,
+    initialTension,
+    legLength1,
+    legLength2,
+    windingDirection,
+    largeDiameter,
+    smallDiameter,
+    conicalTotalCoils,
+    materialId,
   ]);
 
   const [selectedFormats, setSelectedFormats] = useState<CadExportFormat[]>(["STEP", "PDF_2D"]);
@@ -305,17 +437,7 @@ function CadExportContent() {
     setExportedFiles([]);
     
     try {
-      // 构建符合 engine/types 的几何参数
-      const exportGeometry = {
-        ...geometry,
-        materialId: materialId as CompressionSpringGeometry['materialId'],
-        // 确保拉簧有 meanDiameter
-        ...(geometry.type === 'extension' && {
-          meanDiameter: meanDiameter,
-        }),
-      };
-      
-      const result = await requestCadExport(exportGeometry as CompressionSpringGeometry, selectedFormats, {
+      const result = await requestCadExport(engineGeometry, selectedFormats, {
         analysisResult: {
           springRate: springRate ?? 0,
           maxDeflection,
@@ -385,16 +507,24 @@ function CadExportContent() {
           { label: "Material / 材料", value: materialName },
           { label: "Spring Rate k / 刚度", value: springRate ? `${springRate.toFixed(2)} N·mm/°` : "—" },
         ];
-      case "conical":
+      case "conical": {
+        const endTypeLabels: Record<string, string> = {
+          natural: "Natural / 自然端",
+          closed: "Closed / 并紧",
+          closed_ground: "Closed & Ground / 并紧磨平",
+        };
         return [
           ...baseItems,
           { label: "Large OD D1 / 大端外径", value: `${(largeDiameter ?? meanDiameter * 1.5).toFixed(2)} mm` },
           { label: "Small OD D2 / 小端外径", value: `${(smallDiameter ?? meanDiameter * 0.5).toFixed(2)} mm` },
           { label: "Active Coils Na / 有效圈数", value: activeCoils.toFixed(1) },
+          { label: "Total Coils Nt / 总圈数", value: (conicalTotalCoils ?? activeCoils).toFixed(1) },
           { label: "Free Length L₀ / 自由长度", value: `${freeLength.toFixed(1)} mm` },
+          { label: "End Type / 端面形式", value: endTypeLabels[conicalEndType] ?? conicalEndType },
           { label: "Material / 材料", value: materialName },
           { label: "Spring Rate k / 刚度", value: springRate ? `${springRate.toFixed(2)} N/mm` : "—" },
         ];
+      }
       case "compression":
       default:
         return [
@@ -411,7 +541,8 @@ function CadExportContent() {
   }, [
     springType, code, wireDiameter, meanDiameter, activeCoils, totalCoils, 
     freeLength, bodyLength, hookType, initialTension, legLength1, legLength2, 
-    windingDirection, largeDiameter, smallDiameter, materialName, springRate, safetyFactor
+    windingDirection, largeDiameter, smallDiameter, materialName, springRate, safetyFactor,
+    conicalTotalCoils, conicalEndType
   ]);
 
   const rfqUrl = useMemo(() => {
@@ -535,10 +666,9 @@ function CadExportContent() {
                   activeCoils,
                   totalCoils,
                   freeLength,
-                  springRate,
+                  bodyLength,
                   hookType,
                   initialTension,
-                  bodyLength,
                   legLength1,
                   legLength2,
                   windingDirection,
@@ -561,9 +691,9 @@ function CadExportContent() {
                 geometry={{
                   wireDiameter,
                   meanDiameter,
-                  outerDiameter: meanDiameter + wireDiameter,
+                  outerDiameter: springType === "extension" || springType === "torsion" ? meanDiameter + wireDiameter : undefined,
                   activeCoils,
-                  totalCoils,
+                  totalCoils: springType === "conical" ? conicalTotalCoils : totalCoils,
                   freeLength,
                   bodyLength,
                   hookType,
@@ -572,6 +702,9 @@ function CadExportContent() {
                   windingDirection,
                   largeOuterDiameter: largeDiameter,
                   smallOuterDiameter: smallDiameter,
+                  topGround: storeGeometry?.type === "compression" ? storeGeometry.topGround : undefined,
+                  bottomGround: storeGeometry?.type === "compression" ? storeGeometry.bottomGround : undefined,
+                  endType: springType === "conical" ? conicalEndType : undefined,
                 }}
                 className="h-[400px] rounded-lg overflow-hidden"
               />
