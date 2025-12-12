@@ -58,7 +58,6 @@ type FormValues = z.infer<typeof formSchema>;
 type CalculationResult = ReturnType<typeof calculateLoadAndStress> | null;
 
 export function CompressionCalculator() {
-  const [result, setResult] = useState<CalculationResult>(null);
   const [error, setError] = useState<string | null>(null);
   const [stressAnalysis, setStressAnalysis] = useState<StressAnalysisResult | null>(null);
   const [preloadResult, setPreloadResult] = useState<PreloadResult | null>(null);
@@ -71,6 +70,23 @@ export function CompressionCalculator() {
 
   const lastCompressionGeometry = storedGeometry?.type === "compression" ? storedGeometry : null;
   const lastCompressionAnalysis = lastCompressionGeometry ? storedAnalysis : null;
+  
+  // 从 store 恢复上次的计算结果
+  const initialResult = useMemo<CalculationResult>(() => {
+    if (lastCompressionGeometry && lastCompressionAnalysis) {
+      return {
+        k: lastCompressionAnalysis.springRate,
+        load: lastCompressionAnalysis.workingLoad ?? 0,
+        shearStress: lastCompressionAnalysis.shearStress ?? 0,
+        springIndex: lastCompressionAnalysis.springIndex ?? 
+          lastCompressionGeometry.meanDiameter / lastCompressionGeometry.wireDiameter,
+        wahlFactor: lastCompressionAnalysis.wahlFactor ?? 1.2,
+      };
+    }
+    return null;
+  }, [lastCompressionGeometry, lastCompressionAnalysis]);
+  
+  const [result, setResult] = useState<CalculationResult>(initialResult);
   const initialMaterial = useMemo(() => {
     if (storedMaterial?.id) {
       return getSpringMaterial(storedMaterial.id) ?? getDefaultSpringMaterial();

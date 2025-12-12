@@ -12,6 +12,9 @@ import {
   buildExtensionSpringGeometry,
   type ExtensionSpringParams,
 } from "@/lib/spring3d/extensionSpringGeometry";
+import { useFeaStore } from "@/lib/stores/feaStore";
+import { applyFeaColors, findMaxSigmaNodeIndex, findMaxDispNodeIndex } from "@/lib/fea/feaTypes";
+import { Html } from "@react-three/drei";
 import { Button } from "@/components/ui/button";
 import { Eye, RotateCcw } from "lucide-react";
 
@@ -40,6 +43,11 @@ const HOOK_COLOR = "#94a3b8"; // Silver for hooks
 function AnimatedExtensionSpring() {
   const design = useSpringSimulationStore((state) => state.design);
   const currentDeflection = useSpringSimulationStore((state) => state.currentDeflection);
+
+  // FEA store state for coloring
+  const feaResult = useFeaStore((s) => s.feaResult);
+  const colorMode = useFeaStore((s) => s.colorMode);
+  const isFeaMode = colorMode !== "formula" && feaResult !== null;
 
   // Type guard for extension design
   const extensionDesign = design?.type === "extension" ? design as ExtensionDesignMeta : null;
@@ -81,12 +89,26 @@ function AnimatedExtensionSpring() {
   // Create materials - MUST be before any conditional returns to maintain hooks order
   const springMaterial = useMemo(() => {
     return new THREE.MeshStandardMaterial({
-      color: SPRING_COLOR,
-      metalness: 0.85,
-      roughness: 0.15,
+      // Use white base color when vertexColors is enabled so FEA colors show clearly
+      color: isFeaMode ? 0xffffff : SPRING_COLOR,
+      metalness: isFeaMode ? 0.3 : 0.85,  // Reduce metalness for clearer FEA colors
+      roughness: isFeaMode ? 0.7 : 0.15,  // Increase roughness for more diffuse lighting
       side: THREE.DoubleSide,
+      vertexColors: isFeaMode,
     });
-  }, []);
+  }, [isFeaMode]);
+
+  // Apply FEA colors to geometry when in FEA mode
+  useEffect(() => {
+    if (!springGeometry?.bodyGeometry) return;
+    
+    if (isFeaMode && feaResult) {
+      applyFeaColors(springGeometry.bodyGeometry, {
+        mode: colorMode,
+        feaResult,
+      });
+    }
+  }, [springGeometry, isFeaMode, feaResult, colorMode]);
 
   const hookMaterial = useMemo(() => {
     return new THREE.MeshStandardMaterial({
@@ -106,8 +128,8 @@ function AnimatedExtensionSpring() {
 
   return (
     <group>
-      {/* Main spring body */}
-      <mesh geometry={bodyGeometry} material={springMaterial} />
+      {/* Main spring body - key forces re-render when FEA mode changes */}
+      <mesh key={`spring-${isFeaMode}-${colorMode}`} geometry={bodyGeometry} material={springMaterial} />
       
       {/* Bottom hook */}
       {bottomHookGeometry && (
@@ -128,6 +150,96 @@ function AnimatedExtensionSpring() {
           opacity={0.15}
         />
       </mesh>
+
+      {/* Max stress marker - only in FEA mode */}
+      {isFeaMode && feaResult && feaResult.nodes.length > 0 && (
+        <ExtensionMaxStressMarker 
+          feaResult={feaResult} 
+          colorMode={colorMode} 
+          scale={scale} 
+        />
+      )}
+    </group>
+  );
+}
+
+/**
+ * Marker showing the location of maximum stress or displacement
+ */
+function ExtensionMaxStressMarker({ 
+  feaResult, 
+  colorMode, 
+  scale 
+}: { 
+  feaResult: NonNullable<ReturnType<typeof useFeaStore.getState>["feaResult"]>;
+  colorMode: string;
+  scale: number;
+}) {
+  const nodes = feaResult.nodes;
+  
+  const markerData = useMemo(() => {
+    let nodeIndex: number;
+    let value: number;
+    let label: string;
+    let unit: string;
+    let color: string;
+
+    switch (colorMode) {
+      case "fea_sigma":
+        nodeIndex = findMaxSigmaNodeIndex(nodes);
+        value = nodes[nodeIndex].sigma_vm;
+        label = "σ_max";
+        unit = "MPa";
+        color = "#ff0000";
+        break;
+      case "fea_disp":
+        nodeIndex = findMaxDispNodeIndex(nodes);
+        const node = nodes[nodeIndex];
+        value = Math.sqrt(node.ux ** 2 + node.uy ** 2 + node.uz ** 2);
+        label = "u_max";
+        unit = "mm";
+        color = "#ff6600";
+        break;
+      default:
+        nodeIndex = findMaxSigmaNodeIndex(nodes);
+        value = nodes[nodeIndex].sigma_vm;
+        label = "σ_max";
+        unit = "MPa";
+        color = "#ff0000";
+    }
+
+    const targetNode = nodes[nodeIndex];
+    return {
+      position: [targetNode.x * scale, targetNode.y * scale, targetNode.z * scale] as [number, number, number],
+      value,
+      label,
+      unit,
+      color,
+    };
+  }, [nodes, colorMode, scale]);
+
+  const sphereRadius = 1.5;
+
+  return (
+    <group position={markerData.position}>
+      <mesh>
+        <sphereGeometry args={[sphereRadius, 16, 16]} />
+        <meshStandardMaterial
+          color={markerData.color}
+          emissive={markerData.color}
+          emissiveIntensity={0.5}
+          transparent
+          opacity={0.9}
+        />
+      </mesh>
+      <Html position={[0, sphereRadius * 2, 0]} center style={{ pointerEvents: "none" }}>
+        <div className="px-2 py-1 rounded bg-black/80 text-white text-xs whitespace-nowrap">
+          <span className="font-medium">{markerData.label}</span>
+          {" = "}
+          <span className="font-mono">{markerData.value.toFixed(1)}</span>
+          {markerData.unit && <span className="text-gray-300"> {markerData.unit}</span>}
+        </div>
+      </Html>
     </group>
   );
 }

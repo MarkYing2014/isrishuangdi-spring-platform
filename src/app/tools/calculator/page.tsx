@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { SpringType } from "@/lib/springTypes";
 import { useLanguage } from "@/components/language-context";
+import { useSpringDesignStore } from "@/lib/stores/springDesignStore";
 import { CompressionCalculator } from "@/components/calculators/CompressionCalculator";
 import { ExtensionCalculator } from "@/components/calculators/ExtensionCalculator";
 import { TorsionCalculator } from "@/components/calculators/TorsionCalculator";
@@ -52,7 +53,11 @@ const springTypes: {
 ];
 
 export default function SpringCalculatorPage() {
-  const [selectedType, setSelectedType] = useState<SpringType>("compression");
+  // 从 store 读取上次保存的弹簧类型，如果没有则默认 compression
+  const storedSpringType = useSpringDesignStore(state => state.springType);
+  const [selectedType, setSelectedType] = useState<SpringType>(
+    storedSpringType ?? "compression"
+  );
   const { language } = useLanguage();
   const isZh = language === "zh";
 

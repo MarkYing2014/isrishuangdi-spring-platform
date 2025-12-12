@@ -558,43 +558,22 @@ export function buildExtensionSpringGeometry(
   let startHookPts: THREE.Vector3[];
   let endHookPts: THREE.Vector3[];
   
-  if (hookType === "side" || hookType === "extended") {
-    // 使用 HookBuilder 生成 Side Hook / Extended Hook
-    startHookPts = buildHookCenterline(
-      "start",
-      hookSpec,
-      bodyHelixPts,
-      scaledMeanRadius,
-      scaledWireDiameter
-    );
-    endHookPts = buildHookCenterline(
-      "end",
-      hookSpec,
-      bodyHelixPts,
-      scaledMeanRadius,
-      scaledWireDiameter
-    );
-  } else {
-    // 使用原有实现（Machine Hook 等，已验证正确）
-    const scaledOuterDiameter = outerDiameter * scale;
-    const hookAngleDeg = hookType === "doubleLoop" ? 300 : 270;
-    const isRightHand = true;
-    
-    startHookPts = buildSimpleStartHookCenterline(
-      bodyHelixPts,
-      scaledOuterDiameter,
-      scaledWireDiameter,
-      hookAngleDeg,
-      isRightHand
-    );
-    endHookPts = buildSimpleEndHookCenterline(
-      bodyHelixPts,
-      scaledOuterDiameter,
-      scaledWireDiameter,
-      hookAngleDeg,
-      isRightHand
-    );
-  }
+  // 所有钩型都使用 HookBuilder 生成
+  // HookBuilder 支持: machine, side, crossover, extended, doubleLoop
+  startHookPts = buildHookCenterline(
+    "start",
+    hookSpec,
+    bodyHelixPts,
+    scaledMeanRadius,
+    scaledWireDiameter
+  );
+  endHookPts = buildHookCenterline(
+    "end",
+    hookSpec,
+    bodyHelixPts,
+    scaledMeanRadius,
+    scaledWireDiameter
+  );
 
   // === PART 3: Combine into ONE continuous centerline ===
   // Order: start hook → body → end hook

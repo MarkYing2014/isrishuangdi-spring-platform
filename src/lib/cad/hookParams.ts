@@ -40,7 +40,7 @@ export interface CadHookParams {
   loopPlaneType: "axis-plane" | "orthogonal-plane";
   
   /** 环中心模式 */
-  centerMode: "on-axis" | "radial-offset";
+  centerMode: "on-axis" | "radial-offset" | "crossover";
 }
 
 /**

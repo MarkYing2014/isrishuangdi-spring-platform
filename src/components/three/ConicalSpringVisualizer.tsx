@@ -9,6 +9,9 @@ import {
   buildConicalSpringGeometry,
   type ConicalSpringParams,
 } from "@/lib/spring3d/conicalSpringGeometry";
+import { useFeaStore } from "@/lib/stores/feaStore";
+import { applyFeaColors, findMaxSigmaNodeIndex, findMaxDispNodeIndex } from "@/lib/fea/feaTypes";
+import { Html } from "@react-three/drei";
 import { Button } from "@/components/ui/button";
 import { RotateCcw, Play, Pause } from "lucide-react";
 
@@ -68,6 +71,11 @@ function CameraController({
 function ConicalSpringModel() {
   const { design, collapsedCoils, currentDeflection } = useSpringSimulationStore();
 
+  // FEA store state for coloring
+  const feaResult = useFeaStore((s) => s.feaResult);
+  const colorMode = useFeaStore((s) => s.colorMode);
+  const isFeaMode = colorMode !== "formula" && feaResult !== null;
+
   // Type guard for conical design
   const conicalDesign = design?.type === "conical" ? design as ConicalDesignMeta : null;
 
@@ -105,6 +113,25 @@ function ConicalSpringModel() {
     return buildConicalSpringGeometry(params);
   }, [conicalDesign, collapsedCoils, currentDeflection, scale]);
 
+  // Apply FEA colors to geometry when in FEA mode
+  useEffect(() => {
+    if (!springGeometry?.activeGeometry) return;
+    
+    if (isFeaMode && feaResult) {
+      applyFeaColors(springGeometry.activeGeometry, {
+        mode: colorMode,
+        feaResult,
+      });
+      // Also color collapsed geometry if present
+      if (springGeometry.collapsedGeometry) {
+        applyFeaColors(springGeometry.collapsedGeometry, {
+          mode: colorMode,
+          feaResult,
+        });
+      }
+    }
+  }, [springGeometry, isFeaMode, feaResult, colorMode]);
+
   if (!design || !springGeometry) {
     return null;
   }
@@ -130,28 +157,30 @@ function ConicalSpringModel() {
 
   return (
     <group>
-      {/* Collapsed coils (gray) with clipping */}
+      {/* Collapsed coils (gray) with clipping - key forces re-render when FEA mode changes */}
       {collapsedGeometry && (
-        <mesh geometry={collapsedGeometry}>
+        <mesh key={`collapsed-${isFeaMode}-${colorMode}`} geometry={collapsedGeometry}>
           <meshStandardMaterial 
-            color={COLLAPSED_COLOR} 
-            metalness={0.6} 
-            roughness={0.3}
+            color={isFeaMode ? 0xffffff : COLLAPSED_COLOR}
+            metalness={isFeaMode ? 0.3 : 0.6}
+            roughness={isFeaMode ? 0.7 : 0.3}
             clippingPlanes={clippingPlanes}
             clipShadows={true}
+            vertexColors={isFeaMode}
           />
         </mesh>
       )}
 
-      {/* Active coils (blue) with clipping for ground ends */}
+      {/* Active coils (blue) with clipping for ground ends - key forces re-render when FEA mode changes */}
       {activeGeometry && (
-        <mesh geometry={activeGeometry}>
+        <mesh key={`active-${isFeaMode}-${colorMode}`} geometry={activeGeometry}>
           <meshStandardMaterial 
-            color={ACTIVE_COLOR} 
-            metalness={0.6} 
-            roughness={0.3}
+            color={isFeaMode ? 0xffffff : ACTIVE_COLOR}
+            metalness={isFeaMode ? 0.3 : 0.6}
+            roughness={isFeaMode ? 0.7 : 0.3}
             clippingPlanes={clippingPlanes}
             clipShadows={true}
+            vertexColors={isFeaMode}
           />
         </mesh>
       )}
@@ -199,6 +228,97 @@ function ConicalSpringModel() {
           opacity={0.15}
         />
       </mesh>
+
+      {/* Max stress marker - only in FEA mode */}
+      {isFeaMode && feaResult && feaResult.nodes.length > 0 && (
+        <ConicalMaxStressMarker 
+          feaResult={feaResult} 
+          colorMode={colorMode} 
+          scale={scale} 
+        />
+      )}
+    </group>
+  );
+}
+
+/**
+ * Marker showing the location of maximum stress or displacement
+ */
+function ConicalMaxStressMarker({ 
+  feaResult, 
+  colorMode, 
+  scale 
+}: { 
+  feaResult: NonNullable<ReturnType<typeof useFeaStore.getState>["feaResult"]>;
+  colorMode: string;
+  scale: number;
+}) {
+  const nodes = feaResult.nodes;
+  
+  const markerData = useMemo(() => {
+    let nodeIndex: number;
+    let value: number;
+    let label: string;
+    let unit: string;
+    let color: string;
+
+    switch (colorMode) {
+      case "fea_sigma":
+        nodeIndex = findMaxSigmaNodeIndex(nodes);
+        value = nodes[nodeIndex].sigma_vm;
+        label = "σ_max";
+        unit = "MPa";
+        color = "#ff0000";
+        break;
+      case "fea_disp":
+        nodeIndex = findMaxDispNodeIndex(nodes);
+        const node = nodes[nodeIndex];
+        value = Math.sqrt(node.ux ** 2 + node.uy ** 2 + node.uz ** 2);
+        label = "u_max";
+        unit = "mm";
+        color = "#ff6600";
+        break;
+      default:
+        nodeIndex = findMaxSigmaNodeIndex(nodes);
+        value = nodes[nodeIndex].sigma_vm;
+        label = "σ_max";
+        unit = "MPa";
+        color = "#ff0000";
+    }
+
+    const targetNode = nodes[nodeIndex];
+    // Conical spring uses Y as vertical axis
+    return {
+      position: [targetNode.x * scale, targetNode.z * scale, targetNode.y * scale] as [number, number, number],
+      value,
+      label,
+      unit,
+      color,
+    };
+  }, [nodes, colorMode, scale]);
+
+  const sphereRadius = 1.5;
+
+  return (
+    <group position={markerData.position}>
+      <mesh>
+        <sphereGeometry args={[sphereRadius, 16, 16]} />
+        <meshStandardMaterial
+          color={markerData.color}
+          emissive={markerData.color}
+          emissiveIntensity={0.5}
+          transparent
+          opacity={0.9}
+        />
+      </mesh>
+      <Html position={[0, sphereRadius * 2, 0]} center style={{ pointerEvents: "none" }}>
+        <div className="px-2 py-1 rounded bg-black/80 text-white text-xs whitespace-nowrap">
+          <span className="font-medium">{markerData.label}</span>
+          {" = "}
+          <span className="font-mono">{markerData.value.toFixed(1)}</span>
+          {markerData.unit && <span className="text-gray-300"> {markerData.unit}</span>}
+        </div>
+      </Html>
     </group>
   );
 }

@@ -42,23 +42,37 @@ interface FormValues {
 type CalculationResult = ReturnType<typeof calculateExtensionSpring> | null;
 
 export function ExtensionCalculator() {
-  const [result, setResult] = useState<CalculationResult>(null);
   const [error, setError] = useState<string | null>(null);
   
   // 全局设计存储
-  const {
-    geometry: storedGeometry,
-    material: storedMaterial,
-    analysisResult: storedAnalysis,
-    setDesign,
-  } = useSpringDesignStore((state) => ({
-    geometry: state.geometry,
-    material: state.material,
-    analysisResult: state.analysisResult,
-    setDesign: state.setDesign,
-  }));
+  const storedGeometry = useSpringDesignStore(state => state.geometry);
+  const storedMaterial = useSpringDesignStore(state => state.material);
+  const storedAnalysis = useSpringDesignStore(state => state.analysisResult);
+  const setDesign = useSpringDesignStore(state => state.setDesign);
 
   const lastExtensionGeometry = storedGeometry?.type === "extension" ? storedGeometry : null;
+  
+  // 从 store 恢复上次的计算结果
+  const initialResult = useMemo<CalculationResult>(() => {
+    if (lastExtensionGeometry && storedAnalysis) {
+      const meanDiameter = lastExtensionGeometry.meanDiameter ?? 
+        (lastExtensionGeometry.outerDiameter - lastExtensionGeometry.wireDiameter);
+      return {
+        meanDiameter,
+        springIndex: storedAnalysis.springIndex ?? meanDiameter / lastExtensionGeometry.wireDiameter,
+        wahlFactor: storedAnalysis.wahlFactor ?? 1.2,
+        springRate: storedAnalysis.springRate,
+        initialTension: storedAnalysis.initialTension ?? 0,
+        workingDeflection: storedAnalysis.workingDeflection ?? 0,
+        elasticLoad: (storedAnalysis.workingLoad ?? 0) - (storedAnalysis.initialTension ?? 0),
+        totalLoad: storedAnalysis.workingLoad ?? 0,
+        shearStress: storedAnalysis.shearStress ?? 0,
+      };
+    }
+    return null;
+  }, [lastExtensionGeometry, storedAnalysis]);
+  
+  const [result, setResult] = useState<CalculationResult>(initialResult);
   const initialMaterial = useMemo<SpringMaterial>(() => {
     if (storedMaterial?.id) {
       return getSpringMaterial(storedMaterial.id) ?? getDefaultSpringMaterial();

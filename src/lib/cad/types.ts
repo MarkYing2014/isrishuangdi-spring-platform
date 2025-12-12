@@ -284,7 +284,7 @@ export interface CadExportDesign {
       hasExtendedLeg: boolean;
       extendedLegLength: number;
       loopPlaneType: 'axis-plane' | 'orthogonal-plane';
-      centerMode: 'on-axis' | 'radial-offset';
+      centerMode: 'on-axis' | 'radial-offset' | 'crossover';
     };
     /** 扭簧腿部参数 */
     legParams?: {

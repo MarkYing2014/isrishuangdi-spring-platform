@@ -244,13 +244,18 @@ function calculateTorsionSpring(
 }
 
 export function TorsionCalculator() {
-  const [submitted, setSubmitted] = useState(false);
-  const [materialId, setMaterialId] = useState<SpringMaterialId>("music_wire_a228");
-  
   // 全局设计存储
   const setDesign = useSpringDesignStore(state => state.setDesign);
   const designGeometry = useSpringDesignStore(state => state.geometry);
+  const storedAnalysis = useSpringDesignStore(state => state.analysisResult);
+  const storedMaterial = useSpringDesignStore(state => state.material);
   const lastTorsion = designGeometry && designGeometry.type === "torsion" ? designGeometry : null;
+  
+  // 如果 store 里有扭簧数据，则初始化为已提交状态
+  const [submitted, setSubmitted] = useState(!!lastTorsion && !!storedAnalysis);
+  const [materialId, setMaterialId] = useState<SpringMaterialId>(
+    storedMaterial?.id ?? "music_wire_a228"
+  );
 
   const form = useForm<FormValues>({
     defaultValues: {

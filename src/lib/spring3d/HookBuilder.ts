@@ -35,9 +35,10 @@ export interface HookSpec {
   // orthogonal-plane: 环平面垂直于轴线 (Side Hook, Extended Hook)
   
   // 环中心位置
-  centerMode: "on-axis" | "radial-offset";
+  centerMode: "on-axis" | "radial-offset" | "crossover";
   // on-axis: 环中心在轴线上 (Machine Hook)
   // radial-offset: 环中心在弹簧外侧 (Side Hook)
+  // crossover: 线材跨过中心后形成环 (Crossover Hook)
   
   // 间隙参数 (以 wireDiameter 为单位)
   axialGapFactor: number;              // 轴向间隙 = factor * wireDiameter
@@ -102,14 +103,14 @@ export function getHookSpec(hookType: ExtensionHookType): HookSpec {
       return {
         type: "crossover",
         loopCount: 1,
-        loopAngleDeg: 180,
+        loopAngleDeg: 160,              // 减小弯钩角度
         loopStartAngle: -Math.PI / 2,
         loopPlaneType: "axis-plane",
-        centerMode: "on-axis",
-        axialGapFactor: 1.4,
+        centerMode: "crossover",        // 跨过中心模式
+        axialGapFactor: 1.5,            // 钩圈中心离端面距离 ≈ 1.5d
         radialOffsetFactor: 0,
-        hookRadiusFactor: 1.0,          // 较大的弯曲半径
-        handleLengthFactor: 2.5,
+        hookRadiusFactor: 0.35,         // 恢复原来的钩圈半径
+        handleLengthFactor: 0.6,        // 过渡段长度 ~ 0.6d
         hasExtendedLeg: false,
         extendedLegLengthFactor: 0,
       };
@@ -178,6 +179,117 @@ function cubicBezier(
 }
 
 // ================================================================
+// Crossover Hook - Dedicated Builder
+// ================================================================
+
+/**
+ * Crossover Hook - 统一构建函数（OpenAI最终版）
+ * 
+ * 关键修复：
+ * 1. loopCenter 必须推到外侧（沿 radialDir）
+ * 2. 弧平面两端统一用 (axisDir, tanDir)
+ */
+function buildCrossoverHookCenterline(
+  whichEnd: "start" | "end",
+  endPos: THREE.Vector3,
+  prevPos: THREE.Vector3,
+  springAxisDir: THREE.Vector3,
+  meanRadius: number,
+  wireDiameter: number,
+  spec: HookSpec
+): THREE.Vector3[] {
+  const isEnd = whichEnd === "end";
+  const sign = isEnd ? 1 : -1;
+
+  // 1) 基本方向
+  const axisDir = springAxisDir.clone().normalize();       // (0,0,1)
+  const axisPoint = new THREE.Vector3(0, 0, endPos.z);
+
+  let radialDir = endPos.clone().sub(axisPoint);
+  if (radialDir.lengthSq() < 1e-10) radialDir.set(1, 0, 0);
+  radialDir.normalize();
+
+  // ✅ tanDir 统一：用 axis × radial（右手系）
+  let tanDir = new THREE.Vector3().crossVectors(axisDir, radialDir).normalize();
+  if (tanDir.lengthSq() < 1e-10) tanDir.set(0, 1, 0);
+
+  // ✅ 统一手性：保证 (axis × tan) · radial > 0
+  if (new THREE.Vector3().crossVectors(axisDir, tanDir).dot(radialDir) < 0) {
+    tanDir.negate();
+  }
+
+  // 2) 参数
+  const hookRadius = meanRadius * spec.hookRadiusFactor;
+  const axialOffset = wireDiameter * spec.axialGapFactor;
+  const handleLen = (spec.handleLengthFactor ?? 0.6) * wireDiameter;
+
+  // loopCenter：轴上偏移（恢复原始逻辑）
+  const loopCenter = axisPoint.clone()
+    .addScaledVector(axisDir, sign * axialOffset);
+
+  // ✅ 弧平面两端必须一致：arcU=axis, arcV=tan
+  const arcU = axisDir;
+  const arcV = tanDir;
+
+  // 3) startAngle：先把 start 固定回"曾经正确"的版本
+  const startAngle = -Math.PI / 2;
+
+  // 4) loopAngle：保持方向习惯（start/end 镜像）
+  const loopAngleRad = THREE.MathUtils.degToRad(spec.loopAngleDeg) * sign;
+
+  // 5) loopStart
+  const loopStart = loopCenter.clone()
+    .addScaledVector(arcU, hookRadius * Math.cos(startAngle))
+    .addScaledVector(arcV, hookRadius * Math.sin(startAngle));
+
+  // 6) helixInPlane（投影到 arcU+arcV 平面）
+  const helixTangentRaw = isEnd
+    ? endPos.clone().sub(prevPos)
+    : prevPos.clone().sub(endPos);
+  const helixTangent = helixTangentRaw.normalize();
+
+  let helixInPlane = arcU.clone().multiplyScalar(helixTangent.dot(arcU))
+    .add(arcV.clone().multiplyScalar(helixTangent.dot(arcV)));
+  if (helixInPlane.lengthSq() < 1e-10) helixInPlane = arcU.clone().multiplyScalar(sign);
+  helixInPlane.normalize();
+
+  // 7) ring tangent at loopStart
+  const ringTangent = arcU.clone().multiplyScalar(-Math.sin(startAngle))
+    .add(arcV.clone().multiplyScalar(Math.cos(startAngle)))
+    .normalize();
+
+  // 8) Bezier transition
+  const p0 = endPos.clone();
+  const p1 = p0.clone().addScaledVector(helixInPlane, handleLen);
+  const p3 = loopStart.clone();
+  const p2 = p3.clone().sub(ringTangent.clone().multiplyScalar(handleLen));
+
+  const transitionPts: THREE.Vector3[] = [];
+  const segs = 24;
+  for (let i = 1; i <= segs; i++) {
+    const t = i / segs;
+    transitionPts.push(cubicBezier(p0, p1, p2, p3, t));
+  }
+  transitionPts[transitionPts.length - 1].copy(loopStart);
+
+  // 9) loop arc
+  const loopPts: THREE.Vector3[] = [];
+  const loopSegs = 48;
+  for (let i = 1; i <= loopSegs; i++) {
+    const t = i / loopSegs;
+    const theta = startAngle + loopAngleRad * t;
+    const p = loopCenter.clone()
+      .addScaledVector(arcU, hookRadius * Math.cos(theta))
+      .addScaledVector(arcV, hookRadius * Math.sin(theta));
+    loopPts.push(p);
+  }
+
+  const pts = [...transitionPts, ...loopPts];
+  pts[0] = endPos.clone();
+  return pts;
+}
+
+// ================================================================
 // Main Hook Centerline Builder
 // ================================================================
 
@@ -212,8 +324,26 @@ export function buildHookCenterline(
     ? bodyHelixPts[bodyHelixPts.length - 2].clone()
     : bodyHelixPts[1].clone();
   
-  // 弹簧轴方向
-  const springAxisDir = new THREE.Vector3(0, 0, isEnd ? 1 : -1);
+  // ---------------------------------------------------------------
+  // Crossover Hook: 使用专门的构建函数
+  // ---------------------------------------------------------------
+  if (spec.centerMode === "crossover") {
+    // 弹簧整体轴向（始终指向 +Z）
+    const springAxisDir = new THREE.Vector3(0, 0, 1);
+    return buildCrossoverHookCenterline(
+      whichEnd,
+      endPos,
+      prevPos,
+      springAxisDir,
+      meanRadius,
+      wireDiameter,
+      spec
+    );
+  }
+
+  // 弹簧轴方向（其他 hook 类型）
+  const axisDir = new THREE.Vector3(0, 0, isEnd ? 1 : -1);
+  const springAxisDir = new THREE.Vector3(0, 0, 1); // 用于 Side Hook 等
 
   // 轴上的投影点
   const axisPoint = new THREE.Vector3(0, 0, endPos.z);

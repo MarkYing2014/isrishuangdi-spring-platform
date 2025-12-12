@@ -9,6 +9,7 @@ import { UnifiedForceTester } from "@/components/force-tester";
 import { AdvancedAnalysisPanel } from "@/components/analysis/AdvancedAnalysisPanel";
 import { SmartAnalysisPanel } from "@/components/analysis/SmartAnalysisPanel";
 import { AdvancedSimulationPanel } from "@/components/analysis/AdvancedSimulationPanel";
+import { FeaPanel } from "@/components/analysis/FeaPanel";
 import { getMaterialOptions, type SpringMaterialId } from "@/lib/materials/springMaterials";
 import type { SpringGeometry as EngineSpringGeometry, WorkingConditions } from "@/lib/engine/types";
 import {
@@ -637,6 +638,9 @@ function AnalysisReady({
               </Button>
             </CardContent>
           </Card>
+
+          {/* FEA Analysis Panel */}
+          <FeaPanel />
         </div>
 
         {/* Force Tester Panel */}

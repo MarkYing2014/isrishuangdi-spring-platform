@@ -52,7 +52,6 @@ interface FormValues {
 type CalculationResult = ReturnType<typeof calculateLoadAndStress> | null;
 
 export function ConicalCalculator() {
-  const [result, setResult] = useState<CalculationResult>(null);
   const [nonlinearResult, setNonlinearResult] = useState<ConicalNonlinearResult | null>(null);
   const [stageTransitions, setStageTransitions] = useState<ReturnType<typeof extractConicalStageTransitions> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +65,24 @@ export function ConicalCalculator() {
   const setDesign = useSpringDesignStore(state => state.setDesign);
   const lastConicalGeometry = storedGeometry?.type === "conical" ? storedGeometry : null;
   const lastConicalAnalysis = lastConicalGeometry ? storedAnalysis : null;
+  
+  // 从 store 恢复上次的计算结果
+  const initialResult = useMemo<CalculationResult>(() => {
+    if (lastConicalGeometry && lastConicalAnalysis) {
+      const equivalentMeanDiameter = (lastConicalGeometry.largeOuterDiameter + lastConicalGeometry.smallOuterDiameter) / 2 
+        - lastConicalGeometry.wireDiameter;
+      return {
+        k: lastConicalAnalysis.springRate,
+        load: lastConicalAnalysis.workingLoad ?? 0,
+        shearStress: lastConicalAnalysis.shearStress ?? 0,
+        springIndex: lastConicalAnalysis.springIndex ?? equivalentMeanDiameter / lastConicalGeometry.wireDiameter,
+        wahlFactor: lastConicalAnalysis.wahlFactor ?? 1.2,
+      };
+    }
+    return null;
+  }, [lastConicalGeometry, lastConicalAnalysis]);
+  
+  const [result, setResult] = useState<CalculationResult>(initialResult);
   const initialMaterial = useMemo<SpringMaterial>(() => {
     if (storedMaterial?.id) {
       return getSpringMaterial(storedMaterial.id) ?? getDefaultSpringMaterial();
