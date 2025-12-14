@@ -51,6 +51,19 @@ const CadPreview3D = dynamic(
   }
 );
 
+// Dynamic import for Spiral Torsion 3D preview
+const SpiralTorsionSpringVisualizer = dynamic(
+  () => import("@/components/three/SpiralTorsionSpringMesh").then(mod => mod.SpiralTorsionSpringVisualizer),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="h-[400px] bg-slate-900 rounded-lg flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    )
+  }
+);
+
 // Dynamic import for 2D drawing canvas
 const EngineeringDrawingCanvas = dynamic(
   () => import("@/components/drawing/EngineeringDrawingCanvas").then(mod => mod.EngineeringDrawingCanvas),
@@ -122,11 +135,21 @@ function CadExportContent() {
   
   // 从 store 或 URL 获取数据
   const code = storeMeta?.designCode ?? searchParams.get("code") ?? undefined;
-  const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compression") as SpringGeometry['type'];
+  const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compression") as SpringGeometry['type'] | "spiralTorsion";
   
   // 几何参数 - 优先从 store 读取
-  const wireDiameter = storeGeometry?.wireDiameter ?? numberOrUndefined(searchParams.get("d")) ?? 3.2;
-  const meanDiameter = storeGeometry ? getMeanDiameter(storeGeometry) : (numberOrUndefined(searchParams.get("Dm")) ?? 24);
+  // 螺旋扭转弹簧没有 wireDiameter，使用 stripThickness 作为替代
+  const wireDiameter = storeGeometry?.type === "spiralTorsion" 
+    ? storeGeometry.stripThickness 
+    : (storeGeometry?.wireDiameter ?? numberOrUndefined(searchParams.get("d")) ?? 3.2);
+  
+  // 螺旋扭转弹簧没有 meanDiameter 概念，getMeanDiameter 返回 null
+  // 对于 wire spring 使用 meanDiameter，对于 spiral 使用 fallback 值（仅用于显示）
+  const meanDiameterRaw = storeGeometry ? getMeanDiameter(storeGeometry) : null;
+  const meanDiameter = meanDiameterRaw ?? (numberOrUndefined(searchParams.get("Dm")) ?? 24);
+  
+  // 标记是否为螺旋扭转弹簧
+  const isSpiralTorsion = storeGeometry?.type === "spiralTorsion" || springType === "spiralTorsion";
   const activeCoils = storeGeometry?.activeCoils ?? numberOrUndefined(searchParams.get("Na")) ?? 8;
   const totalCoils = (storeGeometry?.type === "compression" ? storeGeometry.totalCoils : undefined) 
     ?? numberOrUndefined(searchParams.get("Nt")) ?? activeCoils + 2;
@@ -267,7 +290,14 @@ function CadExportContent() {
     conicalEndType,
   ]);
 
-  const engineGeometry = useMemo<EngineSpringGeometry>(() => {
+  const engineGeometry = useMemo<EngineSpringGeometry | null>(() => {
+    // 螺旋扭转弹簧现在支持 FreeCAD 导出
+    // 但不支持 engine geometry 转换，直接使用 storeGeometry
+    if (isSpiralTorsion) {
+      // 返回 null 让 FreeCAD 导出使用 storeGeometry
+      return null;
+    }
+    
     if (storeGeometry) {
       return convertStoreGeometryToEngine(storeGeometry, materialId as SpringMaterialId);
     }
@@ -372,12 +402,17 @@ function CadExportContent() {
     setError(null);
     
     try {
-      const response = await fetch("/api/freecad/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          springType,
-          geometry: {
+      // 构建几何参数 - 螺旋扭转弹簧使用特殊参数
+      const geometryParams = isSpiralTorsion && storeGeometry?.type === "spiralTorsion"
+        ? {
+            innerDiameter: storeGeometry.innerDiameter,
+            outerDiameter: storeGeometry.outerDiameter,
+            turns: storeGeometry.activeCoils,
+            stripWidth: storeGeometry.stripWidth,
+            stripThickness: storeGeometry.stripThickness,
+            handedness: "ccw",
+          }
+        : {
             wireDiameter,
             meanDiameter,
             outerDiameter: meanDiameter + wireDiameter,
@@ -391,9 +426,16 @@ function CadExportContent() {
             windingDirection,
             largeOuterDiameter: largeDiameter,
             smallOuterDiameter: smallDiameter,
-          },
+          };
+      
+      const response = await fetch("/api/freecad/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          springType: isSpiralTorsion ? "spiral_torsion" : springType,
+          geometry: geometryParams,
           export: {
-            formats: ["STEP", "STL"],
+            formats: ["STEP"],
             name: `${springType}_spring_${Date.now()}`,
           },
         }),
@@ -429,6 +471,12 @@ function CadExportContent() {
   const handleExport = async () => {
     if (selectedFormats.length === 0) {
       setError("请至少选择一种导出格式");
+      return;
+    }
+    
+    // 螺旋扭转弹簧暂不支持 CAD 导出
+    if (!engineGeometry) {
+      setError("螺旋扭转弹簧暂不支持 CAD 导出 / Spiral torsion spring CAD export not yet supported");
       return;
     }
     
@@ -658,54 +706,87 @@ function CadExportContent() {
             </TabsList>
             
             <TabsContent value="3d">
-              <CadPreview3D 
-                params={{
-                  type: springType,
-                  wireDiameter,
-                  meanDiameter,
-                  activeCoils,
-                  totalCoils,
-                  freeLength,
-                  bodyLength,
-                  hookType,
-                  initialTension,
-                  legLength1,
-                  legLength2,
-                  windingDirection,
-                  largeDiameter,
-                  smallDiameter,
-                }}
-                className="h-[400px] rounded-lg overflow-hidden"
-              />
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                <LanguageText 
-                  en="Three.js preview • Drag to rotate • Scroll to zoom"
-                  zh="Three.js 预览 • 拖动旋转 • 滚轮缩放"
-                />
-              </p>
+              {isSpiralTorsion && storeGeometry?.type === "spiralTorsion" ? (
+                <>
+                  <div className="h-[400px] rounded-lg overflow-hidden">
+                    <SpiralTorsionSpringVisualizer
+                      innerDiameter={storeGeometry.innerDiameter}
+                      outerDiameter={storeGeometry.outerDiameter}
+                      turns={storeGeometry.activeCoils}
+                      stripWidth={storeGeometry.stripWidth}
+                      stripThickness={storeGeometry.stripThickness}
+                      handedness={storeGeometry.windingDirection ?? "cw"}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    <LanguageText 
+                      en="Spiral Torsion Spring • Archimedean spiral + rectangular cross-section"
+                      zh="螺旋扭转弹簧 • 阿基米德螺线 + 矩形截面"
+                    />
+                  </p>
+                </>
+              ) : (
+                <>
+                  <CadPreview3D 
+                    params={{
+                      type: springType as "compression" | "extension" | "torsion" | "conical",
+                      wireDiameter,
+                      meanDiameter,
+                      activeCoils,
+                      totalCoils,
+                      freeLength,
+                      bodyLength,
+                      hookType,
+                      initialTension,
+                      legLength1,
+                      legLength2,
+                      windingDirection,
+                      largeDiameter,
+                      smallDiameter,
+                    }}
+                    className="h-[400px] rounded-lg overflow-hidden"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    <LanguageText 
+                      en="Three.js preview • Drag to rotate • Scroll to zoom"
+                      zh="Three.js 预览 • 拖动旋转 • 滚轮缩放"
+                    />
+                  </p>
+                </>
+              )}
             </TabsContent>
             
             <TabsContent value="cad">
               <FreeCadPreview
-                springType={springType}
-                geometry={{
-                  wireDiameter,
-                  meanDiameter,
-                  outerDiameter: springType === "extension" || springType === "torsion" ? meanDiameter + wireDiameter : undefined,
-                  activeCoils,
-                  totalCoils: springType === "conical" ? conicalTotalCoils : totalCoils,
-                  freeLength,
-                  bodyLength,
-                  hookType,
-                  legLength1,
-                  legLength2,
-                  windingDirection,
-                  largeOuterDiameter: largeDiameter,
-                  smallOuterDiameter: smallDiameter,
-                  topGround: storeGeometry?.type === "compression" ? storeGeometry.topGround : undefined,
-                  bottomGround: storeGeometry?.type === "compression" ? storeGeometry.bottomGround : undefined,
-                  endType: springType === "conical" ? conicalEndType : undefined,
-                }}
+                springType={isSpiralTorsion ? "spiral_torsion" : springType}
+                geometry={isSpiralTorsion && storeGeometry?.type === "spiralTorsion" 
+                  ? {
+                      innerDiameter: storeGeometry.innerDiameter,
+                      outerDiameter: storeGeometry.outerDiameter,
+                      turns: storeGeometry.activeCoils,
+                      stripWidth: storeGeometry.stripWidth,
+                      stripThickness: storeGeometry.stripThickness,
+                      handedness: "ccw",
+                    }
+                  : {
+                      wireDiameter,
+                      meanDiameter,
+                      outerDiameter: springType === "extension" || springType === "torsion" ? meanDiameter + wireDiameter : undefined,
+                      activeCoils,
+                      totalCoils: springType === "conical" ? conicalTotalCoils : totalCoils,
+                      freeLength,
+                      bodyLength,
+                      hookType,
+                      legLength1,
+                      legLength2,
+                      windingDirection,
+                      largeOuterDiameter: largeDiameter,
+                      smallOuterDiameter: smallDiameter,
+                      topGround: storeGeometry?.type === "compression" ? storeGeometry.topGround : undefined,
+                      bottomGround: storeGeometry?.type === "compression" ? storeGeometry.bottomGround : undefined,
+                      endType: springType === "conical" ? conicalEndType : undefined,
+                    }
+                }
                 className="h-[400px] rounded-lg overflow-hidden"
               />
               <p className="text-xs text-muted-foreground mt-2 text-center">
@@ -718,7 +799,7 @@ function CadExportContent() {
             
             <TabsContent value="2d">
               <FreeCadDrawing
-                springType={springType}
+                springType={springType as "compression" | "extension" | "torsion" | "conical"}
                 geometry={{
                   wireDiameter,
                   meanDiameter,

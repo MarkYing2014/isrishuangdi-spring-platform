@@ -30,6 +30,8 @@ import { convertStoreGeometryToEngine } from "@/lib/engine/geometryAdapters";
 import { EXTENSION_HOOK_LABELS, type ExtensionHookType, type SpringType } from "@/lib/springTypes";
 import Link from "next/link";
 import { Brain } from "lucide-react";
+import { SpiralTorsionAnalysisPanel } from "@/components/analysis/SpiralTorsionAnalysisPanel";
+import { isSpiralTorsionDesign } from "@/lib/stores/springDesignStore";
 
 // Dynamic imports for 3D visualizers
 const CompressionSpringVisualizer = dynamic(
@@ -101,6 +103,20 @@ function AnalysisContent() {
     );
   }
 
+  // ⚠️ 螺旋扭转弹簧使用独立的分析面板，不与 wire spring 混用
+  // 这是显式分支，不是 type guard 兼容
+  if (isSpiralTorsionDesign(designGeometry)) {
+    return (
+      <SpiralTorsionAnalysisPanel
+        isZh={isZh}
+        geometry={designGeometry}
+        material={designMaterial}
+        analysisResult={designAnalysis}
+      />
+    );
+  }
+
+  // Wire spring (compression/extension/torsion/conical) 使用原有分析面板
   return (
     <AnalysisReady
       isZh={isZh}
@@ -127,8 +143,16 @@ function AnalysisReady({
   designMaterial,
   designAnalysis,
 }: AnalysisReadyProps) {
+  // ⚠️ 注意：spiralTorsion 已在上层被拦截，此函数只处理 wire spring
+  // 不要在这里添加 spiralTorsion 的兼容代码
+  if (designGeometry.type === "spiralTorsion") {
+    throw new Error("spiralTorsion should be handled by SpiralTorsionAnalysisPanel");
+  }
+  
   const springType = designGeometry.type;
   const materialId = designMaterial.id;
+  
+  // Wire spring 专用字段 - 不包含 spiralTorsion
   const wireDiameter = designGeometry.wireDiameter;
   const activeCoils = designGeometry.activeCoils;
   const shearModulus = designGeometry.shearModulus ?? designMaterial.shearModulus;
@@ -175,6 +199,8 @@ function AnalysisReady({
       conicalFreeLength = designGeometry.freeLength;
       freeLength = conicalFreeLength;
       break;
+    // ⚠️ spiralTorsion 已在上层被拦截，不会到达这里
+    // 不要添加 spiralTorsion case
   }
 
   const minDeflection = 0;

@@ -1237,6 +1237,305 @@ def make_torsion_spring(params):
 
 
 # =============================================================================
+# 螺旋扭转弹簧生成器 (Spiral Torsion Spring - 带材卷绕式)
+# 与 Three.js spiralTorsionGeometry.ts 完全同步
+# =============================================================================
+
+def make_spiral_torsion_spring(params):
+    """
+    螺旋扭转弹簧 (Spiral Torsion Spring) - 带材卷绕式
+    
+    与 Three.js spiralTorsionGeometry.ts 完全同步的算法:
+    - 阿基米德螺线中心线: r(θ) = r_i + a·θ
+    - 矩形截面: 宽度 = stripWidth (b), 厚度 = stripThickness (t)
+    - 内端: 直线穿过轴心 + 小弧过渡
+    - 外端: 直臂 + 90°折弯 + 侧边 + 顶部
+    
+    参数:
+        innerDiameter: 内径 Di (mm)
+        outerDiameter: 外径 Do (mm)
+        turns: 圈数 N
+        stripWidth: 带材宽度 b (mm)
+        stripThickness: 带材厚度 t (mm)
+        handedness: 绕向 "cw" | "ccw"
+    """
+    import time
+    t0 = time.time()
+    def mark(msg):
+        print(f"[spiral_torsion {time.time()-t0:8.3f}s] {msg}", flush=True)
+    
+    mark("start")
+    
+    # 提取参数
+    Di = params.get("innerDiameter", 12.7)
+    Do = params.get("outerDiameter", 50.0)
+    N = params.get("turns", 4.5)
+    b = params.get("stripWidth", 6.35)
+    t = params.get("stripThickness", 0.81)
+    handedness = params.get("handedness", "ccw")
+    
+    # 计算几何参数
+    inner_radius = Di / 2.0
+    outer_radius = Do / 2.0
+    total_angle = 2.0 * math.pi * N
+    a = (outer_radius - inner_radius) / total_angle  # 螺距系数
+    
+    # 端部几何参数 (与 Three.js 一致)
+    inner_leg_length = max(b * 1.2, 10.0)
+    outer_leg_length = max(3.0 * b, 25.0)
+    hook_depth = max(0.45 * b, 5.0)
+    hook_gap = max(0.9 * b, 8.0)
+    bend_radius = max(3.0 * t, 3.0)
+    inner_arc_radius = max(2.0 * t, 2.0)
+    
+    # 采样参数
+    spiral_pts_count = 400
+    inner_leg_segments = 15
+    inner_arc_segments = 12  # 增加内端小弧采样
+    outer_leg_segments = 20
+    bend_segments = 24       # 增加 90° 折弯采样
+    hook_side_segments = 6
+    hook_top_segments = 40   # 增加 U 钩顶部圆弧采样
+    
+    Z = App.Vector(0, 0, 1)
+    
+    print(f"[spiral_torsion] Di={Di}, Do={Do}, N={N}, b={b}, t={t}")
+    print(f"[spiral_torsion] inner_leg={inner_leg_length:.2f}, outer_leg={outer_leg_length:.2f}")
+    
+    # ========================================
+    # 1. 螺旋部分点列 (阿基米德螺线)
+    # ========================================
+    spiral_pts = []
+    for i in range(spiral_pts_count + 1):
+        u = i / spiral_pts_count
+        theta = u * total_angle
+        r = inner_radius + a * theta
+        angle = theta if handedness == "ccw" else -theta
+        x = r * math.cos(angle)
+        y = r * math.sin(angle)
+        spiral_pts.append(App.Vector(x, y, 0))
+    
+    # 螺旋切线
+    def get_spiral_tangent(idx):
+        if idx == 0:
+            return (spiral_pts[1] - spiral_pts[0]).normalize()
+        elif idx == len(spiral_pts) - 1:
+            return (spiral_pts[-1] - spiral_pts[-2]).normalize()
+        else:
+            return (spiral_pts[idx + 1] - spiral_pts[idx - 1]).normalize()
+    
+    t_spiral_start = get_spiral_tangent(0)
+    t_spiral_end = get_spiral_tangent(len(spiral_pts) - 1)
+    
+    p_start = spiral_pts[0]
+    p_end = spiral_pts[-1]
+    
+    # ========================================
+    # 2. 内端固定臂 - 直线穿过轴心 + 小弧过渡
+    # ========================================
+    # 径向内方向 (指向轴心)
+    radial_in = App.Vector(-p_start.x, -p_start.y, 0)
+    if radial_in.Length > 1e-12:
+        radial_in.normalize()
+    else:
+        radial_in = App.Vector(-1, 0, 0)
+    
+    # 内端直线切线 (从轴心往外)
+    t_inner_leg = radial_in * (-1)
+    
+    # 计算小弧参数
+    dot_inner = t_inner_leg.dot(t_spiral_start)
+    inner_arc_angle = math.acos(max(-1, min(1, dot_inner)))
+    
+    # 小弧旋转轴
+    inner_arc_axis = t_inner_leg.cross(t_spiral_start)
+    if inner_arc_axis.Length < 1e-12:
+        inner_arc_axis = Z
+    else:
+        inner_arc_axis.normalize()
+    
+    # 圆弧圆心 (从 p_start 反推，确保圆弧终点在 p_start)
+    n_arc_at_end = inner_arc_axis.cross(t_spiral_start)
+    n_arc_at_end.normalize()
+    arc_center = p_start + n_arc_at_end * inner_arc_radius
+    
+    # 圆弧起点
+    n_arc_at_start = App.Vector(n_arc_at_end.x, n_arc_at_end.y, n_arc_at_end.z)
+    # 绕 inner_arc_axis 旋转 -inner_arc_angle
+    rot = App.Rotation(inner_arc_axis, math.degrees(-inner_arc_angle))
+    n_arc_at_start = rot.multVec(n_arc_at_start) * (-1)
+    p_arc_start = arc_center + n_arc_at_start * inner_arc_radius
+    
+    # 直线终点 (往轴心方向延伸)
+    p_inner_end = p_arc_start + radial_in * inner_leg_length
+    
+    # 生成内端点列
+    inner_pts = []
+    
+    # 2a. 内端直线
+    for i in range(inner_leg_segments):
+        u = i / inner_leg_segments
+        p = p_inner_end + (p_arc_start - p_inner_end) * u
+        inner_pts.append(p)
+    
+    # 2b. 内端小弧
+    radius_vec = p_arc_start - arc_center
+    for i in range(1, inner_arc_segments + 1):
+        phi = (i / inner_arc_segments) * inner_arc_angle
+        rot = App.Rotation(inner_arc_axis, math.degrees(phi))
+        p = arc_center + rot.multVec(radius_vec)
+        inner_pts.append(p)
+    
+    # ========================================
+    # 3. 外端几何 - 直臂 + 90°折弯 + 侧边 + 顶部
+    # ========================================
+    # 外端局部坐标系
+    ex = App.Vector(t_spiral_end.x, t_spiral_end.y, t_spiral_end.z)
+    ex.normalize()
+    
+    # 径向外方向
+    R_end = App.Vector(p_end.x, p_end.y, 0)
+    if R_end.Length > 1e-12:
+        R_end.normalize()
+    else:
+        R_end = App.Vector(1, 0, 0)
+    
+    # ey = R 投影到 ⟂ex 平面
+    ey = R_end - ex * R_end.dot(ex)
+    if ey.Length < 1e-9:
+        ey = App.Vector(-ex.y, ex.x, 0)
+    ey.normalize()
+    
+    # 右手系修正
+    if ex.cross(ey).dot(Z) < 0:
+        ey = ey * (-1)
+    
+    ez = Z
+    
+    outer_pts = []
+    
+    # 3a. 外端直臂 (不包含起点 p_end，因为它已在 spiral_pts 末尾)
+    leg_len = max(outer_leg_length - bend_radius, 0)
+    Q0 = p_end + ex * leg_len  # 直臂终点 = 折弯起点
+    
+    for i in range(1, outer_leg_segments + 1):
+        u = (i / outer_leg_segments) * leg_len
+        p = p_end + ex * u
+        outer_pts.append(p)
+    
+    # 3b. 90° 折弯圆角 (从 i=1 开始，因为 i=0 的点就是 Q0，已在直臂末尾)
+    for i in range(1, bend_segments + 1):
+        phi = (i / bend_segments) * (math.pi / 2)
+        p = Q0 + ex * (bend_radius * math.sin(phi)) + ey * (bend_radius * (1 - math.cos(phi)))
+        outer_pts.append(p)
+    
+    end_bend = outer_pts[-1]  # 折弯终点
+    
+    # 3c. 侧边直线 (从 i=1 开始，因为 i=0 的点就是 end_bend)
+    side_len = max(hook_depth - bend_radius, 0)
+    Q1 = end_bend + ey * side_len  # 侧边终点
+    
+    if side_len > 0:
+        for i in range(1, hook_side_segments + 1):
+            u = i / hook_side_segments
+            p = end_bend + (Q1 - end_bend) * u
+            outer_pts.append(p)
+    
+    # 3d. 顶部直线 (hookTopMode = "line")
+    g = hook_gap
+    Q2 = Q1 - ex * g
+    
+    for i in range(1, hook_top_segments + 1):
+        u = i / hook_top_segments
+        p = Q1 + (Q2 - Q1) * u
+        outer_pts.append(p)
+    
+    # ========================================
+    # 4. 合并所有点列
+    # ========================================
+    all_pts = inner_pts + spiral_pts + outer_pts
+    
+    mark(f"points generated: {len(all_pts)} (inner={len(inner_pts)}, spiral={len(spiral_pts)}, outer={len(outer_pts)})")
+    
+    # ========================================
+    # 5. 创建 B-Spline 路径
+    # ========================================
+    mark("before bspline")
+    path = make_bspline_from_points(all_pts)
+    mark("after bspline")
+    
+    # ========================================
+    # 6. 创建矩形截面并扫掠
+    # ========================================
+    # 获取起点和切线
+    if hasattr(path, 'Edges'):
+        path_wire = Part.Wire(path.Edges)
+    else:
+        path_wire = Part.Wire([path])
+    
+    start_point = path_wire.Vertexes[0].Point
+    first_edge = path_wire.Edges[0]
+    tangent = first_edge.tangentAt(first_edge.FirstParameter)
+    
+    # 计算截面法向 (厚度方向)
+    # 使用径向投影法
+    radial = App.Vector(start_point.x, start_point.y, 0)
+    if radial.Length < 1e-12:
+        radial = App.Vector(1, 0, 0)
+    else:
+        radial.normalize()
+    
+    # N = radial 投影到 ⟂tangent 平面
+    normal = radial - tangent * radial.dot(tangent)
+    if normal.Length < 1e-9:
+        normal = App.Vector(-tangent.y, tangent.x, 0)
+    normal.normalize()
+    
+    # B = tangent × normal
+    binormal = tangent.cross(normal)
+    binormal.normalize()
+    
+    # 创建矩形截面 (厚度沿 normal, 宽度沿 binormal)
+    half_t = t / 2.0
+    half_b = b / 2.0
+    
+    # 矩形四个角点
+    p1 = start_point - normal * half_t - binormal * half_b
+    p2 = start_point + normal * half_t - binormal * half_b
+    p3 = start_point + normal * half_t + binormal * half_b
+    p4 = start_point - normal * half_t + binormal * half_b
+    
+    rect_wire = Part.makePolygon([p1, p2, p3, p4, p1])
+    rect_face = Part.Face(rect_wire)
+    
+    # 扫掠 - 对直线段使用 loft 而不是 sweep 来避免截面扭转
+    mark("before sweep")
+    
+    # 方法：对整条路径使用 makePipe (不是 makePipeShell)
+    # makePipe 使用 "corrected Frenet" 模式，对直线段更稳定
+    try:
+        spring_solid = path_wire.makePipe(rect_face)
+        if spring_solid.ShapeType == "Shell":
+            spring_solid = Part.Solid(spring_solid)
+        mark("makePipe succeeded")
+    except Exception as e:
+        mark(f"makePipe failed: {e}, trying makePipeShell")
+        try:
+            spring_solid = path_wire.makePipeShell([rect_wire], True, True)
+            mark("makePipeShell succeeded")
+        except Exception as e2:
+            mark(f"makePipeShell failed: {e2}")
+            raise RuntimeError("Spiral torsion spring sweep failed")
+    
+    if spring_solid is None or spring_solid.isNull():
+        raise RuntimeError("Spiral torsion spring sweep failed")
+    
+    mark(f"done: ShapeType={spring_solid.ShapeType}, Volume={spring_solid.Volume:.2f}")
+    
+    return spring_solid
+
+
+# =============================================================================
 # 锥形弹簧生成器 (改进版 - 支持死圈、端面磨平)
 # =============================================================================
 
@@ -2078,6 +2377,8 @@ def main():
         spring = make_extension_spring(geometry)
     elif spring_type == "torsion":
         spring = make_torsion_spring(geometry)
+    elif spring_type == "spiral_torsion":
+        spring = make_spiral_torsion_spring(geometry)
     elif spring_type == "conical":
         spring = make_conical_spring(geometry)
     else:
@@ -2115,9 +2416,9 @@ def main():
             # 使用 Mesh 模块导出，可以控制精度
             try:
                 import Mesh
-                # 预览用超高精度（在当前速度可接受的基础上再提升一档）
-                linear_deflection = 0.005  # mm - 超高精度
-                angular_deflection = 0.07  # radians - 超高精度（约4°）
+                # 预览用中等精度（平衡质量和速度）
+                linear_deflection = 0.2  # mm - 中等精度
+                angular_deflection = 0.3  # radians - 中等精度（约17°）
                 
                 # 创建 mesh 并导出
                 mesh = Mesh.Mesh()
@@ -2183,6 +2484,9 @@ def main():
         ]
     }
     print("RESULT_JSON:" + json.dumps(result))
+    
+    # 批处理模式强制退出（避免卡在 recompute/后处理）
+    sys.exit(0)
 
 
 if __name__ == "__main__":

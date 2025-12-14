@@ -85,12 +85,32 @@ export interface ConicalGeometry {
   materialId?: SpringMaterialId;
 }
 
+/** 螺旋扭转弹簧几何参数 (带材卷绕式) */
+export interface SpiralTorsionGeometry {
+  type: "spiralTorsion";
+  stripWidth: number;           // b - 带材宽度 (mm)
+  stripThickness: number;       // t - 带材厚度 (mm)
+  activeLength: number;         // L - 有效带材长度 (mm)
+  innerDiameter: number;        // Di - 内径 (mm) - 空间校核
+  outerDiameter: number;        // Do - 外径 (mm) - 空间校核
+  activeCoils: number;          // Na - 有效圈数 - 参考
+  preloadAngle: number;         // θ0 - 预紧角 (deg)
+  minWorkingAngle: number;      // θ_min - 最小工作角度 (deg)
+  maxWorkingAngle: number;      // θ_max - 最大工作角度 (deg)
+  closeOutAngle: number;        // θ_co - close-out角 (deg)
+  windingDirection?: "cw" | "ccw";
+  innerEndType?: "fixed" | "free" | "guided";
+  outerEndType?: "fixed" | "free" | "guided";
+  materialId?: SpringMaterialId;
+}
+
 /** 所有几何参数联合类型 - 这是 Store 的核心类型 */
 export type SpringGeometry = 
   | CompressionGeometry 
   | ExtensionGeometry 
   | TorsionGeometry 
-  | ConicalGeometry;
+  | ConicalGeometry
+  | SpiralTorsionGeometry;
 
 // ============================================================================
 // 材料信息
@@ -330,16 +350,25 @@ export const useSpringDesignStore = create<SpringDesignState>()(
  * 生成设计编号
  */
 export function generateDesignCode(geometry: SpringGeometry): string {
-  const prefix = {
+  const prefixMap: Record<SpringGeometry["type"], string> = {
     compression: "CS",
     extension: "ES",
     torsion: "TS",
     conical: "CN",
-  }[geometry.type];
+    spiralTorsion: "STS",
+  };
+  const prefix = prefixMap[geometry.type];
   
-  const d = geometry.wireDiameter.toFixed(1);
   const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
   
+  // 螺旋扭转弹簧使用带材尺寸，其他使用线径
+  if (geometry.type === "spiralTorsion") {
+    const b = geometry.stripWidth.toFixed(1);
+    const t = geometry.stripThickness.toFixed(2);
+    return `${prefix}-${b}x${t}-${timestamp}`;
+  }
+  
+  const d = geometry.wireDiameter.toFixed(1);
   let dim = "";
   if (geometry.type === "compression" || geometry.type === "torsion") {
     dim = geometry.meanDiameter.toFixed(0);
@@ -354,14 +383,26 @@ export function generateDesignCode(geometry: SpringGeometry): string {
 
 /**
  * 从 geometry 获取 meanDiameter
+ * 注意：螺旋扭转弹簧没有 meanDiameter 概念，返回 null
+ * @returns meanDiameter (mm) 或 null（对于不适用的弹簧类型）
  */
-export function getMeanDiameter(geometry: SpringGeometry): number {
+export function getMeanDiameter(geometry: SpringGeometry): number | null {
   if (geometry.type === "compression" || geometry.type === "torsion") {
     return geometry.meanDiameter;
   } else if (geometry.type === "extension") {
     return geometry.outerDiameter - geometry.wireDiameter;
   } else if (geometry.type === "conical") {
     return (geometry.largeOuterDiameter + geometry.smallOuterDiameter) / 2 - geometry.wireDiameter;
+  } else if (geometry.type === "spiralTorsion") {
+    // ⚠️ 螺旋扭转弹簧不使用 meanDiameter 概念
+    // 核心参数是 activeLength (L)，不是 Dm
+    // 返回 null 明确表示"不适用"
+    return null;
   }
-  return 0;
+  return null;
+}
+
+/** 检查是否为螺旋扭转弹簧设计 */
+export function isSpiralTorsionDesign(design: SpringGeometry | null): design is SpiralTorsionGeometry {
+  return design?.type === "spiralTorsion";
 }

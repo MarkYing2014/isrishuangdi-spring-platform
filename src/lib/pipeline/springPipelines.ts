@@ -89,6 +89,18 @@ export const SPRING_PIPELINES: Record<SpringType, SpringPipelineConfig> = {
     icon: "Cone",
     implemented: true,
   },
+  spiralTorsion: {
+    type: "spiralTorsion",
+    label: { en: "Spiral Torsion Spring", zh: "螺旋扭转弹簧" },
+    calculatorPath: "/tools/calculator?tab=spiralTorsion",
+    testerPath: "/tools/force-tester?type=spiralTorsion",
+    simulatorPath: "/tools/simulator?type=spiralTorsion",
+    reportPath: "/tools/report?type=spiralTorsion",
+    cadExportPath: "/tools/cad-export?type=spiralTorsion",
+    rfqPath: "/rfq?springType=spiralTorsion",
+    icon: "Disc",
+    implemented: false, // 3D model and other features coming soon
+  },
 };
 
 /**

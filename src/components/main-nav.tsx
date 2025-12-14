@@ -19,6 +19,7 @@ import {
 const navItems = [
   { href: "/", label: { en: "Home", zh: "首页" } },
   { href: "/tools/calculator", label: { en: "Spring Calculator", zh: "弹簧计算" } },
+  { href: "/tools/arc-spring", label: { en: "Arc Spring", zh: "弧形弹簧" } },
   { href: "/tools/analysis", label: { en: "Engineering Analysis", zh: "工程分析" } },
   { href: "/tools/simulator", label: { en: "Spring Simulator", zh: "弹簧仿真" } },
   { href: "/tools/force-tester", label: { en: "Force Tester", zh: "力-位移测试" } },

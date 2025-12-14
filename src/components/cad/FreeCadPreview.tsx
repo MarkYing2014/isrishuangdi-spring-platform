@@ -60,12 +60,12 @@ export function clearGeometryCache(): void {
 // ============================================================================
 
 interface FreeCadPreviewProps {
-  springType: "compression" | "extension" | "torsion" | "conical";
+  springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion";
   geometry: {
-    wireDiameter: number;
+    wireDiameter?: number;
     meanDiameter?: number;
     outerDiameter?: number;
-    activeCoils: number;
+    activeCoils?: number;
     totalCoils?: number;
     freeLength?: number;
     bodyLength?: number;
@@ -76,10 +76,16 @@ interface FreeCadPreviewProps {
     // Conical specific
     largeOuterDiameter?: number;
     smallOuterDiameter?: number;
-    endType?: "natural" | "closed" | "closed_ground";  // 端面类型
+    endType?: "natural" | "closed" | "closed_ground";
     // Compression specific
     topGround?: boolean;
     bottomGround?: boolean;
+    // Spiral Torsion specific
+    innerDiameter?: number;
+    turns?: number;
+    stripWidth?: number;
+    stripThickness?: number;
+    handedness?: "cw" | "ccw";
   };
   className?: string;
 }
@@ -213,21 +219,21 @@ export function FreeCadPreview({
   const [state, setState] = useState<PreviewState>({ status: "idle" });
   const abortControllerRef = useRef<AbortController | null>(null);
   
+  // 稳定化 geometry 引用，避免无限循环
+  const geometryJson = JSON.stringify(geometry);
+  const stableGeometry = useMemo(() => geometry, [geometryJson]);
+  
   // 计算缓存键
-  const cacheKey = useMemo(() => getCacheKey(springType, geometry), [springType, geometry]);
+  const cacheKey = useMemo(() => getCacheKey(springType, stableGeometry), [springType, stableGeometry]);
   
   // 组件挂载时检查缓存
   useEffect(() => {
-    // Debug: log cache key on mount
-    console.log("[FreeCadPreview] Mount with cacheKey:", cacheKey);
-    console.log("[FreeCadPreview] Geometry:", JSON.stringify(geometry, null, 2));
-    
     const cached = getCachedGeometry(cacheKey);
     if (cached) {
       console.log("[FreeCadPreview] Using cached geometry");
       setState({ status: "cached", geometry: cached });
     }
-  }, [cacheKey, geometry]);
+  }, [cacheKey]);
   
   const loadPreview = useCallback(async (forceRefresh = false) => {
     // 如果强制刷新，清除所有缓存
@@ -253,15 +259,11 @@ export function FreeCadPreview({
     
     setState({ status: "loading", message: "Generating CAD model..." });
     
-    // Debug: log geometry being sent
-    console.log("[FreeCadPreview] Sending geometry:", JSON.stringify(geometry, null, 2));
-    console.log("[FreeCadPreview] Cache key:", cacheKey);
-    
     try {
       const response = await fetch("/api/freecad/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ springType, geometry }),
+        body: JSON.stringify({ springType, geometry: stableGeometry }),
         signal: abortControllerRef.current.signal,
       });
       
@@ -314,7 +316,7 @@ export function FreeCadPreview({
         message: error instanceof Error ? error.message : "Unknown error" 
       });
     }
-  }, [springType, geometry, cacheKey]);
+  }, [springType, stableGeometry, cacheKey]);
   
   // 组件卸载时取消请求
   useEffect(() => {

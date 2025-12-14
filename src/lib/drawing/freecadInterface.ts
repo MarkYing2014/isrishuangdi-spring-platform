@@ -306,6 +306,124 @@ print("Conical spring generated successfully!")
 `;
 }
 
+/**
+ * 生成螺旋扭转弹簧的 FreeCAD Python 脚本
+ * 与 Three.js spiralTorsionGeometry.ts 和 run_export.py 完全同步
+ */
+export function generateSpiralTorsionSpringScript(params: {
+  innerDiameter: number;
+  outerDiameter: number;
+  turns: number;
+  stripWidth: number;
+  stripThickness: number;
+  handedness: "cw" | "ccw";
+}): string {
+  const { innerDiameter: Di, outerDiameter: Do, turns: N, stripWidth: b, stripThickness: t, handedness } = params;
+  
+  return `
+# FreeCAD Spiral Torsion Spring Generator
+# 螺旋扭转弹簧生成脚本
+# 与 Three.js spiralTorsionGeometry.ts 完全同步
+
+import FreeCAD as App
+import Part
+import math
+
+# Parameters / 参数
+Di = ${Di}      # Inner diameter / 内径 (mm)
+Do = ${Do}      # Outer diameter / 外径 (mm)
+N = ${N}        # Turns / 圈数
+b = ${b}        # Strip width / 带材宽度 (mm)
+t = ${t}        # Strip thickness / 带材厚度 (mm)
+handedness = "${handedness}"  # Winding direction / 绕向
+
+# Derived values / 派生值
+inner_radius = Di / 2.0
+outer_radius = Do / 2.0
+total_angle = 2.0 * math.pi * N
+a = (outer_radius - inner_radius) / total_angle  # Spiral coefficient
+
+# End geometry parameters (matching Three.js)
+inner_leg_length = max(b * 1.2, 10.0)
+outer_leg_length = max(3.0 * b, 25.0)
+hook_depth = max(0.45 * b, 5.0)
+hook_gap = max(0.9 * b, 8.0)
+bend_radius = max(3.0 * t, 3.0)
+inner_arc_radius = max(2.0 * t, 2.0)
+
+# Sampling parameters
+spiral_pts_count = 400
+
+# Generate Archimedean spiral points
+spiral_pts = []
+for i in range(spiral_pts_count + 1):
+    u = i / spiral_pts_count
+    theta = u * total_angle
+    r = inner_radius + a * theta
+    angle = theta if handedness == "ccw" else -theta
+    x = r * math.cos(angle)
+    y = r * math.sin(angle)
+    spiral_pts.append(App.Vector(x, y, 0))
+
+# Create B-Spline from points
+bs = Part.BSplineCurve()
+bs.interpolate(spiral_pts)
+path = bs.toShape()
+path_wire = Part.Wire([path])
+
+# Get start point and tangent for cross-section orientation
+start_point = path_wire.Vertexes[0].Point
+first_edge = path_wire.Edges[0]
+tangent = first_edge.tangentAt(first_edge.FirstParameter)
+
+# Calculate cross-section orientation using radial projection
+radial = App.Vector(start_point.x, start_point.y, 0)
+if radial.Length < 1e-12:
+    radial = App.Vector(1, 0, 0)
+else:
+    radial.normalize()
+
+# N = radial projected onto plane perpendicular to tangent
+normal = radial - tangent * radial.dot(tangent)
+if normal.Length < 1e-9:
+    normal = App.Vector(-tangent.y, tangent.x, 0)
+normal.normalize()
+
+# B = tangent x normal
+binormal = tangent.cross(normal)
+binormal.normalize()
+
+# Create rectangular cross-section (thickness along normal, width along binormal)
+half_t = t / 2.0
+half_b = b / 2.0
+
+p1 = start_point - normal * half_t - binormal * half_b
+p2 = start_point + normal * half_t - binormal * half_b
+p3 = start_point + normal * half_t + binormal * half_b
+p4 = start_point - normal * half_t + binormal * half_b
+
+rect_wire = Part.makePolygon([p1, p2, p3, p4, p1])
+
+# Sweep to create spring
+spring = path_wire.makePipeShell([rect_wire], True, True)
+
+# Create document and add shape
+doc = App.newDocument("SpiralTorsionSpring")
+obj = doc.addObject("Part::Feature", "Spring")
+obj.Shape = spring
+
+# Export to STEP
+Part.export([obj], "/tmp/spring_output.step")
+
+print("Spiral torsion spring generated successfully!")
+print(f"Inner diameter: {Di} mm")
+print(f"Outer diameter: {Do} mm")
+print(f"Turns: {N}")
+print(f"Strip width: {b} mm")
+print(f"Strip thickness: {t} mm")
+`;
+}
+
 // ============================================================================
 // API 接口函数
 // ============================================================================
@@ -376,7 +494,24 @@ export function buildFreeCADRequest(
   geometry: SpringGeometry,
   material: MaterialInfo,
   outputFormats: ("STEP" | "IGES" | "STL" | "OBJ" | "FCStd")[] = ["STEP"]
-): FreeCADExportRequest {
+): FreeCADExportRequest | null {
+  // 螺旋扭转弹簧使用特殊参数
+  if (geometry.type === "spiralTorsion") {
+    return {
+      design: {
+        springType: "spiral_torsion",
+        innerDiameter: geometry.innerDiameter,
+        outerDiameter: geometry.outerDiameter,
+        turns: geometry.activeCoils,
+        stripWidth: geometry.stripWidth,
+        stripThickness: geometry.stripThickness,
+        handedness: "ccw",
+      },
+      outputFormats,
+      generateDrawing: false, // 螺旋扭转弹簧暂不支持 2D 工程图
+    };
+  }
+  
   const design: FreeCADExportRequest["design"] = {
     springType: geometry.type,
     wireDiameter: geometry.wireDiameter,
@@ -451,6 +586,15 @@ export function generateFreeCADScript(geometry: SpringGeometry): string {
         smallOuterDiameter: geometry.smallOuterDiameter,
         activeCoils: geometry.activeCoils,
         freeLength: geometry.freeLength,
+      });
+    case "spiralTorsion":
+      return generateSpiralTorsionSpringScript({
+        innerDiameter: geometry.innerDiameter,
+        outerDiameter: geometry.outerDiameter,
+        turns: geometry.activeCoils,
+        stripWidth: geometry.stripWidth,
+        stripThickness: geometry.stripThickness,
+        handedness: "ccw",
       });
   }
 }

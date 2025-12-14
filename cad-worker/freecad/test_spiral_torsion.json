@@ -1,0 +1,15 @@
+{
+  "springType": "spiral_torsion",
+  "geometry": {
+    "innerDiameter": 12.7,
+    "outerDiameter": 50.0,
+    "turns": 4.5,
+    "stripWidth": 6.35,
+    "stripThickness": 0.81,
+    "handedness": "ccw"
+  },
+  "export": {
+    "formats": ["STEP"],
+    "name": "spiral_torsion_test"
+  }
+}

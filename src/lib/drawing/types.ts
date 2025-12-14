@@ -393,11 +393,11 @@ export interface ConicalSpringDimensionRules {
 export interface FreeCADExportRequest {
   /** 设计参数 */
   design: {
-    springType: "compression" | "extension" | "torsion" | "conical";
-    wireDiameter: number;
+    springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion";
+    wireDiameter?: number;
     meanDiameter?: number;
     outerDiameter?: number;
-    activeCoils: number;
+    activeCoils?: number;
     totalCoils?: number;
     freeLength?: number;
     pitch?: number;
@@ -411,6 +411,12 @@ export interface FreeCADExportRequest {
     // Conical specific
     largeOuterDiameter?: number;
     smallOuterDiameter?: number;
+    // Spiral Torsion specific
+    innerDiameter?: number;
+    turns?: number;
+    stripWidth?: number;
+    stripThickness?: number;
+    handedness?: "cw" | "ccw";
   };
   /** 输出格式 */
   outputFormats: ("STEP" | "IGES" | "STL" | "OBJ" | "FCStd")[];

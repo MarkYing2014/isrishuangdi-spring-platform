@@ -102,9 +102,9 @@ export function convertStoreGeometryToEngine(
       return toTorsionGeometry(geometry, materialId);
     case "conical":
       return toConicalGeometry(geometry, materialId);
-    default: {
-      const _exhaustiveCheck: never = geometry;
-      return _exhaustiveCheck;
-    }
+    case "spiralTorsion":
+      // 螺旋扭转弹簧暂不支持通用几何适配器
+      // 返回 null 或抛出错误
+      throw new Error("Spiral torsion spring geometry adapter not yet implemented");
   }
 }

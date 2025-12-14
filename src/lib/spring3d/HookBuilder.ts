@@ -74,7 +74,7 @@ export function getHookSpec(hookType: ExtensionHookType): HookSpec {
         centerMode: "on-axis",
         axialGapFactor: 1.2,
         radialOffsetFactor: 0,
-        hookRadiusFactor: 0.85,
+        hookRadiusFactor: 0.5,          // 减小弯钩半径
         handleLengthFactor: 2.0,
         hasExtendedLeg: false,
         extendedLegLengthFactor: 0,
@@ -341,9 +341,8 @@ export function buildHookCenterline(
     );
   }
 
-  // 弹簧轴方向（其他 hook 类型）
-  const axisDir = new THREE.Vector3(0, 0, isEnd ? 1 : -1);
-  const springAxisDir = new THREE.Vector3(0, 0, 1); // 用于 Side Hook 等
+  // 弹簧轴方向（恢复原始逻辑）
+  const springAxisDir = new THREE.Vector3(0, 0, isEnd ? 1 : -1);
 
   // 轴上的投影点
   const axisPoint = new THREE.Vector3(0, 0, endPos.z);

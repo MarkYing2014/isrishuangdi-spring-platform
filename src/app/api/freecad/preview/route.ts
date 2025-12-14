@@ -87,12 +87,12 @@ const SCRIPT_PATH = path.join(process.cwd(), "cad-worker/freecad/run_export.py")
 const TEMP_DIR = path.join(process.cwd(), ".tmp/freecad-preview");
 
 interface PreviewRequest {
-  springType: "compression" | "extension" | "torsion" | "conical";
+  springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion" | "spiralTorsion";
   geometry: {
-    wireDiameter: number;
+    wireDiameter?: number;
     meanDiameter?: number;
     outerDiameter?: number;
-    activeCoils: number;
+    activeCoils?: number;
     totalCoils?: number;
     freeLength?: number;
     bodyLength?: number;
@@ -101,15 +101,21 @@ interface PreviewRequest {
     legLength2?: number;
     windingDirection?: "left" | "right";
     // Torsion specific
-    freeAngle?: number;        // 两腿自由夹角（度）
-    workingAngle?: number;     // 工作扭转角（度）
+    freeAngle?: number;
+    workingAngle?: number;
     // Conical specific
     largeOuterDiameter?: number;
     smallOuterDiameter?: number;
-    endType?: "natural" | "closed" | "closed_ground";  // 端面类型
+    endType?: "natural" | "closed" | "closed_ground";
     // Compression specific
     topGround?: boolean;
     bottomGround?: boolean;
+    // Spiral Torsion specific
+    innerDiameter?: number;
+    turns?: number;
+    stripWidth?: number;
+    stripThickness?: number;
+    handedness?: "cw" | "ccw";
   };
 }
 
@@ -165,8 +171,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const designFile = path.join(jobDir, "design.json");
     const exportName = `preview_${jobId}`;
     
+    // 标准化 springType: spiralTorsion -> spiral_torsion
+    const normalizedSpringType = body.springType === "spiralTorsion" ? "spiral_torsion" : body.springType;
+    
     const designData = {
-      springType: body.springType,
+      springType: normalizedSpringType,
       geometry: body.geometry,
       export: {
         formats: ["STL"],  // 使用 STL 格式，Three.js 可以直接加载
