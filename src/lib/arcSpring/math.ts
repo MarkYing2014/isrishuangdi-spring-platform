@@ -133,6 +133,7 @@ export function computeArcSpringCurveSingle(input: ArcSpringInput): ArcSpringRes
   const k = springRate_k(G, input.d, input.D, input.n);
   const deltaAlphaMax = input.alpha0 - input.alphaC;
   const samples = Math.max(10, input.samples ?? 120);
+  const nParallel = input.countParallel ?? 1; // 并联弹簧数量
 
   // 几何尺寸
   const De = input.D + input.d;  // 外径
@@ -145,8 +146,9 @@ export function computeArcSpringCurveSingle(input: ArcSpringInput): ArcSpringRes
   // 用于修正螺旋弹簧内侧的应力集中
   const wahlFactor = (4 * springIndex - 1) / (4 * springIndex - 4) + 0.615 / springIndex;
 
-  // R_deg = k * r² * (π/180) [N·mm/deg]
-  const R_deg = k * input.r * input.r * (PI / 180);
+  // R_deg = k * r² * (π/180) * nParallel [N·mm/deg]
+  // 并联弹簧的总旋转刚度 = 单根刚度 × 并联数量
+  const R_deg = k * input.r * input.r * (PI / 180) * nParallel;
   const curve: ArcSpringPoint[] = [];
 
   let MMax_load = -Infinity;
@@ -157,8 +159,12 @@ export function computeArcSpringCurveSingle(input: ArcSpringInput): ArcSpringRes
     const { x, F, M } = torqueFromDeltaDeg(k, input.r, deltaDeg);
     const Tf = frictionTorque(input, F);
 
-    const M_load = M + Tf;
-    const M_unload = M - Tf;
+    // 并联弹簧：力和扭矩乘以并联数量
+    const F_total = F * nParallel;
+    const M_total = M * nParallel;
+    const Tf_total = Tf * nParallel;
+    const M_load = M_total + Tf_total;
+    const M_unload = M_total - Tf_total;
 
     MMax_load = Math.max(MMax_load, M_load);
     MMax_unload = Math.max(MMax_unload, M_unload);
@@ -166,7 +172,10 @@ export function computeArcSpringCurveSingle(input: ArcSpringInput): ArcSpringRes
     curve.push({
       deltaDeg,
       alphaDeg: input.alpha0 - deltaDeg,
-      x, F, M, Tf,
+      x, 
+      F: F_total, 
+      M: M_total, 
+      Tf: Tf_total,
       M_load,
       M_unload,
       coilBind: Math.abs(deltaDeg - deltaAlphaMax) < 1e-9,

@@ -191,6 +191,10 @@ export function generateArcSpringReportHTML(
         <div class="param-label">Coil Bind Angle αc / 压并角</div>
         <div class="param-value">${formatNumber(input.alphaC, 1)}<span class="param-unit">°</span></div>
       </div>
+      <div class="param">
+        <div class="param-label">Parallel Count / 并联数量</div>
+        <div class="param-value">${input.countParallel ?? 1}</div>
+      </div>
     </div>
 
     <div style="margin: 8px 0; font-size: 10px; font-weight: 600; color: #475569;">Material & System / 材料与系统</div>

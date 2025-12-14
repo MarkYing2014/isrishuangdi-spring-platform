@@ -28,6 +28,7 @@ export interface ArcSpringInput {
   r: number;       // mm - 工作半径 (力臂，决定扭矩)
   alpha0: number;  // deg - 自由角
   alphaC: number;  // deg - 压并角 (alphaC < alpha0)
+  countParallel?: number; // 并联弹簧数量 (DMF 常用多根并联，默认 1)
 
   // Space constraints (空间约束) - 干涉检查
   maxHousingDiameter?: number;  // mm - 最大可用安装空间 (滑壳内径)

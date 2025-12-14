@@ -167,7 +167,7 @@ export function ArcSpringCalculator() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div className="space-y-1">
                   <Label className="text-sm text-muted-foreground">
                     Working Radius r <span className="text-xs">(mm)</span>
@@ -181,7 +181,7 @@ export function ArcSpringCalculator() {
                     className="h-9"
                   />
                   <p className="text-[10px] text-muted-foreground">
-                    ⚠️ 力臂长度，非角度！Distance from flywheel center to spring axis.
+                    ⚠️ 力臂长度，非角度！
                   </p>
                 </div>
                 <NumberInput
@@ -196,6 +196,13 @@ export function ArcSpringCalculator() {
                   value={input.alphaC}
                   onChange={(v) => updateInput("alphaC", v)}
                   unit="deg"
+                  step={1}
+                />
+                <NumberInput
+                  label="Parallel Count"
+                  value={input.countParallel ?? 1}
+                  onChange={(v) => updateInput("countParallel", Math.max(1, Math.round(v)))}
+                  min={1}
                   step={1}
                 />
               </div>
