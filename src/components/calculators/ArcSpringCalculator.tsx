@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceLine,
 } from "recharts";
 
 interface NumberInputProps {
@@ -61,9 +62,14 @@ function NumberInput({ label, value, onChange, unit, min = 0, step = 0.1, disabl
 
 export function ArcSpringCalculator() {
   const [input, setInput] = useState<ArcSpringInput>(getDefaultArcSpringInput());
+  const [mounted, setMounted] = useState(false);
   const [calculated, setCalculated] = useState(true); // 默认显示示例数据的计算结果
   const [isCalculating, setIsCalculating] = useState(false);
   const [result, setResult] = useState<ArcSpringResult>(() => computeArcSpringCurve(getDefaultArcSpringInput()));
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const updateInput = <K extends keyof ArcSpringInput>(key: K, value: ArcSpringInput[K]) => {
     setInput((prev) => ({ ...prev, [key]: value }));
@@ -541,53 +547,62 @@ export function ArcSpringCalculator() {
             </CardHeader>
             <CardContent>
               <div className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="deltaDeg"
-                      label={{ value: "Δα (deg)", position: "insideBottom", offset: -5 }}
-                    />
-                    <YAxis
-                      label={{ value: "M (N·mm)", angle: -90, position: "insideLeft" }}
-                    />
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-background border rounded-lg p-3 shadow-lg text-sm">
-                              <div className="font-medium mb-1">Δα = {data.deltaDeg}°</div>
-                              <div className="text-muted-foreground">α = {data.alphaDeg}°</div>
-                              <div className="text-blue-600">M_load = {parseFloat(data.M_load).toFixed(0)} N·mm</div>
-                              <div className="text-orange-600">M_unload = {parseFloat(data.M_unload).toFixed(0)} N·mm</div>
-                              <div className="text-muted-foreground">F = {data.F} N</div>
-                              <div className="text-muted-foreground">x = {data.x} mm</div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="M_load"
-                      stroke="#2563eb"
-                      name="Loading (加载)"
-                      dot={false}
-                      strokeWidth={2}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="M_unload"
-                      stroke="#ea580c"
-                      name="Unloading (卸载)"
-                      dot={false}
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                {!mounted || !calculated ? (
+                  <div className="h-full w-full flex items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-400">
+                    {!calculated ? "Click Calculate to view chart" : "Loading chart..."}
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="deltaDeg"
+                        label={{ value: "Δα (deg)", position: "insideBottom", offset: -5 }}
+                      />
+                      <YAxis
+                        label={{ value: "M (N·mm)", angle: -90, position: "insideLeft" }}
+                      />
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-background border rounded p-2 shadow-sm text-xs">
+                                <div>Δα: {data.deltaDeg}°</div>
+                                <div className="text-blue-600">M_load: {Number(data.M_load).toFixed(0)} N·mm</div>
+                                <div className="text-orange-600">M_unload: {Number(data.M_unload).toFixed(0)} N·mm</div>
+                                <div>F: {data.F} N</div>
+                                <div>x: {data.x} mm</div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="M_load"
+                        stroke="#2563eb"
+                        strokeWidth={2}
+                        dot={false}
+                        name="Load"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="M_unload"
+                        stroke="#ea580c"
+                        strokeWidth={2}
+                        dot={false}
+                        name="Unload"
+                      />
+
+                      {/* Engage marker */}
+                      {result.engageAngleMarker !== undefined && (
+                        <ReferenceLine x={result.engageAngleMarker.toFixed(1)} stroke="#f59e0b" strokeDasharray="4 4" />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </div>
               <p className="text-xs text-muted-foreground mt-2 text-center">
                 {input.hysteresisMode === "none"

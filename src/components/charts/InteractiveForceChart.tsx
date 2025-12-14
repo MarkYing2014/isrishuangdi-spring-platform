@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -62,10 +62,26 @@ export function InteractiveForceChart({
   markerColor = "#ef4444",
   showMarker = true,
 }: InteractiveForceChartProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const currentPoint = useMemo(
     () => findNearestPoint(data, currentDeflection),
     [data, currentDeflection]
   );
+
+  if (!mounted) {
+    return (
+      <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-400">
+        Loading chart...
+        <br />
+        <span className="text-xs">图表加载中...</span>
+      </div>
+    );
+  }
 
   if (data.length === 0) {
     return (

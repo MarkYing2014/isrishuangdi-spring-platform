@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
@@ -45,8 +46,22 @@ export function SNcurveChart({
   lineColor = "#3b82f6",
   pointColor = "#ef4444",
 }: SNcurveChartProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const { language } = useLanguage();
   const isZh = language === "zh";
+
+  if (!mounted) {
+    return (
+      <div className="w-full flex items-center justify-center text-muted-foreground text-sm" style={{ height }}>
+        Loading chart...
+      </div>
+    );
+  }
 
   // Transform data for log scale display
   const chartData = curveData.map((point) => ({

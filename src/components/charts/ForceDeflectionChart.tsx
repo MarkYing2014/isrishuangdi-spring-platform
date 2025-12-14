@@ -1,5 +1,7 @@
 "use client";
 
+ import { useEffect, useState } from "react";
+
 import {
   ResponsiveContainer,
   LineChart,
@@ -20,6 +22,20 @@ interface Props {
 }
 
 export function ForceDeflectionChart({ data }: Props) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-400">
+        Loading chart...
+      </div>
+    );
+  }
+
   if (data.length === 0) {
     return (
       <div className="flex h-full w-full items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-400">

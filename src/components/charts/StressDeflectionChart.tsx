@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
@@ -44,8 +45,22 @@ export function StressDeflectionChart({
   markerColor = "#ef4444",
   xAxisLabel,
 }: StressDeflectionChartProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const { language } = useLanguage();
   const isZh = language === "zh";
+
+  if (!mounted) {
+    return (
+      <div className="w-full flex items-center justify-center text-muted-foreground text-sm" style={{ height }}>
+        Loading chart...
+      </div>
+    );
+  }
 
   // Filter data to only include points with stress
   const chartData = data.filter((p) => p.stress !== undefined).map((p) => ({
