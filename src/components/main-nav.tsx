@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { MenuIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ const navItems = [
 
 export function MainNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const { language, toggleLanguage } = useLanguage();
   const [open, setOpen] = useState(false);
   const isActive = (href: string) => {
@@ -89,7 +90,11 @@ export function MainNav() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={() => setOpen(false)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setOpen(false);
+                    router.push(item.href);
+                  }}
                   className={cn(
                     "rounded-md px-3 py-2 text-sm font-medium transition-colors",
                     isActive(item.href)
