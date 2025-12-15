@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { MenuIcon } from "lucide-react";
 
@@ -40,11 +39,9 @@ export function MainNav() {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-slate-50/95 backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2 text-base font-semibold tracking-tight">
-          <Image src="/logo.png" alt="Logo" width={32} height={32} priority />
-          <span>
-            ISRI-SHUANGDI <span className="hidden sm:inline">Spring Engineering</span>
-          </span>
+        <Link href="/" className="flex items-center text-base font-semibold tracking-tight">
+          <img src="/logo.png" alt="Logo" className="h-10 w-auto" />
+          <span className="sr-only">ISRI-SHUANGDI Spring Engineering</span>
         </Link>
 
         <nav className="hidden items-center gap-4 text-sm font-medium md:flex">
@@ -80,9 +77,9 @@ export function MainNav() {
           <SheetContent side="right" className="w-full max-w-xs">
             <SheetHeader>
               <SheetTitle>
-                <span className="flex items-center gap-2">
-                  <Image src="/logo.png" alt="Logo" width={28} height={28} priority />
-                  <span>ISRI-SHUANGDI Spring Engineering</span>
+                <span className="flex items-center">
+                  <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
+                  <span className="sr-only">ISRI-SHUANGDI Spring Engineering</span>
                 </span>
               </SheetTitle>
             </SheetHeader>

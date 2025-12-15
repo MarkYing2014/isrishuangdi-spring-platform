@@ -63,31 +63,43 @@ export default function Home() {
   return (
     <div className="space-y-10">
       <section className="rounded-3xl border bg-card p-10 shadow-sm">
-        <p className="text-sm uppercase tracking-[0.3em] text-primary/70">
-          ISRI-SHUANGDI • Industry 4.0
-        </p>
-        <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">
-          <LanguageText en="Spring Engineering Cloud Platform" zh="弹簧工程云平台" />
-        </h1>
-        <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
-          <LanguageText
-            en="Design, simulate, visualize, and source advanced suspension springs in one cohesive workflow. Built with Next.js, react-three-fiber, and enterprise-ready APIs to outpace legacy tools like SpringStore."
-            zh="一站式完成弹簧设计、仿真、可视化与采购，依托 Next.js、react-three-fiber 以及企业级 API，超越传统 SpringStore 平台。"
-          />
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <a
-            href="/tools/calculator"
-            className="inline-flex items-center rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90"
-          >
-            <LanguageText en="Explore Spring Stack" zh="探索弹簧工具链" />
-          </a>
-          <a
-            href="/rfq"
-            className="inline-flex items-center rounded-full border border-muted px-5 py-2 text-sm font-semibold"
-          >
-            <LanguageText en="Initiate RFQ" zh="发起询价" />
-          </a>
+        <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm uppercase tracking-[0.3em] text-primary/70">
+              ISRI-SHUANGDI • Industry 4.0
+            </p>
+            <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">
+              <LanguageText en="Spring Engineering Cloud Platform" zh="弹簧工程云平台" />
+            </h1>
+            <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
+              <LanguageText
+                en="Design, simulate, visualize, and source advanced suspension springs in one cohesive workflow. Built with Next.js, react-three-fiber, and enterprise-ready APIs to outpace legacy tools like SpringStore."
+                zh="一站式完成弹簧设计、仿真、可视化与采购，依托 Next.js、react-three-fiber 以及企业级 API，超越传统 SpringStore 平台。"
+              />
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <a
+                href="/tools/calculator"
+                className="inline-flex items-center rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow hover:bg-primary/90"
+              >
+                <LanguageText en="Explore Spring Stack" zh="探索弹簧工具链" />
+              </a>
+              <a
+                href="/rfq"
+                className="inline-flex items-center rounded-full border border-muted px-5 py-2 text-sm font-semibold"
+              >
+                <LanguageText en="Initiate RFQ" zh="发起询价" />
+              </a>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center justify-center md:justify-end">
+            <img
+              src="/hero.png"
+              alt="Hero"
+              className="h-24 w-auto md:h-36 lg:h-44"
+            />
+          </div>
         </div>
       </section>
 

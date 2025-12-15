@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Settings2, Circle, Layers, Activity, FileText } from "lucide-react";
@@ -18,6 +20,7 @@ import {
   getDefaultArcSpringInput,
   ARC_SPRING_MATERIALS,
   downloadArcSpringPDF,
+  validateArcSpringInput,
 } from "@/lib/arcSpring";
 import {
   LineChart,
@@ -54,11 +57,94 @@ function NumberInput({ label, value, onChange, unit, min = 0, step = 0.1, disabl
         min={min}
         step={step}
         disabled={disabled}
-        className="h-9"
+        className="h-9 arc-no-spinner"
       />
     </div>
   );
 }
+
+interface SliderNumberInputProps {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  unit?: string;
+  min: number;
+  max: number;
+  step: number;
+  disabled?: boolean;
+}
+
+function SliderNumberInput({
+  label,
+  value,
+  onChange,
+  unit,
+  min,
+  max,
+  step,
+  disabled,
+}: SliderNumberInputProps) {
+  const safeMax = Math.max(min, max);
+  const safeValue = Math.min(Math.max(value, min), safeMax);
+  return (
+    <div className="space-y-2">
+      <div className="flex items-end justify-between gap-2">
+        <Label className="text-sm text-muted-foreground">
+          {label} {unit && <span className="text-xs">({unit})</span>}
+        </Label>
+        <Input
+          type="number"
+          value={safeValue}
+          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          min={min}
+          max={safeMax}
+          step={step}
+          disabled={disabled}
+          className="h-9 w-28 arc-no-spinner"
+        />
+      </div>
+      <Slider
+        value={[safeValue]}
+        min={min}
+        max={safeMax}
+        step={step}
+        onValueChange={(v) => onChange(v[0] ?? 0)}
+        disabled={disabled}
+      />
+      <div className="flex justify-between text-[10px] text-muted-foreground">
+        <span>
+          {min}{unit ? ` ${unit}` : ""}
+        </span>
+        <span>
+          {safeMax}{unit ? ` ${unit}` : ""}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+type ArcIssueLevel = "error" | "warning";
+type ArcIssueField =
+  | "d"
+  | "D"
+  | "n"
+  | "r"
+  | "alpha0"
+  | "alphaC"
+  | "countParallel"
+  | "maxHousingDiameter"
+  | "minClearance"
+  | "hysteresisMode"
+  | "Tf_const"
+  | "cf"
+  | "systemMode"
+  | "engageAngle2";
+
+type ArcIssue = {
+  level: ArcIssueLevel;
+  field: ArcIssueField;
+  message: string;
+};
 
 export function ArcSpringCalculator() {
   const [input, setInput] = useState<ArcSpringInput>(getDefaultArcSpringInput());
@@ -66,10 +152,31 @@ export function ArcSpringCalculator() {
   const [calculated, setCalculated] = useState(true); // 默认显示示例数据的计算结果
   const [isCalculating, setIsCalculating] = useState(false);
   const [result, setResult] = useState<ArcSpringResult>(() => computeArcSpringCurve(getDefaultArcSpringInput()));
+  const [autoCalculate, setAutoCalculate] = useState(true);
+  const [highlightField, setHighlightField] = useState<ArcIssueField | null>(null);
+  const [highlightSeq, setHighlightSeq] = useState(0);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const fieldRefs = React.useRef<Partial<Record<ArcIssueField, HTMLDivElement | null>>>({});
+  const setFieldRef = (field: ArcIssueField) => (el: HTMLDivElement | null) => {
+    fieldRefs.current[field] = el;
+  };
+
+  const jumpToField = (field: ArcIssueField) => {
+    const el = fieldRefs.current[field];
+    if (!el) return;
+
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    const focusable = el.querySelector<HTMLElement>("input, select, textarea, button");
+    focusable?.focus();
+
+    setHighlightField(field);
+    setHighlightSeq((x) => x + 1);
+  };
 
   const updateInput = <K extends keyof ArcSpringInput>(key: K, value: ArcSpringInput[K]) => {
     setInput((prev) => ({ ...prev, [key]: value }));
@@ -95,6 +202,76 @@ export function ArcSpringCalculator() {
     }, 100);
   };
 
+  const issues = useMemo((): ArcIssue[] => {
+    const list: ArcIssue[] = [];
+
+    const baseErrors = validateArcSpringInput(input);
+    for (const e of baseErrors) {
+      const msg = String(e);
+      if (msg.includes("d")) list.push({ level: "error", field: "d", message: msg });
+      else if (msg.includes("D")) list.push({ level: "error", field: "D", message: msg });
+      else if (msg.includes("n")) list.push({ level: "error", field: "n", message: msg });
+      else if (msg.includes("r")) list.push({ level: "error", field: "r", message: msg });
+      else if (msg.includes("alpha0")) list.push({ level: "error", field: "alpha0", message: msg });
+      else if (msg.includes("alphaC")) list.push({ level: "error", field: "alphaC", message: msg });
+      else if (msg.includes("engageAngle2")) list.push({ level: "error", field: "engageAngle2", message: msg });
+      else list.push({ level: "error", field: "systemMode", message: msg });
+    }
+
+    const springIndex = input.d > 0 ? input.D / input.d : NaN;
+    if (isFinite(springIndex) && springIndex > 0) {
+      if (springIndex < 3) {
+        list.push({ level: "warning", field: "D", message: `Spring index C=${springIndex.toFixed(2)} is very low (risk of high stress).` });
+      } else if (springIndex < 4) {
+        list.push({ level: "warning", field: "D", message: `Spring index C=${springIndex.toFixed(2)} is low (consider C>=4).` });
+      }
+    }
+
+    const deltaMax = input.alpha0 - input.alphaC;
+    if (isFinite(deltaMax) && deltaMax > 0 && deltaMax < 5) {
+      list.push({ level: "warning", field: "alpha0", message: "Working angle range (alpha0-alphaC) is small; curve may be less meaningful." });
+    }
+
+    if (input.maxHousingDiameter !== undefined && input.maxHousingDiameter > 0) {
+      const De = input.D + input.d;
+      const clearance = input.maxHousingDiameter - De;
+      const minClearance = input.minClearance ?? 1;
+      if (clearance < minClearance) {
+        list.push({ level: "warning", field: "maxHousingDiameter", message: `Housing clearance ${clearance.toFixed(1)}mm < min ${minClearance}mm.` });
+      }
+    }
+
+    const mode = input.hysteresisMode ?? "none";
+    if (mode === "constant" && (input.Tf_const ?? 0) <= 0) {
+      list.push({ level: "warning", field: "Tf_const", message: "Constant hysteresis selected but Tf is 0." });
+    }
+    if (mode === "proportional" && (input.cf ?? 0) <= 0) {
+      list.push({ level: "warning", field: "cf", message: "Proportional hysteresis selected but cf is 0." });
+    }
+
+    return list;
+  }, [input]);
+
+  const plausibility = useMemo(() => {
+    const hasError = issues.some((x) => x.level === "error");
+    const hasWarning = issues.some((x) => x.level === "warning");
+    const status: "ok" | "warning" | "error" = hasError ? "error" : hasWarning ? "warning" : "ok";
+    return { status, hasError, hasWarning };
+  }, [issues]);
+
+  useEffect(() => {
+    if (!autoCalculate) return;
+    if (plausibility.hasError) return;
+    setIsCalculating(true);
+    const t = setTimeout(() => {
+      const newResult = computeArcSpringCurve(input);
+      setResult(newResult);
+      setCalculated(true);
+      setIsCalculating(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [autoCalculate, input, plausibility.hasError]);
+
   const chartData = useMemo(() => {
     if (!calculated) return [];
     return result.curve.map((p) => ({
@@ -111,6 +288,93 @@ export function ArcSpringCalculator() {
 
   return (
     <div className="space-y-6">
+      <style jsx>{`
+        :global(.arc-no-spinner::-webkit-outer-spin-button),
+        :global(.arc-no-spinner::-webkit-inner-spin-button) {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        :global(.arc-no-spinner) {
+          appearance: textfield;
+          -moz-appearance: textfield;
+        }
+
+        @keyframes arcFieldFlash {
+          0% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.0);
+            background: transparent;
+          }
+          20% {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.45);
+            background: rgba(59, 130, 246, 0.06);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.0);
+            background: transparent;
+          }
+        }
+
+        :global(.arc-field-highlight) {
+          border-radius: 10px;
+          animation: arcFieldFlash 1600ms ease-out;
+        }
+      `}</style>
+
+      <Card>
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Plausibility Check / 合理性检查</CardTitle>
+          {plausibility.status === "ok" && (
+            <Badge className="bg-emerald-600 text-white">OK</Badge>
+          )}
+          {plausibility.status === "warning" && (
+            <Badge className="bg-amber-500 text-white">Warning</Badge>
+          )}
+          {plausibility.status === "error" && (
+            <Badge variant="destructive">Error</Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs text-muted-foreground">
+              {autoCalculate
+                ? "Auto-calculate enabled (300ms debounce)"
+                : "Manual calculate mode"}
+            </div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={autoCalculate}
+                onChange={(e) => setAutoCalculate(e.target.checked)}
+              />
+              Auto / 自动
+            </label>
+          </div>
+
+          {issues.length === 0 ? (
+            <div className="text-sm text-emerald-700">✓ Parameters look reasonable.</div>
+          ) : (
+            <div className="space-y-2">
+              {issues.slice(0, 6).map((it, idx) => (
+                <button
+                  key={`${it.field}-${idx}`}
+                  type="button"
+                  onClick={() => jumpToField(it.field)}
+                  className={
+                    "w-full text-left text-sm underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-md px-1 py-0.5 " +
+                    (it.level === "error" ? "text-red-700" : "text-amber-700")
+                  }
+                >
+                  {it.level === "error" ? "✗" : "⚠"} {it.message}
+                </button>
+              ))}
+              {issues.length > 6 && (
+                <div className="text-xs text-muted-foreground">…and {issues.length - 6} more</div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Warnings */}
       {result.warnings.length > 0 && (
         <Alert variant="destructive">
@@ -135,26 +399,47 @@ export function ArcSpringCalculator() {
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-4">
-              <NumberInput
-                label="Wire Diameter d"
-                value={input.d}
-                onChange={(v) => updateInput("d", v)}
-                unit="mm"
-                step={0.1}
-              />
-              <NumberInput
-                label="Mean Coil Diameter D"
-                value={input.D}
-                onChange={(v) => updateInput("D", v)}
-                unit="mm"
-                step={1}
-              />
-              <NumberInput
-                label="Active Coils n"
-                value={input.n}
-                onChange={(v) => updateInput("n", v)}
-                step={0.5}
-              />
+              <div
+                ref={setFieldRef("d")}
+                className={highlightField === "d" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
+              >
+                <SliderNumberInput
+                  label="Wire Diameter d"
+                  value={input.d}
+                  onChange={(v) => updateInput("d", v)}
+                  unit="mm"
+                  min={0.5}
+                  max={10}
+                  step={0.1}
+                />
+              </div>
+              <div
+                ref={setFieldRef("D")}
+                className={highlightField === "D" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
+              >
+                <SliderNumberInput
+                  label="Mean Coil Diameter D"
+                  value={input.D}
+                  onChange={(v) => updateInput("D", v)}
+                  unit="mm"
+                  min={5}
+                  max={120}
+                  step={1}
+                />
+              </div>
+              <div
+                ref={setFieldRef("n")}
+                className={highlightField === "n" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
+              >
+                <SliderNumberInput
+                  label="Active Coils n"
+                  value={input.n}
+                  onChange={(v) => updateInput("n", v)}
+                  min={1}
+                  max={30}
+                  step={0.5}
+                />
+              </div>
             </CardContent>
           </Card>
 
@@ -168,63 +453,95 @@ export function ArcSpringCalculator() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-4 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-sm text-muted-foreground">
-                    Working Radius r <span className="text-xs">(mm)</span>
-                  </Label>
-                  <Input
-                    type="number"
+                <div
+                  ref={setFieldRef("r")}
+                  className={highlightField === "r" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
+                >
+                  <SliderNumberInput
+                    label="Working Radius r"
                     value={input.r}
-                    onChange={(e) => updateInput("r", parseFloat(e.target.value) || 0)}
-                    min={0}
+                    onChange={(v) => updateInput("r", v)}
+                    unit="mm"
+                    min={10}
+                    max={200}
                     step={1}
-                    className="h-9"
                   />
-                  <p className="text-[10px] text-muted-foreground">
-                    ⚠️ 力臂长度，非角度！
-                  </p>
                 </div>
-                <NumberInput
-                  label="Free Angle α₀"
-                  value={input.alpha0}
-                  onChange={(v) => updateInput("alpha0", v)}
-                  unit="deg"
-                  step={1}
-                />
-                <NumberInput
-                  label="Coil Bind Angle αc"
-                  value={input.alphaC}
-                  onChange={(v) => updateInput("alphaC", v)}
-                  unit="deg"
-                  step={1}
-                />
-                <NumberInput
-                  label="Parallel Count"
-                  value={input.countParallel ?? 1}
-                  onChange={(v) => updateInput("countParallel", Math.max(1, Math.round(v)))}
-                  min={1}
-                  step={1}
-                />
+                <div
+                  ref={setFieldRef("alpha0")}
+                  className={highlightField === "alpha0" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
+                >
+                  <SliderNumberInput
+                    label="Free Angle α₀"
+                    value={input.alpha0}
+                    onChange={(v) => updateInput("alpha0", v)}
+                    unit="deg"
+                    min={10}
+                    max={180}
+                    step={1}
+                  />
+                </div>
+                <div
+                  ref={setFieldRef("alphaC")}
+                  className={highlightField === "alphaC" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
+                >
+                  <SliderNumberInput
+                    label="Coil Bind Angle αc"
+                    value={input.alphaC}
+                    onChange={(v) => updateInput("alphaC", v)}
+                    unit="deg"
+                    min={0}
+                    max={Math.max(0, (input.alpha0 ?? 0) - 1)}
+                    step={1}
+                  />
+                </div>
+                <div
+                  ref={setFieldRef("countParallel")}
+                  className={highlightField === "countParallel" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
+                >
+                  <SliderNumberInput
+                    label="Parallel Count"
+                    value={input.countParallel ?? 1}
+                    onChange={(v) => updateInput("countParallel", Math.max(1, Math.round(v)))}
+                    min={1}
+                    max={12}
+                    step={1}
+                  />
+                </div>
               </div>
               
               {/* Space Constraints */}
               <div className="pt-2 border-t">
                 <Label className="text-xs text-muted-foreground mb-2 block">Space Constraints / 空间约束 (可选)</Label>
                 <div className="grid grid-cols-2 gap-4">
-                  <NumberInput
-                    label="Max Housing Diameter"
-                    value={input.maxHousingDiameter ?? 0}
-                    onChange={(v) => updateInput("maxHousingDiameter", v > 0 ? v : undefined)}
-                    unit="mm"
-                    step={1}
-                  />
-                  <NumberInput
-                    label="Min Clearance"
-                    value={input.minClearance ?? 1}
-                    onChange={(v) => updateInput("minClearance", v)}
-                    unit="mm"
-                    step={0.5}
-                  />
+                  <div
+                    ref={setFieldRef("maxHousingDiameter")}
+                    className={highlightField === "maxHousingDiameter" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
+                  >
+                    <SliderNumberInput
+                      label="Max Housing Diameter"
+                      value={input.maxHousingDiameter ?? 0}
+                      onChange={(v) => updateInput("maxHousingDiameter", v > 0 ? v : undefined)}
+                      unit="mm"
+                      min={0}
+                      max={200}
+                      step={1}
+                    />
+                  </div>
+                  <div
+                    ref={setFieldRef("minClearance")}
+                    className={highlightField === "minClearance" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
+                  >
+                    <SliderNumberInput
+                      label="Min Clearance"
+                      value={input.minClearance ?? 1}
+                      onChange={(v) => updateInput("minClearance", v)}
+                      unit="mm"
+                      min={0}
+                      max={10}
+                      step={0.5}
+                    />
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -258,13 +575,17 @@ export function ArcSpringCalculator() {
                 </Select>
               </div>
               {input.materialKey === "CUSTOM" && (
-                <NumberInput
-                  label="Shear Modulus G"
-                  value={input.G_override ?? 80000}
-                  onChange={(v) => updateInput("G_override", v)}
-                  unit="N/mm²"
-                  step={1000}
-                />
+                <div>
+                  <SliderNumberInput
+                    label="Shear Modulus G"
+                    value={input.G_override ?? 80000}
+                    onChange={(v) => updateInput("G_override", v)}
+                    unit="N/mm²"
+                    min={60000}
+                    max={90000}
+                    step={500}
+                  />
+                </div>
               )}
             </CardContent>
           </Card>
@@ -297,20 +618,24 @@ export function ArcSpringCalculator() {
                 </div>
 
                 {input.hysteresisMode === "constant" && (
-                  <NumberInput
+                  <SliderNumberInput
                     label="Friction Torque Tf"
                     value={input.Tf_const ?? 0}
                     onChange={(v) => updateInput("Tf_const", v)}
                     unit="N·mm"
+                    min={0}
+                    max={20000}
                     step={100}
                   />
                 )}
 
                 {input.hysteresisMode === "proportional" && (
-                  <NumberInput
+                  <SliderNumberInput
                     label="Friction Coefficient cf"
                     value={input.cf ?? 0}
                     onChange={(v) => updateInput("cf", v)}
+                    min={0}
+                    max={1}
                     step={0.01}
                   />
                 )}
@@ -335,11 +660,13 @@ export function ArcSpringCalculator() {
                 </div>
 
                 {input.systemMode === "dual_staged" && (
-                  <NumberInput
+                  <SliderNumberInput
                     label="Engage Angle"
                     value={input.engageAngle2 ?? 0}
                     onChange={(v) => updateInput("engageAngle2", v)}
                     unit="deg"
+                    min={0}
+                    max={Math.max(0, (input.alpha0 ?? 0) - (input.alphaC ?? 0) - 1)}
                     step={1}
                   />
                 )}
@@ -350,24 +677,30 @@ export function ArcSpringCalculator() {
                 <div className="pt-4 border-t">
                   <Label className="text-sm font-medium mb-3 block">Spring 2 Parameters / 第二弹簧参数</Label>
                   <div className="grid grid-cols-3 gap-4">
-                    <NumberInput
+                    <SliderNumberInput
                       label="d₂"
                       value={input.spring2?.d ?? input.d}
                       onChange={(v) => updateSpring2("d", v)}
                       unit="mm"
+                      min={0.5}
+                      max={10}
                       step={0.1}
                     />
-                    <NumberInput
+                    <SliderNumberInput
                       label="D₂"
                       value={input.spring2?.D ?? input.D}
                       onChange={(v) => updateSpring2("D", v)}
                       unit="mm"
+                      min={5}
+                      max={120}
                       step={1}
                     />
-                    <NumberInput
+                    <SliderNumberInput
                       label="n₂"
                       value={input.spring2?.n ?? input.n}
                       onChange={(v) => updateSpring2("n", v)}
+                      min={1}
+                      max={30}
                       step={0.5}
                     />
                   </div>
@@ -380,7 +713,7 @@ export function ArcSpringCalculator() {
           <Button
             className="w-full h-12 text-base"
             onClick={handleCalculate}
-            disabled={isCalculating}
+            disabled={isCalculating || plausibility.hasError}
           >
             {isCalculating ? (
               <>
