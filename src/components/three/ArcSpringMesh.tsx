@@ -82,7 +82,7 @@ export function ArcSpringMesh({
           wireframe={wireframe}
           side={THREE.DoubleSide}
         />
-        <Edges threshold={15} color="#1a365d" />
+        <Edges threshold={35} color="#1a365d" />
       </mesh>
       {showCenterline && centerline.length > 1 && (
         <Line points={centerline} color="#93c5fd" lineWidth={1} />
