@@ -450,18 +450,52 @@ export function downloadArcSpringPDF(
   result: ArcSpringResult,
   options: ArcSpringReportOptions = {}
 ): void {
-  const html = generateArcSpringReportHTML(input, result, options);
-  
-  const printWindow = window.open("", "_blank");
-  if (printWindow) {
-    printWindow.document.write(html);
-    printWindow.document.close();
-    
-    // Wait for content to load then trigger print
-    printWindow.onload = () => {
-      setTimeout(() => {
-        printWindow.print();
-      }, 250);
-    };
-  }
+  const payload = {
+    input,
+    result,
+    meta: {
+      title: options.title,
+      projectName: options.projectName,
+      engineer: options.engineer,
+      language: "bilingual" as const,
+    },
+  };
+
+  fetch("/api/reports/arc-spring", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  })
+    .then(async (res) => {
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      return res.blob();
+    })
+    .then((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `arc-spring-report-${Date.now()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    })
+    .catch(() => {
+      const html = generateArcSpringReportHTML(input, result, options);
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print();
+          }, 250);
+        };
+      }
+    });
 }
