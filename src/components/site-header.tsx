@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MenuIcon } from "lucide-react";
@@ -9,7 +10,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
-  SheetClose,
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
@@ -27,6 +27,7 @@ const navItems = [
 export function SiteHeader() {
   const pathname = usePathname();
   const { language, toggleLanguage } = useLanguage();
+  const [open, setOpen] = useState(false);
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
@@ -71,7 +72,7 @@ export function SiteHeader() {
             </Link>
           </Button>
 
-          <Sheet>
+          <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="md:hidden">
                 <MenuIcon className="size-4" />
@@ -94,19 +95,19 @@ export function SiteHeader() {
                 </Button>
                 <div className="flex flex-col gap-2">
                   {navItems.map((item) => (
-                    <SheetClose key={item.href} asChild>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                          isActive(item.href)
-                            ? "bg-muted text-foreground"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        {language === "en" ? item.label.en : item.label.zh}
-                      </Link>
-                    </SheetClose>
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        isActive(item.href)
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {language === "en" ? item.label.en : item.label.zh}
+                    </Link>
                   ))}
                 </div>
                 <Button asChild>

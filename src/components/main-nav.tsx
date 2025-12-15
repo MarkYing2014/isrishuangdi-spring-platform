@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MenuIcon } from "lucide-react";
@@ -9,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { LanguageText, useLanguage } from "@/components/language-context";
 import {
   Sheet,
-  SheetClose,
   SheetContent,
   SheetHeader,
   SheetTitle,
@@ -31,6 +31,7 @@ const navItems = [
 export function MainNav() {
   const pathname = usePathname();
   const { language, toggleLanguage } = useLanguage();
+  const [open, setOpen] = useState(false);
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
@@ -67,7 +68,7 @@ export function MainNav() {
           </Button>
         </div>
 
-        <Sheet>
+        <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" className="md:hidden">
               <MenuIcon className="size-4" />
@@ -85,19 +86,19 @@ export function MainNav() {
             </SheetHeader>
             <div className="mt-4 flex flex-col gap-2">
               {navItems.map((item) => (
-                <SheetClose key={item.href} asChild>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      "rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                      isActive(item.href)
-                        ? "bg-slate-900/5 text-slate-900"
-                        : "text-slate-500 hover:text-slate-900"
-                    )}
-                  >
-                    {language === "en" ? item.label.en : item.label.zh}
-                  </Link>
-                </SheetClose>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    isActive(item.href)
+                      ? "bg-slate-900/5 text-slate-900"
+                      : "text-slate-500 hover:text-slate-900"
+                  )}
+                >
+                  {language === "en" ? item.label.en : item.label.zh}
+                </Link>
               ))}
             </div>
             <div className="mt-4">
