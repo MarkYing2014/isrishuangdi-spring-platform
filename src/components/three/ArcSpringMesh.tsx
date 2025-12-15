@@ -10,6 +10,59 @@ import {
   type ArcSpringGeometryParams,
 } from "@/lib/spring3d/arcSpringGeometry";
 
+type ArcSpringColorMode = "solid" | "approx_stress";
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t;
+}
+
+function colorRampGyr(t: number): [number, number, number] {
+  const x = Math.max(0, Math.min(1, t));
+  if (x <= 0.5) {
+    const u = x / 0.5;
+    return [lerp(0.1, 1.0, u), lerp(0.8, 0.85, u), lerp(0.2, 0.05, u)];
+  }
+  const u = (x - 0.5) / 0.5;
+  return [lerp(1.0, 1.0, u), lerp(0.85, 0.15, u), lerp(0.05, 0.05, u)];
+}
+
+function applyApproxStressColors(geometry: THREE.BufferGeometry, beta: number) {
+  const posAttr = geometry.getAttribute("position") as THREE.BufferAttribute | undefined;
+  const normalAttr = geometry.getAttribute("normal") as THREE.BufferAttribute | undefined;
+  if (!posAttr || !normalAttr) return;
+
+  const count = posAttr.count;
+  const colors = new Float32Array(count * 3);
+  const b = Math.max(0, Math.min(0.9, beta));
+  const denom = b > 0 ? 2 * b : 1;
+
+  for (let i = 0; i < count; i++) {
+    const px = posAttr.getX(i);
+    const py = posAttr.getY(i);
+    const nx = normalAttr.getX(i);
+    const ny = normalAttr.getY(i);
+
+    const invLen = 1 / Math.max(1e-9, Math.hypot(px, py));
+    const dx = -px * invLen;
+    const dy = -py * invLen;
+
+    const nLen = 1 / Math.max(1e-9, Math.hypot(nx, ny));
+    const nnx = nx * nLen;
+    const nny = ny * nLen;
+
+    const dot = nnx * dx + nny * dy;
+    const factor = 1 + b * dot;
+    const t = b > 0 ? (factor - (1 - b)) / denom : 0.5;
+
+    const [r, g, bl] = colorRampGyr(t);
+    colors[i * 3 + 0] = r;
+    colors[i * 3 + 1] = g;
+    colors[i * 3 + 2] = bl;
+  }
+
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+}
+
 export interface ArcSpringMeshProps {
   d: number;
   D: number;
@@ -20,6 +73,9 @@ export interface ArcSpringMeshProps {
   deadCoilsEnd?: number;
   deadTightnessK?: number;
   deadTightnessSigma?: number;
+  colorMode?: ArcSpringColorMode;
+  approxTauMax?: number;
+  approxStressBeta?: number;
   color?: string;
   metalness?: number;
   roughness?: number;
@@ -37,6 +93,9 @@ export function ArcSpringMesh({
   deadCoilsEnd = 0,
   deadTightnessK = 0,
   deadTightnessSigma = 0,
+  colorMode = "solid",
+  approxTauMax,
+  approxStressBeta = 0.25,
   color = "#6b9bd1",
   metalness = 0.05,
   roughness = 0.45,
@@ -55,7 +114,7 @@ export function ArcSpringMesh({
       return { geometry: new THREE.BoxGeometry(10, 10, 10), centerline: [] as THREE.Vector3[] };
     }
 
-    return createArcSpringTubeGeometry(params, {
+    const res = createArcSpringTubeGeometry(params, {
       centerArc: true,
       radialSegments: 16,
       deadCoilsStart,
@@ -64,7 +123,20 @@ export function ArcSpringMesh({
       tightnessK: deadTightnessK,
       tightnessSigma: deadTightnessSigma,
     });
-  }, [params, validation.valid, deadCoilsStart, deadCoilsEnd, deadTightnessK, deadTightnessSigma]);
+    if (colorMode === "approx_stress") {
+      applyApproxStressColors(res.geometry, approxStressBeta);
+    }
+    return res;
+  }, [
+    params,
+    validation.valid,
+    deadCoilsStart,
+    deadCoilsEnd,
+    deadTightnessK,
+    deadTightnessSigma,
+    colorMode,
+    approxStressBeta,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -75,13 +147,22 @@ export function ArcSpringMesh({
   return (
     <group>
       <mesh geometry={geometry} castShadow receiveShadow>
-        <meshStandardMaterial
-          color={validation.valid ? color : "#ff4444"}
-          metalness={metalness}
-          roughness={roughness}
-          wireframe={wireframe}
-          side={THREE.DoubleSide}
-        />
+        {colorMode === "approx_stress" ? (
+          <meshBasicMaterial
+            color={validation.valid ? "#ffffff" : "#ff4444"}
+            wireframe={wireframe}
+            side={THREE.DoubleSide}
+            vertexColors
+          />
+        ) : (
+          <meshStandardMaterial
+            color={validation.valid ? color : "#ff4444"}
+            metalness={metalness}
+            roughness={roughness}
+            wireframe={wireframe}
+            side={THREE.DoubleSide}
+          />
+        )}
         <Edges threshold={35} color="#1a365d" />
       </mesh>
       {showCenterline && centerline.length > 1 && (
@@ -140,10 +221,31 @@ export interface ArcSpringVisualizerProps {
   deadCoilsPerEnd?: number;
   deadTightnessK?: number;
   deadTightnessSigma?: number;
+  colorMode?: ArcSpringColorMode;
+  approxTauMax?: number;
+  approxStressBeta?: number;
   autoRotate?: boolean;
   wireframe?: boolean;
   showCenterline?: boolean;
 }
+
+type ArcSpringSceneProps = {
+  d: number;
+  D: number;
+  n: number;
+  r: number;
+  alpha0Deg: number;
+  useDeadCoils: boolean;
+  deadCoilsPerEnd: number;
+  deadTightnessK: number;
+  deadTightnessSigma: number;
+  colorMode: ArcSpringColorMode;
+  approxTauMax?: number;
+  approxStressBeta: number;
+  autoRotate: boolean;
+  wireframe: boolean;
+  showCenterline: boolean;
+};
 
 function ArcSpringScene({
   d,
@@ -155,10 +257,13 @@ function ArcSpringScene({
   deadCoilsPerEnd,
   deadTightnessK,
   deadTightnessSigma,
+  colorMode,
+  approxTauMax,
+  approxStressBeta,
   autoRotate,
   wireframe,
   showCenterline,
-}: Required<ArcSpringVisualizerProps>) {
+}: ArcSpringSceneProps) {
   const groupRef = useRef<THREE.Group>(null);
 
   return (
@@ -180,6 +285,9 @@ function ArcSpringScene({
           deadCoilsEnd={useDeadCoils ? deadCoilsPerEnd : 0}
           deadTightnessK={useDeadCoils ? deadTightnessK : 0}
           deadTightnessSigma={useDeadCoils ? deadTightnessSigma : 0}
+          colorMode={colorMode}
+          approxTauMax={approxTauMax}
+          approxStressBeta={approxStressBeta}
           wireframe={wireframe}
           showCenterline={showCenterline}
         />
@@ -200,6 +308,9 @@ export function ArcSpringVisualizer({
   deadCoilsPerEnd = 1,
   deadTightnessK = 0,
   deadTightnessSigma = 0,
+  colorMode = "solid",
+  approxTauMax,
+  approxStressBeta = 0.25,
   autoRotate = false,
   wireframe = false,
   showCenterline = false,
@@ -216,6 +327,9 @@ export function ArcSpringVisualizer({
         deadCoilsPerEnd={Math.max(0, Math.round(deadCoilsPerEnd))}
         deadTightnessK={Math.max(0, deadTightnessK)}
         deadTightnessSigma={Math.max(0, deadTightnessSigma)}
+        colorMode={colorMode}
+        approxTauMax={approxTauMax}
+        approxStressBeta={approxStressBeta}
         autoRotate={autoRotate}
         wireframe={wireframe}
         showCenterline={showCenterline}

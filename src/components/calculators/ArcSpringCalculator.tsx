@@ -172,6 +172,10 @@ export function ArcSpringCalculator() {
   const [deadCoilsPerEnd, setDeadCoilsPerEnd] = useState(1);
   const [deadTightnessK, setDeadTightnessK] = useState(2);
   const [deadTightnessSigma, setDeadTightnessSigma] = useState(0.08);
+  const [allowableTau, setAllowableTau] = useState(800);
+  const [allowableTauFatigue, setAllowableTauFatigue] = useState(500);
+  const [showStressColors, setShowStressColors] = useState(false);
+  const [stressBeta, setStressBeta] = useState(0.25);
 
   useEffect(() => {
     setMounted(true);
@@ -275,6 +279,15 @@ export function ArcSpringCalculator() {
     const status: "ok" | "warning" | "error" = hasError ? "error" : hasWarning ? "warning" : "ok";
     return { status, hasError, hasWarning };
   }, [issues]);
+
+  const fastCheck = useMemo(() => {
+    const tauMax = result?.tauMax;
+    const sf = isFinite(tauMax) && tauMax > 0 ? allowableTau / tauMax : NaN;
+    const sfFatigue = isFinite(tauMax) && tauMax > 0 ? allowableTauFatigue / tauMax : NaN;
+    const status: "green" | "yellow" | "red" =
+      isFinite(sf) && sf >= 1.5 ? "green" : isFinite(sf) && sf >= 1.0 ? "yellow" : "red";
+    return { tauMax, sf, sfFatigue, status };
+  }, [result, allowableTau, allowableTauFatigue]);
 
   useEffect(() => {
     if (!autoCalculate) return;
@@ -800,6 +813,29 @@ export function ArcSpringCalculator() {
                   className="h-8 w-20 arc-no-spinner"
                 />
               </div>
+              <div className="flex items-center justify-between gap-3 pb-3">
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={showStressColors}
+                    onChange={(e) => setShowStressColors(e.target.checked)}
+                  />
+                  Stress Colors / 应力伪色
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-muted-foreground">β</div>
+                  <Input
+                    type="number"
+                    value={stressBeta}
+                    onChange={(e) => setStressBeta(Math.max(0, Math.min(0.9, parseFloat(e.target.value) || 0)))}
+                    min={0}
+                    max={0.9}
+                    step={0.05}
+                    disabled={!showStressColors}
+                    className="h-8 w-20 arc-no-spinner"
+                  />
+                </div>
+              </div>
               <div className="h-[360px] rounded-lg overflow-hidden bg-gradient-to-b from-slate-800 to-slate-900">
                 <ArcSpringVisualizer
                   d={input.d}
@@ -811,6 +847,9 @@ export function ArcSpringCalculator() {
                   deadCoilsPerEnd={deadCoilsPerEnd}
                   deadTightnessK={deadTightnessK}
                   deadTightnessSigma={deadTightnessSigma}
+                  colorMode={showStressColors ? "approx_stress" : "solid"}
+                  approxTauMax={isFinite(result.tauMax) ? result.tauMax : undefined}
+                  approxStressBeta={stressBeta}
                   autoRotate={false}
                   wireframe={false}
                   showCenterline={false}
@@ -819,6 +858,66 @@ export function ArcSpringCalculator() {
               <div className="mt-2 text-xs text-muted-foreground">
                 d={input.d.toFixed(2)}mm, D={input.D.toFixed(1)}mm, n={input.n.toFixed(2)}, r={input.r.toFixed(1)}mm, α₀={input.alpha0.toFixed(1)}°
                 {showDeadCoils ? `, dead=${deadCoilsPerEnd}×2, k=${deadTightnessK.toFixed(2)}, σ=${deadTightnessSigma.toFixed(2)}` : ""}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-base">Fast Engineering Check / 快速工程判定</CardTitle>
+              {fastCheck.status === "green" && (
+                <Badge className="bg-emerald-600 text-white">Green</Badge>
+              )}
+              {fastCheck.status === "yellow" && (
+                <Badge className="bg-amber-500 text-white">Yellow</Badge>
+              )}
+              {fastCheck.status === "red" && (
+                <Badge variant="destructive">Red</Badge>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="text-xs text-muted-foreground">
+                Engineering approximation (spring theory + correction factors). For fast trend guidance, not full 3D FEA.
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">Allowable τ (yield)</div>
+                  <Input
+                    type="number"
+                    value={allowableTau}
+                    onChange={(e) => setAllowableTau(Math.max(0, parseFloat(e.target.value) || 0))}
+                    step={50}
+                    className="h-8 arc-no-spinner"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">Allowable τ (fatigue)</div>
+                  <Input
+                    type="number"
+                    value={allowableTauFatigue}
+                    onChange={(e) => setAllowableTauFatigue(Math.max(0, parseFloat(e.target.value) || 0))}
+                    step={50}
+                    className="h-8 arc-no-spinner"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-2 bg-muted rounded">
+                  <div className="text-muted-foreground">τ_max (MPa)</div>
+                  <div className="font-medium">{isFinite(result.tauMax) ? result.tauMax.toFixed(0) : "—"}</div>
+                </div>
+                <div className="p-2 bg-muted rounded">
+                  <div className="text-muted-foreground">SF (yield)</div>
+                  <div className="font-medium">{isFinite(fastCheck.sf) ? fastCheck.sf.toFixed(2) : "—"}</div>
+                </div>
+                <div className="p-2 bg-muted rounded">
+                  <div className="text-muted-foreground">SF (fatigue)</div>
+                  <div className="font-medium">{isFinite(fastCheck.sfFatigue) ? fastCheck.sfFatigue.toFixed(2) : "—"}</div>
+                </div>
+                <div className="p-2 bg-muted rounded">
+                  <div className="text-muted-foreground">k (N/mm)</div>
+                  <div className="font-medium">{isFinite(result.k) ? result.k.toFixed(2) : "—"}</div>
+                </div>
               </div>
             </CardContent>
           </Card>
