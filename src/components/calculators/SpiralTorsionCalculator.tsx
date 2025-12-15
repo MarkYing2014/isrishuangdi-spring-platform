@@ -40,18 +40,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DimensionHint } from "./DimensionHint";
-import { MaterialSelector } from "./MaterialSelector";
-import { 
-  type SpringMaterialId, 
-  type SpringMaterial,
-  getSpringMaterial 
-} from "@/lib/materials/springMaterials";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   useSpringDesignStore, 
   type SpiralTorsionGeometry,
   type MaterialInfo,
   type AnalysisResult,
 } from "@/lib/stores/springDesignStore";
+import {
+  SPIRAL_SPRING_MATERIALS,
+  getSpiralSpringMaterial,
+  type SpiralSpringMaterial,
+} from "@/lib/spring3d/spiralSpringMaterials";
 
 // ================================================================
 // Types
@@ -168,7 +174,7 @@ function calculateSpiralTorsionSpring(
   outerEndType: string,
   allowableStressOverride: number | null,  // 用户覆盖值
   allowableStressRule: FormValues["allowableStressRule"],  // 设计准则 (类型收紧)
-  material: SpringMaterial
+  material: SpiralSpringMaterial
 ): SpiralTorsionResults {
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -225,10 +231,9 @@ function calculateSpiralTorsionSpring(
   // ---------------------------------------------------------------
   // 3) Material properties
   // ---------------------------------------------------------------
-  // E = 2G(1+ν), ν ≈ 0.29 for steel → E ≈ 2.58G
-  const poissonRatio = 0.29; // typical for spring steel
-  const elasticModulus = material.elasticModulus ?? 2 * material.shearModulus * (1 + poissonRatio);
-  const tensileStrength = material.tensileStrength ?? null;
+  const elasticModulus = material.elasticModulus_MPa;
+  const tensileStrength = material.ultimateStrength_MPa;
+  const yieldStrength = material.yieldStrength_MPa;
   
   // For spiral torsion springs, the primary stress is BENDING stress (not shear)
   // allowableStress: 用户可覆盖，否则根据设计准则计算
@@ -239,7 +244,7 @@ function calculateSpiralTorsionSpring(
     // 用户自定义覆盖值
     allowableStress = allowableStressOverride;
     allowableStressSource = "用户自定义 / User Override";
-  } else if (tensileStrength) {
+  } else {
     // 根据设计准则计算
     switch (allowableStressRule) {
       case "0.45_UTS":
@@ -247,9 +252,8 @@ function calculateSpiralTorsionSpring(
         allowableStressSource = `0.45 × UTS (${tensileStrength} MPa) = ${allowableStress.toFixed(0)} MPa (经验默认，可配置)`;
         break;
       case "0.50_YS":
-        // 假设 YS ≈ 0.85 × UTS for spring steel
-        allowableStress = tensileStrength * 0.85 * 0.50;
-        allowableStressSource = `0.50 × YS (≈0.85×UTS) = ${allowableStress.toFixed(0)} MPa (经验默认，可配置)`;
+        allowableStress = yieldStrength * 0.50;
+        allowableStressSource = `0.50 × YS (${yieldStrength} MPa) = ${allowableStress.toFixed(0)} MPa (屈服强度准则)`;
         break;
       case "0.30_UTS":
         allowableStress = tensileStrength * 0.30;
@@ -259,11 +263,6 @@ function calculateSpiralTorsionSpring(
         allowableStress = tensileStrength * 0.45;
         allowableStressSource = `0.45 × UTS (默认) = ${allowableStress.toFixed(0)} MPa (经验默认，可配置)`;
     }
-  } else {
-    // 无 UTS 数据，使用剪切许用应力推算
-    allowableStress = material.allowShearStatic * 1.25;
-    allowableStressSource = `1.25 × τ_allow (${material.allowShearStatic} MPa) = ${allowableStress.toFixed(0)} MPa (无UTS数据，保守估计)`;
-    warnings.push("材料无 UTS 数据，许用应力为保守估计值");
   }
   
   // ---------------------------------------------------------------
@@ -500,7 +499,7 @@ export function SpiralTorsionCalculator() {
   const router = useRouter();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [materialId, setMaterialId] = useState<SpringMaterialId>("music_wire_a228");
+  const [materialId, setMaterialId] = useState<SpiralSpringMaterial["id"]>("sae1095");
   
   // 使用 useRef 跟踪是否已初始化，避免无限循环
   const initializedRef = useRef(false);
@@ -521,6 +520,7 @@ export function SpiralTorsionCalculator() {
   const hasSpiralDesign = storedGeometry?.type === "spiralTorsion";
 
   const form = useForm<FormValues>({
+    mode: "onChange",
     defaultValues: hasSpiralDesign ? {
       stripWidth: storedGeometry.stripWidth,
       stripThickness: storedGeometry.stripThickness,
@@ -561,23 +561,33 @@ export function SpiralTorsionCalculator() {
     },
   });
 
+  const { errors } = form.formState;
+
   // 在组件首次挂载时恢复 submitted 状态和材料 ID
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
     
-    if (hasSpiralDesign && storedGeometry.materialId) {
-      setMaterialId(storedGeometry.materialId);
-      setSubmitted(true);
+    if (hasSpiralDesign && storedGeometry.spiralMaterialId) {
+      const m = getSpiralSpringMaterial(storedGeometry.spiralMaterialId);
+      if (m) {
+        setMaterialId(m.id);
+        setSubmitted(true);
+      }
     }
   }, [hasSpiralDesign, storedGeometry]);
 
   const watchedValues = form.watch();
 
+  const btRatio =
+    isFinite(watchedValues.stripWidth ?? NaN) && isFinite(watchedValues.stripThickness ?? NaN) && (watchedValues.stripThickness ?? 0) > 0
+      ? (watchedValues.stripWidth ?? 0) / (watchedValues.stripThickness ?? 1)
+      : null;
+
   const results = useMemo((): SpiralTorsionResults | null => {
     if (!submitted) return null;
-    
-    const material = getSpringMaterial(materialId);
+
+    const material = getSpiralSpringMaterial(materialId);
     if (!material) return null;
     
     return calculateSpiralTorsionSpring(
@@ -605,7 +615,7 @@ export function SpiralTorsionCalculator() {
   // 当计算结果有效时，保存到全局 Store
   useEffect(() => {
     if (results?.isValid) {
-      const material = getSpringMaterial(materialId);
+      const material = getSpiralSpringMaterial(materialId);
       if (!material) return;
 
       // 构建几何参数
@@ -624,16 +634,16 @@ export function SpiralTorsionCalculator() {
         windingDirection: watchedValues.windingDirection ?? "cw",
         innerEndType: watchedValues.innerEndType ?? "fixed",
         outerEndType: watchedValues.outerEndType ?? "fixed",
-        materialId: materialId,
+        spiralMaterialId: materialId,
       };
 
       // 构建材料信息
       const materialInfo: MaterialInfo = {
-        id: materialId,
-        name: material.nameEn,
-        shearModulus: material.shearModulus,
+        id: "music_wire_a228",
+        name: material.name,
+        shearModulus: material.elasticModulus_MPa / 2.6,
         elasticModulus: results.elasticModulus,
-        density: material.density ?? 7850,
+        density: 7850,
         tensileStrength: results.tensileStrength ?? undefined,
       };
 
@@ -665,7 +675,7 @@ export function SpiralTorsionCalculator() {
     setSubmitted(true);
   };
 
-  const handleMaterialChange = (material: SpringMaterial) => {
+  const handleMaterialChange = (material: SpiralSpringMaterial) => {
     setMaterialId(material.id);
     if (submitted) {
       setSubmitted(false);
@@ -691,20 +701,66 @@ export function SpiralTorsionCalculator() {
                 <div className="space-y-2">
                   <DimensionHint code="b" label="Strip Width" description="带材宽度，弹簧的轴向尺寸。" />
                   <Label htmlFor="stripWidth">Width b (mm) / 带材宽度</Label>
-                  <Input id="stripWidth" type="number" step="0.1" {...form.register("stripWidth", { valueAsNumber: true })} />
+                  <Input
+                    id="stripWidth"
+                    type="number"
+                    step="0.1"
+                    {...form.register("stripWidth", {
+                      valueAsNumber: true,
+                      required: "b is required",
+                      min: { value: 0.001, message: "b must be > 0" },
+                    })}
+                  />
+                  {errors.stripWidth?.message && (
+                    <p className="text-xs text-red-600 dark:text-red-300">{String(errors.stripWidth.message)}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <DimensionHint code="t" label="Strip Thickness" description="带材厚度，影响刚度和应力。" />
                   <Label htmlFor="stripThickness">Thickness t (mm) / 带材厚度</Label>
-                  <Input id="stripThickness" type="number" step="0.01" {...form.register("stripThickness", { valueAsNumber: true })} />
+                  <Input
+                    id="stripThickness"
+                    type="number"
+                    step="0.01"
+                    {...form.register("stripThickness", {
+                      valueAsNumber: true,
+                      required: "t is required",
+                      min: { value: 0.001, message: "t must be > 0" },
+                    })}
+                  />
+                  {errors.stripThickness?.message && (
+                    <p className="text-xs text-red-600 dark:text-red-300">{String(errors.stripThickness.message)}</p>
+                  )}
                 </div>
+              </div>
+
+              <div className="text-xs text-muted-foreground">
+                b/t = {btRatio === null || !isFinite(btRatio) ? "—" : btRatio.toFixed(2)}
+                {btRatio !== null && isFinite(btRatio) && (btRatio < 6 || btRatio > 60)
+                  ? " (out of recommended range 6–60)"
+                  : ""}
+                {(watchedValues.stripThickness ?? 0) > 0 && (watchedValues.stripThickness ?? 0) < 0.05
+                  ? " | t is very small; check input units"
+                  : ""}
               </div>
 
               {/* 有效带材长度 - 关键参数，直接输入 */}
               <div className="space-y-2">
                 <DimensionHint code="L" label="Active Length" description="有效带材长度，用于扭矩计算。这是关键参数，直接影响刚度。" />
                 <Label htmlFor="activeLength">Active Length L (mm) / 有效带材长度 ⭐</Label>
-                <Input id="activeLength" type="number" step="1" {...form.register("activeLength", { valueAsNumber: true })} />
+                <Input
+                  id="activeLength"
+                  type="number"
+                  step="1"
+                  {...form.register("activeLength", {
+                    valueAsNumber: true,
+                    required: "L is required",
+                    min: { value: 0.1, message: "L must be > 0" },
+                  })}
+                />
+                {errors.activeLength?.message && (
+                  <p className="text-xs text-red-600 dark:text-red-300">{String(errors.activeLength.message)}</p>
+                )}
                 <p className="text-xs text-muted-foreground">关键参数：直接用于扭矩公式 M = πEbt³θ/(6L)</p>
               </div>
 
@@ -757,7 +813,19 @@ export function SpiralTorsionCalculator() {
                 <div className="space-y-2">
                   <DimensionHint code="θmin" label="Min Working Angle" description="最小工作角度，相对中性位。" />
                   <Label htmlFor="minWorkingAngle">Min Angle θmin (°) / 最小角度</Label>
-                  <Input id="minWorkingAngle" type="number" step="1" {...form.register("minWorkingAngle", { valueAsNumber: true })} />
+                  <Input
+                    id="minWorkingAngle"
+                    type="number"
+                    step="1"
+                    {...form.register("minWorkingAngle", {
+                      valueAsNumber: true,
+                      validate: (v) =>
+                        !isFinite(v) || v <= (form.getValues("maxWorkingAngle") ?? v) || "θmin must be ≤ θmax",
+                    })}
+                  />
+                  {errors.minWorkingAngle?.message && (
+                    <p className="text-xs text-red-600 dark:text-red-300">{String(errors.minWorkingAngle.message)}</p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     = {((watchedValues.minWorkingAngle ?? 0) / 360).toFixed(3)} revolution
                   </p>
@@ -765,7 +833,19 @@ export function SpiralTorsionCalculator() {
                 <div className="space-y-2">
                   <DimensionHint code="θmax" label="Max Working Angle" description="最大工作角度，相对中性位。" />
                   <Label htmlFor="maxWorkingAngle">Max Angle θmax (°) / 最大角度</Label>
-                  <Input id="maxWorkingAngle" type="number" step="1" {...form.register("maxWorkingAngle", { valueAsNumber: true })} />
+                  <Input
+                    id="maxWorkingAngle"
+                    type="number"
+                    step="1"
+                    {...form.register("maxWorkingAngle", {
+                      valueAsNumber: true,
+                      validate: (v) =>
+                        !isFinite(v) || v >= (form.getValues("minWorkingAngle") ?? v) || "θmax must be ≥ θmin",
+                    })}
+                  />
+                  {errors.maxWorkingAngle?.message && (
+                    <p className="text-xs text-red-600 dark:text-red-300">{String(errors.maxWorkingAngle.message)}</p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     = {((watchedValues.maxWorkingAngle ?? 0) / 360).toFixed(3)} revolution
                   </p>
@@ -865,7 +945,19 @@ export function SpiralTorsionCalculator() {
                   <div className="space-y-2">
                     <DimensionHint code="θco" label="Close-out Angle" description="close-out起点角，圈间开始接触的角度。PDF建议：线性区约1圈(360°)。" />
                     <Label htmlFor="closeOutAngle">Close-out Angle θco (°) / 贴合起点角</Label>
-                    <Input id="closeOutAngle" type="number" step="1" {...form.register("closeOutAngle", { valueAsNumber: true })} />
+                    <Input
+                      id="closeOutAngle"
+                      type="number"
+                      step="1"
+                      {...form.register("closeOutAngle", {
+                        valueAsNumber: true,
+                        required: "θco is required",
+                        min: { value: 1, message: "θco must be > 0" },
+                      })}
+                    />
+                    {errors.closeOutAngle?.message && (
+                      <p className="text-xs text-red-600 dark:text-red-300">{String(errors.closeOutAngle.message)}</p>
+                    )}
                   </div>
                   
                   {/* 许用应力设置 - 可追溯 */}
@@ -918,11 +1010,49 @@ export function SpiralTorsionCalculator() {
               )}
             </div>
 
-            {/* Material Selector */}
-            <MaterialSelector
-              value={materialId}
-              onChange={handleMaterialChange}
-            />
+            <div className="space-y-2">
+              <Label>Material / 材料</Label>
+              <Select
+                value={materialId}
+                onValueChange={(v) => {
+                  const m = getSpiralSpringMaterial(v as SpiralSpringMaterial["id"]);
+                  if (m) handleMaterialChange(m);
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select material..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {SPIRAL_SPRING_MATERIALS.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      <div className="flex flex-col">
+                        <span>{m.name}</span>
+                        <span className="text-xs text-muted-foreground">{m.standard}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {(() => {
+                const m = getSpiralSpringMaterial(materialId);
+                if (!m) return null;
+                return (
+                  <div className="rounded-md border border-slate-200 bg-slate-50 p-2 text-xs">
+                    <div className="grid grid-cols-2 gap-1">
+                      <span className="text-muted-foreground">E (MPa):</span>
+                      <span className="font-medium">{m.elasticModulus_MPa.toLocaleString()}</span>
+                      <span className="text-muted-foreground">Su (MPa):</span>
+                      <span className="font-medium">{m.ultimateStrength_MPa.toLocaleString()}</span>
+                      <span className="text-muted-foreground">Sy (MPa):</span>
+                      <span className="font-medium">{m.yieldStrength_MPa.toLocaleString()}</span>
+                      <span className="text-muted-foreground">Standard:</span>
+                      <span className="font-medium">{m.standard}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
 
             <Button 
               type="submit" 
@@ -948,7 +1078,7 @@ export function SpiralTorsionCalculator() {
       </Card>
 
       {/* Results Card */}
-      <Card className="bg-slate-900 text-slate-50">
+      <Card className="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-50">
         <CardHeader>
           <CardTitle>Results / 计算结果</CardTitle>
         </CardHeader>
@@ -959,7 +1089,7 @@ export function SpiralTorsionCalculator() {
               {results.errors.length > 0 && (
                 <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3">
                   {results.errors.map((error, i) => (
-                    <p key={i} className="text-xs text-red-200">❌ {error}</p>
+                    <p key={i} className="text-xs text-red-800 dark:text-red-200">❌ {error}</p>
                   ))}
                 </div>
               )}
@@ -968,48 +1098,48 @@ export function SpiralTorsionCalculator() {
               {results.warnings.length > 0 && (
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
                   {results.warnings.map((warning, i) => (
-                    <p key={i} className="text-xs text-amber-200">⚠ {warning}</p>
+                    <p key={i} className="text-xs text-amber-800 dark:text-amber-200">⚠ {warning}</p>
                   ))}
                 </div>
               )}
 
               {/* Geometry Results */}
-              <div className="space-y-2 rounded-md border border-slate-700 bg-slate-800 p-3">
-                <p className="text-xs font-medium text-slate-400">Geometry / 几何参数</p>
+              <div className="space-y-2 rounded-md border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+                <p className="text-xs font-medium text-slate-700 dark:text-slate-400">Geometry / 几何参数</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span className="text-slate-400">Active Length L:</span>
+                  <span className="text-slate-600 dark:text-slate-400">Active Length L:</span>
                   <span>{results.activeLength.toFixed(1)} mm</span>
-                  <span className="text-slate-400">Aspect Ratio b/t:</span>
+                  <span className="text-slate-600 dark:text-slate-400">Aspect Ratio b/t:</span>
                   <span>{results.aspectRatio.toFixed(1)}</span>
-                  <span className="text-slate-400">Di / Do (空间校核):</span>
+                  <span className="text-slate-600 dark:text-slate-400">Di / Do (空间校核):</span>
                   <span>{results.innerDiameter.toFixed(1)} / {results.outerDiameter.toFixed(1)} mm</span>
                 </div>
               </div>
 
               {/* Spring Rate */}
-              <div className="space-y-2 rounded-md border border-green-700 bg-green-900/30 p-3">
-                <p className="text-xs font-medium text-green-400">Spring Rate / 扭转刚度</p>
+              <div className="space-y-2 rounded-md border border-green-200 bg-green-50 p-3 dark:border-green-700 dark:bg-green-900/30">
+                <p className="text-xs font-medium text-green-800 dark:text-green-300">Spring Rate / 扭转刚度</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span className="text-slate-400">k (corrected):</span>
-                  <span className="text-green-300 font-medium">{results.springRateCorrected.toFixed(4)} N·mm/°</span>
-                  <span className="text-slate-400">k (theory):</span>
-                  <span className="text-slate-300">{results.springRateTheory.toFixed(4)} N·mm/°</span>
-                  <span className="text-slate-400">C_end × C_pack:</span>
+                  <span className="text-slate-700 dark:text-slate-300">k (corrected):</span>
+                  <span className="text-green-700 dark:text-green-300 font-medium">{results.springRateCorrected.toFixed(4)} N·mm/°</span>
+                  <span className="text-slate-700 dark:text-slate-300">k (theory):</span>
+                  <span className="text-slate-900 dark:text-slate-300">{results.springRateTheory.toFixed(4)} N·mm/°</span>
+                  <span className="text-slate-700 dark:text-slate-300">C_end × C_pack:</span>
                   <span>{(results.correctionFactorEnd * results.correctionFactorPack).toFixed(3)}</span>
                 </div>
               </div>
 
               {/* Torque at Key Points */}
-              <div className="space-y-2 rounded-md border border-cyan-700 bg-cyan-900/30 p-3">
-                <p className="text-xs font-medium text-cyan-400">Torque / 扭矩</p>
+              <div className="space-y-2 rounded-md border border-cyan-200 bg-cyan-50 p-3 dark:border-cyan-700 dark:bg-cyan-900/30">
+                <p className="text-xs font-medium text-cyan-800 dark:text-cyan-300">Torque / 扭矩</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span className="text-slate-400">T(θ_min):</span>
+                  <span className="text-slate-700 dark:text-slate-300">T(θ_min):</span>
                   <span>{results.minTorque.toFixed(2)} N·mm</span>
-                  <span className="text-slate-400">T(θ_max):</span>
-                  <span className="text-cyan-300 font-medium">{results.maxTorque.toFixed(2)} N·mm</span>
-                  <span className="text-slate-400">T(θ_co):</span>
+                  <span className="text-slate-700 dark:text-slate-300">T(θ_max):</span>
+                  <span className="text-cyan-700 dark:text-cyan-300 font-medium">{results.maxTorque.toFixed(2)} N·mm</span>
+                  <span className="text-slate-700 dark:text-slate-300">T(θ_co):</span>
                   <span>{results.closeOutTorque.toFixed(2)} N·mm</span>
-                  <span className="text-slate-400">Energy U:</span>
+                  <span className="text-slate-700 dark:text-slate-300">Energy U:</span>
                   <span>{results.energyStored.toFixed(2)} N·mm·rad</span>
                 </div>
               </div>
@@ -1024,10 +1154,10 @@ export function SpiralTorsionCalculator() {
               }`}>
                 <p className={`text-xs font-medium ${
                   results.operatingStatus === "SAFE" 
-                    ? "text-emerald-400" 
+                    ? "text-emerald-700 dark:text-emerald-400" 
                     : results.operatingStatus === "WARNING"
-                      ? "text-amber-400"
-                      : "text-red-400"
+                      ? "text-amber-700 dark:text-amber-400"
+                      : "text-red-700 dark:text-red-400"
                 }`}>
                   {results.operatingStatus === "SAFE" && "✓ SAFE - Linear operating range / 安全 - 线性工作区"}
                   {results.operatingStatus === "WARNING" && "⚠️ WARNING - Approaching close-out / 警告 - 接近贴合区"}
@@ -1036,24 +1166,24 @@ export function SpiralTorsionCalculator() {
               </div>
 
               {/* Stress Results */}
-              <div className="space-y-2 rounded-md border border-blue-700 bg-blue-900/30 p-3">
-                <p className="text-xs font-medium text-blue-400">Stress / 应力</p>
+              <div className="space-y-2 rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-900/30">
+                <p className="text-xs font-medium text-blue-800 dark:text-blue-300">Stress / 应力</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span className="text-slate-400">σ_max (linear):</span>
+                  <span className="text-slate-700 dark:text-slate-300">σ_max (linear):</span>
                   <span>{results.maxStressLinear.toFixed(1)} MPa</span>
                   {results.isInCloseOut && (
                     <>
-                      <span className="text-slate-400">σ_max (close-out):</span>
-                      <span className="text-red-300">{results.maxStressCloseOut.toFixed(1)} MPa</span>
+                      <span className="text-slate-700 dark:text-slate-300">σ_max (close-out):</span>
+                      <span className="text-red-700 dark:text-red-300">{results.maxStressCloseOut.toFixed(1)} MPa</span>
                     </>
                   )}
-                  <span className="text-slate-400">σ_allow:</span>
+                  <span className="text-slate-700 dark:text-slate-300">σ_allow:</span>
                   <span>{results.allowableStress.toFixed(0)} MPa</span>
-                  <span className="text-slate-400">Kt:</span>
+                  <span className="text-slate-700 dark:text-slate-300">Kt:</span>
                   <span>{results.stressConcentrationFactor.toFixed(2)}</span>
                 </div>
                 {/* 许用应力来源 - 可追溯 */}
-                <p className="text-xs text-slate-500 mt-1 border-t border-slate-700 pt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 border-t border-slate-200 dark:border-slate-700 pt-1">
                   σ_allow derived from: {results.allowableStressSource}
                 </p>
               </div>
@@ -1061,32 +1191,32 @@ export function SpiralTorsionCalculator() {
               {/* Safety Factors */}
               <div className={`space-y-2 rounded-md border p-3 ${
                 results.safetyFactorLinear >= 1.2 
-                  ? "border-emerald-700 bg-emerald-900/30" 
+                  ? "border-emerald-200 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/30" 
                   : results.safetyFactorLinear >= 1.0 
-                    ? "border-amber-700 bg-amber-900/30"
-                    : "border-red-700 bg-red-900/30"
+                    ? "border-amber-200 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/30"
+                    : "border-red-200 bg-red-50 dark:border-red-700 dark:bg-red-900/30"
               }`}>
-                <p className="text-xs font-medium text-slate-400">Safety / 安全系数</p>
+                <p className="text-xs font-medium text-slate-800 dark:text-slate-300">Safety / 安全系数</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span className="text-slate-400">n (linear):</span>
+                  <span className="text-slate-700 dark:text-slate-300">n (linear):</span>
                   <span className={`font-bold ${
                     results.safetyFactorLinear >= 1.2 
-                      ? "text-emerald-400" 
+                      ? "text-emerald-700 dark:text-emerald-400" 
                       : results.safetyFactorLinear >= 1.0 
-                        ? "text-amber-400"
-                        : "text-red-400"
+                        ? "text-amber-700 dark:text-amber-400"
+                        : "text-red-700 dark:text-red-400"
                   }`}>
                     {results.safetyFactorLinear.toFixed(2)}
                   </span>
                   {results.isInCloseOut && (
                     <>
-                      <span className="text-slate-400">n (close-out):</span>
+                      <span className="text-slate-700 dark:text-slate-300">n (close-out):</span>
                       <span className={`font-bold ${
                         results.safetyFactorCloseOut >= 1.2 
-                          ? "text-emerald-400" 
+                          ? "text-emerald-700 dark:text-emerald-400" 
                           : results.safetyFactorCloseOut >= 1.0 
-                            ? "text-amber-400"
-                            : "text-red-400"
+                            ? "text-amber-700 dark:text-amber-400"
+                            : "text-red-700 dark:text-red-400"
                       }`}>
                         {results.safetyFactorCloseOut.toFixed(2)}
                       </span>
@@ -1097,44 +1227,46 @@ export function SpiralTorsionCalculator() {
 
               {/* Close-out Indicators */}
               {results.isInCloseOut && (
-                <div className="space-y-2 rounded-md border border-red-700 bg-red-900/30 p-3">
-                  <p className="text-xs font-medium text-red-400">⚠ Close-out Warning / 贴合警告</p>
+                <div className="space-y-2 rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-700 dark:bg-red-900/30">
+                  <p className="text-xs font-medium text-red-800 dark:text-red-300">⚠ Close-out Warning / 贴合警告</p>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <span className="text-slate-400">Close-out Gain:</span>
-                    <span className="text-red-300 font-medium">{results.closeOutGainFactor.toFixed(2)}×</span>
+                    <span className="text-slate-700 dark:text-slate-300">Close-out Gain:</span>
+                    <span className="text-red-700 dark:text-red-300 font-medium">{results.closeOutGainFactor.toFixed(2)}×</span>
                   </div>
-                  <p className="text-xs text-red-200 mt-1">
+                  <p className="text-xs text-red-800 dark:text-red-200 mt-1">
                     工作角度已进入close-out区域，扭矩急剧增加！
                   </p>
                 </div>
               )}
 
               {/* Formula Reference - 使用 PDF 正确公式 */}
-              <div className="space-y-1 text-xs text-slate-500 border-t border-slate-700 pt-2">
-                <p className="font-medium text-slate-400">Handbook of Spring Design 公式:</p>
+              <div className="space-y-1 text-xs text-slate-600 dark:text-slate-500 border-t border-slate-200 dark:border-slate-700 pt-2">
+                <p className="font-medium text-slate-800 dark:text-slate-400">Handbook of Spring Design 公式:</p>
                 <p>M = πEbt³θ_rev/(6L)  (θ_rev in revolutions; θ_deg = 360·θ_rev)</p>
                 <p>k_rev = πEbt³/(6L), k_deg = k_rev/360</p>
                 <p>σ = 6M/(bt²) (弯曲应力, bending stress)</p>
-                <p className="text-amber-400">⚠️ 线性区仅在 θ ≤ θ_co 有效</p>
+                <p className="text-amber-700 dark:text-amber-400">⚠️ 线性区仅在 θ ≤ θ_co 有效</p>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-slate-200">
+            <p className="text-sm text-slate-700 dark:text-slate-200">
               Input parameters and run the calculation to view results.
               <br />
-              <span className="text-slate-400">输入参数并点击计算，查看结果。</span>
+              <span className="text-slate-600 dark:text-slate-400">输入参数并点击计算，查看结果。</span>
             </p>
           )}
 
-          {/* Action Buttons - 统一的按钮样式（与其他计算器一致，4个按钮） */}
-          {/* EXCEEDED 时禁用载荷相关按钮（Force Tester, CAD），但允许生成几何模型 */}
+          {/* Action Buttons - 统一的按钮样式（与其他计算器一致） */}
+          {/* EXCEEDED 时禁用载荷相关按钮（Force Tester, CAD） */}
           <div className="space-y-3 pt-2">
+            {/* Generate 3D Model button hidden for now
             <Button 
               className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
               disabled={!results?.isValid}
             >
               Generate 3D Model / 生成3D模型
             </Button>
+            */}
             <Button 
               variant="outline" 
               className="w-full border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 hover:border-emerald-400 hover:text-emerald-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/10"

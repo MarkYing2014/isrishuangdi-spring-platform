@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DimensionHint } from "./DimensionHint";
+import { MaterialSelector } from "./MaterialSelector";
 import { 
   useSpringDesignStore,
   type ConicalGeometry,
@@ -89,6 +90,8 @@ export function ConicalCalculator() {
     }
     return getDefaultSpringMaterial();
   }, [storedMaterial?.id]);
+
+  const [selectedMaterial, setSelectedMaterial] = useState<SpringMaterial>(initialMaterial);
   
   // Derived: extract curve from nonlinear result
   const nonlinearCurve = nonlinearResult?.curve ?? null;
@@ -101,11 +104,19 @@ export function ConicalCalculator() {
       activeCoils: lastConicalGeometry?.activeCoils ?? 5,
       totalCoils: lastConicalGeometry?.totalCoils ?? 7,
       freeLength: lastConicalGeometry?.freeLength ?? 40,
-      shearModulus: lastConicalGeometry?.shearModulus ?? initialMaterial.shearModulus ?? 79300,
+      shearModulus: lastConicalGeometry?.shearModulus ?? selectedMaterial.shearModulus ?? 79300,
       deflection: lastConicalAnalysis?.workingDeflection ?? 15,
       endType: lastConicalGeometry?.endType ?? "closed_ground",
     },
   });
+
+  const handleMaterialChange = useCallback(
+    (material: SpringMaterial) => {
+      setSelectedMaterial(material);
+      form.setValue("shearModulus", material.shearModulus);
+    },
+    [form]
+  );
 
   const simulatorUrl = useMemo(() => {
     if (!result) return "";
@@ -151,10 +162,10 @@ export function ConicalCalculator() {
       L0: watchedValues.freeLength?.toString() ?? "50",
       dxMin: "0",
       dxMax: watchedValues.deflection?.toString() ?? "15",
-      material: "music_wire_a228",
+      material: selectedMaterial.id,
     });
     return `/tools/analysis?${params.toString()}`;
-  }, [watchedValues]);
+  }, [watchedValues, selectedMaterial.id]);
 
   const cadExportUrl = useMemo(() => {
     const params = new URLSearchParams({
@@ -166,12 +177,12 @@ export function ConicalCalculator() {
       Nt: watchedValues.totalCoils?.toString() ?? "7",
       L0: watchedValues.freeLength?.toString() ?? "50",
       endType: watchedValues.endType ?? "closed_ground",
-      material: "music_wire_a228",
+      material: selectedMaterial.id,
       k: result?.k?.toString() ?? "",
       dx: watchedValues.deflection?.toString() ?? "15",
     });
     return `/tools/cad-export?${params.toString()}`;
-  }, [watchedValues, result]);
+  }, [watchedValues, result, selectedMaterial.id]);
 
   // 保存设计到全局 store
   const saveDesignToStore = useCallback((values: FormValues, calc: CalculationResult) => {
@@ -185,15 +196,15 @@ export function ConicalCalculator() {
       freeLength: values.freeLength,
       endType: values.endType,
       shearModulus: values.shearModulus,
-      materialId: initialMaterial.id,
+      materialId: selectedMaterial.id,
     };
     
     const materialInfo: MaterialInfo = {
-      id: initialMaterial.id,
-      name: initialMaterial.nameEn,
+      id: selectedMaterial.id,
+      name: selectedMaterial.nameEn,
       shearModulus: values.shearModulus,
-      elasticModulus: initialMaterial.elasticModulus ?? 207000,
-      density: initialMaterial.density ?? 7850,
+      elasticModulus: selectedMaterial.elasticModulus ?? 207000,
+      density: selectedMaterial.density ?? 7850,
     };
     
     const analysisResult: AnalysisResult = {
@@ -215,7 +226,7 @@ export function ConicalCalculator() {
         designCode: generateDesignCode(geometry),
       },
     });
-  }, [initialMaterial, setDesign]);
+  }, [selectedMaterial, setDesign]);
 
   const onSubmitLinear: SubmitHandler<FormValues> = (values) => {
     setError(null);
@@ -404,6 +415,8 @@ export function ConicalCalculator() {
               </Select>
             </div>
 
+            <MaterialSelector value={selectedMaterial.id} onChange={handleMaterialChange} showDetails={true} />
+
             {/* Shear Modulus */}
             <div className="space-y-2">
               <Label htmlFor="shearModulus">Shear Modulus G (MPa) / 剪切模量</Label>
@@ -487,11 +500,11 @@ export function ConicalCalculator() {
         </CardContent>
       </Card>
 
-      <Card className="bg-slate-900 text-slate-50">
+      <Card className="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-50">
         <CardHeader>
           <CardTitle>Results / 计算结果</CardTitle>
           {(result || nonlinearCurve) && (
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-600 dark:text-slate-400">
               Mode: {mode === "linear" ? "Linear Approximation / 线性近似" : "Nonlinear Analysis / 非线性分析"}
             </p>
           )}
@@ -502,10 +515,10 @@ export function ConicalCalculator() {
             <div className="space-y-4">
               {/* Approximation Notice */}
               <div className="rounded-md border border-blue-500/30 bg-blue-500/10 p-3">
-                <p className="text-xs text-blue-200">
+                <p className="text-xs text-blue-800 dark:text-blue-200">
                   Note: Linear approximation using equivalent mean diameter.
                 </p>
-                <p className="text-xs text-blue-300/80">
+                <p className="text-xs text-blue-700/80 dark:text-blue-300/80">
                   注意：使用等效中径的线性近似计算。
                 </p>
               </div>
@@ -527,10 +540,10 @@ export function ConicalCalculator() {
               {/* Warning if exceeded solid height */}
               {nonlinearResult.exceededSolidHeight && (
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-                  <p className="text-xs font-medium text-amber-200">
+                  <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
                     ⚠️ Max deflection exceeds total available travel before solid height.
                   </p>
-                  <p className="text-xs text-amber-300/80">
+                  <p className="text-xs text-amber-700/80 dark:text-amber-300/80">
                     最大压缩量超过弹簧可压缩行程（到实心高度）。曲线已截止于 {nonlinearResult.clampedMaxDeflection.toFixed(2)} mm。
                   </p>
                 </div>
@@ -538,13 +551,13 @@ export function ConicalCalculator() {
 
               {/* Nonlinear Notice */}
               <div className="rounded-md border border-green-500/30 bg-green-500/10 p-3">
-                <p className="text-xs text-green-200">
+                <p className="text-xs text-green-800 dark:text-green-200">
                   Nonlinear model: coils collapse progressively as deflection increases.
                 </p>
-                <p className="text-xs text-green-300/80">
+                <p className="text-xs text-green-700/80 dark:text-green-300/80">
                   非线性模型：随压缩量增加，线圈逐步贴底。
                 </p>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-green-400">
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-green-700 dark:text-green-400">
                   <span>Solid Height: {nonlinearResult.solidHeight.toFixed(2)} mm</span>
                   <span>Max Travel: {nonlinearResult.totalDeflectionCapacity.toFixed(2)} mm</span>
                   <span>Pitch: {nonlinearResult.pitch.toFixed(2)} mm/coil</span>
@@ -576,29 +589,20 @@ export function ConicalCalculator() {
 
               {/* Stage Transitions */}
               <div className="space-y-2">
-                <p className="text-xs font-medium text-slate-300">Coil Collapse Stages / 圈贴底阶段:</p>
-                <div className="max-h-40 overflow-y-auto rounded-md border border-slate-700 bg-slate-800 p-2 text-xs">
+                <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Coil Collapse Stages / 圈贴底阶段:</p>
+                <div className="max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-800">
                   {stageTransitions.map((stage, idx) => (
-                    <div key={idx} className="border-b border-slate-700 py-1.5 last:border-0">
+                    <div key={idx} className="border-b border-slate-200 py-1.5 last:border-0 dark:border-slate-700">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-slate-200">
+                        <span className="font-medium text-slate-900 dark:text-slate-200">
                           Stage {stage.stage}
                         </span>
-                        <span className="text-green-400">
+                        <span className="text-emerald-700 dark:text-green-400">
                           k = {stage.stiffness.toFixed(2)} N/mm
                         </span>
                       </div>
-                      <div className="mt-0.5 text-slate-400">
-                        {stage.stage === 0 
-                          ? `0 coils collapsed, Na = ${stage.activeCoils}, from Δx = 0 mm`
-                          : `${stage.stage} coil(s) collapsed, Na = ${stage.activeCoils}, from Δx ≈ ${stage.deflection.toFixed(2)} mm`
-                        }
-                      </div>
-                      <div className="mt-0.5 text-slate-500">
-                        {stage.stage === 0 
-                          ? `阶段 ${stage.stage}：初始状态，有效圈数 ${stage.activeCoils}，从压缩量 0 mm 开始`
-                          : `阶段 ${stage.stage}：已贴底 ${stage.stage} 圈，有效圈数 ${stage.activeCoils}，从压缩量约 ${stage.deflection.toFixed(2)} mm 开始`
-                        }
+                      <div className="mt-0.5 text-slate-700 dark:text-slate-300">
+                        x = {stage.deflection.toFixed(2)} mm, active coils = {stage.activeCoils}
                       </div>
                     </div>
                   ))}
@@ -607,8 +611,8 @@ export function ConicalCalculator() {
 
               {/* Curve Preview */}
               <div className="space-y-2">
-                <p className="text-xs font-medium text-slate-300">F–Δx Curve Preview / 曲线预览:</p>
-                <div className="h-24 rounded-md border border-slate-700 bg-slate-800 p-2">
+                <p className="text-xs font-medium text-slate-700 dark:text-slate-300">F–Δx Curve Preview / 曲线预览:</p>
+                <div className="h-24 rounded-md border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-800">
                   <div className="relative h-full w-full">
                     {/* Simple SVG curve preview */}
                     <svg viewBox="0 0 100 50" className="h-full w-full" preserveAspectRatio="none">
@@ -627,11 +631,11 @@ export function ConicalCalculator() {
                           .join(" ")}
                       />
                     </svg>
-                    <div className="absolute bottom-0 left-0 text-[8px] text-slate-500">0</div>
-                    <div className="absolute bottom-0 right-0 text-[8px] text-slate-500">
+                    <div className="absolute bottom-0 left-0 text-[8px] text-slate-500 dark:text-slate-400">0</div>
+                    <div className="absolute bottom-0 right-0 text-[8px] text-slate-500 dark:text-slate-400">
                       {nonlinearCurve[nonlinearCurve.length - 1]?.x.toFixed(1)}mm
                     </div>
-                    <div className="absolute left-0 top-0 text-[8px] text-slate-500">
+                    <div className="absolute left-0 top-0 text-[8px] text-slate-500 dark:text-slate-400">
                       {nonlinearCurve[nonlinearCurve.length - 1]?.load.toFixed(0)}N
                     </div>
                   </div>
@@ -642,15 +646,16 @@ export function ConicalCalculator() {
 
           {/* Empty State */}
           {!result && !nonlinearCurve && (
-            <p className="text-sm text-slate-200">
+            <p className="text-sm text-slate-700 dark:text-slate-200">
               Input parameters and choose a calculation mode.
               <br />
-              <span className="text-slate-400">输入参数并选择计算模式。</span>
+              <span className="text-slate-600 dark:text-slate-400">输入参数并选择计算模式。</span>
             </p>
           )}
 
           {/* Action Buttons - 重新设计的按钮样式 */}
           <div className="space-y-3">
+            {/* Generate 3D Model button hidden for now
             <Button 
               asChild 
               className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg" 
@@ -658,6 +663,7 @@ export function ConicalCalculator() {
             >
               <a href={simulatorUrl || "#"}>Generate 3D Model / 生成3D模型</a>
             </Button>
+            */}
             <Button 
               asChild 
               variant="outline" 
@@ -693,8 +699,12 @@ export function ConicalCalculator() {
 function ResultRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className={highlight ? "text-slate-200 font-medium" : "text-slate-300"}>{label}</span>
-      <span className={highlight ? "font-bold text-green-400" : "font-semibold text-slate-50"}>{value}</span>
+      <span className={highlight ? "text-slate-900 dark:text-slate-200 font-medium" : "text-slate-700 dark:text-slate-300"}>
+        {label}
+      </span>
+      <span className={highlight ? "font-bold text-emerald-700 dark:text-green-400" : "font-semibold text-slate-900 dark:text-slate-50"}>
+        {value}
+      </span>
     </div>
   );
 }

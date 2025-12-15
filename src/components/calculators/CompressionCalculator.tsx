@@ -483,7 +483,7 @@ export function CompressionCalculator() {
         </CardContent>
       </Card>
 
-      <Card className="bg-slate-900 text-slate-50">
+      <Card className="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-50">
         <CardHeader>
           <CardTitle>Results / 计算结果</CardTitle>
         </CardHeader>
@@ -508,15 +508,16 @@ export function CompressionCalculator() {
               />
             </div>
           ) : (
-            <p className="text-sm text-slate-200">
+            <p className="text-sm text-slate-700 dark:text-slate-200">
               Input parameters and run the calculation to view stiffness, load, and stress results.
               <br />
-              <span className="text-slate-400">输入参数并点击计算，查看刚度、载荷与应力结果。</span>
+              <span className="text-slate-600 dark:text-slate-400">输入参数并点击计算，查看刚度、载荷与应力结果。</span>
             </p>
           )}
 
           {/* Action Buttons - 重新设计的按钮样式 */}
           <div className="space-y-3">
+            {/* Generate 3D Model button hidden for now
             <Button 
               asChild 
               className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg" 
@@ -524,6 +525,7 @@ export function CompressionCalculator() {
             >
               <a href={simulatorUrl || "#"}>Generate 3D Model / 生成3D模型</a>
             </Button>
+            */}
             <Button 
               asChild 
               variant="outline" 
@@ -568,8 +570,8 @@ export function CompressionCalculator() {
 function ResultRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className="text-slate-300">{label}</span>
-      <span className="font-semibold text-slate-50">{value}</span>
+      <span className="text-slate-700 dark:text-slate-300">{label}</span>
+      <span className="font-semibold text-slate-900 dark:text-slate-50">{value}</span>
     </div>
   );
 }

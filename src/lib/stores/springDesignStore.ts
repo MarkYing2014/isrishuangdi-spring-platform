@@ -14,6 +14,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { SpringType, ExtensionHookType } from "@/lib/springTypes";
 import type { SpringMaterialId } from "@/lib/materials/springMaterials";
+import type { SpiralSpringMaterial } from "@/lib/spring3d/spiralSpringMaterials";
 
 // ============================================================================
 // 几何参数类型 (Store 专用，与 springTypes.ts 保持兼容)
@@ -102,6 +103,7 @@ export interface SpiralTorsionGeometry {
   innerEndType?: "fixed" | "free" | "guided";
   outerEndType?: "fixed" | "free" | "guided";
   materialId?: SpringMaterialId;
+  spiralMaterialId?: SpiralSpringMaterial["id"];
 }
 
 /** 所有几何参数联合类型 - 这是 Store 的核心类型 */

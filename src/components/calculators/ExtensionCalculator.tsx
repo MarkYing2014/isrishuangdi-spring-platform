@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DimensionHint } from "./DimensionHint";
+import { MaterialSelector } from "./MaterialSelector";
 import { 
   EXTENSION_HOOK_TYPES, 
   EXTENSION_HOOK_LABELS, 
@@ -79,6 +80,7 @@ export function ExtensionCalculator() {
     }
     return getDefaultSpringMaterial();
   }, [storedMaterial?.id]);
+  const [selectedMaterial, setSelectedMaterial] = useState<SpringMaterial>(initialMaterial);
   const defaultDeflection = storedAnalysis?.maxDeflection ?? storedAnalysis?.workingDeflection ?? 15;
 
   const form = useForm<FormValues>({
@@ -88,12 +90,20 @@ export function ExtensionCalculator() {
       activeCoils: lastExtensionGeometry?.activeCoils ?? 10,
       bodyLength: lastExtensionGeometry?.bodyLength ?? 25,
       freeLengthInsideHooks: lastExtensionGeometry?.freeLength ?? 35,
-      shearModulus: lastExtensionGeometry?.shearModulus ?? initialMaterial.shearModulus,
+      shearModulus: lastExtensionGeometry?.shearModulus ?? selectedMaterial.shearModulus,
       initialTension: lastExtensionGeometry?.initialTension ?? 3,
       hookType: lastExtensionGeometry?.hookType ?? "machine",
       workingDeflection: defaultDeflection,
     },
   });
+
+  const handleMaterialChange = useCallback(
+    (material: SpringMaterial) => {
+      setSelectedMaterial(material);
+      form.setValue("shearModulus", material.shearModulus);
+    },
+    [form]
+  );
 
   const persistDesign = useCallback(
     (values: FormValues, calc: NonNullable<CalculationResult>) => {
@@ -110,15 +120,15 @@ export function ExtensionCalculator() {
         hookType: values.hookType,
         initialTension: values.initialTension,
         shearModulus: values.shearModulus,
-        materialId: initialMaterial.id,
+        materialId: selectedMaterial.id,
       };
 
       const material: MaterialInfo = {
-        id: initialMaterial.id,
-        name: initialMaterial.nameEn,
+        id: selectedMaterial.id,
+        name: selectedMaterial.nameEn,
         shearModulus: values.shearModulus,
-        elasticModulus: initialMaterial.elasticModulus ?? 206000,
-        density: initialMaterial.density ?? 7850,
+        elasticModulus: selectedMaterial.elasticModulus ?? 206000,
+        density: selectedMaterial.density ?? 7850,
       };
 
       const analysisResult: AnalysisResult = {
@@ -143,7 +153,7 @@ export function ExtensionCalculator() {
         },
       });
     },
-    [initialMaterial, setDesign]
+    [selectedMaterial, setDesign]
   );
 
   const onSubmit: SubmitHandler<FormValues> = (values) => {
@@ -202,11 +212,11 @@ export function ExtensionCalculator() {
       Fi: watchedValues.initialTension?.toString() ?? "5",
       dxMin: "0",
       dxMax: watchedValues.workingDeflection?.toString() ?? "10",
-      material: "music_wire_a228",
+      material: selectedMaterial.id,
       hookType: watchedValues.hookType ?? "machine",
     });
     return `/tools/analysis?${params.toString()}`;
-  }, [watchedValues]);
+  }, [watchedValues, selectedMaterial.id]);
 
   const cadExportUrl = useMemo(() => {
     const meanDiameter = (watchedValues.outerDiameter ?? 20) - (watchedValues.wireDiameter ?? 2);
@@ -217,13 +227,13 @@ export function ExtensionCalculator() {
       Na: watchedValues.activeCoils?.toString() ?? "10",
       Lb: watchedValues.bodyLength?.toString() ?? "40",
       Fi: watchedValues.initialTension?.toString() ?? "5",
-      material: "music_wire_a228",
+      material: selectedMaterial.id,
       hookType: watchedValues.hookType ?? "machine",
       k: result?.springRate?.toString() ?? "",
       dx: watchedValues.workingDeflection?.toString() ?? "10",
     });
     return `/tools/cad-export?${params.toString()}`;
-  }, [watchedValues, result]);
+  }, [watchedValues, result, selectedMaterial.id]);
 
   const handleNavigateToCad = () => {
     if (!result) return;
@@ -292,6 +302,8 @@ export function ExtensionCalculator() {
                 {...form.register("activeCoils", { valueAsNumber: true })}
               />
             </div>
+
+            <MaterialSelector value={selectedMaterial.id} onChange={handleMaterialChange} showDetails={true} />
 
             {/* Shear Modulus */}
             <div className="space-y-2">
@@ -409,7 +421,7 @@ export function ExtensionCalculator() {
         </CardContent>
       </Card>
 
-      <Card className="bg-slate-900 text-slate-50">
+      <Card className="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-50">
         <CardHeader>
           <CardTitle>Results / 计算结果</CardTitle>
         </CardHeader>
@@ -422,7 +434,7 @@ export function ExtensionCalculator() {
                 <ResultRow label="Initial Tension Fᵢ (N) / 初拉力" value={formatNumber(result.initialTension)} />
                 <ResultRow label="Working Deflection Δx (mm) / 工作伸长量" value={formatNumber(result.workingDeflection)} />
                 <ResultRow label="Elastic Load k·Δx (N) / 弹性载荷" value={formatNumber(result.elasticLoad)} />
-                <div className="border-t border-slate-700 pt-2">
+                <div className="border-t border-slate-200 pt-2 dark:border-slate-700">
                   <ResultRow label="Total Load F (N) / 总载荷" value={formatNumber(result.totalLoad)} highlight />
                 </div>
                 <ResultRow label="Shear Stress τ (MPa) / 剪应力" value={formatNumber(result.shearStress)} />
@@ -432,21 +444,22 @@ export function ExtensionCalculator() {
               </div>
 
               {/* Formula Note */}
-              <div className="rounded-md border border-slate-700 bg-slate-800 p-3 text-xs text-slate-400">
+              <div className="rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
                 <p>F_total = Fᵢ + k·Δx</p>
                 <p>τ = Kw · 8·F·Dm / (π·d³)</p>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-slate-200">
+            <p className="text-sm text-slate-700 dark:text-slate-200">
               Input parameters and run the calculation to view spring rate, load, and stress results.
               <br />
-              <span className="text-slate-400">输入参数并点击计算，查看刚度、载荷与应力结果。</span>
+              <span className="text-slate-600 dark:text-slate-400">输入参数并点击计算，查看刚度、载荷与应力结果。</span>
             </p>
           )}
 
           {/* Action Buttons - 重新设计的按钮样式 */}
           <div className="space-y-3">
+            {/* Generate 3D Model button hidden for now
             <Button 
               asChild 
               className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg" 
@@ -454,6 +467,7 @@ export function ExtensionCalculator() {
             >
               <a href={simulatorUrl || "#"}>Generate 3D Model / 生成3D模型</a>
             </Button>
+            */}
             <Button 
               asChild 
               variant="outline" 
@@ -486,8 +500,12 @@ export function ExtensionCalculator() {
 function ResultRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className={highlight ? "text-slate-200 font-medium" : "text-slate-300"}>{label}</span>
-      <span className={highlight ? "font-bold text-green-400" : "font-semibold text-slate-50"}>{value}</span>
+      <span className={highlight ? "text-slate-900 dark:text-slate-200 font-medium" : "text-slate-700 dark:text-slate-300"}>
+        {label}
+      </span>
+      <span className={highlight ? "font-bold text-emerald-700 dark:text-emerald-400" : "font-semibold text-slate-900 dark:text-slate-50"}>
+        {value}
+      </span>
     </div>
   );
 }

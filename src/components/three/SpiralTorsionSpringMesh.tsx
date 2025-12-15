@@ -12,6 +12,8 @@ import { useMemo, useRef, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Edges } from "@react-three/drei";
 import * as THREE from "three";
+import { useFeaStore } from "@/lib/stores/feaStore";
+import { applyFeaColors } from "@/lib/fea/feaTypes";
 import {
   createSpiralTorsionSpringGeometry,
   validateSpiralTorsionGeometry,
@@ -73,6 +75,10 @@ export function SpiralTorsionSpringMesh({
   rotation = [0, 0, 0],
   scale = 1,
 }: SpiralTorsionSpringMeshProps) {
+  const feaResult = useFeaStore((s) => s.feaResult);
+  const colorMode = useFeaStore((s) => s.colorMode);
+  const isFeaMode = colorMode !== "formula" && feaResult !== null;
+
   // 构建几何参数
   const params: SpiralTorsionGeometryParams = useMemo(() => ({
     innerDiameter,
@@ -87,17 +93,33 @@ export function SpiralTorsionSpringMesh({
   // 验证几何参数
   const validation = useMemo(() => validateSpiralTorsionGeometry(params), [params]);
 
-  // 创建几何体
+  // 创建几何体并应用 FEA 颜色
   const geometry = useMemo(() => {
     if (!validation.valid) {
-      // 如果参数无效，返回一个简单的占位几何体
       return new THREE.BoxGeometry(10, 10, 10);
     }
-    return createSpiralTorsionSpringGeometry(params, steps);
-  }, [params, steps, validation.valid]);
+    const geom = createSpiralTorsionSpringGeometry(params, steps);
+    
+    // 在创建几何体时就应用 FEA 颜色
+    if (isFeaMode && feaResult) {
+      applyFeaColors(geom, {
+        mode: colorMode,
+        feaResult,
+      });
+    }
+    
+    return geom;
+  }, [params, steps, validation.valid, isFeaMode, feaResult, colorMode]);
+
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  // 使用 key 强制在 FEA 模式切换时重新创建 mesh 和材质
+  const meshKey = `mesh-${isFeaMode ? 'fea' : 'normal'}-${colorMode}-${feaResult ? 'hasResult' : 'noResult'}`;
 
   return (
     <mesh
+      key={meshKey}
+      ref={meshRef}
       geometry={geometry}
       position={position}
       rotation={rotation}
@@ -106,11 +128,12 @@ export function SpiralTorsionSpringMesh({
       receiveShadow
     >
       <meshStandardMaterial
-        color={validation.valid ? color : "#ff4444"}
-        metalness={metalness}
-        roughness={roughness}
+        color={validation.valid ? (isFeaMode ? "#ffffff" : color) : "#ff4444"}
+        metalness={isFeaMode ? 0.3 : metalness}
+        roughness={isFeaMode ? 0.7 : roughness}
         wireframe={wireframe}
         side={THREE.DoubleSide}
+        vertexColors={isFeaMode}
       />
       {/* 添加轮廓线，提高可读性 */}
       <Edges threshold={15} color="#1a365d" />

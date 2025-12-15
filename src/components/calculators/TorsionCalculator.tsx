@@ -566,7 +566,7 @@ export function TorsionCalculator() {
         </CardContent>
       </Card>
 
-      <Card className="bg-slate-900 text-slate-50">
+      <Card className="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-50">
         <CardHeader>
           <CardTitle>Results / 计算结果</CardTitle>
         </CardHeader>
@@ -577,118 +577,120 @@ export function TorsionCalculator() {
               {results.warnings.length > 0 && (
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
                   {results.warnings.map((warning, i) => (
-                    <p key={i} className="text-xs text-amber-200">⚠ {warning}</p>
+                    <p key={i} className="text-xs text-amber-800 dark:text-amber-200">⚠ {warning}</p>
                   ))}
                 </div>
               )}
 
               {/* Material Properties */}
-              <div className="space-y-2 rounded-md border border-slate-700 bg-slate-800 p-3">
-                <p className="text-xs font-medium text-slate-400">Material / 材料</p>
+              <div className="space-y-2 rounded-md border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+                <p className="text-xs font-medium text-slate-700 dark:text-slate-400">Material / 材料</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span className="text-slate-400">Shear Modulus G:</span>
+                  <span className="text-slate-600 dark:text-slate-400">Shear Modulus G:</span>
                   <span>{results.shearModulus.toFixed(0)} kg/mm²</span>
-                  <span className="text-slate-400">Max Stress Smax:</span>
+                  <span className="text-slate-600 dark:text-slate-400">Max Stress Smax:</span>
                   <span>{(results.maxAllowableStress / 1e6).toFixed(0)} MPa</span>
                 </div>
               </div>
 
               {/* Geometry Results */}
-              <div className="space-y-2 rounded-md border border-slate-700 bg-slate-800 p-3">
-                <p className="text-xs font-medium text-slate-400">Geometry / 几何参数</p>
+              <div className="space-y-2 rounded-md border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+                <p className="text-xs font-medium text-slate-700 dark:text-slate-400">Geometry / 几何参数</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span className="text-slate-400">Na (有效圈数):</span>
+                  <span className="text-slate-600 dark:text-slate-400">Na (有效圈数):</span>
                   <span>{results.activeCoils}</span>
-                  <span className="text-slate-400">Rotated Length L:</span>
+                  <span className="text-slate-600 dark:text-slate-400">Rotated Length L:</span>
                   <span>{results.rotatedLength.toFixed(2)} mm</span>
-                  <span className="text-slate-400">Rotated Inner Ds:</span>
+                  <span className="text-slate-600 dark:text-slate-400">Rotated Inner Ds:</span>
                   <span>{results.rotatedInnerDiameter.toFixed(2)} mm</span>
                 </div>
               </div>
 
               {/* Spring Rate */}
-              <div className="space-y-2 rounded-md border border-green-700 bg-green-900/30 p-3">
-                <p className="text-xs font-medium text-green-400">Spring Rate / 弹簧系数</p>
+              <div className="space-y-2 rounded-md border border-green-200 bg-green-50 p-3 dark:border-green-700 dark:bg-green-900/30">
+                <p className="text-xs font-medium text-green-800 dark:text-green-300">Spring Rate / 弹簧系数</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span className="text-slate-400">K =</span>
-                  <span className="text-green-300 font-medium">{results.springRateGmm.toFixed(2)} g·mm/deg</span>
+                  <span className="text-slate-700 dark:text-slate-300">K =</span>
+                  <span className="text-green-700 dark:text-green-300 font-medium">{results.springRateGmm.toFixed(2)} g·mm/deg</span>
                 </div>
               </div>
 
               {/* Force & Torque */}
-              <div className="space-y-2 rounded-md border border-cyan-700 bg-cyan-900/30 p-3">
-                <p className="text-xs font-medium text-cyan-400">Force & Torque / 力与扭矩</p>
+              <div className="space-y-2 rounded-md border border-cyan-200 bg-cyan-50 p-3 dark:border-cyan-700 dark:bg-cyan-900/30">
+                <p className="text-xs font-medium text-cyan-800 dark:text-cyan-300">Force & Torque / 力与扭矩</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span className="text-slate-400">P1 (作用力量):</span>
+                  <span className="text-slate-700 dark:text-slate-300">P1 (作用力量):</span>
                   <span>{results.installForceG.toFixed(2)} g</span>
-                  <span className="text-slate-400">P2 (作用力量):</span>
-                  <span className="text-cyan-300 font-medium">{results.workingForceG.toFixed(2)} g</span>
-                  <span className="text-slate-400">M1 (力矩):</span>
+                  <span className="text-slate-700 dark:text-slate-300">P2 (作用力量):</span>
+                  <span className="text-cyan-700 dark:text-cyan-300 font-medium">{results.workingForceG.toFixed(2)} g</span>
+                  <span className="text-slate-700 dark:text-slate-300">M1 (力矩):</span>
                   <span>{results.installTorqueGmm.toFixed(2)} g·mm</span>
-                  <span className="text-slate-400">M2 (力矩):</span>
-                  <span className="text-cyan-300 font-medium">{results.workingTorqueGmm.toFixed(2)} g·mm</span>
+                  <span className="text-slate-700 dark:text-slate-300">M2 (力矩):</span>
+                  <span className="text-cyan-700 dark:text-cyan-300 font-medium">{results.workingTorqueGmm.toFixed(2)} g·mm</span>
                 </div>
               </div>
 
               {/* Stress Results */}
-              <div className="space-y-2 rounded-md border border-blue-700 bg-blue-900/30 p-3">
-                <p className="text-xs font-medium text-blue-400">Stress / 应力</p>
+              <div className="space-y-2 rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-700 dark:bg-blue-900/30">
+                <p className="text-xs font-medium text-blue-800 dark:text-blue-300">Stress / 应力</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span className="text-slate-400">S1 (应力):</span>
+                  <span className="text-slate-700 dark:text-slate-300">S1 (应力):</span>
                   <span>{results.installStress.toFixed(3)} kg/mm²</span>
-                  <span className="text-slate-400">S2 (应力):</span>
-                  <span className="text-blue-300 font-medium">{results.workingStress.toFixed(3)} kg/mm²</span>
+                  <span className="text-slate-700 dark:text-slate-300">S2 (应力):</span>
+                  <span className="text-blue-700 dark:text-blue-300 font-medium">{results.workingStress.toFixed(3)} kg/mm²</span>
                 </div>
               </div>
 
               {/* Safety & Weight */}
               <div className={`space-y-2 rounded-md border p-3 ${
                 results.safetyFactor >= 1.2 
-                  ? "border-emerald-700 bg-emerald-900/30" 
+                  ? "border-emerald-200 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/30" 
                   : results.safetyFactor >= 1.0 
-                    ? "border-amber-700 bg-amber-900/30"
-                    : "border-red-700 bg-red-900/30"
+                    ? "border-amber-200 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/30"
+                    : "border-red-200 bg-red-50 dark:border-red-700 dark:bg-red-900/30"
               }`}>
-                <p className="text-xs font-medium text-slate-400">Safety & Weight / 安全与重量</p>
+                <p className="text-xs font-medium text-slate-800 dark:text-slate-300">Safety & Weight / 安全与重量</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span className="text-slate-400">SF (安全率):</span>
+                  <span className="text-slate-700 dark:text-slate-300">SF (安全率):</span>
                   <span className={`font-bold ${
                     results.safetyFactor >= 1.2 
-                      ? "text-emerald-400" 
+                      ? "text-emerald-700 dark:text-emerald-400" 
                       : results.safetyFactor >= 1.0 
-                        ? "text-amber-400"
-                        : "text-red-400"
+                        ? "text-amber-700 dark:text-amber-400"
+                        : "text-red-700 dark:text-red-400"
                   }`}>
                     {results.safetyFactorPercent.toFixed(0)} %
                   </span>
-                  <span className="text-slate-400">M (弹簧重量):</span>
+                  <span className="text-slate-700 dark:text-slate-300">M (弹簧重量):</span>
                   <span>{results.springWeight.toFixed(2)} g</span>
                 </div>
               </div>
 
               {/* Formula Reference */}
-              <div className="space-y-1 text-xs text-slate-500 border-t border-slate-700 pt-2">
+              <div className="space-y-1 text-xs text-slate-600 dark:text-slate-500 border-t border-slate-200 dark:border-slate-700 pt-2">
                 <p>K = E·d⁴ / (64·D·Na) × (π/180)</p>
                 <p>M = K·θ, P = M/R</p>
                 <p>S = 32·M / (π·d³)</p>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-slate-200">
+            <p className="text-sm text-slate-700 dark:text-slate-200">
               Input parameters and run the calculation to view results.
               <br />
-              <span className="text-slate-400">输入参数并点击计算，查看结果。</span>
+              <span className="text-slate-600 dark:text-slate-400">输入参数并点击计算，查看结果。</span>
             </p>
           )}
 
-          {/* Action Buttons - 统一的按钮样式（与其他计算器一致，4个按钮） */}
+          {/* Action Buttons - 统一的按钮样式（与其他计算器一致） */}
           <div className="space-y-3 pt-2">
+            {/* Generate 3D Model button hidden for now
             <Button 
               asChild 
               className="w-full bg-slate-700 hover:bg-slate-600 text-white border-0 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
             >
               <a href={analysisUrl}>Generate 3D Model / 生成3D模型</a>
             </Button>
+            */}
             <Button 
               asChild 
               variant="outline" 

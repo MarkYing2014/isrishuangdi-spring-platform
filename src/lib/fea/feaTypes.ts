@@ -234,13 +234,21 @@ export function applyFeaColors(
   const bbox = geometry.boundingBox;
   if (!bbox) return false;
   
-  const geomMinZ = bbox.min.z;
-  const geomMaxZ = bbox.max.z;
-  const geomRangeZ = geomMaxZ - geomMinZ;
-  if (geomRangeZ <= 0) return false;
-  
   const nodes = feaResult.nodes;
   const numNodes = nodes.length;
+
+  // Check FEA nodes Z range to determine mapping strategy
+  // For spiral springs, FEA nodes are all in XY plane (Z=0), so use radius mapping
+  let nodeMinZ = Infinity;
+  let nodeMaxZ = -Infinity;
+  for (const node of nodes) {
+    if (node.z < nodeMinZ) nodeMinZ = node.z;
+    if (node.z > nodeMaxZ) nodeMaxZ = node.z;
+  }
+  const nodeRangeZ = nodeMaxZ - nodeMinZ;
+  const usePlanarMapping = nodeRangeZ < 1e-6; // FEA nodes are in same plane
+
+  const nodeLookup = buildNodeLookup(nodes);
 
   // Calculate min/max scalar values for color normalization
   let minVal = Infinity;
@@ -265,28 +273,75 @@ export function applyFeaColors(
 
   const colors = colorAttr.array as Float32Array;
 
-  for (let i = 0; i < vertexCount; i++) {
-    const vertexZ = positionAttr.getZ(i);
-    
-    // Normalize vertex Z position to [0, 1]
-    const normalizedZ = (vertexZ - geomMinZ) / geomRangeZ;
-    
-    // Find corresponding FEA node by normalized position
-    // Map normalizedZ to FEA node index
-    const nodeIndex = Math.min(
-      Math.floor(normalizedZ * numNodes),
-      numNodes - 1
-    );
-    const node = nodes[Math.max(0, nodeIndex)];
-    
-    // Get scalar value and normalize to [0, 1] for color
-    const val = getNodeScalar(node, mode, allowableStress);
-    const t = (val - minVal) / safeRange;
+  const tmp = new THREE.Vector3();
 
-    const color = lerpLUT(t);
-    colors[i * 3] = color.r;
-    colors[i * 3 + 1] = color.g;
-    colors[i * 3 + 2] = color.b;
+  if (usePlanarMapping) {
+    let minR = Infinity;
+    let maxR = -Infinity;
+    for (let i = 0; i < vertexCount; i++) {
+      const x = positionAttr.getX(i);
+      const y = positionAttr.getY(i);
+      const r = Math.sqrt(x * x + y * y);
+      if (r < minR) minR = r;
+      if (r > maxR) maxR = r;
+    }
+
+    const rangeR = maxR - minR;
+    if (rangeR > 1e-12) {
+      for (let i = 0; i < vertexCount; i++) {
+        const x = positionAttr.getX(i);
+        const y = positionAttr.getY(i);
+        const r = Math.sqrt(x * x + y * y);
+
+        const normalizedR = (r - minR) / rangeR;
+        const nodeIndex = Math.min(Math.floor(normalizedR * numNodes), numNodes - 1);
+        const node = nodes[Math.max(0, nodeIndex)];
+
+        const val = getNodeScalar(node, mode, allowableStress);
+        const t = (val - minVal) / safeRange;
+        const color = lerpLUT(t);
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+      }
+    } else {
+      for (let i = 0; i < vertexCount; i++) {
+        tmp.set(positionAttr.getX(i), positionAttr.getY(i), positionAttr.getZ(i));
+        const nearest = findNearestNode(tmp, nodes, nodeLookup) ?? nodes[0];
+
+        const val = getNodeScalar(nearest, mode, allowableStress);
+        const t = (val - minVal) / safeRange;
+        const color = lerpLUT(t);
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+      }
+    }
+  } else {
+    // Use Z-axis mapping for 3D springs (compression, extension, torsion)
+    const geomMinZ = bbox.min.z;
+    const geomMaxZ = bbox.max.z;
+    const geomRangeZ = geomMaxZ - geomMinZ;
+    const safeGeomRangeZ = geomRangeZ > 1e-12 ? geomRangeZ : 1;
+
+    for (let i = 0; i < vertexCount; i++) {
+      const vertexZ = positionAttr.getZ(i);
+
+      // Normalize vertex Z position to [0, 1]
+      const normalizedZ = (vertexZ - geomMinZ) / safeGeomRangeZ;
+
+      // Find corresponding FEA node by normalized position
+      const nodeIndex = Math.min(Math.floor(normalizedZ * numNodes), numNodes - 1);
+      const node = nodes[Math.max(0, nodeIndex)];
+
+      const val = getNodeScalar(node, mode, allowableStress);
+      const t = (val - minVal) / safeRange;
+
+      const color = lerpLUT(t);
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+    }
   }
 
   colorAttr.needsUpdate = true;

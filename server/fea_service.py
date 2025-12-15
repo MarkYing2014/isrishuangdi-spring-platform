@@ -13,12 +13,14 @@ Phase 1: Beam + CalculiX placeholder pipeline
 import json
 import math
 import os
+import re
 import subprocess
+import shutil
 import tempfile
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Tuple
 
-SpringType = Literal["compression", "extension", "torsion", "conical"]
+SpringType = Literal["compression", "extension", "torsion", "conical", "spiralTorsion"]
 
 
 @dataclass
@@ -68,6 +70,45 @@ class FEAResult:
       "maxDisplacement": self.max_displacement,
       "safetyFactor": self.safety_factor,
     }
+
+
+def find_ccx_executable() -> str | None:
+  ccx_env = os.environ.get("CCX_PATH") or os.environ.get("CCX_BIN")
+  if ccx_env and os.path.isfile(ccx_env):
+    return ccx_env
+
+  exe = shutil.which("ccx")
+  if exe:
+    return exe
+
+  for name in ("ccx_2.22", "ccx_2.21", "ccx_2.20", "ccx_2.19"):
+    exe = shutil.which(name)
+    if exe:
+      return exe
+
+  for base in (
+    "/opt/homebrew/opt/calculix-ccx/bin",
+    "/usr/local/opt/calculix-ccx/bin",
+  ):
+    if not os.path.isdir(base):
+      continue
+
+    for name in ("ccx", "ccx_2.22", "ccx_2.21", "ccx_2.20", "ccx_2.19"):
+      candidate = os.path.join(base, name)
+      if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+        return candidate
+
+    try:
+      for fn in os.listdir(base):
+        if not fn.startswith("ccx_"):
+          continue
+        candidate = os.path.join(base, fn)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+          return candidate
+    except Exception:
+      pass
+
+  return None
 
 
 def generate_centerline_points(
@@ -154,6 +195,27 @@ def generate_centerline_points(
       y = radius * math.sin(theta)
       pts.append((x, y, z))
 
+  elif spring_type == "spiralTorsion":
+    di = geometry.get("innerDiameter", 15.0)
+    do = geometry.get("outerDiameter", 50.0)
+    turns = geometry.get("turns", geometry.get("activeCoils", 5))
+    ri = float(di) / 2.0
+    ro = float(do) / 2.0
+    turns = float(turns)
+    total_angle = 2.0 * math.pi * turns
+    a = (ro - ri) / total_angle if total_angle != 0 else 0.0
+    handedness = geometry.get("handedness", geometry.get("windingDirection", "cw"))
+
+    for i in range(num_samples + 1):
+      t = i / num_samples
+      theta = t * total_angle
+      r = ri + a * theta
+      angle = -theta if handedness == "cw" else theta
+      x = r * math.cos(angle)
+      y = r * math.sin(angle)
+      z = 0.0
+      pts.append((x, y, z))
+
   else:
     raise NotImplementedError(f"Centerline generation for {spring_type} is not implemented")
 
@@ -169,6 +231,8 @@ def write_beam_inp(
 ) -> None:
   d = geometry.get("wireDiameter", 1.6)
   radius = d / 2.0
+  strip_width = geometry.get("stripWidth", 10.0)
+  strip_thickness = geometry.get("stripThickness", 0.8)
 
   e_mod = 2.06e5  # MPa
   poisson = 0.3
@@ -185,8 +249,16 @@ def write_beam_inp(
   for i in range(1, len(centerline)):
     lines.append(f"{i}, {i}, {i + 1}")
 
-  lines.append("*BEAM SECTION, SECTION=CIRCLE, MATERIAL=SPRINGSTEEL, ELSET=EALL")
-  lines.append(f"{radius:.6f}, 0., 0., 1., 1., 0., 0.")
+  last_node = len(centerline)
+  lines.append("*NSET, NSET=NALL, GENERATE")
+  lines.append(f"1, {last_node}, 1")
+
+  if load_case.spring_type == "spiralTorsion":
+    lines.append("*BEAM SECTION, SECTION=RECT, MATERIAL=SPRINGSTEEL, ELSET=EALL")
+    lines.append(f"{float(strip_thickness):.6f}, {float(strip_width):.6f}, 0., 0., 1.")
+  else:
+    lines.append("*BEAM SECTION, SECTION=CIRCLE, MATERIAL=SPRINGSTEEL, ELSET=EALL")
+    lines.append(f"{radius:.6f}, 0., 0., 1., 1., 0., 0.")
 
   lines.append("*MATERIAL, NAME=SPRINGSTEEL")
   lines.append("*ELASTIC")
@@ -197,17 +269,20 @@ def write_beam_inp(
   lines.append("*BOUNDARY")
   lines.append("1, 1, 6")
 
-  last_node = len(centerline)
-  lines.append("*CLOAD")
-  fy = load_case.load_value
-  target_dof = 2 if load_case.spring_type == "torsion" else 3
-  lines.append(f"{last_node}, {target_dof}, {fy:.3f}")
-
   lines.append("*STEP")
   lines.append("*STATIC")
-  lines.append("*NODE OUTPUT")
+
+  lines.append("*CLOAD")
+  fy = load_case.load_value
+  if load_case.spring_type == "spiralTorsion":
+    target_dof = 6
+  else:
+    target_dof = 2 if load_case.spring_type == "torsion" else 3
+  lines.append(f"{last_node}, {target_dof}, {fy:.3f}")
+
+  lines.append("*NODE PRINT, NSET=NALL")
   lines.append("U")
-  lines.append("*ELEMENT OUTPUT, ELSET=EALL")
+  lines.append("*EL PRINT, ELSET=EALL")
   lines.append("S")
   lines.append("*END STEP")
 
@@ -215,8 +290,14 @@ def write_beam_inp(
     fh.write("\n".join(lines))
 
 
-def run_ccx(workdir: str, job_name: str) -> None:
-  subprocess.run(["ccx", job_name], cwd=workdir, check=True)
+def run_ccx(workdir: str, job_name: str, ccx_exe: str) -> None:
+  subprocess.run(
+    [ccx_exe, job_name],
+    cwd=workdir,
+    check=True,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+  )
 
 
 def parse_ccx_dat(
@@ -233,6 +314,85 @@ def parse_ccx_dat(
   Uses engineering formulas to generate realistic stress values.
   """
   num_nodes = len(centerline)
+
+  if os.path.exists(dat_path):
+    try:
+      with open(dat_path, "r", encoding="utf-8", errors="ignore") as fh:
+        dat_text = fh.read()
+
+      disp_map: Dict[int, Tuple[float, float, float]] = {}
+      in_u = False
+      blank_count = 0
+      for line in dat_text.splitlines():
+        low = line.lower()
+        if "displacements" in low:
+          in_u = True
+          blank_count = 0
+          continue
+        if in_u:
+          if line.strip() == "":
+            blank_count += 1
+            if blank_count > 1:
+              in_u = False
+            continue
+          m = re.match(r"^\s*(\d+)\s+([-+0-9Ee.]+)\s+([-+0-9Ee.]+)\s+([-+0-9Ee.]+)", line)
+          if m:
+            nid = int(m.group(1))
+            disp_map[nid] = (float(m.group(2)), float(m.group(3)), float(m.group(4)))
+
+      el_mises: Dict[int, float] = {}
+      in_s = False
+      s_blank_count = 0
+      for line in dat_text.splitlines():
+        low = line.lower()
+        if "stresses" in low:
+          in_s = True
+          s_blank_count = 0
+          continue
+        if in_s:
+          if line.strip() == "":
+            s_blank_count += 1
+            if s_blank_count > 1:
+              in_s = False
+            continue
+        if in_s:
+          m = re.match(
+            r"^\s*(\d+)\s+(\d+)\s+([-+0-9Ee.]+)\s+([-+0-9Ee.]+)\s+([-+0-9Ee.]+)\s+([-+0-9Ee.]+)\s+([-+0-9Ee.]+)\s+([-+0-9Ee.]+)",
+            line,
+          )
+          if m:
+            eid = int(m.group(1))
+            sxx = float(m.group(3))
+            syy = float(m.group(4))
+            szz = float(m.group(5))
+            sxy = float(m.group(6))
+            sxz = float(m.group(7))
+            syz = float(m.group(8))
+            mises = math.sqrt(
+              0.5 * ((sxx - syy) ** 2 + (syy - szz) ** 2 + (szz - sxx) ** 2) + 3.0 * (sxy ** 2 + syz ** 2 + sxz ** 2)
+            )
+            if eid not in el_mises or mises > el_mises[eid]:
+              el_mises[eid] = mises
+
+      if disp_map:
+        nodes: List[FEAResultNode] = []
+        max_sigma = 0.0
+        max_disp = 0.0
+
+        for i, (x, y, z) in enumerate(centerline, start=1):
+          ux, uy, uz = disp_map.get(i, (0.0, 0.0, 0.0))
+          sigma_vm = 0.0
+          if el_mises:
+            sigma_vm = max(el_mises.get(i - 1, 0.0), el_mises.get(i, 0.0))
+          nodes.append(FEAResultNode(id=i, x=x, y=y, z=z, sigma_vm=sigma_vm, ux=ux, uy=uy, uz=uz))
+          max_sigma = max(max_sigma, sigma_vm)
+          max_disp = max(max_disp, math.sqrt(ux * ux + uy * uy + uz * uz))
+
+        safety_factor = (allow_stress / max_sigma) if allow_stress and max_sigma > 0 else None
+        return FEAResult(nodes=nodes, max_sigma=max_sigma, max_displacement=max_disp, safety_factor=safety_factor)
+    except Exception:
+      pass
+
   nodes: List[FEAResultNode] = []
   
   # Get geometry parameters
@@ -261,6 +421,13 @@ def parse_ccx_dat(
     C1 = D1 / d
     Kw = (4 * C1 - 1) / (4 * C1 - 4) + 0.615 / C1 if C1 > 1 else 1.0
     base_sigma = (8 * load_value * D1 * Kw) / (math.pi * d ** 3)
+  elif spring_type == "spiralTorsion":
+    b = float(geometry.get("stripWidth", geometry.get("b", 10.0)))
+    t = float(geometry.get("stripThickness", geometry.get("t", 0.8)))
+    b = max(1e-9, b)
+    t = max(1e-9, t)
+    torque = load_value  # N·mm
+    base_sigma = (6.0 * torque) / (b * t * t)
   else:
     base_sigma = load_value * 2.0
   
@@ -276,6 +443,8 @@ def parse_ccx_dat(
     if spring_type == "torsion":
       # Torsion: stress highest at fixed end
       stress_factor = 1.0 - t * 0.3
+    elif spring_type == "spiralTorsion":
+      stress_factor = 1.0 - t * 0.35
     else:
       # Compression/Extension: stress more uniform with coil variation
       stress_factor = 0.85 + 0.15 * math.sin(t * math.pi * 2)
@@ -308,6 +477,7 @@ def run_fea(design: Dict[str, Any]) -> Dict[str, Any]:
   spring_type: SpringType = design["springType"]
   geometry = design["geometry"]
   load_case_raw = design.get("loadCase", {})
+  allow_stress = design.get("allowableStress")
   load_case = LoadCase(
     spring_type=spring_type,
     load_value=float(load_case_raw.get("loadValue", 0.0)),
@@ -318,23 +488,44 @@ def run_fea(design: Dict[str, Any]) -> Dict[str, Any]:
 
   centerline = generate_centerline_points(spring_type, geometry)
 
-  with tempfile.TemporaryDirectory() as tmpdir:
+  keep_tmp = os.environ.get("FEA_KEEP_TMP") in ("1", "true", "TRUE", "yes", "YES")
+  tmpctx: tempfile.TemporaryDirectory[str] | None = None
+  tmpdir: str
+
+  if keep_tmp:
+    tmpdir = tempfile.mkdtemp(prefix="fea_")
+  else:
+    tmpctx = tempfile.TemporaryDirectory()
+    tmpdir = tmpctx.name
+
+  try:
     job_name = "spring_beam"
     inp_path = os.path.join(tmpdir, f"{job_name}.inp")
     write_beam_inp(inp_path, centerline, geometry, load_case, job_name=job_name)
 
-    # TODO: enable when ccx installed
-    # run_ccx(tmpdir, job_name)
+    ccx_exe = find_ccx_executable()
+    if ccx_exe is not None:
+      try:
+        run_ccx(tmpdir, job_name, ccx_exe)
+      except Exception:
+        pass
+
     dat_path = os.path.join(tmpdir, f"{job_name}.dat")
     result = parse_ccx_dat(
-      dat_path, 
-      centerline, 
+      dat_path,
+      centerline,
       spring_type=spring_type,
       geometry=geometry,
-      load_case=load_case
+      load_case=load_case,
+      allow_stress=float(allow_stress) if allow_stress is not None else None,
     )
-
-  return result.to_dict()
+    out = result.to_dict()
+    if keep_tmp:
+      out["debugWorkdir"] = tmpdir
+    return out
+  finally:
+    if tmpctx is not None:
+      tmpctx.cleanup()
 
 
 def main() -> None:

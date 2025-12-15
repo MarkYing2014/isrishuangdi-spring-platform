@@ -19,21 +19,21 @@ interface ResultRowProps {
  */
 export function ResultRow({ label, value, unit, highlight, status }: ResultRowProps) {
   const statusColors = {
-    safe: "text-green-400",
-    warning: "text-amber-400",
-    danger: "text-red-400",
+    safe: "text-emerald-700 dark:text-emerald-400",
+    warning: "text-amber-700 dark:text-amber-400",
+    danger: "text-red-700 dark:text-red-400",
   };
 
   return (
     <div className="flex items-center justify-between text-sm">
-      <span className={cn("text-slate-300", highlight && "font-medium")}>{label}</span>
+      <span className={cn("text-slate-700 dark:text-slate-300", highlight && "font-medium")}>{label}</span>
       <span className={cn(
         "font-semibold",
-        status ? statusColors[status] : "text-slate-50",
-        highlight && "text-green-400"
+        status ? statusColors[status] : "text-slate-900 dark:text-slate-50",
+        highlight && "text-emerald-700 dark:text-emerald-400"
       )}>
         {typeof value === "number" ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : value}
-        {unit && <span className="ml-1 text-slate-400 font-normal">{unit}</span>}
+        {unit && <span className="ml-1 text-slate-500 dark:text-slate-400 font-normal">{unit}</span>}
       </span>
     </div>
   );
@@ -77,13 +77,13 @@ export function SpringResultCard({
   };
 
   return (
-    <Card className={cn("bg-slate-900 text-slate-50", className)}>
+    <Card className={cn(className)}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-lg">{title}</CardTitle>
             {subtitle && (
-              <p className="text-xs text-slate-400 mt-1">{subtitle}</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{subtitle}</p>
             )}
           </div>
           {getSafetyBadge()}
@@ -108,7 +108,7 @@ interface ResultSectionProps {
 export function ResultSection({ title, children, className }: ResultSectionProps) {
   return (
     <div className={cn("space-y-2", className)}>
-      <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">
+      <h4 className="text-xs font-medium text-slate-700 dark:text-slate-400 uppercase tracking-wide">
         {title}
       </h4>
       <div className="space-y-1">
@@ -131,10 +131,10 @@ export function EmptyResult({
   messageZh = "输入参数并点击计算，查看结果。"
 }: EmptyResultProps) {
   return (
-    <p className="text-sm text-slate-200">
+    <p className="text-sm text-slate-700 dark:text-slate-200">
       {message}
       <br />
-      <span className="text-slate-400">{messageZh}</span>
+      <span className="text-slate-600 dark:text-slate-400">{messageZh}</span>
     </p>
   );
 }
