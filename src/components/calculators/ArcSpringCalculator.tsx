@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Settings2, Circle, Layers, Activity, FileText } from "lucide-react";
+import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer } from "lucide-react";
 import {
   ArcSpringInput,
   ArcSpringResult,
@@ -21,6 +21,7 @@ import {
   getDefaultArcSpringInput,
   ARC_SPRING_MATERIALS,
   downloadArcSpringPDF,
+  printArcSpringReport,
   validateArcSpringInput,
 } from "@/lib/arcSpring";
 import {
@@ -926,15 +927,26 @@ export function ArcSpringCalculator() {
           <Card>
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <CardTitle className="text-base">Results / 计算结果</CardTitle>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => downloadArcSpringPDF(input, result)}
-                disabled={!calculated || (result.warnings.length > 0 && !isFinite(result.k))}
-              >
-                <FileText className="w-4 h-4 mr-1" />
-                Export PDF
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => printArcSpringReport(input, result)}
+                  disabled={!calculated || (result.warnings.length > 0 && !isFinite(result.k))}
+                >
+                  <Printer className="w-4 h-4 mr-1" />
+                  Print Report
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => downloadArcSpringPDF(input, result)}
+                  disabled={!calculated || (result.warnings.length > 0 && !isFinite(result.k))}
+                >
+                  <FileText className="w-4 h-4 mr-1" />
+                  Export PDF
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {!calculated ? (

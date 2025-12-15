@@ -499,3 +499,21 @@ export function downloadArcSpringPDF(
       }
     });
 }
+
+export function printArcSpringReport(
+  input: ArcSpringInput,
+  result: ArcSpringResult,
+  options: ArcSpringReportOptions = {}
+): void {
+  const html = generateArcSpringReportHTML(input, result, options);
+  const printWindow = window.open("", "_blank");
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    };
+  }
+}
