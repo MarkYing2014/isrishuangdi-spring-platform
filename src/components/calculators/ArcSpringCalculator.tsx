@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +34,18 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+
+const ArcSpringVisualizer = dynamic(
+  () => import("@/components/three/ArcSpringMesh").then((mod) => mod.ArcSpringVisualizer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full w-full flex items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-400">
+        Loading 3D...
+      </div>
+    ),
+  }
+);
 
 interface NumberInputProps {
   label: string;
@@ -155,6 +168,10 @@ export function ArcSpringCalculator() {
   const [autoCalculate, setAutoCalculate] = useState(true);
   const [highlightField, setHighlightField] = useState<ArcIssueField | null>(null);
   const [highlightSeq, setHighlightSeq] = useState(0);
+  const [showDeadCoils, setShowDeadCoils] = useState(false);
+  const [deadCoilsPerEnd, setDeadCoilsPerEnd] = useState(1);
+  const [deadTightnessK, setDeadTightnessK] = useState(2);
+  const [deadTightnessSigma, setDeadTightnessSigma] = useState(0.08);
 
   useEffect(() => {
     setMounted(true);
@@ -733,6 +750,79 @@ export function ArcSpringCalculator() {
 
         {/* Right Column: Results */}
         <div className="space-y-4">
+          {/* 3D Preview */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">3D Preview / 三维预览</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between gap-3 pb-3">
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={showDeadCoils}
+                    onChange={(e) => setShowDeadCoils(e.target.checked)}
+                  />
+                  Dead Coils / 两端接触圈
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-muted-foreground">per end</div>
+                  <Input
+                    type="number"
+                    value={deadCoilsPerEnd}
+                    onChange={(e) => setDeadCoilsPerEnd(Math.max(0, Math.round(parseFloat(e.target.value) || 0)))}
+                    min={0}
+                    step={1}
+                    disabled={!showDeadCoils}
+                    className="h-8 w-20 arc-no-spinner"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 pb-3">
+                <div className="text-xs text-muted-foreground">k</div>
+                <Input
+                  type="number"
+                  value={deadTightnessK}
+                  onChange={(e) => setDeadTightnessK(Math.max(0, parseFloat(e.target.value) || 0))}
+                  min={0}
+                  step={0.5}
+                  disabled={!showDeadCoils}
+                  className="h-8 w-20 arc-no-spinner"
+                />
+                <div className="text-xs text-muted-foreground">σ</div>
+                <Input
+                  type="number"
+                  value={deadTightnessSigma}
+                  onChange={(e) => setDeadTightnessSigma(Math.max(0, parseFloat(e.target.value) || 0))}
+                  min={0}
+                  step={0.01}
+                  disabled={!showDeadCoils}
+                  className="h-8 w-20 arc-no-spinner"
+                />
+              </div>
+              <div className="h-[360px] rounded-lg overflow-hidden bg-gradient-to-b from-slate-800 to-slate-900">
+                <ArcSpringVisualizer
+                  d={input.d}
+                  D={input.D}
+                  n={input.n}
+                  r={input.r}
+                  alpha0Deg={input.alpha0}
+                  useDeadCoils={showDeadCoils}
+                  deadCoilsPerEnd={deadCoilsPerEnd}
+                  deadTightnessK={deadTightnessK}
+                  deadTightnessSigma={deadTightnessSigma}
+                  autoRotate={false}
+                  wireframe={false}
+                  showCenterline={false}
+                />
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground">
+                d={input.d.toFixed(2)}mm, D={input.D.toFixed(1)}mm, n={input.n.toFixed(2)}, r={input.r.toFixed(1)}mm, α₀={input.alpha0.toFixed(1)}°
+                {showDeadCoils ? `, dead=${deadCoilsPerEnd}×2, k=${deadTightnessK.toFixed(2)}, σ=${deadTightnessSigma.toFixed(2)}` : ""}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Summary Card */}
           <Card>
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
