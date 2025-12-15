@@ -15,6 +15,9 @@ export function SiteFooter() {
         <p className="text-xs text-slate-500">
           © {year} ISRI-SHUANGDI. All rights reserved.
         </p>
+        <p className="text-xs text-slate-500">
+          Developed by: markying2014@gmail.com
+        </p>
       </div>
     </footer>
   );
