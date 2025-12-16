@@ -692,7 +692,6 @@ export function CompressionCalculator() {
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <Label>Material / 材料</Label>
                   <MaterialSelector
                     value={selectedMaterial.id}
                     onChange={handleMaterialChange}
