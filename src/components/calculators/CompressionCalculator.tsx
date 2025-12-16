@@ -7,10 +7,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 import { 
   calculateLoadAndStress, 
+  calculateVariablePitchCompressionAtDeflection,
+  generateVariablePitchForceDeflectionCurve,
+  invertVariablePitchCompressionForce,
   performStressAnalysis,
   calculatePreload,
   type StressAnalysisResult,
   type PreloadResult,
+  type VariablePitchSegment,
 } from "@/lib/springMath";
 import { 
   getDefaultSpringMaterial,
@@ -27,6 +31,20 @@ import { Label } from "@/components/ui/label";
 import { DimensionHint } from "./DimensionHint";
 import { MaterialSelector } from "./MaterialSelector";
 import { StressAnalysisCard } from "./StressAnalysisCard";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  VariablePitchCurvesChart,
+  type VariablePitchCurveMode,
+} from "@/components/charts/VariablePitchCurvesChart";
 import { 
   useSpringDesignStore,
   type CompressionGeometry,
@@ -61,6 +79,17 @@ export function CompressionCalculator() {
   const [error, setError] = useState<string | null>(null);
   const [stressAnalysis, setStressAnalysis] = useState<StressAnalysisResult | null>(null);
   const [preloadResult, setPreloadResult] = useState<PreloadResult | null>(null);
+
+  const [variablePitchSegments, setVariablePitchSegments] = useState<VariablePitchSegment[]>([
+    { coils: 2, pitch: 6 },
+    { coils: 6, pitch: 8 },
+  ]);
+  const [variablePitchMode, setVariablePitchMode] = useState<"deflection" | "load">("deflection");
+  const [variablePitchDeflection, setVariablePitchDeflection] = useState<number>(10);
+  const [variablePitchLoad, setVariablePitchLoad] = useState<number>(0);
+  const [variablePitchChartMode, setVariablePitchChartMode] = useState<VariablePitchCurveMode>(
+    "force"
+  );
   
   // 全局设计存储
   const storedGeometry = useSpringDesignStore((state) => state.geometry);
@@ -287,6 +316,93 @@ export function CompressionCalculator() {
   };
 
   const formatNumber = (value: number) => Number(value.toFixed(2)).toLocaleString();
+
+  const variablePitchBase = useMemo(() => {
+    const values = form.getValues();
+    return {
+      wireDiameter: values.wireDiameter,
+      meanDiameter: values.meanDiameter,
+      shearModulus: values.shearModulus,
+      activeCoils0: values.activeCoils,
+      totalCoils: values.totalCoils,
+      freeLength: values.freeLength,
+      segments: variablePitchSegments,
+    };
+  }, [form, watchedValues, variablePitchSegments]);
+
+  const variablePitchComputedDeflection = useMemo(() => {
+    if (variablePitchMode !== "load") return undefined;
+    const inv = invertVariablePitchCompressionForce({
+      ...variablePitchBase,
+      load: variablePitchLoad,
+    });
+    return inv.deflection;
+  }, [variablePitchBase, variablePitchLoad, variablePitchMode]);
+
+  const variablePitchDeflectionUsed =
+    variablePitchMode === "load" ? variablePitchComputedDeflection ?? 0 : variablePitchDeflection;
+
+  const variablePitchResult = useMemo(() => {
+    return calculateVariablePitchCompressionAtDeflection({
+      ...variablePitchBase,
+      deflection: variablePitchDeflectionUsed,
+    });
+  }, [variablePitchBase, variablePitchDeflectionUsed]);
+
+  const variablePitchChart = useMemo(() => {
+    const maxDeflection =
+      variablePitchResult.deltaMax !== undefined
+        ? variablePitchResult.deltaMax
+        : Math.max(1, variablePitchDeflectionUsed * 1.3);
+    const step = Math.max(0.2, maxDeflection / 40);
+    return generateVariablePitchForceDeflectionCurve({
+      ...variablePitchBase,
+      maxDeflection,
+      step,
+    });
+  }, [variablePitchBase, variablePitchDeflectionUsed, variablePitchResult.deltaMax]);
+
+  const variablePitchCoilsSum = useMemo(() => {
+    return variablePitchSegments.reduce((acc, s) => acc + (isFinite(s.coils) ? s.coils : 0), 0);
+  }, [variablePitchSegments]);
+
+  const variablePitchCoilsMismatch =
+    isFinite(variablePitchBase.activeCoils0) &&
+    Math.abs(variablePitchCoilsSum - variablePitchBase.activeCoils0) > 1e-6;
+
+  const variablePitchIssues = useMemo(() => {
+    const issues = new Set<string>();
+    for (const msg of variablePitchResult.issues) issues.add(msg);
+    if (variablePitchMode === "load") {
+      const inv = invertVariablePitchCompressionForce({
+        ...variablePitchBase,
+        load: variablePitchLoad,
+      });
+      for (const msg of inv.issues) issues.add(msg);
+    }
+    return Array.from(issues);
+  }, [variablePitchBase, variablePitchLoad, variablePitchMode, variablePitchResult.issues]);
+
+  const setVariablePitchSegmentValue = (index: number, patch: Partial<VariablePitchSegment>) => {
+    setVariablePitchSegments((prev) => {
+      const next = prev.slice();
+      const cur = next[index];
+      if (!cur) return prev;
+      next[index] = {
+        coils: patch.coils ?? cur.coils,
+        pitch: patch.pitch ?? cur.pitch,
+      };
+      return next;
+    });
+  };
+
+  const addVariablePitchSegment = () => {
+    setVariablePitchSegments((prev) => prev.concat({ coils: 1, pitch: Math.max(0, variablePitchBase.wireDiameter + 1) }));
+  };
+
+  const removeVariablePitchSegment = (index: number) => {
+    setVariablePitchSegments((prev) => prev.filter((_, i) => i !== index));
+  };
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -563,6 +679,223 @@ export function CompressionCalculator() {
           />
         </div>
       )}
+
+      <div className="md:col-span-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Variable Pitch Compression Spring / 变节距压缩弹簧</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Progressive rate via coil-to-coil contact (engineering approximation)
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label>Material / 材料</Label>
+                  <MaterialSelector
+                    value={selectedMaterial.id}
+                    onChange={handleMaterialChange}
+                    showDetails={true}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Shared with the main compression calculator (updates G).
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Segments / 节距分段</Label>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[180px]">Coils Ni</TableHead>
+                          <TableHead className="w-[180px]">Pitch pi (mm)</TableHead>
+                          <TableHead>Quick check</TableHead>
+                          <TableHead className="w-[120px]" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {variablePitchSegments.map((seg, idx) => {
+                          const gap = seg.pitch - variablePitchBase.wireDiameter;
+                          const okPitch = gap > 0;
+                          return (
+                            <TableRow key={idx}>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.25"
+                                  min="0"
+                                  value={seg.coils}
+                                  onChange={(e) =>
+                                    setVariablePitchSegmentValue(idx, {
+                                      coils: parseFloat(e.target.value) || 0,
+                                    })
+                                  }
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={seg.pitch}
+                                  onChange={(e) =>
+                                    setVariablePitchSegmentValue(idx, {
+                                      pitch: parseFloat(e.target.value) || 0,
+                                    })
+                                  }
+                                />
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {okPitch ? (
+                                  <span className="text-emerald-700">pitch &gt; d (bindable)</span>
+                                ) : (
+                                  <span className="text-amber-700">pitch ≤ d (solid)</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeVariablePitchSegment(idx)}
+                                  disabled={variablePitchSegments.length <= 1}
+                                >
+                                  Remove
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Na0 = {formatNumber(variablePitchBase.activeCoils0)} (Nt={formatNumber(variablePitchBase.totalCoils)})
+                    </p>
+                    <Button type="button" variant="outline" onClick={addVariablePitchSegment}>
+                      Add segment
+                    </Button>
+                  </div>
+
+                  {variablePitchCoilsMismatch && (
+                    <Alert>
+                      <AlertTitle>Coils mismatch</AlertTitle>
+                      <AlertDescription>
+                        Segment coils sum = <b>{formatNumber(variablePitchCoilsSum)}</b>, but Na0 = <b>{formatNumber(variablePitchBase.activeCoils0)}</b>.
+                        Provide <b>Free Length</b> to auto-fill remaining coils, or adjust segments.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Working condition / 工况</Label>
+                  <Tabs value={variablePitchMode} onValueChange={(v) => setVariablePitchMode(v as "deflection" | "load")}>
+                    <TabsList className="w-fit">
+                      <TabsTrigger value="deflection">By deflection</TabsTrigger>
+                      <TabsTrigger value="load">By load</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="deflection" className="mt-3 space-y-2">
+                      <Label>Deflection Δx (mm)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={variablePitchDeflection}
+                        onChange={(e) => setVariablePitchDeflection(parseFloat(e.target.value) || 0)}
+                      />
+                    </TabsContent>
+                    <TabsContent value="load" className="mt-3 space-y-2">
+                      <Label>Load F (N)</Label>
+                      <Input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={variablePitchLoad}
+                        onChange={(e) => setVariablePitchLoad(parseFloat(e.target.value) || 0)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Solved deflection: {formatNumber(variablePitchComputedDeflection ?? 0)} mm
+                      </p>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+
+                {variablePitchIssues.length > 0 && (
+                  <Alert variant="destructive">
+                    <AlertTitle>Issues</AlertTitle>
+                    <AlertDescription>
+                      <div className="mt-1 space-y-1 text-xs">
+                        {variablePitchIssues.map((m, i) => (
+                          <div key={i}>{m}</div>
+                        ))}
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+
+              <div className="space-y-5">
+                <div className="grid gap-3 rounded-md border bg-muted/20 p-4">
+                  <ResultRow label="Active coils Na(Δx) / 活圈" value={formatNumber(variablePitchResult.activeCoils)} />
+                  <ResultRow label="Spring rate k(Δx) (N/mm) / 刚度" value={formatNumber(variablePitchResult.springRate)} />
+                  <ResultRow label="Load F(Δx) (N) / 载荷" value={formatNumber(variablePitchResult.load)} />
+                  <ResultRow label="Shear stress τ (MPa) / 剪应力" value={formatNumber(variablePitchResult.shearStress)} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Solid / coil contact state</Label>
+                  <div className="rounded-md border">
+                    <div className="grid grid-cols-[auto_1fr_auto] gap-2 border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
+                      <span>#</span>
+                      <span>Pitch</span>
+                      <span className="text-right">Solid</span>
+                    </div>
+                    <div className="space-y-1 p-3 text-xs">
+                      {variablePitchResult.segmentStates.map((st) => (
+                        <div key={st.index} className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
+                          <span className="w-6 text-muted-foreground">{st.index + 1}</span>
+                          <span>
+                            p={formatNumber(st.pitch)} mm, Ni={formatNumber(st.coils)}
+                          </span>
+                          <span className="text-right">
+                            {formatNumber(st.solidCoils)} / {formatNumber(st.coils)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Curves / 曲线</Label>
+                  <Tabs
+                    value={variablePitchChartMode}
+                    onValueChange={(v) => setVariablePitchChartMode(v as VariablePitchCurveMode)}
+                  >
+                    <TabsList className="w-fit flex-wrap">
+                      <TabsTrigger value="force">F-Δx</TabsTrigger>
+                      <TabsTrigger value="stiffness">k-Δx</TabsTrigger>
+                      <TabsTrigger value="stress">τ-Δx</TabsTrigger>
+                      <TabsTrigger value="overlay_force_stress">F+τ</TabsTrigger>
+                      <TabsTrigger value="overlay_force_stiffness">F+k</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value={variablePitchChartMode} className="mt-3">
+                      <div className="h-[340px] rounded-md border bg-background p-3">
+                        <VariablePitchCurvesChart data={variablePitchChart} mode={variablePitchChartMode} />
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -181,6 +181,276 @@ export function generateForceDeflectionCurve(params: {
   return points;
 }
 
+export type VariablePitchSegment = {
+  coils: number;
+  pitch: number;
+};
+
+export type VariablePitchSegmentState = {
+  index: number;
+  coils: number;
+  pitch: number;
+  spacing: number;
+  capacity: number;
+  solidCoils: number;
+  status: "free" | "partial" | "solid" | "invalid";
+};
+
+export function calculateVariablePitchCompressionAtDeflection(params: {
+  wireDiameter: number;
+  meanDiameter: number;
+  shearModulus: number;
+  activeCoils0: number;
+  totalCoils: number;
+  freeLength?: number;
+  segments: VariablePitchSegment[];
+  deflection: number;
+}): {
+  activeCoils: number;
+  springRate: number;
+  load: number;
+  springIndex: number;
+  wahlFactor: number;
+  shearStress: number;
+  deltaMax?: number;
+  segmentStates: VariablePitchSegmentState[];
+  issues: string[];
+} {
+  const {
+    wireDiameter,
+    meanDiameter,
+    shearModulus,
+    activeCoils0,
+    totalCoils,
+    freeLength,
+    segments,
+    deflection,
+  } = params;
+
+  const issues: string[] = [];
+
+  if (wireDiameter <= 0) issues.push("Wire diameter must be > 0");
+  if (meanDiameter <= 0) issues.push("Mean diameter must be > 0");
+  if (shearModulus <= 0) issues.push("Shear modulus must be > 0");
+  if (activeCoils0 <= 0) issues.push("Active coils must be > 0");
+  if (totalCoils <= 0) issues.push("Total coils must be > 0");
+  if (deflection < 0) issues.push("Deflection must be ≥ 0");
+
+  const deltaMax =
+    freeLength !== undefined && isFinite(freeLength)
+      ? Math.max(0, freeLength - totalCoils * wireDiameter)
+      : undefined;
+
+  const cleanSegments = segments
+    .map((s) => ({
+      coils: Number(s.coils),
+      pitch: Number(s.pitch),
+    }))
+    .filter((s) => isFinite(s.coils) && isFinite(s.pitch) && s.coils > 0);
+
+  const sumCoils = cleanSegments.reduce((acc, s) => acc + s.coils, 0);
+  if (sumCoils > activeCoils0 + 1e-6) {
+    issues.push("Sum of segment coils exceeds active coils Na0");
+  }
+
+  const remainingCoils = Math.max(0, activeCoils0 - sumCoils);
+  let effectiveSegments = cleanSegments.slice();
+
+  if (remainingCoils > 1e-6) {
+    if (freeLength !== undefined && isFinite(freeLength)) {
+      const solidHeight = totalCoils * wireDiameter;
+      const usedLen = effectiveSegments.reduce((acc, s) => acc + s.coils * s.pitch, 0);
+      const restPitch = (freeLength - solidHeight - usedLen) / remainingCoils;
+      if (isFinite(restPitch) && restPitch > 0) {
+        effectiveSegments = effectiveSegments.concat({ coils: remainingCoils, pitch: restPitch });
+      } else {
+        issues.push("Cannot auto-fill remaining coils: free length constraint invalid");
+      }
+    } else {
+      issues.push("Segment coils do not cover Na0 (remaining coils require free length to infer pitch)");
+    }
+  }
+
+  const segmentStates: VariablePitchSegmentState[] = effectiveSegments.map((s, idx) => {
+    const spacing = s.pitch - wireDiameter;
+    const capacity = spacing > 0 ? s.coils * spacing : 0;
+    return {
+      index: idx,
+      coils: s.coils,
+      pitch: s.pitch,
+      spacing,
+      capacity,
+      solidCoils: 0,
+      status: "free",
+    };
+  });
+
+  let activeCoils = activeCoils0;
+  for (const st of segmentStates) {
+    if (st.spacing <= 0) {
+      st.status = "invalid";
+      st.solidCoils = st.coils;
+      activeCoils -= st.coils;
+      issues.push("One or more segments have pitch ≤ wire diameter (already solid)");
+    }
+  }
+  activeCoils = Math.max(1e-9, activeCoils);
+
+  const validOrder = segmentStates
+    .map((s, idx) => ({ s, idx }))
+    .filter(({ s }) => s.spacing > 0)
+    .sort((a, b) => a.s.pitch - b.s.pitch);
+
+  const A = (shearModulus * wireDiameter ** 4) / (8 * meanDiameter ** 3);
+  let remaining = deflection;
+  let load = 0;
+
+  for (const { s } of validOrder) {
+    if (remaining <= 1e-12) break;
+
+    const naStart = activeCoils;
+    const maxDefl = s.capacity;
+
+    if (maxDefl <= 0) continue;
+
+    if (remaining >= maxDefl - 1e-12) {
+      const naEnd = Math.max(1e-9, naStart - s.coils);
+      load += A * s.spacing * Math.log(naStart / naEnd);
+      s.solidCoils = s.coils;
+      s.status = "solid";
+      activeCoils = naEnd;
+      remaining -= maxDefl;
+      continue;
+    }
+
+    const coilsSolid = remaining / s.spacing;
+    const naEnd = Math.max(1e-9, naStart - coilsSolid);
+    load += A * s.spacing * Math.log(naStart / naEnd);
+    s.solidCoils = coilsSolid;
+    s.status = "partial";
+    activeCoils = naEnd;
+    remaining = 0;
+    break;
+  }
+
+  for (const { s } of validOrder) {
+    if (s.status === "free") {
+      s.solidCoils = 0;
+    }
+  }
+
+  const springIndex = meanDiameter / wireDiameter;
+  const wahlFactor = (4 * springIndex - 1) / (4 * springIndex - 4) + 0.615 / springIndex;
+  const springRate = A / Math.max(1e-9, activeCoils);
+  const shearStress = wahlFactor * ((8 * load * meanDiameter) / (PI * wireDiameter ** 3));
+
+  return {
+    activeCoils,
+    springRate,
+    load,
+    springIndex,
+    wahlFactor,
+    shearStress,
+    deltaMax,
+    segmentStates,
+    issues,
+  };
+}
+
+export function invertVariablePitchCompressionForce(params: {
+  wireDiameter: number;
+  meanDiameter: number;
+  shearModulus: number;
+  activeCoils0: number;
+  totalCoils: number;
+  freeLength?: number;
+  segments: VariablePitchSegment[];
+  load: number;
+}): {
+  deflection: number;
+  issues: string[];
+} {
+  const { load } = params;
+  const issues: string[] = [];
+  if (load < 0) issues.push("Load must be ≥ 0");
+  if (!isFinite(load)) issues.push("Load must be finite");
+  if (issues.length) return { deflection: 0, issues };
+
+  let lo = 0;
+  let hi = 1;
+  let hiRes = calculateVariablePitchCompressionAtDeflection({ ...params, deflection: hi });
+
+  const deltaMax = hiRes.deltaMax;
+  if (deltaMax !== undefined && deltaMax > 0) {
+    hi = deltaMax;
+    hiRes = calculateVariablePitchCompressionAtDeflection({ ...params, deflection: hi });
+  } else {
+    while (hiRes.load < load && hi < 1e6) {
+      hi *= 2;
+      hiRes = calculateVariablePitchCompressionAtDeflection({ ...params, deflection: hi });
+      if (hiRes.issues.length) break;
+    }
+  }
+
+  if (hiRes.load < load - 1e-9) {
+    issues.push("Target load exceeds curve range");
+    return { deflection: hi, issues };
+  }
+
+  for (let iter = 0; iter < 60; iter++) {
+    const mid = 0.5 * (lo + hi);
+    const res = calculateVariablePitchCompressionAtDeflection({ ...params, deflection: mid });
+    if (res.load >= load) hi = mid;
+    else lo = mid;
+    if (Math.abs(hi - lo) <= 1e-6) break;
+  }
+
+  return { deflection: hi, issues };
+}
+
+export function generateVariablePitchForceDeflectionCurve(params: {
+  wireDiameter: number;
+  meanDiameter: number;
+  shearModulus: number;
+  activeCoils0: number;
+  totalCoils: number;
+  freeLength?: number;
+  segments: VariablePitchSegment[];
+  maxDeflection: number;
+  step: number;
+}): {
+  deflection: number;
+  load: number;
+  springRate?: number;
+  shearStress?: number;
+  activeCoils?: number;
+}[] {
+  const { maxDeflection, step } = params;
+  if (maxDeflection <= 0 || step <= 0) return [];
+
+  const points: {
+    deflection: number;
+    load: number;
+    springRate?: number;
+    shearStress?: number;
+    activeCoils?: number;
+  }[] = [];
+  for (let deflection = 0; deflection <= maxDeflection + 1e-9; deflection += step) {
+    const res = calculateVariablePitchCompressionAtDeflection({
+      ...params,
+      deflection,
+    });
+    points.push({
+      deflection: Number(deflection.toFixed(6)),
+      load: res.load,
+      springRate: res.springRate,
+      shearStress: res.shearStress,
+      activeCoils: res.activeCoils,
+    });
+  }
+  return points;
+}
+
 /**
  * Calculates spring rate, load, and stress for an extension spring.
  * Uses the same helical spring formula as compression springs for the body coils.
