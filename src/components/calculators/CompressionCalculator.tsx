@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { type SubmitHandler, type Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { FileText, Printer } from "lucide-react";
 
 import { 
   calculateLoadAndStress, 
@@ -46,6 +47,14 @@ import {
   VariablePitchCurvesChart,
   type VariablePitchCurveMode,
 } from "@/components/charts/VariablePitchCurvesChart";
+
+import {
+  mapToVariablePitchCompressionReportPayload,
+} from "@/lib/reports/variablePitchCompressionReport";
+import {
+  downloadVariablePitchCompressionPDF,
+  printVariablePitchCompressionReport,
+} from "@/lib/reports/variablePitchCompressionReportGenerator";
 import { 
   useSpringDesignStore,
   type CompressionGeometry,
@@ -451,6 +460,48 @@ export function CompressionCalculator() {
     });
   }, [selectedMaterial.allowShearStatic, variablePitchBase, variablePitchResult.deltaMax, variablePitchWorkingPoints]);
 
+  const variablePitchReportPayload = useMemo(() => {
+    const curve = (variablePitchChart ?? []).map((p) => ({
+      deflection: p.deflection,
+      load: p.load,
+      springRate: p.springRate,
+      shearStress: p.shearStress,
+      activeCoils: p.activeCoils,
+    }));
+
+    return mapToVariablePitchCompressionReportPayload({
+      spring: {
+        wireDiameter: variablePitchBase.wireDiameter,
+        meanDiameter: variablePitchBase.meanDiameter,
+        freeLength: variablePitchBase.freeLength,
+        totalCoils: variablePitchBase.totalCoils,
+        activeCoils0: variablePitchBase.activeCoils0,
+        shearModulus: variablePitchBase.shearModulus,
+        materialId: selectedMaterial.id,
+        materialName: selectedMaterial.nameEn,
+      },
+      segments: variablePitchBase.segments,
+      curve,
+      workingPoint: {
+        segmentStates: variablePitchResult.segmentStates,
+        springIndex: variablePitchResult.springIndex,
+        wahlFactor: variablePitchResult.wahlFactor,
+        deltaMax: variablePitchResult.deltaMax,
+        issues: variablePitchResult.issues,
+      },
+    });
+  }, [
+    selectedMaterial.id,
+    selectedMaterial.nameEn,
+    variablePitchBase,
+    variablePitchChart,
+    variablePitchResult.deltaMax,
+    variablePitchResult.issues,
+    variablePitchResult.segmentStates,
+    variablePitchResult.springIndex,
+    variablePitchResult.wahlFactor,
+  ]);
+
   const addVariablePitchWorkingPoint = () => {
     setVariablePitchWorkingPoints((prev) => {
       const next = prev.slice();
@@ -771,11 +822,33 @@ export function CompressionCalculator() {
 
       <div className="md:col-span-2">
         <Card>
-          <CardHeader>
-            <CardTitle>Variable Pitch Compression Spring / 变节距压缩弹簧</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Progressive rate via coil-to-coil contact (engineering approximation)
-            </p>
+          <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <div className="space-y-1">
+              <CardTitle>Variable Pitch Compression Spring / 变节距压缩弹簧</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Progressive rate via coil-to-coil contact (engineering approximation)
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => printVariablePitchCompressionReport(variablePitchReportPayload)}
+                disabled={variablePitchIssues.length > 0}
+              >
+                <Printer className="w-4 h-4 mr-1" />
+                Print Report
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => downloadVariablePitchCompressionPDF(variablePitchReportPayload)}
+                disabled={variablePitchIssues.length > 0}
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                Export PDF
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-2">
