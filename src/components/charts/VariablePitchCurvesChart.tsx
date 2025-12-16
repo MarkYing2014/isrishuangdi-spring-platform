@@ -78,7 +78,7 @@ export function VariablePitchCurvesChart({ data, mode, markers }: Props) {
       : "Shear Stress (MPa)";
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
       <LineChart data={data} margin={{ top: 40, right: 24, left: 16, bottom: 18 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
         <XAxis

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { FileText, Printer } from "lucide-react";
 
 import {
@@ -40,6 +40,8 @@ import {
   type VariablePitchCurveMode,
 } from "@/components/charts/VariablePitchCurvesChart";
 
+import { VariablePitchCompressionSpringVisualizer } from "@/components/three/VariablePitchCompressionSpringVisualizer";
+
 import { mapToVariablePitchCompressionReportPayload } from "@/lib/reports/variablePitchCompressionReport";
 import {
   downloadVariablePitchCompressionPDF,
@@ -57,6 +59,9 @@ function ResultRow({ label, value }: { label: string; value: string }) {
 
 export function VariablePitchCompressionCalculator() {
   const formatNumber = (value: number) => Number(value.toFixed(2)).toLocaleString();
+
+  const [showStressColors, setShowStressColors] = useState(false);
+  const [stressBeta, setStressBeta] = useState(0.25);
 
   const wireDiameter = useVariablePitchCompressionStore((s) => s.wireDiameter);
   const meanDiameter = useVariablePitchCompressionStore((s) => s.meanDiameter);
@@ -99,6 +104,77 @@ export function VariablePitchCompressionCalculator() {
     setShearModulus(material.shearModulus);
   };
 
+  const coilsSum = useMemo(() => {
+    return segments.reduce((acc, s) => acc + (isFinite(s.coils) ? s.coils : 0), 0);
+  }, [segments]);
+
+  const freeLengthEstimate = useMemo(() => {
+    const d = wireDiameter;
+    if (!(isFinite(d) && d > 0)) return undefined;
+
+    const dead = Math.max(0, totalCoils - activeCoils0);
+    const segmentsLen = segments.reduce((acc, s) => {
+      const n = isFinite(s.coils) ? s.coils : 0;
+      const p = isFinite(s.pitch) ? s.pitch : 0;
+      return acc + n * p;
+    }, 0);
+
+    return segmentsLen + dead * d;
+  }, [wireDiameter, totalCoils, activeCoils0, segments]);
+
+  const l0Dominant = useMemo(() => {
+    const d = wireDiameter;
+    if (!(isFinite(d) && d > 0)) {
+      return { segmentsUsed: segments, pitchGapScale: undefined as number | undefined, issue: "" };
+    }
+
+    if (!(freeLength !== undefined && isFinite(freeLength))) {
+      return { segmentsUsed: segments, pitchGapScale: undefined as number | undefined, issue: "" };
+    }
+
+    // Only scale when segments fully cover Na0.
+    if (!(isFinite(activeCoils0) && Math.abs(coilsSum - activeCoils0) <= 1e-6)) {
+      return { segmentsUsed: segments, pitchGapScale: undefined as number | undefined, issue: "" };
+    }
+
+    const solidHeight = totalCoils * d;
+    if (freeLength < solidHeight - 1e-9) {
+      return {
+        segmentsUsed: segments,
+        pitchGapScale: undefined as number | undefined,
+        issue: `L0 < solid height (Nt*d = ${formatNumber(solidHeight)} mm)`,
+      };
+    }
+
+    const baseGap = segments.reduce((acc, s) => {
+      const n = isFinite(s.coils) ? s.coils : 0;
+      const p = isFinite(s.pitch) ? s.pitch : 0;
+      const gap = Math.max(0, p - d);
+      return acc + n * gap;
+    }, 0);
+
+    if (!(baseGap > 1e-12)) {
+      return {
+        segmentsUsed: segments,
+        pitchGapScale: undefined as number | undefined,
+        issue: "No positive pitch gap to scale (all pitch ≤ d)",
+      };
+    }
+
+    const targetGap = Math.max(0, freeLength - solidHeight);
+    const pitchGapScale = targetGap / baseGap;
+
+    const segmentsUsed: VariablePitchSegment[] = segments.map((s) => {
+      const n = isFinite(s.coils) ? s.coils : 0;
+      const p = isFinite(s.pitch) ? s.pitch : 0;
+      const gap0 = Math.max(0, p - d);
+      const pEff = d + gap0 * pitchGapScale;
+      return { coils: n, pitch: pEff };
+    });
+
+    return { segmentsUsed, pitchGapScale, issue: "" };
+  }, [wireDiameter, freeLength, segments, activeCoils0, coilsSum, totalCoils, formatNumber]);
+
   const variablePitchBase = useMemo(() => {
     return {
       wireDiameter,
@@ -107,9 +183,17 @@ export function VariablePitchCompressionCalculator() {
       activeCoils0,
       totalCoils,
       freeLength,
-      segments,
+      segments: l0Dominant.segmentsUsed,
     };
-  }, [wireDiameter, meanDiameter, shearModulus, activeCoils0, totalCoils, freeLength, segments]);
+  }, [
+    wireDiameter,
+    meanDiameter,
+    shearModulus,
+    activeCoils0,
+    totalCoils,
+    freeLength,
+    l0Dominant.segmentsUsed,
+  ]);
 
   const computedDeflection = useMemo(() => {
     if (mode !== "load") return undefined;
@@ -140,9 +224,12 @@ export function VariablePitchCompressionCalculator() {
     });
   }, [variablePitchBase, deflectionUsed, result.deltaMax]);
 
-  const coilsSum = useMemo(() => {
-    return segments.reduce((acc, s) => acc + (isFinite(s.coils) ? s.coils : 0), 0);
-  }, [segments]);
+  const freeLengthMismatch = useMemo(() => {
+    if (freeLengthEstimate === undefined) return undefined;
+    if (freeLength === undefined) return undefined;
+    if (!isFinite(freeLength)) return undefined;
+    return freeLength - freeLengthEstimate;
+  }, [freeLength, freeLengthEstimate]);
 
   const coilsMismatch =
     isFinite(activeCoils0) && Math.abs(coilsSum - activeCoils0) > 1e-6;
@@ -162,7 +249,7 @@ export function VariablePitchCompressionCalculator() {
 
   const eventMarkers = useMemo(() => {
     const d = wireDiameter;
-    const sorted = segments
+    const sorted = l0Dominant.segmentsUsed
       .map((s, idx) => ({ idx, coils: s.coils, pitch: s.pitch }))
       .filter((s) => isFinite(s.coils) && isFinite(s.pitch) && s.coils > 0)
       .sort((a, b) => a.pitch - b.pitch);
@@ -186,7 +273,7 @@ export function VariablePitchCompressionCalculator() {
     }
 
     return markers;
-  }, [wireDiameter, segments]);
+  }, [wireDiameter, l0Dominant.segmentsUsed]);
 
   const checkRows = useMemo(() => {
     const tauAllow = selectedMaterial.allowShearStatic;
@@ -242,7 +329,7 @@ export function VariablePitchCompressionCalculator() {
         materialId: selectedMaterial.id,
         materialName: selectedMaterial.nameEn,
       },
-      segments,
+      segments: l0Dominant.segmentsUsed,
       curve,
       workingPoint: {
         segmentStates: result.segmentStates,
@@ -262,7 +349,7 @@ export function VariablePitchCompressionCalculator() {
     shearModulus,
     selectedMaterial.id,
     selectedMaterial.nameEn,
-    segments,
+    l0Dominant.segmentsUsed,
     result.segmentStates,
     result.springIndex,
     result.wahlFactor,
@@ -457,6 +544,24 @@ export function VariablePitchCompressionCalculator() {
                     </AlertDescription>
                   </Alert>
                 )}
+
+                {typeof freeLengthMismatch === "number" &&
+                  isFinite(freeLengthMismatch) &&
+                  Math.abs(freeLengthMismatch) > 1 && (
+                    <Alert>
+                      <AlertTitle>Plausibility Check / 合理性检查</AlertTitle>
+                      <AlertDescription>
+                        L0-dominant mode: your input pitches imply L0≈<b>{formatNumber(freeLengthEstimate ?? 0)}</b> mm, but
+                        target L0=<b>{formatNumber(freeLength ?? 0)}</b> mm (Δ=<b>{formatNumber(freeLengthMismatch)}</b> mm).
+                        To satisfy L0, the tool scales pitch gaps (p-d) by
+                        {typeof l0Dominant.pitchGapScale === "number" && isFinite(l0Dominant.pitchGapScale)
+                          ? ` ×${formatNumber(l0Dominant.pitchGapScale)}`
+                          : " a factor"}
+                        and uses the scaled pitches for calculation + 3D.
+                        {l0Dominant.issue ? ` Not feasible: ${l0Dominant.issue}.` : ""}
+                      </AlertDescription>
+                    </Alert>
+                  )}
               </div>
 
               <div className="space-y-2">
@@ -563,6 +668,71 @@ export function VariablePitchCompressionCalculator() {
             </div>
 
             <div className="space-y-5">
+              <Card>
+                <CardHeader>
+                  <CardTitle>3D Preview / 三维预览</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between gap-3 pb-3">
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={showStressColors}
+                        onChange={(e) => setShowStressColors(e.target.checked)}
+                      />
+                      Stress Colors / 应力伪色
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs text-muted-foreground">β</div>
+                      <Input
+                        type="number"
+                        value={stressBeta}
+                        onChange={(e) =>
+                          setStressBeta(Math.max(0, Math.min(0.9, parseFloat(e.target.value) || 0)))
+                        }
+                        min={0}
+                        max={0.9}
+                        step={0.05}
+                        disabled={!showStressColors}
+                        className="h-8 w-20"
+                      />
+                    </div>
+                  </div>
+                  <div className="h-[420px] w-full overflow-hidden rounded-md border bg-background">
+                    <VariablePitchCompressionSpringVisualizer
+                      wireDiameter={wireDiameter}
+                      meanDiameter={meanDiameter}
+                      shearModulus={shearModulus}
+                      activeCoils0={activeCoils0}
+                      totalCoils={totalCoils}
+                      freeLength={freeLength}
+                      segments={l0Dominant.segmentsUsed}
+                      deflection={deflectionUsed}
+                      showStressColors={showStressColors}
+                      stressBeta={stressBeta}
+                      stressUtilization={
+                        selectedMaterial.allowShearStatic > 0
+                          ? result.shearStress / selectedMaterial.allowShearStatic
+                          : 0
+                      }
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Ends are squared & ground via clipping planes; solid coils lock to Δz=d.
+                  </p>
+                  {showStressColors && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      τ={formatNumber(result.shearStress)} MPa, τ_allow={formatNumber(selectedMaterial.allowShearStatic)} MPa,
+                      utilization={
+                        selectedMaterial.allowShearStatic > 0
+                          ? formatNumber(result.shearStress / selectedMaterial.allowShearStatic)
+                          : "-"
+                      }
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
               <div className="flex items-center justify-end gap-2">
                 <Button
                   size="sm"
