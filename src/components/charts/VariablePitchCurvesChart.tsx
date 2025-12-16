@@ -10,6 +10,7 @@ import {
   Tooltip,
   Line,
   Legend,
+  ReferenceLine,
 } from "recharts";
 
 export type VariablePitchCurvePoint = {
@@ -27,12 +28,19 @@ export type VariablePitchCurveMode =
   | "overlay_force_stress"
   | "overlay_force_stiffness";
 
+export type VariablePitchEventMarker = {
+  deflection: number;
+  label: string;
+  color?: string;
+};
+
 interface Props {
   data: VariablePitchCurvePoint[];
   mode: VariablePitchCurveMode;
+  markers?: VariablePitchEventMarker[];
 }
 
-export function VariablePitchCurvesChart({ data, mode }: Props) {
+export function VariablePitchCurvesChart({ data, mode, markers }: Props) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -123,6 +131,24 @@ export function VariablePitchCurvesChart({ data, mode }: Props) {
           align="right"
           wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
         />
+
+        {(markers ?? [])
+          .filter((m) => isFinite(m.deflection))
+          .map((m, idx) => (
+            <ReferenceLine
+              key={`${m.deflection}-${idx}`}
+              x={m.deflection}
+              stroke={m.color ?? "#94a3b8"}
+              strokeDasharray="4 4"
+              strokeWidth={1.5}
+              label={{
+                value: m.label,
+                position: "top",
+                fontSize: 11,
+                fill: m.color ?? "#64748b",
+              }}
+            />
+          ))}
 
         {showForce && (
           <Line

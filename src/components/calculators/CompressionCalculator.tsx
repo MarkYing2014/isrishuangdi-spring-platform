@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { DimensionHint } from "./DimensionHint";
 import { MaterialSelector } from "./MaterialSelector";
 import { StressAnalysisCard } from "./StressAnalysisCard";
@@ -90,6 +91,11 @@ export function CompressionCalculator() {
   const [variablePitchChartMode, setVariablePitchChartMode] = useState<VariablePitchCurveMode>(
     "force"
   );
+  const [variablePitchWorkingPoints, setVariablePitchWorkingPoints] = useState<number[]>([
+    5,
+    10,
+    15,
+  ]);
   
   // 全局设计存储
   const storedGeometry = useSpringDesignStore((state) => state.geometry);
@@ -382,6 +388,89 @@ export function CompressionCalculator() {
     }
     return Array.from(issues);
   }, [variablePitchBase, variablePitchLoad, variablePitchMode, variablePitchResult.issues]);
+
+  const variablePitchEventMarkers = useMemo(() => {
+    const d = variablePitchBase.wireDiameter;
+    const sorted = variablePitchSegments
+      .map((s, idx) => ({ idx, coils: s.coils, pitch: s.pitch }))
+      .filter((s) => isFinite(s.coils) && isFinite(s.pitch) && s.coils > 0)
+      .sort((a, b) => a.pitch - b.pitch);
+
+    let cum = 0;
+    const markers: Array<{ deflection: number; label: string; color?: string }> = [];
+    let stage = 1;
+
+    for (const s of sorted) {
+      const spacing = s.pitch - d;
+      if (!(spacing > 0)) continue;
+      const cap = s.coils * spacing;
+      if (!(cap > 0)) continue;
+      cum += cap;
+      markers.push({
+        deflection: Number(cum.toFixed(6)),
+        label: `S${stage}`,
+        color: "#94a3b8",
+      });
+      stage += 1;
+    }
+
+    return markers;
+  }, [variablePitchBase.wireDiameter, variablePitchSegments]);
+
+  const variablePitchCheckRows = useMemo(() => {
+    const tauAllow = selectedMaterial.allowShearStatic;
+    const deltaMax = variablePitchResult.deltaMax;
+
+    const points = variablePitchWorkingPoints
+      .map((x) => Number(x))
+      .filter((x) => isFinite(x) && x >= 0)
+      .sort((a, b) => a - b);
+
+    return points.map((dx) => {
+      const res = calculateVariablePitchCompressionAtDeflection({
+        ...variablePitchBase,
+        deflection: dx,
+      });
+
+      const sf = res.shearStress > 0 ? tauAllow / res.shearStress : Infinity;
+      const overSolid = deltaMax !== undefined ? dx > deltaMax + 1e-9 : false;
+
+      let status: "PASS" | "WARN" | "FAIL" = "PASS";
+      if (overSolid || sf < 1) status = "FAIL";
+      else if (sf < 1.2) status = "WARN";
+
+      return {
+        deflection: dx,
+        load: res.load,
+        springRate: res.springRate,
+        shearStress: res.shearStress,
+        sf,
+        overSolid,
+        status,
+      };
+    });
+  }, [selectedMaterial.allowShearStatic, variablePitchBase, variablePitchResult.deltaMax, variablePitchWorkingPoints]);
+
+  const addVariablePitchWorkingPoint = () => {
+    setVariablePitchWorkingPoints((prev) => {
+      const next = prev.slice();
+      const candidate = Number.isFinite(variablePitchDeflectionUsed) ? variablePitchDeflectionUsed : 0;
+      next.push(Number(candidate.toFixed(2)));
+      return next;
+    });
+  };
+
+  const setVariablePitchWorkingPoint = (index: number, value: number) => {
+    setVariablePitchWorkingPoints((prev) => {
+      const next = prev.slice();
+      next[index] = value;
+      return next;
+    });
+  };
+
+  const removeVariablePitchWorkingPoint = (index: number) => {
+    setVariablePitchWorkingPoints((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const setVariablePitchSegmentValue = (index: number, patch: Partial<VariablePitchSegment>) => {
     setVariablePitchSegments((prev) => {
@@ -793,7 +882,10 @@ export function CompressionCalculator() {
 
                 <div className="space-y-2">
                   <Label>Working condition / 工况</Label>
-                  <Tabs value={variablePitchMode} onValueChange={(v) => setVariablePitchMode(v as "deflection" | "load")}>
+                  <Tabs
+                    value={variablePitchMode}
+                    onValueChange={(v) => setVariablePitchMode(v as "deflection" | "load")}
+                  >
                     <TabsList className="w-fit">
                       <TabsTrigger value="deflection">By deflection</TabsTrigger>
                       <TabsTrigger value="load">By load</TabsTrigger>
@@ -824,6 +916,55 @@ export function CompressionCalculator() {
                   </Tabs>
                 </div>
 
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Working points Δx (mm) / 多工况点</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addVariablePitchWorkingPoint}>
+                      Add point
+                    </Button>
+                  </div>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[180px]">Δx (mm)</TableHead>
+                          <TableHead>Result</TableHead>
+                          <TableHead className="w-[120px]" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {variablePitchWorkingPoints.map((dx, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                value={dx}
+                                onChange={(e) => setVariablePitchWorkingPoint(idx, parseFloat(e.target.value) || 0)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              τ_allow = {selectedMaterial.allowShearStatic} MPa
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => removeVariablePitchWorkingPoint(idx)}
+                                disabled={variablePitchWorkingPoints.length <= 1}
+                              >
+                                Remove
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
                 {variablePitchIssues.length > 0 && (
                   <Alert variant="destructive">
                     <AlertTitle>Issues</AlertTitle>
@@ -844,6 +985,55 @@ export function CompressionCalculator() {
                   <ResultRow label="Spring rate k(Δx) (N/mm) / 刚度" value={formatNumber(variablePitchResult.springRate)} />
                   <ResultRow label="Load F(Δx) (N) / 载荷" value={formatNumber(variablePitchResult.load)} />
                   <ResultRow label="Shear stress τ (MPa) / 剪应力" value={formatNumber(variablePitchResult.shearStress)} />
+                  <ResultRow
+                    label="τ_allow (MPa) / 许用"
+                    value={formatNumber(selectedMaterial.allowShearStatic)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Multi-point check / 多工况校核</Label>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[120px]">Δx</TableHead>
+                          <TableHead>F (N)</TableHead>
+                          <TableHead>k (N/mm)</TableHead>
+                          <TableHead>τ (MPa)</TableHead>
+                          <TableHead>SF</TableHead>
+                          <TableHead className="w-[110px]">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {variablePitchCheckRows.map((r) => (
+                          <TableRow key={r.deflection}>
+                            <TableCell>{formatNumber(r.deflection)}</TableCell>
+                            <TableCell>{formatNumber(r.load)}</TableCell>
+                            <TableCell>{formatNumber(r.springRate)}</TableCell>
+                            <TableCell>{formatNumber(r.shearStress)}</TableCell>
+                            <TableCell>{Number.isFinite(r.sf) ? formatNumber(r.sf) : "∞"}</TableCell>
+                            <TableCell>
+                              <Badge
+                                className={
+                                  r.status === "PASS"
+                                    ? "bg-green-500 text-white"
+                                    : r.status === "WARN"
+                                      ? "bg-amber-500 text-white"
+                                      : "bg-red-500 text-white"
+                                }
+                              >
+                                {r.status}
+                              </Badge>
+                              {r.overSolid && (
+                                <span className="ml-2 text-xs text-red-600">SOLID</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -885,7 +1075,11 @@ export function CompressionCalculator() {
                     </TabsList>
                     <TabsContent value={variablePitchChartMode} className="mt-3">
                       <div className="h-[340px] rounded-md border bg-background p-3">
-                        <VariablePitchCurvesChart data={variablePitchChart} mode={variablePitchChartMode} />
+                        <VariablePitchCurvesChart
+                          data={variablePitchChart}
+                          mode={variablePitchChartMode}
+                          markers={variablePitchEventMarkers}
+                        />
                       </div>
                     </TabsContent>
                   </Tabs>
