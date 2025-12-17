@@ -215,8 +215,11 @@ export function VariablePitchCompressionCalculator() {
       totalCoils,
       freeLength,
       segments: l0Dominant.segmentsUsed,
+      context: {
+        deflection: deflectionUsed,
+      },
     });
-  }, [wireDiameter, meanDiameter, totalCoils, freeLength, l0Dominant.segmentsUsed]);
+  }, [wireDiameter, meanDiameter, totalCoils, freeLength, l0Dominant.segmentsUsed, deflectionUsed]);
 
   const result = useMemo(() => {
     return calculateVariablePitchCompressionAtDeflection({

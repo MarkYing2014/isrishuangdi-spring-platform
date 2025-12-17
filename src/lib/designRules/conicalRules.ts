@@ -1,4 +1,5 @@
 import type { ConicalGeometry, AnalysisResult } from "@/lib/stores/springDesignStore";
+import type { ConicalNonlinearResult, ConicalNonlinearCurvePoint } from "@/lib/springMath";
 
 import type { DesignRuleFinding, DesignRuleReport } from "./types";
 import { summarizeRuleStatus } from "./types";
@@ -7,6 +8,10 @@ import { designRulesDefaults } from "./defaults";
 export function buildConicalDesignRuleReport(params: {
   geometry?: ConicalGeometry | null;
   analysisResult?: AnalysisResult | null;
+  context?: {
+    nonlinearResult?: ConicalNonlinearResult | null;
+    nonlinearCurve?: ConicalNonlinearCurvePoint[] | null;
+  };
 }): DesignRuleReport {
   const findings: DesignRuleFinding[] = [];
   const metrics: DesignRuleReport["metrics"] = {};
@@ -39,10 +44,20 @@ export function buildConicalDesignRuleReport(params: {
   const Cmin = d > 0 ? DmMin / d : NaN;
   const solidHeightEst = isFinite(Nt) && isFinite(d) ? Nt * d : NaN;
 
+  const DmMax = Dmax - d;
+  const DmAvg = isFinite(DmMax) && isFinite(DmMin) ? 0.5 * (DmMax + DmMin) : NaN;
+  const slenderness = isFinite(L0) && isFinite(DmAvg) && DmAvg > 0 ? L0 / DmAvg : NaN;
+
   metrics.taper_ratio = {
     value: isFinite(taperRatio) ? Number(taperRatio.toFixed(3)) : "-",
     labelEn: "Taper ratio Dmax/Dmin",
     labelZh: "锥度比 Dmax/Dmin",
+  };
+
+  metrics.slenderness = {
+    value: isFinite(slenderness) ? Number(slenderness.toFixed(3)) : "-",
+    labelEn: "Slenderness L0/Dm_avg",
+    labelZh: "细长比 L0/Dm_avg",
   };
 
   metrics.c_min = {
@@ -57,6 +72,89 @@ export function buildConicalDesignRuleReport(params: {
     labelEn: "Estimated solid height (Nt·d)",
     labelZh: "估算并紧高度（Nt·d）",
   };
+
+  if (isFinite(taperRatio) && isFinite(slenderness)) {
+    const taperWarn = designRulesDefaults.conical.guidanceTaperWarn;
+    const slenderWarn = designRulesDefaults.conical.guidanceSlendernessWarn;
+    if (taperRatio >= taperWarn && slenderness >= slenderWarn) {
+      findings.push({
+        id: "CON_GUIDANCE_RISK",
+        level: "warning",
+        titleEn: "Guidance/off-axis risk may be high",
+        titleZh: "导向不足/偏载风险可能较高",
+        detailEn: `Taper ratio=${taperRatio.toFixed(2)} and L0/Dm_avg=${slenderness.toFixed(2)}. Verify guidance and seating to avoid tilt/off-axis loading.`,
+        detailZh: `锥度比=${taperRatio.toFixed(2)}，细长比 L0/Dm_avg=${slenderness.toFixed(2)}。请核对导向与端部贴合，避免倾斜/偏载。`,
+        evidence: { taperRatio, slenderness, taperWarn, slenderWarn },
+      });
+    } else if (taperRatio >= taperWarn || slenderness >= slenderWarn) {
+      findings.push({
+        id: "CON_GUIDANCE_RISK",
+        level: "warning",
+        titleEn: "Guidance/off-axis risk should be verified",
+        titleZh: "建议核对导向/偏载风险",
+        detailEn: `Taper ratio=${taperRatio.toFixed(2)}, L0/Dm_avg=${slenderness.toFixed(2)}. Verify guidance and seating.`,
+        detailZh: `锥度比=${taperRatio.toFixed(2)}，细长比 L0/Dm_avg=${slenderness.toFixed(2)}。建议核对导向与端部贴合。`,
+        evidence: { taperRatio, slenderness, taperWarn, slenderWarn },
+      });
+    }
+  }
+
+  const nl = params.context?.nonlinearResult ?? null;
+  const curve = params.context?.nonlinearCurve ?? nl?.curve ?? null;
+  const dxWork = (a?.workingDeflection ?? a?.maxDeflection) ?? undefined;
+
+  if (curve && curve.length > 0 && dxWork !== undefined && isFinite(dxWork)) {
+    // Find nearest point
+    let best = curve[0];
+    let bestDist = Math.abs(curve[0].x - dxWork);
+    for (const p of curve) {
+      const dist = Math.abs(p.x - dxWork);
+      if (dist < bestDist) {
+        best = p;
+        bestDist = dist;
+      }
+    }
+
+    metrics.k_local = {
+      value: isFinite(best.k) ? Number(best.k.toFixed(3)) : "-",
+      unit: "N/mm",
+      labelEn: "Local stiffness at working deflection",
+      labelZh: "工作点局部刚度",
+    };
+    metrics.collapsed_coils = {
+      value: isFinite(best.collapsedCoils) ? Number(best.collapsedCoils.toFixed(2)) : "-",
+      labelEn: "Collapsed coils (nonlinear)",
+      labelZh: "已贴合圈数（非线性）",
+    };
+
+    findings.push({
+      id: "CON_NONLINEAR_STIFFNESS_INFO",
+      level: "info",
+      titleEn: "Nonlinear stiffness information",
+      titleZh: "非线性刚度信息",
+      detailEn: `At x≈${dxWork.toFixed(2)}mm, k≈${best.k.toFixed(2)} N/mm, collapsed≈${best.collapsedCoils.toFixed(1)} coils.`,
+      detailZh: `在 x≈${dxWork.toFixed(2)}mm，k≈${best.k.toFixed(2)} N/mm，已贴合≈${best.collapsedCoils.toFixed(1)} 圈。`,
+      evidence: { dxWork, kLocal: best.k, collapsedCoils: best.collapsedCoils },
+    });
+
+    if (nl && isFinite(nl.pitch) && isFinite(d) && d > 0) {
+      const stage = Math.round(dxWork / nl.pitch);
+      const stageX = stage * nl.pitch;
+      const dist = Math.abs(dxWork - stageX);
+      const thresh = designRulesDefaults.conical.stageProximityD * d;
+      if (isFinite(dist) && dist <= thresh) {
+        findings.push({
+          id: "CON_NEAR_STAGE_TRANSITION",
+          level: "warning",
+          titleEn: "Working point near stiffness transition",
+          titleZh: "工作点接近刚度拐点",
+          detailEn: `x≈${dxWork.toFixed(2)}mm is within ${thresh.toFixed(2)}mm of a coil-collapse stage. Results may be sensitive to tolerances.`,
+          detailZh: `工作点 x≈${dxWork.toFixed(2)}mm 距离贴合拐点小于 ${thresh.toFixed(2)}mm，结果可能对公差更敏感。`,
+          evidence: { dxWork, stageX, dist, thresh, pitch: nl.pitch },
+        });
+      }
+    }
+  }
 
   if (!(isFinite(d) && d > 0) || !(isFinite(Dmax) && Dmax > d) || !(isFinite(Dmin) && Dmin > d) || !(isFinite(Na) && Na > 0) || !(isFinite(L0) && L0 > 0) || !(Dmax > Dmin)) {
     findings.push({

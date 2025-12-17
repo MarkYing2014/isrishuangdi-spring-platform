@@ -73,8 +73,12 @@ export function ConicalCalculator() {
     return buildConicalDesignRuleReport({
       geometry: lastConicalGeometry,
       analysisResult: lastConicalAnalysis,
+      context: {
+        nonlinearResult,
+        nonlinearCurve: nonlinearResult?.curve ?? null,
+      },
     });
-  }, [lastConicalGeometry, lastConicalAnalysis]);
+  }, [lastConicalGeometry, lastConicalAnalysis, nonlinearResult]);
   
   // 从 store 恢复上次的计算结果
   const initialResult = useMemo<CalculationResult>(() => {

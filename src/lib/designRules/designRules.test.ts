@@ -3,12 +3,16 @@ import { describe, expect, test } from "vitest";
 import type { ArcSpringInput } from "@/lib/arcSpring";
 import { getDefaultArcSpringInput } from "@/lib/arcSpring";
 import type { CompressionSpringEds } from "@/lib/eds/engineeringDefinition";
-import type { ExtensionGeometry } from "@/lib/stores/springDesignStore";
+import type { ConicalGeometry, ExtensionGeometry, TorsionGeometry } from "@/lib/stores/springDesignStore";
+import { calculateConicalSpringNonlinear } from "@/lib/springMath";
 
 import {
   buildArcSpringDesignRuleReport,
   buildCompressionDesignRuleReport,
+  buildConicalDesignRuleReport,
   buildExtensionDesignRuleReport,
+  buildTorsionDesignRuleReport,
+  buildVariablePitchCompressionDesignRuleReport,
 } from "@/lib/designRules";
 import type { DesignRuleFinding } from "@/lib/designRules/types";
 
@@ -212,5 +216,92 @@ describe("designRules framework", () => {
 
     expect(report.findings.some((f: DesignRuleFinding) => f.id === "EXT_INITIAL_TENSION_WINDOW")).toBe(true);
     expect(report.metrics.pre_extension).toBeDefined();
+  });
+
+  test("torsion: arm envelope risk + high angle utilization", () => {
+    const geom: TorsionGeometry = {
+      type: "torsion",
+      wireDiameter: 2,
+      meanDiameter: 10,
+      activeCoils: 5,
+      legLength1: 5,
+      legLength2: 5,
+      workingAngle: 170,
+      materialId: "music_wire_a228",
+    };
+
+    const report = buildTorsionDesignRuleReport({
+      geometry: geom,
+      analysisResult: {
+        springRate: 10,
+        springRateUnit: "N·mm/deg",
+        workingDeflection: 170,
+      },
+    });
+
+    expect(report.findings.some((f: DesignRuleFinding) => f.id === "TOR_ARM_ENVELOPE_RISK")).toBe(true);
+    expect(report.findings.some((f: DesignRuleFinding) => f.id === "TOR_ANGLE_UTILIZATION_HIGH")).toBe(true);
+    expect(report.metrics.arm_ratio_min).toBeDefined();
+    expect(report.metrics.angle_utilization).toBeDefined();
+  });
+
+  test("conical: nonlinear local stiffness info present when curve provided", () => {
+    const geom: ConicalGeometry = {
+      type: "conical",
+      wireDiameter: 2,
+      largeOuterDiameter: 30,
+      smallOuterDiameter: 15,
+      activeCoils: 5,
+      totalCoils: 7,
+      freeLength: 50,
+      endType: "closed_ground",
+      materialId: "music_wire_a228",
+    };
+
+    const nl = calculateConicalSpringNonlinear({
+      wireDiameter: geom.wireDiameter,
+      largeOuterDiameter: geom.largeOuterDiameter,
+      smallOuterDiameter: geom.smallOuterDiameter,
+      activeCoils: geom.activeCoils,
+      shearModulus: 79300,
+      freeLength: geom.freeLength,
+      maxDeflection: 12,
+      samplePoints: 20,
+    });
+
+    const report = buildConicalDesignRuleReport({
+      geometry: geom,
+      analysisResult: {
+        springRate: 10,
+        springRateUnit: "N/mm",
+        workingDeflection: 12,
+      },
+      context: {
+        nonlinearResult: nl,
+        nonlinearCurve: nl.curve,
+      },
+    });
+
+    expect(report.findings.some((f: DesignRuleFinding) => f.id === "CON_NONLINEAR_STIFFNESS_INFO")).toBe(true);
+    expect(report.metrics.k_local).toBeDefined();
+  });
+
+  test("variable-pitch: near contact stage warning when deflection near first contact", () => {
+    const report = buildVariablePitchCompressionDesignRuleReport({
+      wireDiameter: 2,
+      meanDiameter: 20,
+      totalCoils: 10,
+      freeLength: 40,
+      segments: [
+        { coils: 2, pitch: 3 }, // spacing=1, cap=2
+        { coils: 3, pitch: 5 }, // spacing=3, cap=9
+      ],
+      context: {
+        deflection: 2,
+      },
+    });
+
+    expect(report.metrics.first_contact_deflection).toBeDefined();
+    expect(report.findings.some((f: DesignRuleFinding) => f.id === "VP_NEAR_CONTACT_STAGE")).toBe(true);
   });
 });

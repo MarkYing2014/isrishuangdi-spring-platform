@@ -47,17 +47,25 @@ export const designRulesDefaults = {
     deflectionHighDeg: 180,
     stressWarnMpa: 900,
     stressHighMpa: 1100,
+    angleUtilWarn: 0.8,
+    armLengthRatioWarn: 1.0,
+    armLengthRatioHigh: 0.75,
   },
 
   conical: {
     taperRatioWarn: 2.0,
     taperRatioHigh: 3.0,
     minIndexWarn: 4,
+    guidanceTaperWarn: 2.5,
+    guidanceSlendernessWarn: 4,
+    stageProximityD: 1,
   },
 
   variablePitch: {
     pitchMinFactorWarn: 1.05,
     pitchLEdSeverity: "warning" as const,
     lengthMismatchWarnRatio: 0.2,
+    stageProximityD: 1,
+    solidProximityD: 2,
   },
 } as const;

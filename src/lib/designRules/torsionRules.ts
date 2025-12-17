@@ -49,6 +49,31 @@ export function buildTorsionDesignRuleReport(params: {
     labelZh: "工作扭转角",
   };
 
+  const angleUtil =
+    isFinite(thetaWork) && thetaWork > 0
+      ? thetaWork / Math.max(1e-9, designRulesDefaults.torsion.deflectionHighDeg)
+      : NaN;
+
+  metrics.angle_utilization = {
+    value: isFinite(angleUtil) ? Number(angleUtil.toFixed(3)) : "-",
+    labelEn: "Angle utilization θ/θ_ref",
+    labelZh: "角度利用率 θ/θ_ref",
+    noteEn: `θ_ref=${designRulesDefaults.torsion.deflectionHighDeg}°`,
+    noteZh: `θ_ref=${designRulesDefaults.torsion.deflectionHighDeg}°`,
+  };
+
+  if (isFinite(angleUtil) && angleUtil >= designRulesDefaults.torsion.angleUtilWarn) {
+    findings.push({
+      id: "TOR_ANGLE_UTILIZATION_HIGH",
+      level: "warning",
+      titleEn: "High angle utilization",
+      titleZh: "角度利用率偏高",
+      detailEn: `θ/θ_ref=${angleUtil.toFixed(2)} ≥ ${designRulesDefaults.torsion.angleUtilWarn}. Review permanent set and fatigue risk.`,
+      detailZh: `角度利用率 θ/θ_ref=${angleUtil.toFixed(2)} ≥ ${designRulesDefaults.torsion.angleUtilWarn}，请关注永久变形与疲劳风险。`,
+      evidence: { field: "workingAngle", thetaWork, angleUtil },
+    });
+  }
+
   if (stress !== undefined) {
     metrics.max_stress = {
       value: isFinite(stress) ? Number(stress.toFixed(2)) : "-",
@@ -134,25 +159,46 @@ export function buildTorsionDesignRuleReport(params: {
 
   const arm1 = g.legLength1;
   const arm2 = g.legLength2;
-  if (isFinite(Dm) && Dm > 0 && (arm1 < 0.5 * Dm || arm2 < 0.5 * Dm)) {
-    findings.push({
-      id: "TOR_ARM_GEOM_RISK",
-      level: "warning",
-      titleEn: "Arm geometry may cause interference",
-      titleZh: "臂部几何可能干涉",
-      detailEn: "Arm length is relatively short; verify packaging clearance.",
-      detailZh: "臂长相对较短，请核对装配间隙与干涉。",
-      evidence: { field: "legLength1", arm1, arm2, Dm },
-    });
-  } else {
-    findings.push({
-      id: "TOR_ARM_GEOM_INFO",
-      level: "info",
-      titleEn: "Verify arm clearance",
-      titleZh: "请核对臂部间隙",
-      detailEn: "Arm geometry may cause interference; verify packaging clearance.",
-      detailZh: "臂部几何可能干涉，请核对装配间隙。",
-    });
+  const armRatioMin =
+    isFinite(Dm) && Dm > 0 ? Math.min(arm1 / Dm, arm2 / Dm) : NaN;
+
+  metrics.arm_ratio_min = {
+    value: isFinite(armRatioMin) ? Number(armRatioMin.toFixed(3)) : "-",
+    labelEn: "Min arm length ratio min(L1,L2)/Dm",
+    labelZh: "最小臂长比 min(L1,L2)/Dm",
+  };
+
+  if (isFinite(armRatioMin)) {
+    if (armRatioMin < designRulesDefaults.torsion.armLengthRatioHigh) {
+      findings.push({
+        id: "TOR_ARM_ENVELOPE_RISK",
+        level: "warning",
+        titleEn: "High arm interference risk",
+        titleZh: "臂部干涉风险较高",
+        detailEn: `min(L1,L2)/Dm=${armRatioMin.toFixed(2)} < ${designRulesDefaults.torsion.armLengthRatioHigh}. Verify envelope and assembly clearance.`,
+        detailZh: `最小臂长比=${armRatioMin.toFixed(2)} < ${designRulesDefaults.torsion.armLengthRatioHigh}，请核对包络与装配间隙。`,
+        evidence: { field: "legLength1", arm1, arm2, Dm, armRatioMin },
+      });
+    } else if (armRatioMin < designRulesDefaults.torsion.armLengthRatioWarn) {
+      findings.push({
+        id: "TOR_ARM_ENVELOPE_RISK",
+        level: "warning",
+        titleEn: "Arm clearance should be verified",
+        titleZh: "建议核对臂部间隙",
+        detailEn: `min(L1,L2)/Dm=${armRatioMin.toFixed(2)} < ${designRulesDefaults.torsion.armLengthRatioWarn}. Verify envelope and assembly clearance.`,
+        detailZh: `最小臂长比=${armRatioMin.toFixed(2)} < ${designRulesDefaults.torsion.armLengthRatioWarn}，建议核对包络与装配间隙。`,
+        evidence: { field: "legLength1", arm1, arm2, Dm, armRatioMin },
+      });
+    } else {
+      findings.push({
+        id: "TOR_ARM_ENVELOPE_INFO",
+        level: "info",
+        titleEn: "Verify arm clearance",
+        titleZh: "请核对臂部间隙",
+        detailEn: "Arm geometry may cause interference depending on packaging; verify clearance.",
+        detailZh: "臂部几何可能随装配空间产生干涉，请核对间隙。",
+      });
+    }
   }
 
   findings.push({
