@@ -82,10 +82,11 @@ export function buildCompressionDesignRuleReport(params: {
   const coilBindClearance =
     Lwork !== undefined && isFinite(solidHeightEst) ? Lwork - solidHeightEst : undefined;
 
-  const slenderness = isFinite(L0) && isFinite(Dm) && Dm > 0 ? L0 / Dm : NaN;
+  const slenderness =
+    L0 !== undefined && isFinite(L0) && isFinite(Dm) && Dm > 0 ? L0 / Dm : NaN;
 
   const pitchEst =
-    isFinite(L0) && isFinite(solidHeightEst) && isFinite(Na) && Na > 1
+    L0 !== undefined && isFinite(L0) && isFinite(solidHeightEst) && isFinite(Na) && Na > 1
       ? (L0 - solidHeightEst) / (Na - 1)
       : NaN;
 
