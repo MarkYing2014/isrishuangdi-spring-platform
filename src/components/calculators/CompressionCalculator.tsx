@@ -322,7 +322,7 @@ export function CompressionCalculator() {
 
   const previewPpapHtml = async () => {
     if (!storedEds || storedEds.type !== "compression" || !storedResolved || storedResolved.type !== "compression" || !storedAnalysis) {
-      alert("请先计算一次（生成 analysisResult）后再预览 PPAP 报告。");
+      alert("Please run Calculate once to generate analysisResult before previewing PPAP. / 请先计算一次（生成 analysisResult）后再预览 PPAP 报告。 ");
       return;
     }
 
@@ -579,7 +579,7 @@ export function CompressionCalculator() {
                       }
                       disabled={storedEds?.type !== "compression"}
                     >
-                      Add
+                      Add / 添加
                     </Button>
                   </div>
 
@@ -588,7 +588,7 @@ export function CompressionCalculator() {
                       <div key={idx} className="rounded-md border border-slate-200 bg-white p-3">
                         <div className="grid gap-3 md:grid-cols-2">
                           <div className="space-y-2">
-                            <Label>Characteristic</Label>
+                            <Label>Characteristic / 特性</Label>
                             <Input
                               value={c.characteristic ?? ""}
                               onChange={(e) => {
@@ -600,7 +600,7 @@ export function CompressionCalculator() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>Spec</Label>
+                            <Label>Spec / 规范</Label>
                             <Input
                               value={c.spec ?? ""}
                               onChange={(e) => {
@@ -612,7 +612,7 @@ export function CompressionCalculator() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>Method</Label>
+                            <Label>Method / 方法</Label>
                             <Input
                               value={c.method ?? ""}
                               onChange={(e) => {
@@ -624,7 +624,7 @@ export function CompressionCalculator() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>Frequency</Label>
+                            <Label>Frequency / 频次</Label>
                             <Input
                               value={c.frequency ?? ""}
                               onChange={(e) => {
@@ -638,7 +638,7 @@ export function CompressionCalculator() {
                         </div>
 
                         <div className="mt-3 space-y-2">
-                          <Label>Reaction Plan</Label>
+                          <Label>Reaction Plan / 反应计划</Label>
                           <Textarea
                             value={c.reactionPlan ?? ""}
                             onChange={(e) => {
@@ -662,7 +662,7 @@ export function CompressionCalculator() {
                             }}
                             disabled={storedEds?.type !== "compression"}
                           >
-                            Remove
+                            Remove / 删除
                           </Button>
                         </div>
                       </div>
@@ -685,7 +685,7 @@ export function CompressionCalculator() {
                       }
                       disabled={storedEds?.type !== "compression"}
                     >
-                      Add
+                      Add / 添加
                     </Button>
                   </div>
 
@@ -694,7 +694,7 @@ export function CompressionCalculator() {
                       <div key={idx} className="rounded-md border border-slate-200 bg-white p-3">
                         <div className="grid gap-3 md:grid-cols-2">
                           <div className="space-y-2">
-                            <Label>Step</Label>
+                            <Label>Step / 工序</Label>
                             <Input
                               value={s.stepName ?? ""}
                               onChange={(e) => {
@@ -706,7 +706,7 @@ export function CompressionCalculator() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>Machine</Label>
+                            <Label>Machine / 设备</Label>
                             <Input
                               value={s.machine ?? ""}
                               onChange={(e) => {
@@ -718,7 +718,7 @@ export function CompressionCalculator() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>Key Params</Label>
+                            <Label>Key Params / 关键参数</Label>
                             <Input
                               value={s.keyParams ?? ""}
                               onChange={(e) => {
@@ -730,7 +730,7 @@ export function CompressionCalculator() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>Operator Check</Label>
+                            <Label>Operator Check / 操作员检查</Label>
                             <Input
                               value={s.operatorCheck ?? ""}
                               onChange={(e) => {
@@ -744,7 +744,7 @@ export function CompressionCalculator() {
                         </div>
 
                         <div className="mt-3 space-y-2">
-                          <Label>In-process Check</Label>
+                          <Label>In-process Check / 过程检验</Label>
                           <Textarea
                             value={s.inProcessCheck ?? ""}
                             onChange={(e) => {
@@ -768,7 +768,7 @@ export function CompressionCalculator() {
                             }}
                             disabled={storedEds?.type !== "compression"}
                           >
-                            Remove
+                            Remove / 删除
                           </Button>
                         </div>
                       </div>
@@ -782,12 +782,16 @@ export function CompressionCalculator() {
                     variant="outline"
                     onClick={() => {
                       previewPpapHtml().catch((e) => {
-                        alert(e instanceof Error ? e.message : "Failed to generate report");
+                        alert(
+                          e instanceof Error
+                            ? `${e.message} / 生成报告失败`
+                            : "Failed to generate report / 生成报告失败"
+                        );
                       });
                     }}
                     disabled={storedEds?.type !== "compression" || !storedResolved || storedResolved.type !== "compression" || !storedAnalysis}
                   >
-                    Preview PPAP (HTML)
+                    Preview PPAP (HTML) / 预览 PPAP（HTML）
                   </Button>
                 </div>
               </div>
