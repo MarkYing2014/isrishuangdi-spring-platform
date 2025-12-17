@@ -178,6 +178,47 @@ export function ArcSpringCalculator() {
   const [showStressColors, setShowStressColors] = useState(false);
   const [stressBeta, setStressBeta] = useState(0.25);
 
+  const arcRule = useMemo(() => {
+    const deg2rad = (deg: number) => (deg * Math.PI) / 180;
+
+    const nWarn = 20;
+    const nHigh = 30;
+    const kGap = 1.05;
+    const wireLenWarnMm = 2000;
+    const wireLenHighMm = 3000;
+
+    const deadStart = showDeadCoils ? Math.max(0, Math.round(deadCoilsPerEnd)) : 0;
+    const deadEnd = showDeadCoils ? Math.max(0, Math.round(deadCoilsPerEnd)) : 0;
+    const nTotal = Math.max(1e-9, (input.n ?? 0) + deadStart + deadEnd);
+
+    const alpha0Rad = deg2rad(input.alpha0 ?? 0);
+    const alphaCRad = deg2rad(input.alphaC ?? 0);
+    const lFree = (input.r ?? 0) * alpha0Rad;
+    const lWork = (input.r ?? 0) * alphaCRad;
+
+    const pFree = nTotal > 0 ? lFree / nTotal : NaN;
+    const pWork = nTotal > 0 ? lWork / nTotal : NaN;
+
+    const perTurn = Math.sqrt(Math.pow(Math.PI * (input.D ?? 0), 2) + Math.pow(pFree, 2));
+    const wireLengthEstMm = isFinite(perTurn) ? perTurn * nTotal : NaN;
+
+    return {
+      nWarn,
+      nHigh,
+      kGap,
+      wireLenWarnMm,
+      wireLenHighMm,
+      deadStart,
+      deadEnd,
+      nTotal,
+      lFree,
+      lWork,
+      pFree,
+      pWork,
+      wireLengthEstMm,
+    };
+  }, [input, showDeadCoils, deadCoilsPerEnd]);
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -271,8 +312,54 @@ export function ArcSpringCalculator() {
       list.push({ level: "warning", field: "cf", message: "Proportional hysteresis selected but cf is 0." });
     }
 
+    if (isFinite(input.n) && input.n > arcRule.nHigh) {
+      list.push({
+        level: "warning",
+        field: "n",
+        message: `Active coils n=${input.n} is very high; check wire length, packaging, and cost. / 有效圈数 n=${input.n} 偏大，请检查线长、装配空间与成本。`,
+      });
+    } else if (isFinite(input.n) && input.n > arcRule.nWarn) {
+      list.push({
+        level: "warning",
+        field: "n",
+        message: `Active coils n=${input.n} is high; watch manufacturability and cost. / 有效圈数 n=${input.n} 偏大，请关注制造与成本风险。`,
+      });
+    }
+
+    const d = input.d ?? NaN;
+    const tightFree = isFinite(arcRule.pFree) && isFinite(d) && arcRule.pFree <= arcRule.kGap * d;
+    const tightWork = isFinite(arcRule.pWork) && isFinite(d) && arcRule.pWork <= arcRule.kGap * d;
+    if (tightFree) {
+      list.push({
+        level: "warning",
+        field: "n",
+        message: `Arc turn spacing is tight at free state: p_free=${arcRule.pFree.toFixed(2)}mm ≤ ${arcRule.kGap.toFixed(2)}·d. Risk of overlap/contact. / 自由态弧长等效匝距偏密：p_free=${arcRule.pFree.toFixed(2)}mm ≤ ${arcRule.kGap.toFixed(2)}·d，可能重叠/接触。`,
+      });
+    }
+    if (tightWork) {
+      list.push({
+        level: "warning",
+        field: "n",
+        message: `Arc turn spacing is tight at work end: p_work=${arcRule.pWork.toFixed(2)}mm ≤ ${arcRule.kGap.toFixed(2)}·d. Possible contact/wear/nonlinearity. / 工作末端弧长等效匝距偏密：p_work=${arcRule.pWork.toFixed(2)}mm ≤ ${arcRule.kGap.toFixed(2)}·d，可能接触/磨损/非线性。`,
+      });
+    }
+
+    if (isFinite(arcRule.wireLengthEstMm) && arcRule.wireLengthEstMm > arcRule.wireLenHighMm) {
+      list.push({
+        level: "warning",
+        field: "n",
+        message: `Estimated wire length is high: ${(arcRule.wireLengthEstMm / 1000).toFixed(2)}m (> ${(arcRule.wireLenHighMm / 1000).toFixed(1)}m). Check cost/handling. / 估算线长偏大：${(arcRule.wireLengthEstMm / 1000).toFixed(2)}m（> ${(arcRule.wireLenHighMm / 1000).toFixed(1)}m），请关注成本与加工装配。`,
+      });
+    } else if (isFinite(arcRule.wireLengthEstMm) && arcRule.wireLengthEstMm > arcRule.wireLenWarnMm) {
+      list.push({
+        level: "warning",
+        field: "n",
+        message: `Estimated wire length is notable: ${(arcRule.wireLengthEstMm / 1000).toFixed(2)}m (> ${(arcRule.wireLenWarnMm / 1000).toFixed(1)}m). / 估算线长偏大：${(arcRule.wireLengthEstMm / 1000).toFixed(2)}m（> ${(arcRule.wireLenWarnMm / 1000).toFixed(1)}m）。`,
+      });
+    }
+
     return list;
-  }, [input]);
+  }, [input, arcRule]);
 
   const plausibility = useMemo(() => {
     const hasError = issues.some((x) => x.level === "error");
@@ -381,8 +468,43 @@ export function ArcSpringCalculator() {
             </label>
           </div>
 
+          {!plausibility.hasError && (
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <div>
+                <span className="font-medium text-slate-700">N_total</span>
+                <span className="ml-1">(turns) / 总匝数：</span>
+                <span className="ml-1">{arcRule.nTotal.toFixed(1)}</span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-700">k_gap</span>
+                <span className="ml-1">/ 间隙系数：</span>
+                <span className="ml-1">{arcRule.kGap.toFixed(2)}</span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-700">p_free</span>
+                <span className="ml-1">(mm) / 自由态等效匝距：</span>
+                <span className="ml-1">{isFinite(arcRule.pFree) ? arcRule.pFree.toFixed(2) : "-"}</span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-700">p_work</span>
+                <span className="ml-1">(mm) / 工作末端等效匝距：</span>
+                <span className="ml-1">{isFinite(arcRule.pWork) ? arcRule.pWork.toFixed(2) : "-"}</span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-700">Wire length</span>
+                <span className="ml-1">/ 线长估算：</span>
+                <span className="ml-1">{isFinite(arcRule.wireLengthEstMm) ? `${(arcRule.wireLengthEstMm / 1000).toFixed(2)} m` : "-"}</span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-700">Note</span>
+                <span className="ml-1">/ 说明：</span>
+                <span className="ml-1">Arc turn spacing ≠ axial pitch / 弧长等效匝距≠轴向节距</span>
+              </div>
+            </div>
+          )}
+
           {issues.length === 0 ? (
-            <div className="text-sm text-emerald-700">✓ Parameters look reasonable.</div>
+            <div className="text-sm text-emerald-700">✓ Parameters look reasonable. / 参数看起来合理。</div>
           ) : (
             <div className="space-y-2">
               {issues.slice(0, 6).map((it, idx) => (
@@ -403,6 +525,12 @@ export function ArcSpringCalculator() {
               )}
             </div>
           )}
+
+          <div className="text-xs text-muted-foreground">
+            Info: n increases → stiffness decreases and wire length increases. / 提示：n 增大→刚度下降、线长增加。
+            <br />
+            Axial pitch / coil bind checks require free length model (not included here). / 轴向节距/贴圈检查需要自由长度模型（当前模块未覆盖）。
+          </div>
         </CardContent>
       </Card>
 
