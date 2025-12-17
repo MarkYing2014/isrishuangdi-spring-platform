@@ -21,6 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { HoverGlassCard } from "@/components/home/HoverGlassCard";
 
 const features = [
   {
@@ -143,42 +144,68 @@ export default function Home() {
         </div>
       </Card>
 
-      <section className="grid gap-6 md:grid-cols-2">
-        {(features as HomeFeature[]).map((feature) => {
-          const Icon = feature.icon;
-          return (
-            <Link key={feature.title.en} href={feature.href} className="group">
-              <Card className="h-full transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-                <CardHeader className="gap-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-10 items-center justify-center rounded-xl border bg-background shadow-sm">
-                        <Icon className="size-5 text-muted-foreground transition-colors group-hover:text-primary" />
-                      </div>
-                      <CardTitle className="text-base font-semibold">
-                        <LanguageText en={feature.title.en} zh={feature.title.zh} />
-                      </CardTitle>
-                    </div>
-                    <ArrowRight className="mt-1 size-4 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <p className="text-lg font-semibold text-foreground">
-                    <LanguageText en={feature.description.en} zh={feature.description.zh} />
-                  </p>
-                </CardContent>
-                <CardFooter className="mt-auto">
-                  <span className="inline-flex items-center gap-2 text-sm font-medium text-primary">
-                    <LanguageText en="Open module" zh="进入模块" />
-                    <span className="text-muted-foreground transition-colors group-hover:text-primary">
-                      →
+      <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-4 sm:p-6">
+        <div className="pointer-events-none absolute inset-0 opacity-70" aria-hidden={true}>
+          <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-indigo-200/40 blur-3xl" />
+          <div className="absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-sky-200/40 blur-3xl" />
+        </div>
+
+        <div className="relative grid gap-6 md:grid-cols-2">
+          {(features as HomeFeature[]).map((feature, index) => {
+            const Icon = feature.icon;
+
+            if (index < 6) {
+              return (
+                <HoverGlassCard
+                  key={feature.title.en}
+                  href={feature.href}
+                  title={<LanguageText en={feature.title.en} zh={feature.title.zh} />}
+                  description={<LanguageText en={feature.description.en} zh={feature.description.zh} />}
+                  icon={<Icon className="size-5" />}
+                  footer={
+                    <span className="inline-flex items-center gap-2 text-sm font-medium text-primary">
+                      <LanguageText en="Open module" zh="进入模块" />
+                      <span className="text-muted-foreground transition-colors group-hover:text-primary">→</span>
                     </span>
-                  </span>
-                </CardFooter>
-              </Card>
-            </Link>
-          );
-        })}
+                  }
+                />
+              );
+            }
+
+            return (
+              <Link key={feature.title.en} href={feature.href} className="group">
+                <Card className="h-full transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+                  <CardHeader className="gap-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-10 items-center justify-center rounded-xl border bg-background shadow-sm">
+                          <Icon className="size-5 text-muted-foreground transition-colors group-hover:text-primary" />
+                        </div>
+                        <CardTitle className="text-base font-semibold">
+                          <LanguageText en={feature.title.en} zh={feature.title.zh} />
+                        </CardTitle>
+                      </div>
+                      <ArrowRight className="mt-1 size-4 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-lg font-semibold text-foreground">
+                      <LanguageText en={feature.description.en} zh={feature.description.zh} />
+                    </p>
+                  </CardContent>
+                  <CardFooter className="mt-auto">
+                    <span className="inline-flex items-center gap-2 text-sm font-medium text-primary">
+                      <LanguageText en="Open module" zh="进入模块" />
+                      <span className="text-muted-foreground transition-colors group-hover:text-primary">
+                        →
+                      </span>
+                    </span>
+                  </CardFooter>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
       </section>
     </div>
   );

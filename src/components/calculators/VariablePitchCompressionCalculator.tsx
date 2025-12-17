@@ -9,6 +9,7 @@ import {
   invertVariablePitchCompressionForce,
   type VariablePitchSegment,
 } from "@/lib/springMath";
+import { buildVariablePitchCompressionDesignRuleReport } from "@/lib/designRules";
 import {
   getSpringMaterial,
   getDefaultSpringMaterial,
@@ -22,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -206,6 +208,16 @@ export function VariablePitchCompressionCalculator() {
 
   const deflectionUsed = mode === "load" ? computedDeflection ?? 0 : deflection;
 
+  const designRuleReport = useMemo(() => {
+    return buildVariablePitchCompressionDesignRuleReport({
+      wireDiameter,
+      meanDiameter,
+      totalCoils,
+      freeLength,
+      segments: l0Dominant.segmentsUsed,
+    });
+  }, [wireDiameter, meanDiameter, totalCoils, freeLength, l0Dominant.segmentsUsed]);
+
   const result = useMemo(() => {
     return calculateVariablePitchCompressionAtDeflection({
       ...variablePitchBase,
@@ -365,6 +377,8 @@ export function VariablePitchCompressionCalculator() {
 
   return (
     <div className="space-y-6">
+      <DesignRulePanel report={designRuleReport} title="Design Rules / 设计规则" />
+
       <Card>
         <CardHeader>
           <CardTitle>Variable Pitch Compression Spring / 变节距压缩弹簧</CardTitle>

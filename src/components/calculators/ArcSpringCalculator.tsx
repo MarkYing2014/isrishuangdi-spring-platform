@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer } from "lucide-react";
+import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import {
   ArcSpringInput,
   ArcSpringResult,
@@ -22,8 +23,8 @@ import {
   ARC_SPRING_MATERIALS,
   downloadArcSpringPDF,
   printArcSpringReport,
-  validateArcSpringInput,
 } from "@/lib/arcSpring";
+import { buildArcSpringDesignRuleReport } from "@/lib/designRules";
 import {
   LineChart,
   Line,
@@ -147,8 +148,6 @@ function SliderNumberInput({
     </div>
   );
 }
-
-type ArcIssueLevel = "error" | "warning";
 type ArcIssueField =
   | "d"
   | "D"
@@ -164,12 +163,6 @@ type ArcIssueField =
   | "cf"
   | "systemMode"
   | "engageAngle2";
-
-type ArcIssue = {
-  level: ArcIssueLevel;
-  field: ArcIssueField;
-  message: string;
-};
 
 export function ArcSpringCalculator() {
   const [input, setInput] = useState<ArcSpringInput>(getDefaultArcSpringInput());
@@ -189,46 +182,16 @@ export function ArcSpringCalculator() {
   const [showStressColors, setShowStressColors] = useState(false);
   const [stressBeta, setStressBeta] = useState(0.25);
 
-  const arcRule = useMemo(() => {
-    const deg2rad = (deg: number) => (deg * Math.PI) / 180;
+  const designRuleReport = useMemo(
+    () =>
+      buildArcSpringDesignRuleReport(input, {
+        showDeadCoils,
+        deadCoilsPerEnd,
+      }),
+    [input, showDeadCoils, deadCoilsPerEnd]
+  );
 
-    const nWarn = 20;
-    const nHigh = 30;
-    const kGap = 1.05;
-    const wireLenWarnMm = 2000;
-    const wireLenHighMm = 3000;
-
-    const deadStart = showDeadCoils ? Math.max(0, Math.round(deadCoilsPerEnd)) : 0;
-    const deadEnd = showDeadCoils ? Math.max(0, Math.round(deadCoilsPerEnd)) : 0;
-    const nTotal = Math.max(1e-9, (input.n ?? 0) + deadStart + deadEnd);
-
-    const alpha0Rad = deg2rad(input.alpha0 ?? 0);
-    const alphaCRad = deg2rad(input.alphaC ?? 0);
-    const lFree = (input.r ?? 0) * alpha0Rad;
-    const lWork = (input.r ?? 0) * alphaCRad;
-
-    const pFree = nTotal > 0 ? lFree / nTotal : NaN;
-    const pWork = nTotal > 0 ? lWork / nTotal : NaN;
-
-    const perTurn = Math.sqrt(Math.pow(Math.PI * (input.D ?? 0), 2) + Math.pow(pFree, 2));
-    const wireLengthEstMm = isFinite(perTurn) ? perTurn * nTotal : NaN;
-
-    return {
-      nWarn,
-      nHigh,
-      kGap,
-      wireLenWarnMm,
-      wireLenHighMm,
-      deadStart,
-      deadEnd,
-      nTotal,
-      lFree,
-      lWork,
-      pFree,
-      pWork,
-      wireLengthEstMm,
-    };
-  }, [input, showDeadCoils, deadCoilsPerEnd]);
+  const hasRuleError = designRuleReport.summary.status === "FAIL";
 
   useEffect(() => {
     setMounted(true);
@@ -276,109 +239,6 @@ export function ArcSpringCalculator() {
     }, 100);
   };
 
-  const issues = useMemo((): ArcIssue[] => {
-    const list: ArcIssue[] = [];
-
-    const baseErrors = validateArcSpringInput(input);
-    for (const e of baseErrors) {
-      const msg = String(e);
-      if (msg.includes("d")) list.push({ level: "error", field: "d", message: msg });
-      else if (msg.includes("D")) list.push({ level: "error", field: "D", message: msg });
-      else if (msg.includes("n")) list.push({ level: "error", field: "n", message: msg });
-      else if (msg.includes("r")) list.push({ level: "error", field: "r", message: msg });
-      else if (msg.includes("alpha0")) list.push({ level: "error", field: "alpha0", message: msg });
-      else if (msg.includes("alphaC")) list.push({ level: "error", field: "alphaC", message: msg });
-      else if (msg.includes("engageAngle2")) list.push({ level: "error", field: "engageAngle2", message: msg });
-      else list.push({ level: "error", field: "systemMode", message: msg });
-    }
-
-    const springIndex = input.d > 0 ? input.D / input.d : NaN;
-    if (isFinite(springIndex) && springIndex > 0) {
-      if (springIndex < 3) {
-        list.push({ level: "warning", field: "D", message: `Spring index C=${springIndex.toFixed(2)} is very low (risk of high stress).` });
-      } else if (springIndex < 4) {
-        list.push({ level: "warning", field: "D", message: `Spring index C=${springIndex.toFixed(2)} is low (consider C>=4).` });
-      }
-    }
-
-    const deltaMax = input.alpha0 - input.alphaC;
-    if (isFinite(deltaMax) && deltaMax > 0 && deltaMax < 5) {
-      list.push({ level: "warning", field: "alpha0", message: "Working angle range (alpha0-alphaC) is small; curve may be less meaningful." });
-    }
-
-    if (input.maxHousingDiameter !== undefined && input.maxHousingDiameter > 0) {
-      const De = input.D + input.d;
-      const clearance = input.maxHousingDiameter - De;
-      const minClearance = input.minClearance ?? 1;
-      if (clearance < minClearance) {
-        list.push({ level: "warning", field: "maxHousingDiameter", message: `Housing clearance ${clearance.toFixed(1)}mm < min ${minClearance}mm.` });
-      }
-    }
-
-    const mode = input.hysteresisMode ?? "none";
-    if (mode === "constant" && (input.Tf_const ?? 0) <= 0) {
-      list.push({ level: "warning", field: "Tf_const", message: "Constant hysteresis selected but Tf is 0." });
-    }
-    if (mode === "proportional" && (input.cf ?? 0) <= 0) {
-      list.push({ level: "warning", field: "cf", message: "Proportional hysteresis selected but cf is 0." });
-    }
-
-    if (isFinite(input.n) && input.n > arcRule.nHigh) {
-      list.push({
-        level: "warning",
-        field: "n",
-        message: `Active coils n=${input.n} is very high; check wire length, packaging, and cost. / 有效圈数 n=${input.n} 偏大，请检查线长、装配空间与成本。`,
-      });
-    } else if (isFinite(input.n) && input.n > arcRule.nWarn) {
-      list.push({
-        level: "warning",
-        field: "n",
-        message: `Active coils n=${input.n} is high; watch manufacturability and cost. / 有效圈数 n=${input.n} 偏大，请关注制造与成本风险。`,
-      });
-    }
-
-    const d = input.d ?? NaN;
-    const tightFree = isFinite(arcRule.pFree) && isFinite(d) && arcRule.pFree <= arcRule.kGap * d;
-    const tightWork = isFinite(arcRule.pWork) && isFinite(d) && arcRule.pWork <= arcRule.kGap * d;
-    if (tightFree) {
-      list.push({
-        level: "warning",
-        field: "n",
-        message: `Arc turn spacing is tight at free state: p_free=${arcRule.pFree.toFixed(2)}mm ≤ ${arcRule.kGap.toFixed(2)}·d. Risk of overlap/contact. / 自由态弧长等效匝距偏密：p_free=${arcRule.pFree.toFixed(2)}mm ≤ ${arcRule.kGap.toFixed(2)}·d，可能重叠/接触。`,
-      });
-    }
-    if (tightWork) {
-      list.push({
-        level: "warning",
-        field: "n",
-        message: `Arc turn spacing is tight at work end: p_work=${arcRule.pWork.toFixed(2)}mm ≤ ${arcRule.kGap.toFixed(2)}·d. Possible contact/wear/nonlinearity. / 工作末端弧长等效匝距偏密：p_work=${arcRule.pWork.toFixed(2)}mm ≤ ${arcRule.kGap.toFixed(2)}·d，可能接触/磨损/非线性。`,
-      });
-    }
-
-    if (isFinite(arcRule.wireLengthEstMm) && arcRule.wireLengthEstMm > arcRule.wireLenHighMm) {
-      list.push({
-        level: "warning",
-        field: "n",
-        message: `Estimated wire length is high: ${(arcRule.wireLengthEstMm / 1000).toFixed(2)}m (> ${(arcRule.wireLenHighMm / 1000).toFixed(1)}m). Check cost/handling. / 估算线长偏大：${(arcRule.wireLengthEstMm / 1000).toFixed(2)}m（> ${(arcRule.wireLenHighMm / 1000).toFixed(1)}m），请关注成本与加工装配。`,
-      });
-    } else if (isFinite(arcRule.wireLengthEstMm) && arcRule.wireLengthEstMm > arcRule.wireLenWarnMm) {
-      list.push({
-        level: "warning",
-        field: "n",
-        message: `Estimated wire length is notable: ${(arcRule.wireLengthEstMm / 1000).toFixed(2)}m (> ${(arcRule.wireLenWarnMm / 1000).toFixed(1)}m). / 估算线长偏大：${(arcRule.wireLengthEstMm / 1000).toFixed(2)}m（> ${(arcRule.wireLenWarnMm / 1000).toFixed(1)}m）。`,
-      });
-    }
-
-    return list;
-  }, [input, arcRule]);
-
-  const plausibility = useMemo(() => {
-    const hasError = issues.some((x) => x.level === "error");
-    const hasWarning = issues.some((x) => x.level === "warning");
-    const status: "ok" | "warning" | "error" = hasError ? "error" : hasWarning ? "warning" : "ok";
-    return { status, hasError, hasWarning };
-  }, [issues]);
-
   const fastCheck = useMemo(() => {
     const tauMax = result?.tauMax;
     const sf = isFinite(tauMax) && tauMax > 0 ? allowableTau / tauMax : NaN;
@@ -390,7 +250,7 @@ export function ArcSpringCalculator() {
 
   useEffect(() => {
     if (!autoCalculate) return;
-    if (plausibility.hasError) return;
+    if (hasRuleError) return;
     setIsCalculating(true);
     const t = setTimeout(() => {
       const newResult = computeArcSpringCurve(input);
@@ -399,7 +259,7 @@ export function ArcSpringCalculator() {
       setIsCalculating(false);
     }, 300);
     return () => clearTimeout(t);
-  }, [autoCalculate, input, plausibility.hasError]);
+  }, [autoCalculate, input, hasRuleError]);
 
   const chartData = useMemo(() => {
     if (!calculated) return [];
@@ -449,25 +309,13 @@ export function ArcSpringCalculator() {
         }
       `}</style>
 
-      <Card>
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Plausibility Check / 合理性检查</CardTitle>
-          {plausibility.status === "ok" && (
-            <Badge className="bg-emerald-600 text-white">OK</Badge>
-          )}
-          {plausibility.status === "warning" && (
-            <Badge className="bg-amber-500 text-white">Warning</Badge>
-          )}
-          {plausibility.status === "error" && (
-            <Badge variant="destructive">Error</Badge>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <DesignRulePanel
+        report={designRuleReport}
+        title="Design Rules / 设计规则"
+        subheader={
           <div className="flex items-center justify-between gap-3">
             <div className="text-xs text-muted-foreground">
-              {autoCalculate
-                ? "Auto-calculate enabled (300ms debounce)"
-                : "Manual calculate mode"}
+              {autoCalculate ? "Auto-calculate enabled (300ms debounce)" : "Manual calculate mode"}
             </div>
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input
@@ -478,72 +326,12 @@ export function ArcSpringCalculator() {
               Auto / 自动
             </label>
           </div>
-
-          {!plausibility.hasError && (
-            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-              <div>
-                <span className="font-medium text-slate-700">N_total</span>
-                <span className="ml-1">(turns) / 总匝数：</span>
-                <span className="ml-1">{arcRule.nTotal.toFixed(1)}</span>
-              </div>
-              <div>
-                <span className="font-medium text-slate-700">k_gap</span>
-                <span className="ml-1">/ 间隙系数：</span>
-                <span className="ml-1">{arcRule.kGap.toFixed(2)}</span>
-              </div>
-              <div>
-                <span className="font-medium text-slate-700">p_free</span>
-                <span className="ml-1">(mm) / 自由态等效匝距：</span>
-                <span className="ml-1">{isFinite(arcRule.pFree) ? arcRule.pFree.toFixed(2) : "-"}</span>
-              </div>
-              <div>
-                <span className="font-medium text-slate-700">p_work</span>
-                <span className="ml-1">(mm) / 工作末端等效匝距：</span>
-                <span className="ml-1">{isFinite(arcRule.pWork) ? arcRule.pWork.toFixed(2) : "-"}</span>
-              </div>
-              <div>
-                <span className="font-medium text-slate-700">Wire length</span>
-                <span className="ml-1">/ 线长估算：</span>
-                <span className="ml-1">{isFinite(arcRule.wireLengthEstMm) ? `${(arcRule.wireLengthEstMm / 1000).toFixed(2)} m` : "-"}</span>
-              </div>
-              <div>
-                <span className="font-medium text-slate-700">Note</span>
-                <span className="ml-1">/ 说明：</span>
-                <span className="ml-1">Arc turn spacing ≠ axial pitch / 弧长等效匝距≠轴向节距</span>
-              </div>
-            </div>
-          )}
-
-          {issues.length === 0 ? (
-            <div className="text-sm text-emerald-700">✓ Parameters look reasonable. / 参数看起来合理。</div>
-          ) : (
-            <div className="space-y-2">
-              {issues.slice(0, 6).map((it, idx) => (
-                <button
-                  key={`${it.field}-${idx}`}
-                  type="button"
-                  onClick={() => jumpToField(it.field)}
-                  className={
-                    "w-full text-left text-sm underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-md px-1 py-0.5 " +
-                    (it.level === "error" ? "text-red-700" : "text-amber-700")
-                  }
-                >
-                  {it.level === "error" ? "✗" : "⚠"} {it.message}
-                </button>
-              ))}
-              {issues.length > 6 && (
-                <div className="text-xs text-muted-foreground">…and {issues.length - 6} more</div>
-              )}
-            </div>
-          )}
-
-          <div className="text-xs text-muted-foreground">
-            Info: n increases → stiffness decreases and wire length increases. / 提示：n 增大→刚度下降、线长增加。
-            <br />
-            Axial pitch / coil bind checks require free length model (not included here). / 轴向节距/贴圈检查需要自由长度模型（当前模块未覆盖）。
-          </div>
-        </CardContent>
-      </Card>
+        }
+        onFindingClick={(f) => {
+          const field = (f.evidence as { field?: unknown } | undefined)?.field;
+          if (typeof field === "string") jumpToField(field as ArcIssueField);
+        }}
+      />
 
       {/* Warnings */}
       {result.warnings.length > 0 && (
@@ -883,7 +671,7 @@ export function ArcSpringCalculator() {
           <Button
             className="w-full h-12 text-base"
             onClick={handleCalculate}
-            disabled={isCalculating || plausibility.hasError}
+            disabled={isCalculating || hasRuleError}
           >
             {isCalculating ? (
               <>

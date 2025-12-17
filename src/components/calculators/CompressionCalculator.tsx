@@ -23,12 +23,14 @@ import {
 import { SpringDesign } from "@/lib/springTypes";
 import { resolveCompressionNominal } from "@/lib/eds/compressionResolver";
 import { toEdsFromLegacyForm } from "@/lib/eds/legacyAdapters";
+import { buildCompressionDesignRuleReport } from "@/lib/designRules";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { buildCompressionPpapReport } from "@/lib/reports/compressionPpapReport";
 import { DimensionHint } from "./DimensionHint";
 import { MaterialSelector } from "./MaterialSelector";
@@ -81,6 +83,16 @@ export function CompressionCalculator() {
 
   const lastCompressionGeometry = storedGeometry?.type === "compression" ? storedGeometry : null;
   const lastCompressionAnalysis = lastCompressionGeometry ? storedAnalysis : null;
+
+  const designRuleReport = useMemo(() => {
+    const eds = storedEds?.type === "compression" ? storedEds : null;
+    const resolved = storedResolved?.type === "compression" ? storedResolved : null;
+    return buildCompressionDesignRuleReport({
+      eds,
+      resolved,
+      analysisResult: lastCompressionAnalysis,
+    });
+  }, [storedEds, storedResolved, lastCompressionAnalysis]);
   
   // 从 store 恢复上次的计算结果
   const initialResult = useMemo<CalculationResult>(() => {
@@ -355,6 +367,10 @@ export function CompressionCalculator() {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
+      <div className="md:col-span-2">
+        <DesignRulePanel report={designRuleReport} title="Design Rules / 设计规则" />
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Input Parameters / 输入参数</CardTitle>

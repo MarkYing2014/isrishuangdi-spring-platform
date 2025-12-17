@@ -4,10 +4,12 @@ import { useMemo, useState, useCallback } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
 import { calculateExtensionSpring, type ExtensionSpringInput } from "@/lib/springMath";
+import { buildExtensionDesignRuleReport } from "@/lib/designRules";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { DimensionHint } from "./DimensionHint";
 import { MaterialSelector } from "./MaterialSelector";
 import { 
@@ -52,6 +54,14 @@ export function ExtensionCalculator() {
   const setDesign = useSpringDesignStore(state => state.setDesign);
 
   const lastExtensionGeometry = storedGeometry?.type === "extension" ? storedGeometry : null;
+  const lastExtensionAnalysis = lastExtensionGeometry ? storedAnalysis : null;
+
+  const designRuleReport = useMemo(() => {
+    return buildExtensionDesignRuleReport({
+      geometry: lastExtensionGeometry,
+      analysisResult: lastExtensionAnalysis,
+    });
+  }, [lastExtensionGeometry, lastExtensionAnalysis]);
   
   // 从 store 恢复上次的计算结果
   const initialResult = useMemo<CalculationResult>(() => {
@@ -244,6 +254,10 @@ export function ExtensionCalculator() {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
+      <div className="md:col-span-2">
+        <DesignRulePanel report={designRuleReport} title="Design Rules / 设计规则" />
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Input Parameters / 输入参数</CardTitle>

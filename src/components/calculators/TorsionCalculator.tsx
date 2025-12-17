@@ -14,10 +14,12 @@
 import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 
+import { buildTorsionDesignRuleReport } from "@/lib/designRules";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { DimensionHint } from "./DimensionHint";
 import { MaterialSelector } from "./MaterialSelector";
 import { 
@@ -250,6 +252,15 @@ export function TorsionCalculator() {
   const storedAnalysis = useSpringDesignStore(state => state.analysisResult);
   const storedMaterial = useSpringDesignStore(state => state.material);
   const lastTorsion = designGeometry && designGeometry.type === "torsion" ? designGeometry : null;
+
+  const lastTorsionAnalysis = lastTorsion ? storedAnalysis : null;
+
+  const designRuleReport = useMemo(() => {
+    return buildTorsionDesignRuleReport({
+      geometry: lastTorsion,
+      analysisResult: lastTorsionAnalysis,
+    });
+  }, [lastTorsion, lastTorsionAnalysis]);
   
   // 如果 store 里有扭簧数据，则初始化为已提交状态
   const [submitted, setSubmitted] = useState(!!lastTorsion && !!storedAnalysis);
@@ -440,6 +451,10 @@ export function TorsionCalculator() {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
+      <div className="md:col-span-2">
+        <DesignRulePanel report={designRuleReport} title="Design Rules / 设计规则" />
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Input Parameters / 输入参数</CardTitle>

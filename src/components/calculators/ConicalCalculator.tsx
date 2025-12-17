@@ -11,10 +11,12 @@ import {
   type ConicalNonlinearResult,
 } from "@/lib/springMath";
 import { SpringDesign } from "@/lib/springTypes";
+import { buildConicalDesignRuleReport } from "@/lib/designRules";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { DimensionHint } from "./DimensionHint";
 import { MaterialSelector } from "./MaterialSelector";
 import { 
@@ -66,6 +68,13 @@ export function ConicalCalculator() {
   const setDesign = useSpringDesignStore(state => state.setDesign);
   const lastConicalGeometry = storedGeometry?.type === "conical" ? storedGeometry : null;
   const lastConicalAnalysis = lastConicalGeometry ? storedAnalysis : null;
+
+  const designRuleReport = useMemo(() => {
+    return buildConicalDesignRuleReport({
+      geometry: lastConicalGeometry,
+      analysisResult: lastConicalAnalysis,
+    });
+  }, [lastConicalGeometry, lastConicalAnalysis]);
   
   // 从 store 恢复上次的计算结果
   const initialResult = useMemo<CalculationResult>(() => {
@@ -294,10 +303,14 @@ export function ConicalCalculator() {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
+      <div className="md:col-span-2">
+        <DesignRulePanel report={designRuleReport} title="Design Rules / 设计规则" />
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Input Parameters / 输入参数</CardTitle>
-          <p className="text-xs text-muted-foreground">Conical Compression Spring / 锥形压缩弹簧</p>
+          <p className="text-xs text-muted-foreground">Conical Spring / 圆锥弹簧</p>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={form.handleSubmit(onSubmitLinear)}>
