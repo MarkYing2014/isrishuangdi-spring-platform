@@ -21,6 +21,8 @@ import {
   type SpringMaterialId,
 } from "@/lib/materials/springMaterials";
 import { SpringDesign } from "@/lib/springTypes";
+import { resolveCompressionNominal } from "@/lib/eds/compressionResolver";
+import { toEdsFromLegacyForm } from "@/lib/eds/legacyAdapters";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -125,6 +127,10 @@ export function CompressionCalculator() {
   const handleMaterialChange = (material: SpringMaterial) => {
     setSelectedMaterial(material);
     form.setValue("shearModulus", material.shearModulus);
+
+    if (result) {
+      form.handleSubmit(onSubmit)();
+    }
   };
 
   const simulatorUrl = useMemo(() => {
@@ -192,8 +198,7 @@ export function CompressionCalculator() {
   const onSubmit: SubmitHandler<FormValues> = (values) => {
     setError(null);
     try {
-      const design: SpringDesign = {
-        type: "compression",
+      const eds = toEdsFromLegacyForm({
         wireDiameter: values.wireDiameter,
         meanDiameter: values.meanDiameter,
         activeCoils: values.activeCoils,
@@ -202,7 +207,11 @@ export function CompressionCalculator() {
         freeLength: values.freeLength,
         topGround: values.topGround,
         bottomGround: values.bottomGround,
-      };
+        materialId: selectedMaterial.id,
+      });
+
+      const resolved = resolveCompressionNominal(eds);
+      const design: SpringDesign = resolved.design;
 
       const calc = calculateLoadAndStress(design, values.deflection);
       setResult(calc);
@@ -235,21 +244,21 @@ export function CompressionCalculator() {
       // 写入全局 store
       const geometry: CompressionGeometry = {
         type: "compression",
-        wireDiameter: values.wireDiameter,
-        meanDiameter: values.meanDiameter,
-        activeCoils: values.activeCoils,
-        totalCoils: values.totalCoils,
-        freeLength: values.freeLength ?? 50,
-        topGround: values.topGround ?? false,
-        bottomGround: values.bottomGround ?? false,
-        shearModulus: selectedMaterial.shearModulus,
-        materialId: selectedMaterial.id,
+        wireDiameter: design.wireDiameter,
+        meanDiameter: design.meanDiameter,
+        activeCoils: design.activeCoils,
+        totalCoils: design.totalCoils ?? values.totalCoils,
+        freeLength: design.freeLength ?? (values.freeLength ?? 50),
+        topGround: design.topGround ?? (values.topGround ?? false),
+        bottomGround: design.bottomGround ?? (values.bottomGround ?? false),
+        shearModulus: design.shearModulus,
+        materialId: design.materialId,
       };
       
       const materialInfo: MaterialInfo = {
         id: selectedMaterial.id,
         name: selectedMaterial.nameEn,
-        shearModulus: selectedMaterial.shearModulus,
+        shearModulus: design.shearModulus,
         elasticModulus: selectedMaterial.elasticModulus ?? 200000,
         density: selectedMaterial.density ?? 7850,
         tensileStrength: selectedMaterial.tensileStrength,
@@ -276,6 +285,7 @@ export function CompressionCalculator() {
         geometry,
         material: materialInfo,
         analysisResult: analysisResultData,
+        eds,
         meta: {
           designCode: generateDesignCode(geometry),
         },
