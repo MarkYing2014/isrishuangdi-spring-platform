@@ -99,7 +99,19 @@ function SliderNumberInput({
   disabled,
 }: SliderNumberInputProps) {
   const safeMax = Math.max(min, max);
-  const safeValue = Math.min(Math.max(value, min), safeMax);
+  const [expandedMax, setExpandedMax] = useState(safeMax);
+
+  useEffect(() => {
+    setExpandedMax((prev) => Math.max(prev, safeMax));
+  }, [safeMax]);
+
+  useEffect(() => {
+    if (!isFinite(value)) return;
+    if (value > expandedMax) setExpandedMax(value);
+  }, [value, expandedMax]);
+
+  const effectiveMax = Math.max(min, expandedMax);
+  const sliderValue = Math.min(Math.max(value, min), effectiveMax);
   return (
     <div className="space-y-2">
       <div className="flex items-end justify-between gap-2">
@@ -108,19 +120,18 @@ function SliderNumberInput({
         </Label>
         <Input
           type="number"
-          value={safeValue}
+          value={Number.isFinite(value) ? value : 0}
           onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
           min={min}
-          max={safeMax}
           step={step}
           disabled={disabled}
           className="h-9 w-28 arc-no-spinner"
         />
       </div>
       <Slider
-        value={[safeValue]}
+        value={[sliderValue]}
         min={min}
-        max={safeMax}
+        max={effectiveMax}
         step={step}
         onValueChange={(v) => onChange(v[0] ?? 0)}
         disabled={disabled}
@@ -130,7 +141,7 @@ function SliderNumberInput({
           {min}{unit ? ` ${unit}` : ""}
         </span>
         <span>
-          {safeMax}{unit ? ` ${unit}` : ""}
+          {effectiveMax}{unit ? ` ${unit}` : ""}
         </span>
       </div>
     </div>
