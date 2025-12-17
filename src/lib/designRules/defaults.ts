@@ -23,6 +23,9 @@ export const designRulesDefaults = {
     slendernessHigh: 6,
     stressWarnMpa: 900,
     stressHighMpa: 1100,
+    allowShearUtilWarn: 0.9,
+    allowShearUtilFail: 1.0,
+    naturalFreqWarnHz: 20,
   },
 
   extension: {
@@ -32,6 +35,8 @@ export const designRulesDefaults = {
     hookRiskIndexWarn: 6,
     extensionRatioWarn: 0.25,
     extensionRatioHigh: 0.4,
+    initialTensionPreExtRatioLow: 0.01,
+    initialTensionPreExtRatioHigh: 0.08,
   },
 
   torsion: {

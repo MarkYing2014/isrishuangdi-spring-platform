@@ -1,6 +1,7 @@
 import type { CompressionSpringEds } from "@/lib/eds/engineeringDefinition";
 import type { ResolveCompressionNominalResult } from "@/lib/eds/compressionResolver";
 import type { AnalysisResult } from "@/lib/stores/springDesignStore";
+import { getSpringMaterial } from "@/lib/materials/springMaterials";
 
 import type { DesignRuleFinding, DesignRuleReport } from "./types";
 import { summarizeRuleStatus } from "./types";
@@ -75,6 +76,10 @@ export function buildCompressionDesignRuleReport(params: {
 
   const stressWarnMpa = params.context?.stressWarnMpa ?? designRulesDefaults.compression.stressWarnMpa;
   const stressHighMpa = params.context?.stressHighMpa ?? designRulesDefaults.compression.stressHighMpa;
+
+  const allowShearUtilWarn = designRulesDefaults.compression.allowShearUtilWarn;
+  const allowShearUtilFail = designRulesDefaults.compression.allowShearUtilFail;
+  const naturalFreqWarnHz = designRulesDefaults.compression.naturalFreqWarnHz;
 
   const dx = (analysis?.maxDeflection ?? analysis?.workingDeflection) ?? 0;
   const Lwork = L0 !== undefined ? L0 - dx : undefined;
@@ -157,6 +162,27 @@ export function buildCompressionDesignRuleReport(params: {
     };
   }
 
+  const materialId = design.materialId ?? eds.material.materialId;
+  const material = materialId ? getSpringMaterial(materialId) : undefined;
+  if (material) {
+    metrics.allow_shear_static = {
+      value: isFinite(material.allowShearStatic) ? Number(material.allowShearStatic.toFixed(0)) : "-",
+      unit: "MPa",
+      labelEn: "Allowable shear (static)",
+      labelZh: "许用剪应力（静态）",
+    };
+  } else {
+    findings.push({
+      id: "COMP_MATERIAL_STRENGTH_UNKNOWN",
+      level: "info",
+      titleEn: "Material strength data not available",
+      titleZh: "缺少材料强度数据",
+      detailEn: "Allowable stress utilization checks are skipped because material properties are missing.",
+      detailZh: "由于缺少材料属性，无法进行许用应力利用率检查。",
+      evidence: { materialId },
+    });
+  }
+
   if (analysis?.staticSafetyFactor !== undefined) {
     metrics.sf_static = {
       value: isFinite(analysis.staticSafetyFactor) ? Number(analysis.staticSafetyFactor.toFixed(3)) : "-",
@@ -204,6 +230,82 @@ export function buildCompressionDesignRuleReport(params: {
         detailZh: `可能提前贴圈/并高（L0 - x ≤ Ls）。压缩后长度 L=${Lwork.toFixed(2)}mm，Ls≈${solidHeightEst.toFixed(2)}mm。`,
         evidence: { L0, dx, Lwork, solidHeightEst, coilBindClearanceTarget },
       });
+    }
+  }
+
+  if (
+    material &&
+    analysis?.shearStress !== undefined &&
+    isFinite(analysis.shearStress) &&
+    isFinite(material.allowShearStatic) &&
+    material.allowShearStatic > 0
+  ) {
+    const tau = analysis.shearStress;
+    const util = tau / material.allowShearStatic;
+
+    metrics.shear_utilization = {
+      value: isFinite(util) ? Number(util.toFixed(3)) : "-",
+      labelEn: "Shear utilization τ/τ_allow",
+      labelZh: "剪应力利用率 τ/τ_allow",
+      noteEn: `Warn ≥ ${allowShearUtilWarn}, Fail ≥ ${allowShearUtilFail}`,
+      noteZh: `警告 ≥ ${allowShearUtilWarn}，失败 ≥ ${allowShearUtilFail}`,
+    };
+
+    if (util >= allowShearUtilFail) {
+      findings.push({
+        id: "COMP_ALLOW_SHEAR_EXCEEDED",
+        level: "error",
+        titleEn: "Allowable shear stress exceeded",
+        titleZh: "超过许用剪应力",
+        detailEn: `τ/τ_allow=${util.toFixed(2)} ≥ ${allowShearUtilFail}.` ,
+        detailZh: `剪应力利用率 τ/τ_allow=${util.toFixed(2)} ≥ ${allowShearUtilFail}。`,
+        evidence: { tau, allow: material.allowShearStatic, util, materialId: material.id },
+      });
+    } else if (util >= allowShearUtilWarn) {
+      findings.push({
+        id: "COMP_ALLOW_SHEAR_EXCEEDED",
+        level: "warning",
+        titleEn: "High shear utilization",
+        titleZh: "剪应力利用率偏高",
+        detailEn: `τ/τ_allow=${util.toFixed(2)} ≥ ${allowShearUtilWarn}.`,
+        detailZh: `剪应力利用率 τ/τ_allow=${util.toFixed(2)} ≥ ${allowShearUtilWarn}。`,
+        evidence: { tau, allow: material.allowShearStatic, util, materialId: material.id },
+      });
+    }
+  }
+
+  // Natural frequency (approx): f ≈ (1/2π)*sqrt(k/m_eff), m_eff≈m/3
+  // Uses estimated wire length ≈ π·Dm·Nt and material density if available.
+  if (material?.density !== undefined && isFinite(material.density) && material.density > 0) {
+    const kNperMm = analysis?.springRate;
+    if (kNperMm !== undefined && isFinite(kNperMm) && kNperMm > 0 && isFinite(Dm) && isFinite(d) && isFinite(Nt)) {
+      const kNperM = kNperMm * 1000;
+      const DmM = Dm / 1000;
+      const dM = d / 1000;
+      const wireLenM = Math.PI * DmM * Nt;
+      const wireAreaM2 = Math.PI * Math.pow(dM, 2) / 4;
+      const massKg = material.density * wireLenM * wireAreaM2;
+      const meff = massKg / 3;
+      const fHz = meff > 0 ? (1 / (2 * Math.PI)) * Math.sqrt(kNperM / meff) : NaN;
+
+      metrics.natural_freq_hz = {
+        value: isFinite(fHz) ? Number(fHz.toFixed(2)) : "-",
+        unit: "Hz",
+        labelEn: "Estimated natural frequency",
+        labelZh: "估算固有频率",
+      };
+
+      if (isFinite(fHz) && fHz < naturalFreqWarnHz) {
+        findings.push({
+          id: "COMP_NATURAL_FREQ_LOW",
+          level: "warning",
+          titleEn: "Low natural frequency (surge risk)",
+          titleZh: "固有频率偏低（可能共振）",
+          detailEn: `Estimated f≈${fHz.toFixed(1)}Hz < ${naturalFreqWarnHz}Hz. Consider guidance/damping or design changes.`,
+          detailZh: `估算固有频率 f≈${fHz.toFixed(1)}Hz < ${naturalFreqWarnHz}Hz，可能存在共振风险，可考虑导向/阻尼或调整设计。`,
+          evidence: { fHz, naturalFreqWarnHz, kNperMm, Nt, Dm, d, materialId: material.id },
+        });
+      }
     }
   }
 

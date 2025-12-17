@@ -33,6 +33,14 @@ export function buildExtensionDesignRuleReport(params: {
   const bodyLength = g.bodyLength;
   const xWork = a?.workingDeflection ?? 0;
 
+  const initialTension = a?.initialTension ?? g.initialTension;
+  const k = a?.springRate;
+  const preExtensionMm =
+    initialTension !== undefined && isFinite(initialTension) && initialTension > 0 &&
+    k !== undefined && isFinite(k) && k > 0 && a?.springRateUnit === "N/mm"
+      ? initialTension / k
+      : undefined;
+
   metrics.spring_index = {
     value: isFinite(C) ? Number(C.toFixed(3)) : "-",
     labelEn: "Spring Index C = Dm/d",
@@ -44,6 +52,22 @@ export function buildExtensionDesignRuleReport(params: {
     labelEn: "Extension ratio x/bodyLength",
     labelZh: "相对伸长 x/簧体长度",
   };
+
+  metrics.initial_tension = {
+    value: initialTension !== undefined && isFinite(initialTension) ? Number(initialTension.toFixed(3)) : "-",
+    unit: "N",
+    labelEn: "Initial tension Fi",
+    labelZh: "初张力 Fi",
+  };
+
+  if (preExtensionMm !== undefined) {
+    metrics.pre_extension = {
+      value: isFinite(preExtensionMm) ? Number(preExtensionMm.toFixed(3)) : "-",
+      unit: "mm",
+      labelEn: "Pre-extension Fi/k",
+      labelZh: "预伸长 Fi/k",
+    };
+  }
 
   if (!(isFinite(d) && d > 0) || !(isFinite(Dm) && Dm > d) || !(isFinite(g.activeCoils) && g.activeCoils > 0)) {
     findings.push({
@@ -83,9 +107,8 @@ export function buildExtensionDesignRuleReport(params: {
     }
   }
 
-  const initialTension = a?.initialTension ?? g.initialTension ?? 0;
   const hasLoadCurve = (a?.workingLoad ?? 0) > 0 || xWork > 0;
-  if (hasLoadCurve && !(isFinite(initialTension) && initialTension > 0)) {
+  if (hasLoadCurve && !(initialTension !== undefined && isFinite(initialTension) && initialTension > 0)) {
     findings.push({
       id: "EXT_INITIAL_TENSION_MISSING",
       level: "warning",
@@ -95,6 +118,23 @@ export function buildExtensionDesignRuleReport(params: {
       detailZh: "未指定初张力，载荷曲线可能不准确。",
       evidence: { field: "initialTension" },
     });
+  }
+
+  if (preExtensionMm !== undefined && isFinite(bodyLength) && bodyLength > 0) {
+    const ratio = preExtensionMm / bodyLength;
+    const low = designRulesDefaults.extension.initialTensionPreExtRatioLow;
+    const high = designRulesDefaults.extension.initialTensionPreExtRatioHigh;
+    if (isFinite(ratio) && (ratio < low || ratio > high)) {
+      findings.push({
+        id: "EXT_INITIAL_TENSION_WINDOW",
+        level: "warning",
+        titleEn: "Initial tension may be outside recommended window",
+        titleZh: "初张力可能超出推荐窗口",
+        detailEn: `Fi/k≈${preExtensionMm.toFixed(2)}mm, ratio=${ratio.toFixed(3)} outside recommended (${low}~${high}).`,
+        detailZh: `Fi/k≈${preExtensionMm.toFixed(2)}mm，比例=${ratio.toFixed(3)} 超出推荐范围（${low}~${high}）。`,
+        evidence: { field: "initialTension", preExtensionMm, ratio, low, high },
+      });
+    }
   }
 
   if (isFinite(bodyLength) && bodyLength > 0 && isFinite(xWork) && xWork > 0) {
