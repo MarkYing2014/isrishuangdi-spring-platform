@@ -28,6 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { DimensionHint } from "./DimensionHint";
 import { MaterialSelector } from "./MaterialSelector";
 import { StressAnalysisCard } from "./StressAnalysisCard";
@@ -71,7 +72,10 @@ export function CompressionCalculator() {
   const storedGeometry = useSpringDesignStore((state) => state.geometry);
   const storedMaterial = useSpringDesignStore((state) => state.material);
   const storedAnalysis = useSpringDesignStore((state) => state.analysisResult);
+  const storedEds = useSpringDesignStore((state) => state.eds);
   const setDesign = useSpringDesignStore((state) => state.setDesign);
+  const updateCompressionPpap = useSpringDesignStore((state) => state.updateCompressionPpap);
+  const updateCompressionProcessRoute = useSpringDesignStore((state) => state.updateCompressionProcessRoute);
 
   const lastCompressionGeometry = storedGeometry?.type === "compression" ? storedGeometry : null;
   const lastCompressionAnalysis = lastCompressionGeometry ? storedAnalysis : null;
@@ -198,7 +202,7 @@ export function CompressionCalculator() {
   const onSubmit: SubmitHandler<FormValues> = (values) => {
     setError(null);
     try {
-      const eds = toEdsFromLegacyForm({
+      const eds0 = toEdsFromLegacyForm({
         wireDiameter: values.wireDiameter,
         meanDiameter: values.meanDiameter,
         activeCoils: values.activeCoils,
@@ -209,6 +213,15 @@ export function CompressionCalculator() {
         bottomGround: values.bottomGround,
         materialId: selectedMaterial.id,
       });
+
+      const eds =
+        storedEds && storedEds.type === "compression"
+          ? {
+              ...eds0,
+              quality: storedEds.quality,
+              process: storedEds.process,
+            }
+          : eds0;
 
       const resolved = resolveCompressionNominal(eds);
       const design: SpringDesign = resolved.design;
@@ -300,6 +313,10 @@ export function CompressionCalculator() {
   };
 
   const formatNumber = (value: number) => Number(value.toFixed(2)).toLocaleString();
+
+  const compressionPpap = storedEds?.type === "compression" ? storedEds.quality?.ppap : undefined;
+  const compressionRoute = storedEds?.type === "compression" ? storedEds.process?.route ?? [] : [];
+  const compressionCtq = compressionPpap?.ctq ?? [];
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -472,6 +489,259 @@ export function CompressionCalculator() {
                 <input type="checkbox" {...form.register("bottomGround")} /> Bottom ground / 底端磨平
               </label>
             </div>
+
+            <details className="rounded-md border border-slate-200 bg-slate-50 p-3">
+              <summary className="cursor-pointer text-sm font-medium text-slate-700">
+                PPAP / 工艺与质量
+              </summary>
+              <div className="mt-3 space-y-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Customer / 客户</Label>
+                    <Input
+                      value={compressionPpap?.customer ?? ""}
+                      onChange={(e) => updateCompressionPpap({ customer: e.target.value })}
+                      disabled={storedEds?.type !== "compression"}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Part Number / 零件号</Label>
+                    <Input
+                      value={compressionPpap?.partNumber ?? ""}
+                      onChange={(e) => updateCompressionPpap({ partNumber: e.target.value })}
+                      disabled={storedEds?.type !== "compression"}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Revision / 版本</Label>
+                    <Input
+                      value={compressionPpap?.rev ?? ""}
+                      onChange={(e) => updateCompressionPpap({ rev: e.target.value })}
+                      disabled={storedEds?.type !== "compression"}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Submission Level / 提交等级</Label>
+                    <Input
+                      value={compressionPpap?.submissionLevel ?? ""}
+                      onChange={(e) => updateCompressionPpap({ submissionLevel: e.target.value })}
+                      disabled={storedEds?.type !== "compression"}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>CTQ / 关键特性</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        updateCompressionPpap({
+                          ctq: [...compressionCtq, { characteristic: "", spec: "", method: "", frequency: "", reactionPlan: "" }],
+                        })
+                      }
+                      disabled={storedEds?.type !== "compression"}
+                    >
+                      Add
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {compressionCtq.map((c, idx) => (
+                      <div key={idx} className="rounded-md border border-slate-200 bg-white p-3">
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label>Characteristic</Label>
+                            <Input
+                              value={c.characteristic ?? ""}
+                              onChange={(e) => {
+                                const next = compressionCtq.slice();
+                                next[idx] = { ...next[idx], characteristic: e.target.value };
+                                updateCompressionPpap({ ctq: next });
+                              }}
+                              disabled={storedEds?.type !== "compression"}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Spec</Label>
+                            <Input
+                              value={c.spec ?? ""}
+                              onChange={(e) => {
+                                const next = compressionCtq.slice();
+                                next[idx] = { ...next[idx], spec: e.target.value };
+                                updateCompressionPpap({ ctq: next });
+                              }}
+                              disabled={storedEds?.type !== "compression"}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Method</Label>
+                            <Input
+                              value={c.method ?? ""}
+                              onChange={(e) => {
+                                const next = compressionCtq.slice();
+                                next[idx] = { ...next[idx], method: e.target.value };
+                                updateCompressionPpap({ ctq: next });
+                              }}
+                              disabled={storedEds?.type !== "compression"}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Frequency</Label>
+                            <Input
+                              value={c.frequency ?? ""}
+                              onChange={(e) => {
+                                const next = compressionCtq.slice();
+                                next[idx] = { ...next[idx], frequency: e.target.value };
+                                updateCompressionPpap({ ctq: next });
+                              }}
+                              disabled={storedEds?.type !== "compression"}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-3 space-y-2">
+                          <Label>Reaction Plan</Label>
+                          <Textarea
+                            value={c.reactionPlan ?? ""}
+                            onChange={(e) => {
+                              const next = compressionCtq.slice();
+                              next[idx] = { ...next[idx], reactionPlan: e.target.value };
+                              updateCompressionPpap({ ctq: next });
+                            }}
+                            disabled={storedEds?.type !== "compression"}
+                          />
+                        </div>
+
+                        <div className="mt-3 flex justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const next = compressionCtq.slice();
+                              next.splice(idx, 1);
+                              updateCompressionPpap({ ctq: next });
+                            }}
+                            disabled={storedEds?.type !== "compression"}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Process Route / 工艺路线</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        updateCompressionProcessRoute([
+                          ...compressionRoute,
+                          { stepName: "", machine: "", keyParams: "", operatorCheck: "", inProcessCheck: "" },
+                        ])
+                      }
+                      disabled={storedEds?.type !== "compression"}
+                    >
+                      Add
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {compressionRoute.map((s, idx) => (
+                      <div key={idx} className="rounded-md border border-slate-200 bg-white p-3">
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label>Step</Label>
+                            <Input
+                              value={s.stepName ?? ""}
+                              onChange={(e) => {
+                                const next = compressionRoute.slice();
+                                next[idx] = { ...next[idx], stepName: e.target.value };
+                                updateCompressionProcessRoute(next);
+                              }}
+                              disabled={storedEds?.type !== "compression"}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Machine</Label>
+                            <Input
+                              value={s.machine ?? ""}
+                              onChange={(e) => {
+                                const next = compressionRoute.slice();
+                                next[idx] = { ...next[idx], machine: e.target.value };
+                                updateCompressionProcessRoute(next);
+                              }}
+                              disabled={storedEds?.type !== "compression"}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Key Params</Label>
+                            <Input
+                              value={s.keyParams ?? ""}
+                              onChange={(e) => {
+                                const next = compressionRoute.slice();
+                                next[idx] = { ...next[idx], keyParams: e.target.value };
+                                updateCompressionProcessRoute(next);
+                              }}
+                              disabled={storedEds?.type !== "compression"}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Operator Check</Label>
+                            <Input
+                              value={s.operatorCheck ?? ""}
+                              onChange={(e) => {
+                                const next = compressionRoute.slice();
+                                next[idx] = { ...next[idx], operatorCheck: e.target.value };
+                                updateCompressionProcessRoute(next);
+                              }}
+                              disabled={storedEds?.type !== "compression"}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-3 space-y-2">
+                          <Label>In-process Check</Label>
+                          <Textarea
+                            value={s.inProcessCheck ?? ""}
+                            onChange={(e) => {
+                              const next = compressionRoute.slice();
+                              next[idx] = { ...next[idx], inProcessCheck: e.target.value };
+                              updateCompressionProcessRoute(next);
+                            }}
+                            disabled={storedEds?.type !== "compression"}
+                          />
+                        </div>
+
+                        <div className="mt-3 flex justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const next = compressionRoute.slice();
+                              next.splice(idx, 1);
+                              updateCompressionProcessRoute(next);
+                            }}
+                            disabled={storedEds?.type !== "compression"}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </details>
 
             <Button 
               type="submit" 

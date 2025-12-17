@@ -15,7 +15,12 @@ import { persist } from "zustand/middleware";
 import type { SpringType, ExtensionHookType } from "@/lib/springTypes";
 import type { SpringMaterialId } from "@/lib/materials/springMaterials";
 import type { SpiralSpringMaterial } from "@/lib/spring3d/spiralSpringMaterials";
-import type { CompressionSpringEds, SpringEds } from "@/lib/eds/engineeringDefinition";
+import type {
+  CompressionPpap,
+  CompressionProcessStep,
+  CompressionSpringEds,
+  SpringEds,
+} from "@/lib/eds/engineeringDefinition";
 import { resolveCompressionNominal } from "@/lib/eds/compressionResolver";
 import { toEdsFromLegacyForm } from "@/lib/eds/legacyAdapters";
 import type { CompressionSpringDesign } from "@/lib/springTypes";
@@ -249,6 +254,9 @@ interface SpringDesignState {
   setMeta: (meta: Partial<DesignMeta>) => void;
 
   setEds: (eds: SpringEds | null) => void;
+
+  updateCompressionPpap: (ppap: Partial<CompressionPpap>) => void;
+  updateCompressionProcessRoute: (route: CompressionProcessStep[]) => void;
   
   /** 
    * 完整设置（计算器使用）
@@ -503,6 +511,37 @@ export const useSpringDesignStore = create<SpringDesignState>()(
           geometry: nextGeometry,
           analysisResult: nextAnalysis,
           hasValidDesign: !!(nextGeometry && get().material && nextAnalysis),
+        });
+      },
+
+      updateCompressionPpap: (ppap) => {
+        const current = get().eds;
+        if (!current || current.type !== "compression") return;
+        set({
+          eds: {
+            ...current,
+            quality: {
+              ...(current.quality ?? {}),
+              ppap: {
+                ...(current.quality?.ppap ?? {}),
+                ...ppap,
+              },
+            },
+          },
+        });
+      },
+
+      updateCompressionProcessRoute: (route) => {
+        const current = get().eds;
+        if (!current || current.type !== "compression") return;
+        set({
+          eds: {
+            ...current,
+            process: {
+              ...(current.process ?? {}),
+              route,
+            },
+          },
         });
       },
       

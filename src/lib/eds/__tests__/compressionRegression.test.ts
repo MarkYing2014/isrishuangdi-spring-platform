@@ -73,10 +73,13 @@ describe("EDS compression regression", () => {
         bottomGround: nominal.bottomGround,
       },
       quality: {
-        inspectionLevel: "V1",
+        ppap: {
+          customer: "V1",
+          ctq: [{ characteristic: "L0" }],
+        },
       },
       process: {
-        route: "V1",
+        route: [{ stepName: "coil" }],
       },
     };
 
@@ -218,8 +221,8 @@ describe("EDS compression regression", () => {
           tolerance: { plus: 0.02, minus: 0 },
         },
       },
-      quality: { ppap: "reserved" },
-      process: { route: "reserved" },
+      quality: { ppap: { customer: "reserved", ctq: [{ characteristic: "k" }] } },
+      process: { route: [{ stepName: "reserved" }] },
     };
 
     useSpringDesignStore.getState().setEds(edsWithExtra);
@@ -243,6 +246,120 @@ describe("EDS compression regression", () => {
 
     const summary1 = geometrySummary(g1);
     g1.tubeGeometry.dispose();
+
+    expect(summary1).toEqual(summary0);
+  });
+
+  test("updating PPAP/process fields does not change geometry summary nor analysisResult", () => {
+    useSpringDesignStore.getState().clear();
+
+    const geometry = {
+      type: "compression" as const,
+      wireDiameter: 3.2,
+      meanDiameter: 24,
+      activeCoils: 8,
+      totalCoils: 10,
+      freeLength: 50,
+      topGround: true,
+      bottomGround: true,
+      shearModulus: 79300,
+      materialId: "music_wire_a228" as const,
+    };
+
+    const material = {
+      id: "music_wire_a228" as const,
+      name: "Music Wire",
+      shearModulus: 79300,
+      elasticModulus: 200000,
+      density: 7850,
+    };
+
+    const analysisResult = {
+      springRate: 0,
+      springRateUnit: "N/mm" as const,
+      workingDeflection: 10,
+      maxDeflection: 10,
+    };
+
+    useSpringDesignStore.getState().setDesign({
+      springType: "compression",
+      geometry,
+      material,
+      analysisResult,
+      meta: { designCode: "T" },
+    });
+
+    const s0 = useSpringDesignStore.getState();
+    const a0 = s0.analysisResult;
+    const g0 = s0.geometry;
+    if (!a0) throw new Error("missing analysisResult");
+    if (!g0 || g0.type !== "compression") throw new Error("missing compression geometry");
+
+    const geom0 = buildCompressionSpringGeometry(
+      {
+        totalCoils: g0.totalCoils,
+        activeCoils: g0.activeCoils,
+        meanDiameter: g0.meanDiameter,
+        wireDiameter: g0.wireDiameter,
+        freeLength: g0.freeLength,
+        currentDeflection: a0.workingDeflection ?? 0,
+        scale: 1,
+      },
+      a0.springRate
+    );
+    const summary0 = geometrySummary(geom0);
+    geom0.tubeGeometry.dispose();
+
+    useSpringDesignStore.getState().updateCompressionPpap({
+      customer: "ACME",
+      partNumber: "PN-001",
+      rev: "A",
+      submissionLevel: "L3",
+      ctq: [
+        {
+          characteristic: "L0",
+          spec: "50±0.5",
+          method: "height gauge",
+          frequency: "per batch",
+          reactionPlan: "isolate + recheck",
+        },
+      ],
+    });
+
+    useSpringDesignStore.getState().updateCompressionProcessRoute([
+      {
+        stepName: "cut",
+        machine: "Cutter",
+        keyParams: "length",
+        operatorCheck: "visual",
+        inProcessCheck: "sample",
+      },
+      { stepName: "coil" },
+    ]);
+
+    const s1 = useSpringDesignStore.getState();
+    expect(s1.analysisResult).toEqual(a0);
+    expect(s1.geometry).toEqual(g0);
+
+    const a1 = s1.analysisResult;
+    const g1 = s1.geometry;
+    if (!a1) throw new Error("missing analysisResult");
+    if (!g1 || g1.type !== "compression") throw new Error("missing compression geometry");
+
+    const geom1 = buildCompressionSpringGeometry(
+      {
+        totalCoils: g1.totalCoils,
+        activeCoils: g1.activeCoils,
+        meanDiameter: g1.meanDiameter,
+        wireDiameter: g1.wireDiameter,
+        freeLength: g1.freeLength,
+        currentDeflection: a1.workingDeflection ?? 0,
+        scale: 1,
+      },
+      a1.springRate
+    );
+    const summary1 = geometrySummary(geom1);
+    geom1.tubeGeometry.dispose();
 
     expect(summary1).toEqual(summary0);
   });

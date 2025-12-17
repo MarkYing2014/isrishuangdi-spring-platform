@@ -20,6 +20,38 @@ export type CompressionEngineeringFlags = {
   bottomGround?: boolean;
 };
 
+export type CompressionPpapCtq = {
+  characteristic: string;
+  spec?: string;
+  method?: string;
+  frequency?: string;
+  reactionPlan?: string;
+};
+
+export type CompressionPpap = {
+  customer?: string;
+  partNumber?: string;
+  rev?: string;
+  submissionLevel?: string;
+  ctq?: CompressionPpapCtq[];
+};
+
+export type CompressionQuality = {
+  ppap?: CompressionPpap;
+};
+
+export type CompressionProcessStep = {
+  stepName: string;
+  machine?: string;
+  keyParams?: string;
+  operatorCheck?: string;
+  inProcessCheck?: string;
+};
+
+export type CompressionProcess = {
+  route?: CompressionProcessStep[];
+};
+
 export type CompressionSpringEds = {
   type: "compression";
   geometry: {
@@ -34,8 +66,8 @@ export type CompressionSpringEds = {
     shearModulus: EngineeringValueNumber;
   };
   flags?: CompressionEngineeringFlags;
-  quality?: Record<string, unknown>;
-  process?: Record<string, unknown>;
+  quality?: CompressionQuality;
+  process?: CompressionProcess;
 };
 
 export type SpringEds = CompressionSpringEds;
