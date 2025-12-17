@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { buildCompressionPpapReport } from "@/lib/reports/compressionPpapReport";
 import { DimensionHint } from "./DimensionHint";
 import { MaterialSelector } from "./MaterialSelector";
 import { StressAnalysisCard } from "./StressAnalysisCard";
@@ -73,6 +74,7 @@ export function CompressionCalculator() {
   const storedMaterial = useSpringDesignStore((state) => state.material);
   const storedAnalysis = useSpringDesignStore((state) => state.analysisResult);
   const storedEds = useSpringDesignStore((state) => state.eds);
+  const storedResolved = useSpringDesignStore((state) => state.resolved);
   const setDesign = useSpringDesignStore((state) => state.setDesign);
   const updateCompressionPpap = useSpringDesignStore((state) => state.updateCompressionPpap);
   const updateCompressionProcessRoute = useSpringDesignStore((state) => state.updateCompressionProcessRoute);
@@ -317,6 +319,39 @@ export function CompressionCalculator() {
   const compressionPpap = storedEds?.type === "compression" ? storedEds.quality?.ppap : undefined;
   const compressionRoute = storedEds?.type === "compression" ? storedEds.process?.route ?? [] : [];
   const compressionCtq = compressionPpap?.ctq ?? [];
+
+  const previewPpapHtml = async () => {
+    if (!storedEds || storedEds.type !== "compression" || !storedResolved || storedResolved.type !== "compression" || !storedAnalysis) {
+      alert("请先计算一次（生成 analysisResult）后再预览 PPAP 报告。");
+      return;
+    }
+
+    const model = buildCompressionPpapReport(
+      storedEds,
+      { design: storedResolved.design, issues: storedResolved.issues },
+      storedAnalysis
+    );
+
+    const res = await fetch("/api/reports/compression-ppap?format=html", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(model),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(text || `HTTP ${res.status}`);
+    }
+
+    const html = await res.text();
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  };
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -739,6 +774,21 @@ export function CompressionCalculator() {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      previewPpapHtml().catch((e) => {
+                        alert(e instanceof Error ? e.message : "Failed to generate report");
+                      });
+                    }}
+                    disabled={storedEds?.type !== "compression" || !storedResolved || storedResolved.type !== "compression" || !storedAnalysis}
+                  >
+                    Preview PPAP (HTML)
+                  </Button>
                 </div>
               </div>
             </details>
