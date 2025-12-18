@@ -146,6 +146,207 @@ export default function AboutPage() {
       <section className="space-y-4">
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold tracking-tight">
+            <LanguageText en="Typical Customer Scenarios" zh="典型客户场景" />
+          </h2>
+          <p className="max-w-3xl text-slate-600">
+            <LanguageText
+              en="Three common situations where teams need fast, evidence-based decisions."
+              zh="三类最常见的现场场景：你需要更快、更可追溯的决策。"
+            />
+          </p>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Cog className="size-5 text-slate-700" />
+                <LanguageText en="New Program Launch" zh="新项目导入" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-slate-600">
+              <p>
+                <LanguageText
+                  en="Before SOP, you need to know what will break first: manufacturability, risk drivers, and which actions matter."
+                  zh="量产导入前，需要明确：哪里最先出问题、风险驱动因子是什么、先改哪几项最有效。"
+                />
+              </p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>
+                  <LanguageText
+                    en="Output: risk badge + drivers + prioritized actions"
+                    zh="输出：风险结论 + 驱动因子 + 优先动作清单"
+                  />
+                </li>
+                <li>
+                  <LanguageText
+                    en="Reduce PPAP rejections and avoid late design changes"
+                    zh="减少 PPAP 被打回，避免后期被迫改设计"
+                  />
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="size-5 text-slate-700" />
+                <LanguageText en="Mass Production Fluctuation" zh="量产波动" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-slate-600">
+              <p>
+                <LanguageText
+                  en="Scrap rate spikes, alarms increase, and quality drifts — but the team can’t tell whether it’s machine, process, or design."
+                  zh="报废率上升、报警变多、质量漂移，但难判断是机台、工艺还是设计问题。"
+                />
+              </p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>
+                  <LanguageText
+                    en="Correlate anomalies with machine, batch, and time window"
+                    zh="将异常与机台、批次、时间窗口直接关联"
+                  />
+                </li>
+                <li>
+                  <LanguageText
+                    en="Make root-cause investigation systematic and faster"
+                    zh="把根因排查系统化，并显著提速"
+                  />
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="size-5 text-slate-700" />
+                <LanguageText en="Customer Audit & PPAP" zh="客户审核与 PPAP" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-slate-600">
+              <p>
+                <LanguageText
+                  en="When customers ask for evidence, the bottleneck is not analysis — it’s assembling consistent, auditable documentation."
+                  zh="客户要证据时，瓶颈往往不是计算，而是整理一致、可审核的文档与报告。"
+                />
+              </p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>
+                  <LanguageText
+                    en="One-click evidence pack: SPC + capability + audit-ready PDF"
+                    zh="一键证据包：SPC + 能力分析 + 可审核 PDF"
+                  />
+                </li>
+                <li>
+                  <LanguageText
+                    en="Traceable results that auditors can review and sign"
+                    zh="结果可追溯、可复核、可签署"
+                  />
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight">
+            <LanguageText en="Pilot Timeline" zh="Pilot 时间线" />
+          </h2>
+          <p className="max-w-3xl text-slate-600">
+            <LanguageText
+              en="A practical 4-step process to reach measurable outcomes in 2–4 weeks."
+              zh="一个可落地的 4 步流程，通常 2–4 周交付可量化结果。"
+            />
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-xl border border-slate-200 bg-white/80 p-4">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 inline-flex size-7 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                1
+              </span>
+              <div>
+                <p className="font-semibold text-slate-900">
+                  <LanguageText en="Scope & Success Metrics" zh="范围与成功指标" />
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  <LanguageText
+                    en="Define product family, line, and KPI (scrap, FPY, PPAP cycle time)."
+                    zh="确定产品族、产线与 KPI（报废、FPY、PPAP 周期）。"
+                  />
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white/80 p-4">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 inline-flex size-7 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                2
+              </span>
+              <div>
+                <p className="font-semibold text-slate-900">
+                  <LanguageText en="Ingest Specs & Data" zh="导入规范与数据" />
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  <LanguageText
+                    en="Onboard drawings/specs + one dataset (SPC or inspection) and map fields."
+                    zh="导入图纸/规范 + 1 份数据（SPC 或检验），并完成字段映射。"
+                  />
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white/80 p-4">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 inline-flex size-7 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                3
+              </span>
+              <div>
+                <p className="font-semibold text-slate-900">
+                  <LanguageText en="Run Risk + Evidence" zh="输出风险与证据" />
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  <LanguageText
+                    en="Generate risk radar, drivers, and an audit-ready quality evidence pack."
+                    zh="生成风险雷达、驱动因子，并输出可审核的质量证据包。"
+                  />
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white/80 p-4">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 inline-flex size-7 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                4
+              </span>
+              <div>
+                <p className="font-semibold text-slate-900">
+                  <LanguageText en="Deliver ROI & Rollout Plan" zh="交付 ROI 与上线计划" />
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  <LanguageText
+                    en="Review results, quantify ROI, and define the next integration path (CSV/API/MES)."
+                    zh="复盘结果、量化 ROI，并明确下一步接入路径（CSV/API/MES）。"
+                  />
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight">
             <LanguageText en="What You Get" zh="你能拿到什么（Deliverables）" />
           </h2>
           <p className="max-w-3xl text-slate-600">
