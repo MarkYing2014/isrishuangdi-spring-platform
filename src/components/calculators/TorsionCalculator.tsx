@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { DimensionHint } from "./DimensionHint";
 import { MaterialSelector } from "./MaterialSelector";
+import { Calculator3DPreview } from "./Calculator3DPreview";
 import { 
   type SpringMaterialId, 
   type SpringMaterial,
@@ -728,6 +729,13 @@ export function TorsionCalculator() {
             >
               <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
             </Button>
+          </div>
+
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">3D Preview / 3D 预览</p>
+            <div className="mt-3">
+              <Calculator3DPreview expectedType="torsion" />
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { DimensionHint } from "./DimensionHint";
 import { MaterialSelector } from "./MaterialSelector";
+import { Calculator3DPreview } from "./Calculator3DPreview";
 import { 
   useSpringDesignStore,
   type ConicalGeometry,
@@ -704,9 +705,16 @@ export function ConicalCalculator() {
               <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
             </Button>
           </div>
-          <p className="text-center text-xs text-slate-500">
-            3D model uses equivalent cylindrical spring / 3D模型使用等效圆柱弹簧
-          </p>
+
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">3D Preview / 3D 预览</p>
+            <p className="mt-1 text-center text-xs text-slate-500">
+              3D model uses equivalent cylindrical spring / 3D模型使用等效圆柱弹簧
+            </p>
+            <div className="mt-3">
+              <Calculator3DPreview expectedType="conical" />
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

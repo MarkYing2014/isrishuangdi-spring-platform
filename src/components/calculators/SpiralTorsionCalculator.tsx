@@ -41,6 +41,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DimensionHint } from "./DimensionHint";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
+import { Calculator3DPreview } from "./Calculator3DPreview";
 import {
   Select,
   SelectContent,
@@ -1337,6 +1338,13 @@ export function SpiralTorsionCalculator() {
               Export CAD / 导出 CAD
               {results?.operatingStatus === "EXCEEDED" && " ⚠️"}
             </Button>
+          </div>
+
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">3D Preview / 3D 预览</p>
+            <div className="mt-3">
+              <Calculator3DPreview expectedType="spiralTorsion" />
+            </div>
           </div>
         </CardContent>
       </Card>
