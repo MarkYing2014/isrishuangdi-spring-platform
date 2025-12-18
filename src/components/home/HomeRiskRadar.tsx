@@ -37,6 +37,23 @@ function overallStatusLabel(status: RadarOverallStatus): { en: string; zh: strin
   }
 }
 
+function springTypeLabel(geometryType: string | null | undefined): { en: string; zh: string } {
+  switch (geometryType) {
+    case "compression":
+      return { en: "Compression Spring", zh: "压缩弹簧" };
+    case "extension":
+      return { en: "Extension Spring", zh: "拉伸弹簧" };
+    case "torsion":
+      return { en: "Torsion Spring", zh: "扭转弹簧" };
+    case "conical":
+      return { en: "Conical Spring", zh: "圆锥弹簧" };
+    case "spiralTorsion":
+      return { en: "Spiral Torsion Spring", zh: "螺旋扭簧" };
+    default:
+      return { en: "Unknown Spring", zh: "未知弹簧" };
+  }
+}
+
 function overallStatusTone(status: RadarOverallStatus): { bg: string; text: string; border: string } {
   switch (status) {
     case "ENGINEERING_OK":
@@ -175,6 +192,10 @@ export function HomeRiskRadar() {
   }, [geometry, analysisResult, eds, resolved]);
 
   const isDemo = !geometry;
+  const currentSpringTypeLabel = useMemo(() => {
+    if (!geometry) return null;
+    return springTypeLabel(geometry.type);
+  }, [geometry]);
 
   const chartData = useMemo(() => {
     const labels =
@@ -216,12 +237,23 @@ export function HomeRiskRadar() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold">
-            <LanguageText en={isDemo ? "Radar demo" : "Radar (live design)"} zh={isDemo ? "雷达示例" : "雷达（当前设计）"} />
+            <LanguageText
+              en={isDemo ? "Radar demo" : `Radar (live: ${currentSpringTypeLabel?.en ?? "Unknown Spring"})`}
+              zh={isDemo ? "雷达示例" : `雷达（当前设计：${currentSpringTypeLabel?.zh ?? "未知弹簧"}）`}
+            />
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             <LanguageText
-              en={isDemo ? "Showing a demo radar. Run a calculator to see live risk." : "Built from the current design in SpringDesignStore."}
-              zh={isDemo ? "当前显示示例雷达。请在任一计算器计算后查看实时风险。" : "基于 SpringDesignStore 的当前设计生成。"}
+              en={
+                isDemo
+                  ? "Showing a demo radar. Run a calculator to see live risk."
+                  : `Built from the current ${currentSpringTypeLabel?.en ?? "spring"} in SpringDesignStore.`
+              }
+              zh={
+                isDemo
+                  ? "当前显示示例雷达。请在任一计算器计算后查看实时风险。"
+                  : `基于 SpringDesignStore 的当前设计（${currentSpringTypeLabel?.zh ?? "未知弹簧"}）生成。`
+              }
             />
           </p>
         </div>
