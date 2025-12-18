@@ -16,7 +16,7 @@ export function SiteFooter() {
           © {year} ISRI-SHUANGDI. All rights reserved.
         </p>
         <p className="text-xs text-slate-500">
-          Developed by: markying2014@gmail.com
+          Business contact / 商务联系: <a className="underline" href="mailto:markying2014@gmail.com">markying2014@gmail.com</a>
         </p>
       </div>
     </footer>

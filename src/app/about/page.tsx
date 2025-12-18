@@ -63,6 +63,12 @@ export default function AboutPage() {
               </a>
             </Button>
           </div>
+          <p className="text-xs text-slate-500">
+            <LanguageText en="Business contact:" zh="商务联系：" />{" "}
+            <a className="underline" href="mailto:markying2014@gmail.com">
+              markying2014@gmail.com
+            </a>
+          </p>
         </div>
       </section>
 
@@ -565,6 +571,12 @@ export default function AboutPage() {
               </a>
             </Button>
           </div>
+          <p className="text-xs text-slate-500">
+            <LanguageText en="Business contact:" zh="商务联系：" />{" "}
+            <a className="underline" href="mailto:markying2014@gmail.com">
+              markying2014@gmail.com
+            </a>
+          </p>
         </div>
       </section>
     </div>
