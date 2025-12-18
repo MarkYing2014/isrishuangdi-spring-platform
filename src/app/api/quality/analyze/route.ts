@@ -57,7 +57,13 @@ export async function POST(req: NextRequest) {
 
     const dataset = await loadDataset(body.datasetId);
     if (!dataset) {
-      return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
+      return NextResponse.json(
+        {
+          error:
+            "Dataset not found. If running on serverless, tmp filesystem is not durable across requests/instances. Please re-upload, or configure QUALITY_DATA_DIR to a persistent writable path when self-hosting.",
+        },
+        { status: 404 }
+      );
     }
 
     const defaultMapping = dataset.inferredMapping ?? inferMapping(dataset.headers).mapping;

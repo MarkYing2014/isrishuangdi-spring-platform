@@ -250,7 +250,12 @@ export default function QualityPage() {
 
       const text = await res.text();
       if (!res.ok) {
-        setError(text || "Failed to generate HTML report");
+        try {
+          const parsed = JSON.parse(text) as { error?: string };
+          setError(parsed?.error || text || "Failed to generate HTML report");
+        } catch {
+          setError(text || "Failed to generate HTML report");
+        }
         return;
       }
 
