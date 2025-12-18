@@ -764,7 +764,7 @@ export function ArcSpringCalculator() {
                   />
                 </div>
               </div>
-              <div className="h-[360px] rounded-lg overflow-hidden bg-gradient-to-b from-slate-800 to-slate-900">
+              <div className="h-[360px] rounded-lg overflow-hidden bg-slate-50">
                 <ArcSpringVisualizer
                   d={input.d}
                   D={input.D}

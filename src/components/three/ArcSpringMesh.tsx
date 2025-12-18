@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Edges, Line } from "@react-three/drei";
 import * as THREE from "three";
+import { previewTheme } from "@/lib/three/previewTheme";
 import {
   createArcSpringTubeGeometry,
   validateArcSpringGeometry,
@@ -97,8 +98,8 @@ export function ArcSpringMesh({
   approxTauMax,
   approxStressBeta = 0.25,
   color = "#6b9bd1",
-  metalness = 0.05,
-  roughness = 0.45,
+  metalness = previewTheme.material.spring.metalness,
+  roughness = previewTheme.material.spring.roughness,
   wireframe = false,
   showCenterline = false,
 }: ArcSpringMeshProps) {
@@ -268,11 +269,11 @@ function ArcSpringScene({
 
   return (
     <>
-      <color attach="background" args={["#0b1220"]} />
-      <ambientLight intensity={0.9} />
-      <directionalLight position={[200, -200, 300]} intensity={1.2} />
-      <directionalLight position={[-200, 150, 120]} intensity={0.6} />
-      <pointLight position={[0, 100, 50]} intensity={0.5} />
+      <color attach="background" args={[previewTheme.background]} />
+      <ambientLight intensity={previewTheme.lights.ambient} />
+      <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} />
+      <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
+      <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
 
       <group ref={groupRef}>
         <ArcSpringMesh

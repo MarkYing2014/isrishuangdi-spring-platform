@@ -4,13 +4,15 @@ import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment } from "@react-three/drei";
 
+import { previewTheme } from "@/lib/three/previewTheme";
+
 function SceneContent({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <color attach="background" args={["#0b1220"]} />
-      <ambientLight intensity={0.7} />
-      <directionalLight position={[3, 5, 2]} intensity={1} />
-      <directionalLight position={[-3, -2, -1]} intensity={0.3} />
+      <color attach="background" args={[previewTheme.background]} />
+      <ambientLight intensity={previewTheme.lights.ambient} />
+      <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} />
+      <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
       <group position={[0, -0.2, 0]}>{children}</group>
       <Suspense fallback={null}>
         <Environment preset="city" />
@@ -34,7 +36,7 @@ export function BasicScene({ children }: { children: React.ReactNode }) {
         frameloop="always"
         dpr={[1, 2]}
         onCreated={({ gl }) => {
-          gl.setClearColor("#0b1220");
+          gl.setClearColor(previewTheme.background);
         }}
       >
         <SceneContent>{children}</SceneContent>

@@ -14,6 +14,7 @@ import { OrbitControls, Edges } from "@react-three/drei";
 import * as THREE from "three";
 import { useFeaStore } from "@/lib/stores/feaStore";
 import { applyFeaColors } from "@/lib/fea/feaTypes";
+import { previewTheme } from "@/lib/three/previewTheme";
 import {
   createSpiralTorsionSpringGeometry,
   validateSpiralTorsionGeometry,
@@ -68,8 +69,8 @@ export function SpiralTorsionSpringMesh({
   handedness = "cw",
   steps = 800,
   color = "#6b9bd1",
-  metalness = 0.05,
-  roughness = 0.45,
+  metalness = previewTheme.material.spring.metalness,
+  roughness = previewTheme.material.spring.roughness,
   wireframe = false,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
@@ -129,8 +130,8 @@ export function SpiralTorsionSpringMesh({
     >
       <meshStandardMaterial
         color={validation.valid ? (isFeaMode ? "#ffffff" : color) : "#ff4444"}
-        metalness={isFeaMode ? 0.3 : metalness}
-        roughness={isFeaMode ? 0.7 : roughness}
+        metalness={isFeaMode ? previewTheme.material.fea.metalness : metalness}
+        roughness={isFeaMode ? previewTheme.material.fea.roughness : roughness}
         wireframe={wireframe}
         side={THREE.DoubleSide}
         vertexColors={isFeaMode}
@@ -234,14 +235,12 @@ function SpiralTorsionScene({
 
   return (
     <>
-      {/* 背景色 */}
-      <color attach="background" args={["#0b1220"]} />
+      <color attach="background" args={[previewTheme.background]} />
       
-      {/* 光照 - 按 OpenAI 建议增强 */}
-      <ambientLight intensity={0.9} />
-      <directionalLight position={[200, -200, 300]} intensity={1.2} />
-      <directionalLight position={[-200, 150, 120]} intensity={0.6} />
-      <pointLight position={[0, 100, 50]} intensity={0.5} />
+      <ambientLight intensity={previewTheme.lights.ambient} />
+      <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} castShadow />
+      <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
+      <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
       
       {/* 螺旋扭转弹簧网格 */}
       <group ref={groupRef} rotation={[Math.PI / 2, 0, 0]}>
@@ -254,10 +253,12 @@ function SpiralTorsionScene({
           handedness={handedness}
           scale={scaleFactor}
           color="#6b9bd1"
-          metalness={0.05}
-          roughness={0.45}
+          metalness={previewTheme.material.spring.metalness}
+          roughness={previewTheme.material.spring.roughness}
         />
       </group>
+
+      <gridHelper args={[100, 20, previewTheme.grid.major, previewTheme.grid.minor]} position={[0, -20, 0]} />
       
       {/* 自动对焦相机 */}
       <FitToObject groupRef={groupRef} autoRotate={autoRotate} />

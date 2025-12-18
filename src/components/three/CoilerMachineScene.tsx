@@ -10,6 +10,8 @@ import { WireFeed } from "@/components/three/WireFeed";
 import { SpringDesign, CompressionSpringDesign, isCompressionDesign } from "@/lib/springTypes";
 import { getMeanDiameter } from "@/lib/springMath";
 
+import { previewTheme } from "@/lib/three/previewTheme";
+
 type CoilerMachineSceneProps = {
   springDesign: SpringDesign;
   pitch: number;
@@ -33,10 +35,10 @@ export function CoilerMachineScene({ springDesign, pitch }: CoilerMachineScenePr
         frameloop="always"
         dpr={[1, 2]}
       >
-        <color attach="background" args={["#05080f"]} />
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[2, 3, 2]} intensity={1} />
-        <directionalLight position={[-2, -1, -1]} intensity={0.3} />
+        <color attach="background" args={[previewTheme.background]} />
+        <ambientLight intensity={previewTheme.lights.ambient} />
+        <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} />
+        <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
 
         <Suspense fallback={null}>
           <group position={[0, -0.4, 0]}>

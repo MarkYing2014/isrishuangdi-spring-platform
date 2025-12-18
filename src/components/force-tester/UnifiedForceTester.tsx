@@ -247,9 +247,9 @@ export function UnifiedForceTester({
           <div className="grid gap-4 md:grid-cols-[1fr,160px]">
             {/* 3D View */}
             <Card className="overflow-hidden">
-              <div className="h-[420px] bg-slate-900">
+              <div className="h-[420px] bg-slate-50">
                 {visualizer || (
-                  <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+                  <div className="flex items-center justify-center h-full text-slate-500 text-sm">
                     {isZh ? "3D 视图" : "3D View"}
                   </div>
                 )}

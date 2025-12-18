@@ -18,6 +18,8 @@ import { Html } from "@react-three/drei";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
 
+import { previewTheme } from "@/lib/three/previewTheme";
+
 // View presets - camera positions for different views
 const VIEW_PRESETS = {
   perspective: { position: [80, 60, 80], target: [0, 0, 0] },
@@ -30,7 +32,7 @@ type ViewType = keyof typeof VIEW_PRESETS;
 
 // Spring colors
 const BODY_COLOR = "#f59e0b"; // Amber for torsion springs
-const LEG_COLOR = "#94a3b8"; // Silver for legs
+const LEG_COLOR = previewTheme.material.endCap.color; // Silver for legs
 
 /**
  * Camera controller component - must be inside Canvas
@@ -99,8 +101,8 @@ function AnimatedTorsionSpring() {
     return new THREE.MeshStandardMaterial({
       // Use white base color when vertexColors is enabled so FEA colors show clearly
       color: isFeaMode ? 0xffffff : BODY_COLOR,
-      metalness: isFeaMode ? 0.3 : 0.85,  // Reduce metalness for clearer FEA colors
-      roughness: isFeaMode ? 0.7 : 0.15,  // Increase roughness for more diffuse lighting
+      metalness: isFeaMode ? previewTheme.material.fea.metalness : previewTheme.material.spring.metalness,
+      roughness: isFeaMode ? previewTheme.material.fea.roughness : previewTheme.material.spring.roughness,
       side: THREE.DoubleSide,
       vertexColors: isFeaMode,
     });
@@ -109,8 +111,8 @@ function AnimatedTorsionSpring() {
   const legMaterial = useMemo(() => {
     return new THREE.MeshStandardMaterial({
       color: LEG_COLOR,
-      metalness: 0.9,
-      roughness: 0.1,
+      metalness: previewTheme.material.endCap.metalness,
+      roughness: previewTheme.material.endCap.roughness,
       side: THREE.DoubleSide,
     });
   }, []);
@@ -317,11 +319,13 @@ export function TorsionSpringVisualizer() {
         camera={{ position: [80, 60, 80], fov: 45 }}
       >
         <CameraController viewType={currentView} controlsRef={controlsRef} />
+
+        <color attach="background" args={[previewTheme.background]} />
         
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 30, 20]} intensity={1.2} castShadow />
-        <directionalLight position={[-15, -10, -10]} intensity={0.4} />
-        <pointLight position={[0, 50, 0]} intensity={0.3} />
+        <ambientLight intensity={previewTheme.lights.ambient} />
+        <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} castShadow />
+        <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
+        <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
         
         <AnimatedTorsionSpring />
         
@@ -337,7 +341,7 @@ export function TorsionSpringVisualizer() {
         
         {/* Ground grid */}
         <gridHelper 
-          args={[100, 20, "#94a3b8", "#cbd5e1"]} 
+          args={[100, 20, previewTheme.grid.major, previewTheme.grid.minor]} 
           position={[0, -20, 0]} 
         />
       </Canvas>

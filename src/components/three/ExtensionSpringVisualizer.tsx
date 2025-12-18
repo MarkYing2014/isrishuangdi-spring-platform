@@ -18,6 +18,8 @@ import { Html } from "@react-three/drei";
 import { Button } from "@/components/ui/button";
 import { Eye, RotateCcw } from "lucide-react";
 
+import { previewTheme } from "@/lib/three/previewTheme";
+
 // View presets - camera positions for different views
 const VIEW_PRESETS = {
   perspective: { position: [60, 40, 80], target: [0, 0, 25] },
@@ -30,7 +32,7 @@ type ViewType = keyof typeof VIEW_PRESETS;
 
 // Spring colors
 const SPRING_COLOR = "#22c55e"; // Green for extension springs
-const HOOK_COLOR = "#94a3b8"; // Silver for hooks
+const HOOK_COLOR = previewTheme.material.endCap.color; // Silver for hooks
 
 /**
  * Animated extension spring model with engineering-accurate geometry
@@ -91,8 +93,8 @@ function AnimatedExtensionSpring() {
     return new THREE.MeshStandardMaterial({
       // Use white base color when vertexColors is enabled so FEA colors show clearly
       color: isFeaMode ? 0xffffff : SPRING_COLOR,
-      metalness: isFeaMode ? 0.3 : 0.85,  // Reduce metalness for clearer FEA colors
-      roughness: isFeaMode ? 0.7 : 0.15,  // Increase roughness for more diffuse lighting
+      metalness: isFeaMode ? previewTheme.material.fea.metalness : previewTheme.material.spring.metalness,
+      roughness: isFeaMode ? previewTheme.material.fea.roughness : previewTheme.material.spring.roughness,
       side: THREE.DoubleSide,
       vertexColors: isFeaMode,
     });
@@ -113,8 +115,8 @@ function AnimatedExtensionSpring() {
   const hookMaterial = useMemo(() => {
     return new THREE.MeshStandardMaterial({
       color: HOOK_COLOR,
-      metalness: 0.9,
-      roughness: 0.1,
+      metalness: previewTheme.material.endCap.metalness,
+      roughness: previewTheme.material.endCap.roughness,
       side: THREE.DoubleSide,
     });
   }, []);
@@ -145,9 +147,9 @@ function AnimatedExtensionSpring() {
       <mesh position={[0, 0, -2]} rotation={[0, 0, 0]}>
         <circleGeometry args={[extensionDesign.outerDiameter * scale * 0.8, 32]} />
         <meshStandardMaterial 
-          color="#1e293b" 
+          color={previewTheme.material.groundShadow.color}
           transparent 
-          opacity={0.15}
+          opacity={previewTheme.material.groundShadow.opacity}
         />
       </mesh>
 
@@ -290,8 +292,8 @@ export function ExtensionSpringVisualizer() {
 
   if (!extensionDesign) {
     return (
-      <div className="h-full w-full flex items-center justify-center bg-slate-900 rounded-lg">
-        <p className="text-sm text-slate-400">暂无拉伸弹簧数据</p>
+      <div className="h-full w-full flex items-center justify-center bg-slate-100 rounded-lg">
+        <p className="text-sm text-muted-foreground">暂无拉伸弹簧数据</p>
       </div>
     );
   }
@@ -306,11 +308,13 @@ export function ExtensionSpringVisualizer() {
         camera={{ position: [60, 40, 80], fov: 45 }}
       >
         <CameraController viewType={currentView} controlsRef={controlsRef} />
+
+        <color attach="background" args={[previewTheme.background]} />
         
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 30, 20]} intensity={1.2} castShadow />
-        <directionalLight position={[-15, -10, -10]} intensity={0.4} />
-        <pointLight position={[0, 50, 0]} intensity={0.3} />
+        <ambientLight intensity={previewTheme.lights.ambient} />
+        <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} castShadow />
+        <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
+        <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
         
         <AnimatedExtensionSpring />
         
@@ -326,7 +330,7 @@ export function ExtensionSpringVisualizer() {
         
         {/* Ground grid */}
         <gridHelper 
-          args={[80, 16, "#94a3b8", "#cbd5e1"]} 
+          args={[80, 16, previewTheme.grid.major, previewTheme.grid.minor]} 
           position={[0, 0, 0]} 
           rotation={[Math.PI / 2, 0, 0]}
         />

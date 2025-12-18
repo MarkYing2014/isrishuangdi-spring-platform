@@ -53,8 +53,8 @@ const SpiralTorsionSpringVisualizer = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-[420px] bg-slate-900 rounded-lg flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      <div className="h-[420px] bg-slate-50 rounded-lg flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-500" />
       </div>
     ),
   }
@@ -741,7 +741,7 @@ export function SpiralTorsionAnalysisPanel({
               <TabsContent value="fea" className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-lg overflow-hidden border border-border">
-                    <div className="h-[420px] bg-slate-900">
+                    <div className="h-[420px] bg-slate-50">
                       <SpiralTorsionSpringVisualizer
                         innerDiameter={innerDiameter}
                         outerDiameter={outerDiameter}

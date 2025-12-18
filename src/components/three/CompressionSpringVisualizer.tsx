@@ -18,6 +18,8 @@ import { Html } from "@react-three/drei";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
 
+import { previewTheme } from "@/lib/three/previewTheme";
+
 // View presets - camera positions for different views
 const VIEW_PRESETS = {
   perspective: { position: [60, 40, 80], target: [0, 0, 25] },
@@ -31,7 +33,7 @@ type ViewType = keyof typeof VIEW_PRESETS;
 // Spring colors
 const SPRING_COLOR = "#3b82f6"; // Blue for active coils
 const SPRING_COLOR_BOTTOMED = "#64748b"; // Gray for bottomed coils
-const END_CAP_COLOR = "#94a3b8"; // Silver for ground ends
+const END_CAP_COLOR = previewTheme.material.endCap.color; // Silver for ground ends
 
 /**
  * Camera controller component - must be inside Canvas
@@ -127,8 +129,8 @@ function AnimatedCompressionSpring() {
     const mat = new THREE.MeshStandardMaterial({
       // Use white base color when vertexColors is enabled so FEA colors show clearly
       color: isFeaMode ? 0xffffff : (state.isAtSolidHeight ? SPRING_COLOR_BOTTOMED : SPRING_COLOR),
-      metalness: isFeaMode ? 0.3 : 0.85,  // Reduce metalness for clearer FEA colors
-      roughness: isFeaMode ? 0.7 : 0.15,  // Increase roughness for more diffuse lighting
+      metalness: isFeaMode ? previewTheme.material.fea.metalness : previewTheme.material.spring.metalness,
+      roughness: isFeaMode ? previewTheme.material.fea.roughness : previewTheme.material.spring.roughness,
       side: THREE.DoubleSide,
       clippingPlanes: [clipPlanes.bottom, clipPlanes.top],
       clipShadows: true,
@@ -166,8 +168,8 @@ function AnimatedCompressionSpring() {
         <ringGeometry args={[endDiscs.innerRadius, endDiscs.outerRadius, 32]} />
         <meshStandardMaterial 
           color={END_CAP_COLOR} 
-          metalness={0.9} 
-          roughness={0.1}
+          metalness={previewTheme.material.endCap.metalness}
+          roughness={previewTheme.material.endCap.roughness}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -177,8 +179,8 @@ function AnimatedCompressionSpring() {
         <ringGeometry args={[endDiscs.innerRadius, endDiscs.outerRadius, 32]} />
         <meshStandardMaterial 
           color={END_CAP_COLOR} 
-          metalness={0.9} 
-          roughness={0.1}
+          metalness={previewTheme.material.endCap.metalness}
+          roughness={previewTheme.material.endCap.roughness}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -187,9 +189,9 @@ function AnimatedCompressionSpring() {
       <mesh position={[0, 0, -0.5]} rotation={[0, 0, 0]}>
         <circleGeometry args={[endDiscs.outerRadius * 1.5, 32]} />
         <meshStandardMaterial 
-          color="#1e293b" 
+          color={previewTheme.material.groundShadow.color}
           transparent 
-          opacity={0.15}
+          opacity={previewTheme.material.groundShadow.opacity}
         />
       </mesh>
 
@@ -334,11 +336,13 @@ export function CompressionSpringVisualizer() {
         gl={{ localClippingEnabled: true }}
       >
         <CameraController viewType={currentView} controlsRef={controlsRef} />
+
+        <color attach="background" args={[previewTheme.background]} />
         
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 30, 20]} intensity={1.2} castShadow />
-        <directionalLight position={[-15, -10, -10]} intensity={0.4} />
-        <pointLight position={[0, 50, 0]} intensity={0.3} />
+        <ambientLight intensity={previewTheme.lights.ambient} />
+        <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} castShadow />
+        <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
+        <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
         
         <AnimatedCompressionSpring />
         
@@ -354,7 +358,7 @@ export function CompressionSpringVisualizer() {
         
         {/* Ground grid */}
         <gridHelper 
-          args={[80, 16, "#94a3b8", "#cbd5e1"]} 
+          args={[80, 16, previewTheme.grid.major, previewTheme.grid.minor]} 
           position={[0, 0, 0]} 
           rotation={[Math.PI / 2, 0, 0]}
         />

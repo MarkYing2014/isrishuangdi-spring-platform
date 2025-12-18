@@ -14,8 +14,8 @@ const CadPreview3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-full w-full flex items-center justify-center bg-slate-900 rounded-lg">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      <div className="h-full w-full flex items-center justify-center bg-slate-50 rounded-lg">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-500" />
       </div>
     ),
   }
@@ -26,8 +26,8 @@ const SpiralTorsionSpringVisualizer = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-full w-full flex items-center justify-center bg-slate-900 rounded-lg">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      <div className="h-full w-full flex items-center justify-center bg-slate-50 rounded-lg">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-500" />
       </div>
     ),
   }
@@ -154,5 +154,5 @@ export function Calculator3DPreview({
     );
   }
 
-  return <div className={"w-full " + heightClassName + " overflow-hidden rounded-lg border bg-slate-900"}>{preview}</div>;
+  return <div className={"w-full " + heightClassName + " overflow-hidden rounded-lg border bg-slate-50"}>{preview}</div>;
 }

@@ -15,6 +15,8 @@ import { Html } from "@react-three/drei";
 import { Button } from "@/components/ui/button";
 import { RotateCcw, Play, Pause } from "lucide-react";
 
+import { previewTheme } from "@/lib/three/previewTheme";
+
 // View presets - camera positions for different views
 // Target Y will be adjusted based on spring height
 const getViewPresets = (springCenterY: number) => ({
@@ -162,8 +164,8 @@ function ConicalSpringModel() {
         <mesh key={`collapsed-${isFeaMode}-${colorMode}`} geometry={collapsedGeometry}>
           <meshStandardMaterial 
             color={isFeaMode ? 0xffffff : COLLAPSED_COLOR}
-            metalness={isFeaMode ? 0.3 : 0.6}
-            roughness={isFeaMode ? 0.7 : 0.3}
+            metalness={isFeaMode ? previewTheme.material.fea.metalness : previewTheme.material.spring.metalness}
+            roughness={isFeaMode ? previewTheme.material.fea.roughness : previewTheme.material.spring.roughness}
             clippingPlanes={clippingPlanes}
             clipShadows={true}
             vertexColors={isFeaMode}
@@ -176,8 +178,8 @@ function ConicalSpringModel() {
         <mesh key={`active-${isFeaMode}-${colorMode}`} geometry={activeGeometry}>
           <meshStandardMaterial 
             color={isFeaMode ? 0xffffff : ACTIVE_COLOR}
-            metalness={isFeaMode ? 0.3 : 0.6}
-            roughness={isFeaMode ? 0.7 : 0.3}
+            metalness={isFeaMode ? previewTheme.material.fea.metalness : previewTheme.material.spring.metalness}
+            roughness={isFeaMode ? previewTheme.material.fea.roughness : previewTheme.material.spring.roughness}
             clippingPlanes={clippingPlanes}
             clipShadows={true}
             vertexColors={isFeaMode}
@@ -194,9 +196,9 @@ function ConicalSpringModel() {
             32
           ]} />
           <meshStandardMaterial 
-            color={END_CAP_COLOR} 
-            metalness={0.9} 
-            roughness={0.1}
+            color={previewTheme.material.endCap.color} 
+            metalness={previewTheme.material.endCap.metalness}
+            roughness={previewTheme.material.endCap.roughness}
             side={THREE.DoubleSide}
           />
         </mesh>
@@ -211,9 +213,9 @@ function ConicalSpringModel() {
             32
           ]} />
           <meshStandardMaterial 
-            color={END_CAP_COLOR} 
-            metalness={0.9} 
-            roughness={0.1}
+            color={previewTheme.material.endCap.color} 
+            metalness={previewTheme.material.endCap.metalness}
+            roughness={previewTheme.material.endCap.roughness}
             side={THREE.DoubleSide}
           />
         </mesh>
@@ -223,9 +225,9 @@ function ConicalSpringModel() {
       <mesh position={[0, -0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[endDiscs ? endDiscs.largeRadius * 1.5 : wireRadius * 15, 32]} />
         <meshStandardMaterial 
-          color="#1e293b" 
+          color={previewTheme.material.groundShadow.color}
           transparent 
-          opacity={0.15}
+          opacity={previewTheme.material.groundShadow.opacity}
         />
       </mesh>
 
@@ -328,7 +330,7 @@ function ConicalMaxStressMarker({
  */
 function Legend() {
   return (
-    <div className="absolute bottom-2 left-2 bg-black/70 rounded-md px-3 py-2 text-xs text-white max-w-[200px]">
+    <div className="absolute bottom-2 left-2 bg-white/90 rounded-md px-3 py-2 text-xs text-slate-900 max-w-[200px] shadow">
       <div className="flex items-center gap-2 mb-1">
         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: ACTIVE_COLOR }} />
         <span>Active coils / 工作圈</span>
@@ -337,10 +339,10 @@ function Legend() {
         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLLAPSED_COLOR }} />
         <span>Collapsed coils / 贴底圈</span>
       </div>
-      <div className="text-[10px] text-slate-300 border-t border-white/20 pt-1">
+      <div className="text-[10px] text-slate-600 border-t border-slate-200 pt-1">
         Continuous helical tube. Grey = collapsed, Blue = active.
         <br />
-        <span className="text-slate-400">连续螺旋管显示，灰色为贴底圈，蓝色为工作圈。</span>
+        <span className="text-slate-500">连续螺旋管显示，灰色为贴底圈，蓝色为工作圈。</span>
       </div>
     </div>
   );
@@ -353,13 +355,13 @@ function StatusDisplay() {
   const { currentDeflection, collapsedCoils, activeCoils, currentLoad, currentStiffness } = useSpringSimulationStore();
   
   return (
-    <div className="absolute top-2 right-2 bg-black/70 rounded-md px-3 py-2 text-xs text-white">
+    <div className="absolute top-2 right-2 bg-white/90 rounded-md px-3 py-2 text-xs text-slate-900 shadow">
       <div>Δx = {currentDeflection.toFixed(2)} mm</div>
       <div>F = {currentLoad.toFixed(2)} N</div>
       <div>k = {currentStiffness.toFixed(2)} N/mm</div>
-      <div className="mt-1 pt-1 border-t border-white/30">
-        <span className="text-blue-400">{activeCoils}</span> active, 
-        <span className="text-slate-400 ml-1">{collapsedCoils}</span> collapsed
+      <div className="mt-1 pt-1 border-t border-slate-200">
+        <span className="text-blue-600">{activeCoils}</span> active, 
+        <span className="text-slate-500 ml-1">{collapsedCoils}</span> collapsed
       </div>
     </div>
   );
@@ -463,7 +465,7 @@ export function ConicalSpringVisualizer() {
   }
 
   return (
-    <div className="relative h-full w-full rounded-lg overflow-hidden bg-gradient-to-b from-slate-800 to-slate-900">
+    <div className="relative h-full w-full rounded-lg overflow-hidden">
       <Canvas
         camera={{ position: [60, 45 + springCenterY, 60], fov: 50 }}
         gl={{ 
@@ -480,11 +482,11 @@ export function ConicalSpringVisualizer() {
           springCenterY={springCenterY}
         />
         
-        <color attach="background" args={["#1e293b"]} />
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 20 + springCenterY, 10]} intensity={1} castShadow />
-        <directionalLight position={[-10, 10 + springCenterY, -10]} intensity={0.4} />
-        <pointLight position={[0, 30 + springCenterY, 0]} intensity={0.3} />
+        <color attach="background" args={[previewTheme.background]} />
+        <ambientLight intensity={previewTheme.lights.ambient} />
+        <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} castShadow />
+        <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
+        <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
         
         <ConicalSpringModel />
         
@@ -498,7 +500,7 @@ export function ConicalSpringVisualizer() {
           autoRotateSpeed={0.5}
         />
         
-        <gridHelper args={[80, 16, "#475569", "#334155"]} position={[0, -2, 0]} />
+        <gridHelper args={[80, 16, previewTheme.grid.major, previewTheme.grid.minor]} position={[0, -2, 0]} />
       </Canvas>
       
       {/* Animation control - top left */}

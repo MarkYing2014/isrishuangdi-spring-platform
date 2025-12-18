@@ -5,6 +5,8 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 
+import { previewTheme } from "@/lib/three/previewTheme";
+
 import type { VariablePitchSegment } from "@/lib/springMath";
 import {
   createVariablePitchCompressionSpringGeometry,
@@ -205,8 +207,8 @@ function SpringMesh(props: VariablePitchCompressionSpringVisualizerProps) {
     }
     return new THREE.MeshStandardMaterial({
       color: "#6b9bd1",
-      metalness: 0.15,
-      roughness: 0.55,
+      metalness: previewTheme.material.spring.metalness,
+      roughness: previewTheme.material.spring.roughness,
       side: THREE.DoubleSide,
       clippingPlanes,
     });
@@ -232,8 +234,8 @@ function SpringMesh(props: VariablePitchCompressionSpringVisualizerProps) {
 
     return new THREE.MeshStandardMaterial({
       color: "#6b9bd1",
-      metalness: 0.15,
-      roughness: 0.6,
+      metalness: previewTheme.material.endCap.metalness,
+      roughness: previewTheme.material.endCap.roughness,
       side: THREE.DoubleSide,
       polygonOffset: true,
       polygonOffsetFactor: -1,
@@ -300,16 +302,16 @@ export function VariablePitchCompressionSpringVisualizer(
       style={{ width: "100%", height: "100%" }}
       gl={{ localClippingEnabled: true, antialias: true }}
     >
-      <color attach="background" args={["#0b1220"]} />
+      <color attach="background" args={[previewTheme.background]} />
 
-      <ambientLight intensity={0.9} />
-      <directionalLight position={[200, -200, 300]} intensity={1.2} castShadow />
-      <directionalLight position={[-200, 150, 120]} intensity={0.6} />
-      <pointLight position={[0, 100, 50]} intensity={0.5} />
+      <ambientLight intensity={previewTheme.lights.ambient} />
+      <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} castShadow />
+      <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
+      <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
 
       <SpringMesh {...props} />
 
-      <gridHelper args={[80, 16, "#94a3b8", "#334155"]} position={[0, 0, 0]} rotation={[0, 0, 0]} />
+      <gridHelper args={[80, 16, previewTheme.grid.major, previewTheme.grid.minor]} position={[0, 0, 0]} rotation={[0, 0, 0]} />
     </Canvas>
   );
 }

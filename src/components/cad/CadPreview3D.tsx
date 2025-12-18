@@ -130,8 +130,8 @@ export function CadPreview3D({ params, className = "" }: CadPreview3DProps) {
   
   if (!currentDesign) {
     return (
-      <div className={"flex items-center justify-center bg-slate-900 rounded-lg " + className}>
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      <div className={"flex items-center justify-center bg-slate-50 rounded-lg " + className}>
+        <Loader2 className="w-8 h-8 animate-spin text-slate-500" />
       </div>
     );
   }
