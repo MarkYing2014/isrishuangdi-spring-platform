@@ -121,24 +121,27 @@ export default function Home() {
               <span>ISRI-SHUANGDI • Industry 4.0</span>
             </div>
             <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-              <LanguageText en="Spring Engineering Cloud Platform" zh="弹簧工程云平台" />
+              <LanguageText
+                en="See Spring Design, Manufacturing, and Quality Risks — Before They Become Problems"
+                zh="让弹簧设计、制造与质量风险，在问题发生前被看见"
+              />
             </h1>
             <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
               <LanguageText
-                en="Design, simulate, visualize, and source advanced suspension springs in one cohesive workflow. Built with Next.js, react-three-fiber, and enterprise-ready APIs to outpace legacy tools like SpringStore."
-                zh="一站式完成弹簧设计、仿真、可视化与采购，依托 Next.js、react-three-fiber 以及企业级 API，超越传统 SpringStore 平台。"
+                en="From engineering calculation to shopfloor reality — one system that connects design decisions, manufacturing risk, and quality outcomes."
+                zh="从工程计算 → 生产状态 → 质量数据，用一个系统打通 设计判断、制造风险、质量结论。"
               />
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg" className="rounded-full">
                 <Link href="/tools/calculator">
-                  <LanguageText en="Explore Spring Stack" zh="探索弹簧工具链" />
+                  <LanguageText en="Start with calculation" zh="从计算开始" />
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="rounded-full">
-                <Link href="/rfq">
-                  <LanguageText en="Initiate RFQ" zh="发起询价" />
+                <Link href="/production">
+                  <LanguageText en="Explore live production" zh="探索真实生产场景" />
                 </Link>
               </Button>
             </div>
@@ -185,6 +188,12 @@ export default function Home() {
               <LanguageText
                 en="Not just calculations. Built-in engineering rules transform spring designs into manufacturing-ready decisions."
                 zh="不只是计算结果，内置工程规则，把弹簧设计变成可制造的决策。"
+              />
+            </p>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              <LanguageText
+                en="Rule-based, explainable. No black-box decisions."
+                zh="规则驱动，可解释；拒绝黑盒决策。"
               />
             </p>
 
@@ -303,6 +312,12 @@ export default function Home() {
                   zh="工程风险雷达在生产开始前评估设计可行性。"
                 />
               </p>
+              <p className="text-xs text-muted-foreground">
+                <LanguageText
+                  en="Rule-based, explainable. No black-box decisions."
+                  zh="规则驱动，可解释；拒绝黑盒决策。"
+                />
+              </p>
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
                   <LanguageText en="Stress Analysis" zh="应力分析" />
@@ -345,6 +360,12 @@ export default function Home() {
                 <LanguageText
                   en="Live monitoring with explainable risk drivers. Demo-first, production-ready."
                   zh="实时监控与可解释的风险驱动因素。演示优先，生产就绪。"
+                />
+              </p>
+              <p className="text-xs text-muted-foreground">
+                <LanguageText
+                  en="Engineering assumptions validated by real production data."
+                  zh="用真实生产数据验证工程假设。"
                 />
               </p>
               <div className="flex flex-wrap gap-2">
@@ -391,6 +412,12 @@ export default function Home() {
                   zh="SPC、Nelson 规则、Cp/Cpk、MSA（Gage R&R）和 PPAP 报告。"
                 />
               </p>
+              <p className="text-xs text-muted-foreground">
+                <LanguageText
+                  en="Fully traceable, explainable, and auditable."
+                  zh="可追溯、可解释、可审计。"
+                />
+              </p>
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">
                   <LanguageText en="I-MR / Xbar-R" zh="I-MR / Xbar-R" />
@@ -432,7 +459,7 @@ export default function Home() {
             </div>
             <Button asChild variant="default" className="rounded-full">
               <Link href="/production">
-                <LanguageText en="See it live" zh="查看实时" />
+                <LanguageText en="Explore live scenarios" zh="探索真实场景" />
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
