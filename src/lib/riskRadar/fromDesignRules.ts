@@ -63,6 +63,32 @@ function classifyDimension(args: {
     }
   }
 
+  if (args.springType === "extension") {
+    if (id.startsWith("EXT_GEOM_INVALID")) return "engineering";
+    if (id.startsWith("EXT_INDEX") || id.includes("HOOK") || id.includes("TENSION")) return "manufacturing";
+    if (id.startsWith("EXT_MAX_EXTENSION") || id.startsWith("EXT_INITIAL_TENSION")) return "engineering";
+  }
+
+  if (args.springType === "torsion") {
+    if (id.startsWith("TOR_GEOM_INVALID")) return "engineering";
+    if (id.startsWith("TOR_ARM") || id.startsWith("TOR_INDEX")) return "manufacturing";
+    if (id.startsWith("TOR_DEFLECTION") || id.startsWith("TOR_STRESS") || id.startsWith("TOR_ANGLE")) return "engineering";
+  }
+
+  if (args.springType === "conical") {
+    if (id.startsWith("CON_GEOM_INVALID")) return "engineering";
+    if (id.startsWith("CON_BIND") || id.startsWith("CON_BIND_AT_FREE")) return "manufacturing";
+    if (id.startsWith("CON_TAPER") || id.startsWith("CON_MIN_INDEX") || id.startsWith("CON_GUIDANCE") || id.startsWith("CON_NEAR_STAGE") || id.startsWith("CON_NONLINEAR")) {
+      return "manufacturing";
+    }
+  }
+
+  if (args.springType === "variablePitch") {
+    if (id.startsWith("VP_GEOM_INVALID")) return "engineering";
+    if (id.startsWith("VP_PITCH") || id.startsWith("VP_SUM_LENGTH") || id.startsWith("VP_NEAR_CONTACT_STAGE")) return "manufacturing";
+    if (id.startsWith("VP_OVER_SOLID") || id.startsWith("VP_NEAR_SOLID")) return "manufacturing";
+  }
+
   if (id.includes("READ_ONLY")) return "quality";
 
   return "engineering";
@@ -159,6 +185,47 @@ function dimensionMetricsFromReport(args: {
     }
     if (args.dimension === "manufacturing") {
       return pick("diameter_ratio", "width_thickness_ratio", "n_eff");
+    }
+  }
+
+  if (args.springType === "extension") {
+    if (args.dimension === "engineering") {
+      return pick("extension_ratio", "initial_tension", "pre_extension");
+    }
+    if (args.dimension === "manufacturing") {
+      return pick("spring_index");
+    }
+  }
+
+  if (args.springType === "torsion") {
+    if (args.dimension === "engineering") {
+      return pick("theta_work", "angle_utilization", "max_stress");
+    }
+    if (args.dimension === "manufacturing") {
+      return pick("spring_index", "arm_ratio_min");
+    }
+  }
+
+  if (args.springType === "conical") {
+    if (args.dimension === "engineering") {
+      return pick("slenderness", "c_min");
+    }
+    if (args.dimension === "manufacturing") {
+      return pick("taper_ratio", "solid_height_est", "k_local", "collapsed_coils");
+    }
+  }
+
+  if (args.springType === "variablePitch") {
+    if (args.dimension === "engineering") {
+      return pick("segment_count");
+    }
+    if (args.dimension === "manufacturing") {
+      return pick(
+        "min_pitch",
+        "first_contact_deflection",
+        "full_solid_deflection",
+        "sum_pitch_length"
+      );
     }
   }
 

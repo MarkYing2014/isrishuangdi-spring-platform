@@ -2,6 +2,7 @@ import { LanguageText } from "@/components/language-context";
 
 import Link from "next/link";
 import {
+  ArrowRight,
   BarChart3,
   Box,
   Calculator,
@@ -9,7 +10,6 @@ import {
   Mail,
   Move3D,
   PackageSearch,
-  ArrowRight,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,6 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { HomeRiskRadar } from "@/components/home/HomeRiskRadar";
 import { HoverGlassCard } from "@/components/home/HoverGlassCard";
 
 const features = [
@@ -240,101 +241,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="rounded-2xl border bg-muted/20 p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold">
-                  <LanguageText en="Radar demo (static)" zh="雷达示例（静态）" />
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  <LanguageText
-                    en="Example output for a compression spring design."
-                    zh="以压缩弹簧为例展示输出结构。"
-                  />
-                </p>
-              </div>
-              <div className="rounded-full border bg-background px-3 py-1 text-sm font-semibold">
-                <LanguageText en="Score: 78" zh="得分：78" />
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-3">
-              <div className="rounded-xl border bg-background/70 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                  <LanguageText en="Overall" zh="总体" />
-                </p>
-                <p className="mt-1 text-base font-semibold">
-                  <LanguageText en="Manufacturing Risk" zh="制造风险" />
-                </p>
-                <div className="mt-3 grid gap-2 text-sm">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">
-                      <LanguageText en="Engineering" zh="工程" />
-                    </span>
-                    <span className="font-semibold">OK</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">
-                      <LanguageText en="Manufacturing" zh="制造" />
-                    </span>
-                    <span className="font-semibold">WARN</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">
-                      <LanguageText en="Quality" zh="质量" />
-                    </span>
-                    <span className="font-semibold">OK</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-xl border bg-background/70 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                  <LanguageText en="Key risks" zh="关键风险" />
-                </p>
-                <div className="mt-2 space-y-2 text-sm">
-                  <p>
-                    <span className="font-semibold">1.</span>{" "}
-                    <LanguageText en="Coil bind margin is low" zh="贴圈余量偏小" />
-                  </p>
-                  <p>
-                    <span className="font-semibold">2.</span>{" "}
-                    <LanguageText en="Shear utilization is near limit" zh="剪应力利用率接近上限" />
-                  </p>
-                  <p>
-                    <span className="font-semibold">3.</span>{" "}
-                    <LanguageText en="Pitch estimate is tight" zh="估算节距偏紧" />
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-xl border bg-background/70 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                  <LanguageText en="What makes this different" zh="差异点" />
-                </p>
-                <div className="mt-2 grid gap-2 text-sm text-muted-foreground">
-                  <p>
-                    <LanguageText
-                      en="Calculates + Engineering Risk Radar"
-                      zh="不仅计算，更提供工程风险雷达"
-                    />
-                  </p>
-                  <p>
-                    <LanguageText
-                      en="3D visualization + manufacturing insight"
-                      zh="3D 可视化 + 制造可行性洞察"
-                    />
-                  </p>
-                  <p>
-                    <LanguageText
-                      en="PPAP / DFM ready outputs"
-                      zh="面向 PPAP / DFM 的输出"
-                    />
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <HomeRiskRadar />
         </div>
       </section>
 

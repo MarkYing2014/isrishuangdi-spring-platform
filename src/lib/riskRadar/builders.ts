@@ -1,14 +1,24 @@
 import type { ArcSpringInput } from "@/lib/arcSpring";
 import type { CompressionSpringEds } from "@/lib/eds/engineeringDefinition";
 import type { ResolveCompressionNominalResult } from "@/lib/eds/compressionResolver";
-import type { AnalysisResult, SpiralTorsionGeometry } from "@/lib/stores/springDesignStore";
+import type {
+  AnalysisResult,
+  ConicalGeometry,
+  ExtensionGeometry,
+  SpiralTorsionGeometry,
+  TorsionGeometry,
+} from "@/lib/stores/springDesignStore";
 
 import type { ArcSpringRuleContext } from "@/lib/designRules/arcSpringRules";
 import type { CompressionRuleContext } from "@/lib/designRules/compressionRules";
 
 import { buildArcSpringDesignRuleReport } from "@/lib/designRules/arcSpringRules";
 import { buildCompressionDesignRuleReport } from "@/lib/designRules/compressionRules";
+import { buildConicalDesignRuleReport } from "@/lib/designRules/conicalRules";
+import { buildExtensionDesignRuleReport } from "@/lib/designRules/extensionRules";
 import { buildSpiralSpringDesignRuleReport } from "@/lib/designRules/spiralSpringRules";
+import { buildTorsionDesignRuleReport } from "@/lib/designRules/torsionRules";
+import { buildVariablePitchCompressionDesignRuleReport } from "@/lib/designRules/variablePitchRules";
 
 import type { EngineeringRiskRadar } from "./types";
 import { radarFromDesignRuleReport } from "./fromDesignRules";
@@ -37,4 +47,46 @@ export function buildSpiralRiskRadar(params: {
 }): EngineeringRiskRadar {
   const report = buildSpiralSpringDesignRuleReport(params);
   return radarFromDesignRuleReport({ springType: "spiral", report });
+}
+
+export function buildExtensionRiskRadar(params: {
+  geometry?: ExtensionGeometry | null;
+  analysisResult?: AnalysisResult | null;
+}): EngineeringRiskRadar {
+  const report = buildExtensionDesignRuleReport(params);
+  return radarFromDesignRuleReport({ springType: "extension", report });
+}
+
+export function buildTorsionRiskRadar(params: {
+  geometry?: TorsionGeometry | null;
+  analysisResult?: AnalysisResult | null;
+}): EngineeringRiskRadar {
+  const report = buildTorsionDesignRuleReport(params);
+  return radarFromDesignRuleReport({ springType: "torsion", report });
+}
+
+export function buildConicalRiskRadar(params: {
+  geometry?: ConicalGeometry | null;
+  analysisResult?: AnalysisResult | null;
+  context?: {
+    nonlinearResult?: import("@/lib/springMath").ConicalNonlinearResult | null;
+    nonlinearCurve?: import("@/lib/springMath").ConicalNonlinearCurvePoint[] | null;
+  };
+}): EngineeringRiskRadar {
+  const report = buildConicalDesignRuleReport(params);
+  return radarFromDesignRuleReport({ springType: "conical", report });
+}
+
+export function buildVariablePitchRiskRadar(params: {
+  wireDiameter: number;
+  meanDiameter: number;
+  totalCoils: number;
+  freeLength?: number;
+  segments: import("@/lib/springMath").VariablePitchSegment[];
+  context?: {
+    deflection?: number;
+  };
+}): EngineeringRiskRadar {
+  const report = buildVariablePitchCompressionDesignRuleReport(params);
+  return radarFromDesignRuleReport({ springType: "variablePitch", report });
 }
