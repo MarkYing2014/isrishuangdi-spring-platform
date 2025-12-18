@@ -149,11 +149,11 @@ export default function Home() {
 
           <div className="relative">
             <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border bg-muted/30 shadow-sm">
-              <div className="flex h-full w-full items-center justify-center p-6">
+              <div className="flex h-full w-full items-center justify-center p-2">
                 <img
                   src="/hero.png"
                   alt="Hero"
-                  className="h-28 w-auto object-contain sm:h-32 md:h-36"
+                  className="h-full w-full object-contain"
                 />
               </div>
             </div>
