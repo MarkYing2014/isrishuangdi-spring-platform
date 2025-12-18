@@ -39,8 +39,8 @@ export default function AboutPage() {
             </h1>
             <p className="max-w-3xl text-pretty text-base text-slate-600 sm:text-lg">
               <LanguageText
-                en="A unified platform that connects spring design, manufacturing risk, and quality analytics — before problems reach the shopfloor."
-                zh="从设计计算，到制造风险与质量结论的一体化工程平台"
+                en="Customer-ready engineering platform for spring manufacturers — reduce scrap, shorten PPAP cycles, and ship with confidence."
+                zh="面向弹簧制造现场的一体化工程平台：减少报废与返工，加速 PPAP，一次通过交付。"
               />
             </p>
           </div>
@@ -49,7 +49,7 @@ export default function AboutPage() {
             <Button asChild>
               <Link href="/rfq">
                 <span className="flex items-center gap-2">
-                  <LanguageText en="Demo / Pilot" zh="Demo / Pilot 项目" />
+                  <LanguageText en="Request Customer Pilot" zh="申请客户 Pilot" />
                   <ArrowRight className="size-4" />
                 </span>
               </Link>
@@ -76,14 +76,14 @@ export default function AboutPage() {
           <CardContent className="space-y-3 text-slate-600">
             <p>
               <LanguageText
-                en="We help manufacturers know — before production — whether a spring design is buildable, where the risks are, and whether quality is controllable."
-                zh="我们帮助制造企业在弹簧投入生产之前，就清楚知道：这个设计能不能做、风险在哪里、质量是否可控。"
+                en="Turn spring designs into production-ready decisions: manufacturability, risk drivers, and PPAP-grade quality evidence — in one workflow."
+                zh="把弹簧设计变成可投产的决策：可制造性、风险驱动因子、以及 PPAP 级质量证据，一条链路完成。"
               />
             </p>
             <p className="text-sm text-slate-500">
               <LanguageText
-                en="A unified platform that connects spring design, manufacturing risk, and quality analytics — before problems reach the shopfloor."
-                zh="A unified platform that connects spring design, manufacturing risk, and quality analytics — before problems reach the shopfloor."
+                en="Typical pilot: one product family, one line, 2–4 weeks — with measurable ROI."
+                zh="典型 Pilot：一个产品族 + 一条产线，2–4 周交付可量化 ROI。"
               />
             </p>
           </CardContent>
@@ -103,20 +103,20 @@ export default function AboutPage() {
               <ul className="list-disc space-y-1 pl-5 text-sm">
                 <li>
                   <LanguageText
-                    en="Engineering: calculations exist, but manufacturability is unclear."
-                    zh="工程端：计算能算，但不知道是否可制造"
+                    en="Engineering: calculations exist, but yield and manufacturability are unclear."
+                    zh="工程端：计算能算，但良率与可制造性不清楚"
                   />
                 </li>
                 <li>
                   <LanguageText
-                    en="Production: adjustments happen after issues occur — expensive."
-                    zh="生产端：问题发生后才调整，代价高"
+                    en="Production: firefighting after issues occur — scrap and line stops."
+                    zh="生产端：问题发生后救火，带来报废与停线"
                   />
                 </li>
                 <li>
                   <LanguageText
-                    en="Quality: analysis and reporting are manual, slow, and hard to reproduce."
-                    zh="质量端：报告靠人工分析，慢且不可重复"
+                    en="Quality: PPAP/SPC evidence takes manual effort and is hard to standardize."
+                    zh="质量端：PPAP/SPC 证据依赖人工，难标准化与复用"
                   />
                 </li>
               </ul>
@@ -128,8 +128,8 @@ export default function AboutPage() {
               </p>
               <p className="mt-1">
                 <LanguageText
-                  en="Rework, delays, customer complaints, and PPAP cycles that keep getting rejected."
-                  zh="返工、延误、客户投诉、PPAP 反复被打回"
+                  en="Scrap, rework, delayed SOP, and audit pressure — plus PPAP cycles that keep getting rejected."
+                  zh="报废、返工、SOP 延期与审核压力，以及 PPAP 反复被打回。"
                 />
               </p>
             </div>
@@ -140,10 +140,13 @@ export default function AboutPage() {
       <section className="space-y-4">
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold tracking-tight">
-            <LanguageText en="What We Built" zh="我们的解决方案（What We Built）" />
+            <LanguageText en="What You Get" zh="你能拿到什么（Deliverables）" />
           </h2>
           <p className="max-w-3xl text-slate-600">
-            <LanguageText en="One system covering three critical phases." zh="一个系统，覆盖三个关键阶段：" />
+            <LanguageText
+              en="Three connected modules with concrete outputs your team can act on."
+              zh="三个模块闭环输出可落地结果，让工程、生产、质量对齐同一套证据。"
+            />
           </p>
         </div>
 
@@ -158,8 +161,8 @@ export default function AboutPage() {
             <CardContent className="space-y-3 text-sm text-slate-600">
               <p>
                 <LanguageText
-                  en="Expose risks at the design stage and output clear, explainable conclusions."
-                  zh="在设计阶段暴露风险：自动评估工程可行性、制造复杂度、质量稳定性，并输出明确结论。"
+                  en="A design gate that outputs a clear risk badge, drivers, and prioritized actions — before production."
+                  zh="设计闸门：在投产前输出清晰的风险结论、驱动因子与优先整改建议。"
                 />
               </p>
               <ul className="list-disc space-y-1 pl-5">
@@ -175,8 +178,8 @@ export default function AboutPage() {
               </ul>
               <p className="text-slate-500">
                 <LanguageText
-                  en="All results are grounded in engineering rules and interpretable metrics — not black-box AI."
-                  zh="所有结论基于工程规则与可解释指标，而非黑盒 AI。"
+                  en="Explainable by engineers: rules + interpretable metrics, with traceable evidence."
+                  zh="工程师可解释：规则 + 可解释指标，并提供可追溯证据链。"
                 />
               </p>
             </CardContent>
@@ -197,21 +200,21 @@ export default function AboutPage() {
             <CardContent className="space-y-3 text-sm text-slate-600">
               <p>
                 <LanguageText
-                  en="Align design assumptions with production reality, via real integrations or realistic simulation."
-                  zh="让设计假设对齐真实生产：支持接入或模拟设备状态、产线节拍、报废率与报警。"
+                  en="Connect production signals (machine status, takt, scrap, alarms) to the design and batch context."
+                  zh="把生产信号（机台状态、节拍、报废、报警）与设计、批次、时间段关联起来。"
                 />
               </p>
               <ul className="list-disc space-y-1 pl-5">
                 <li>
                   <LanguageText
-                    en="Correlate quality anomalies with machine, process step, batch, and time window."
-                    zh="将质量异常与机台、工艺步骤、批次 / 时间段直接关联"
+                    en="Pinpoint where problems originate: machine, process step, or specific time window."
+                    zh="快速定位问题源头：机台、工艺步骤、或特定时间段。"
                   />
                 </li>
                 <li>
                   <LanguageText
-                    en="Help teams decide: design issue, process issue, or equipment issue."
-                    zh="帮助企业判断：这是设计问题、工艺问题，还是设备问题。"
+                    en="Help teams decide what to change first — design, process, or equipment."
+                    zh="帮助团队判断优先改哪里：设计、工艺还是设备。"
                   />
                 </li>
               </ul>
@@ -233,14 +236,14 @@ export default function AboutPage() {
             <CardContent className="space-y-3 text-sm text-slate-600">
               <p>
                 <LanguageText
-                  en="Generate customer-grade quality conclusions and reports with one click."
-                  zh="客户级质量结论，一键生成：内置 SPC / Nelson Rules、Cp/Cpk、分层分析、PPAP 数据结构，并自动生成可追溯、可审核、可签署的质量报告。"
+                  en="One-click SPC/PPAP evidence packs: capability results, rule-based alarms, and audit-ready PDF exports."
+                  zh="一键生成 SPC/PPAP 证据包：能力结果、规则报警、以及可审核/可签署的 PDF 导出。"
                 />
               </p>
               <p className="text-slate-500">
                 <LanguageText
-                  en="Upgrade from “calculating data” to “delivering decisions.”"
-                  zh="从“算数据”升级为“给结论”。"
+                  en="Standardize reporting, shorten PPAP loops, and reduce manual effort."
+                  zh="标准化报告输出，缩短 PPAP 闭环，降低人工成本。"
                 />
               </p>
             </CardContent>
@@ -281,6 +284,14 @@ export default function AboutPage() {
                   </TableCell>
                   <TableCell>
                     <LanguageText en="Real-time / production data-ready" zh="实时 / 可接入生产数据" />
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>
+                    <LanguageText en="Manual PPAP/SPC documentation" zh="手工整理 PPAP/SPC 文档" />
+                  </TableCell>
+                  <TableCell>
+                    <LanguageText en="Audit-ready evidence pack in one click" zh="一键生成可审核证据包" />
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -390,15 +401,15 @@ export default function AboutPage() {
             <div className="flex items-start gap-2">
               <TrendingDown className="mt-0.5 size-4 text-slate-700" />
               <span>
-                <LanguageText en="Reduce rework and trial production cycles" zh="减少返工与试产轮次" />
+                <LanguageText en="Reduce scrap and rework" zh="降低报废与返工" />
               </span>
             </div>
             <div className="flex items-start gap-2">
               <TrendingUp className="mt-0.5 size-4 text-slate-700" />
               <span>
                 <LanguageText
-                  en="Improve first pass yield (FPY)"
-                  zh="提高一次通过率（First Pass Yield）"
+                  en="Increase first pass yield (FPY) and stability"
+                  zh="提高一次通过率（FPY）与过程稳定性"
                 />
               </span>
             </div>
@@ -406,8 +417,8 @@ export default function AboutPage() {
               <TrendingDown className="mt-0.5 size-4 text-slate-700" />
               <span>
                 <LanguageText
-                  en="Cut manual effort for quality analysis and reporting"
-                  zh="降低质量分析与报告的人力成本"
+                  en="Shorten PPAP loops and time-to-SOP"
+                  zh="缩短 PPAP 闭环与导入周期（time-to-SOP）"
                 />
               </span>
             </div>
@@ -415,8 +426,8 @@ export default function AboutPage() {
               <TrendingUp className="mt-0.5 size-4 text-slate-700" />
               <span>
                 <LanguageText
-                  en="Boost credibility with customers and auditors"
-                  zh="提升对客户与审核机构的专业可信度"
+                  en="Standardize audit-ready reporting with less manual work"
+                  zh="用更少人工实现可审核、可复用的报告标准化"
                 />
               </span>
             </div>
@@ -474,12 +485,12 @@ export default function AboutPage() {
         <div className="flex flex-col gap-4">
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold tracking-tight">
-              <LanguageText en="Vision" zh="我们的愿景（Vision）" />
+              <LanguageText en="Customer Outcome" zh="客户结果（Outcome）" />
             </h2>
             <p className="max-w-3xl text-slate-700">
               <LanguageText
-                en="Make engineering decisions driven by data, rules, and explainable conclusions — not guesswork."
-                zh="让工程决策不再依赖经验猜测，而是基于数据、规则与可解释结论。"
+                en="Launch programs faster with fewer surprises — a shared, evidence-based workflow across engineering, production, and quality."
+                zh="更快导入、更少意外：让工程、生产、质量基于同一套证据协同决策。"
               />
             </p>
             <div className="grid gap-4 pt-2 lg:grid-cols-2">
@@ -489,16 +500,22 @@ export default function AboutPage() {
                 </p>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
                   <li>
-                    <LanguageText en="Demo / Pilot project" zh="Demo / Pilot 项目" />
-                  </li>
-                  <li>
                     <LanguageText
-                      en="Review sample engineering & quality reports"
-                      zh="查看示例工程与质量报告"
+                      en="30-min discovery: goals, constraints, and success metrics"
+                      zh="30 分钟沟通：目标、约束与成功指标"
                     />
                   </li>
                   <li>
-                    <LanguageText en="Explore industry collaboration" zh="探索行业合作" />
+                    <LanguageText
+                      en="Pilot inputs: drawing/spec + 1 dataset (SPC or inspection)"
+                      zh="Pilot 输入：图纸/规范 + 1 份数据（SPC 或检验数据）"
+                    />
+                  </li>
+                  <li>
+                    <LanguageText
+                      en="Deliverables: risk radar + evidence pack + action list"
+                      zh="Pilot 交付：风险雷达 + 证据包 + 动作清单"
+                    />
                   </li>
                 </ul>
               </div>
@@ -509,20 +526,20 @@ export default function AboutPage() {
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
                   <li>
                     <LanguageText
-                      en="Investor version (growth & market oriented)"
-                      zh="改写成投资人版本（更偏增长与市场）"
+                      en="Integration checklist (CSV / API / MES)"
+                      zh="接入清单（CSV / API / MES）"
                     />
                   </li>
                   <li>
                     <LanguageText
-                      en="Customer sales version (ROI & scenarios oriented)"
-                      zh="改写成客户销售版本（更偏 ROI 与应用场景）"
+                      en="ROI estimate and pilot plan template"
+                      zh="ROI 估算与 Pilot 计划模板"
                     />
                   </li>
                   <li>
                     <LanguageText
-                      en="One-page PPT / pitch deck outline"
-                      zh="生成一页 PPT / Pitch Deck 结构"
+                      en="Sample report pack (SPC / PPAP / audit-ready PDF)"
+                      zh="示例报告包（SPC / PPAP / 可审核 PDF）"
                     />
                   </li>
                 </ul>
@@ -534,7 +551,7 @@ export default function AboutPage() {
             <Button asChild>
               <Link href="/rfq">
                 <span className="flex items-center gap-2">
-                  <LanguageText en="Start a Demo / Pilot" zh="发起 Demo / Pilot" />
+                  <LanguageText en="Start Customer Pilot" zh="发起客户 Pilot" />
                   <ArrowRight className="size-4" />
                 </span>
               </Link>
