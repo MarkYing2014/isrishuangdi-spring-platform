@@ -11,6 +11,9 @@ import {
   Mail,
   Move3D,
   PackageSearch,
+  Cog,
+  Activity,
+  Shield,
   type LucideIcon,
 } from "lucide-react";
 
@@ -252,6 +255,188 @@ export default function Home() {
           </div>
 
           <HomeRiskRadar />
+        </div>
+      </section>
+
+      <section className="rounded-3xl border bg-background p-6 sm:p-10">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-primary/80">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            <span>
+              <LanguageText en="Live Risk Brain" zh="实时风险大脑" />
+            </span>
+          </div>
+          <h2 className="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">
+            <LanguageText
+              en="Design → Production → Quality: Closed Loop"
+              zh="设计 → 生产 → 质量：闭环系统"
+            />
+          </h2>
+          <p className="mt-4 mx-auto max-w-3xl text-lg text-muted-foreground">
+            <LanguageText
+              en="Not just calculations. A unified intelligence layer that connects engineering design, real-time production monitoring, and quality analytics into one explainable decision system."
+              zh="不只是计算。统一的智能层将工程设计、实时生产监控和质量分析连接成一个可解释的决策系统。"
+            />
+          </p>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          <Card className="relative overflow-hidden border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-100/50 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <CardHeader className="relative">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
+                  <Cog className="h-5 w-5 text-emerald-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Step 1</p>
+                  <CardTitle className="text-lg">
+                    <LanguageText en="Design" zh="设计" />
+                  </CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="relative space-y-3">
+              <p className="text-sm text-muted-foreground">
+                <LanguageText
+                  en="Engineering Risk Radar evaluates design feasibility before production starts."
+                  zh="工程风险雷达在生产开始前评估设计可行性。"
+                />
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  <LanguageText en="Stress Analysis" zh="应力分析" />
+                </span>
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  <LanguageText en="DFM Rules" zh="DFM 规则" />
+                </span>
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  <LanguageText en="Risk Score" zh="风险评分" />
+                </span>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button asChild variant="outline" size="sm" className="w-full rounded-full border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+                <Link href="/tools/calculator">
+                  <LanguageText en="Open Calculator" zh="打开计算器" />
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardFooter>
+          </Card>
+
+          <Card className="relative overflow-hidden border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-white">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-100/50 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <CardHeader className="relative">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
+                  <Activity className="h-5 w-5 text-amber-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">Step 2</p>
+                  <CardTitle className="text-lg">
+                    <LanguageText en="Production" zh="生产" />
+                  </CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="relative space-y-3">
+              <p className="text-sm text-muted-foreground">
+                <LanguageText
+                  en="Live monitoring with explainable risk drivers. Demo-first, production-ready."
+                  zh="实时监控与可解释的风险驱动因素。演示优先，生产就绪。"
+                />
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  <LanguageText en="Cycle Time" zh="节拍" />
+                </span>
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  <LanguageText en="Temp Drift" zh="温度漂移" />
+                </span>
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  <LanguageText en="Alerts" zh="告警" />
+                </span>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button asChild variant="outline" size="sm" className="w-full rounded-full border-amber-200 text-amber-700 hover:bg-amber-50">
+                <Link href="/production">
+                  <LanguageText en="Open Dashboard" zh="打开看板" />
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardFooter>
+          </Card>
+
+          <Card className="relative overflow-hidden border-2 border-sky-200 bg-gradient-to-br from-sky-50 to-white">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-sky-100/50 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <CardHeader className="relative">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100">
+                  <Shield className="h-5 w-5 text-sky-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-sky-600">Step 3</p>
+                  <CardTitle className="text-lg">
+                    <LanguageText en="Quality" zh="质量" />
+                  </CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="relative space-y-3">
+              <p className="text-sm text-muted-foreground">
+                <LanguageText
+                  en="SPC, Nelson rules, Cp/Cpk, MSA (Gage R&R), and PPAP-ready reports."
+                  zh="SPC、Nelson 规则、Cp/Cpk、MSA（Gage R&R）和 PPAP 报告。"
+                />
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">
+                  <LanguageText en="I-MR / Xbar-R" zh="I-MR / Xbar-R" />
+                </span>
+                <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">
+                  <LanguageText en="MSA" zh="MSA" />
+                </span>
+                <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">
+                  <LanguageText en="PPAP" zh="PPAP" />
+                </span>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button asChild variant="outline" size="sm" className="w-full rounded-full border-sky-200 text-sky-700 hover:bg-sky-50">
+                <Link href="/quality">
+                  <LanguageText en="Open Quality" zh="打开质量" />
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+
+        <div className="mt-8 rounded-xl border bg-muted/30 p-4">
+          <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <BarChart3 className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold">
+                <LanguageText en="Live Risk Brain: The Unified Intelligence" zh="Live Risk Brain：统一智能" />
+              </p>
+              <p className="text-sm text-muted-foreground">
+                <LanguageText
+                  en="Combines Engineering Radar + Production State + Quality Analytics into one explainable score with actionable drivers."
+                  zh="将工程雷达 + 生产状态 + 质量分析合成一个可解释的评分，并提供可执行的驱动因素。"
+                />
+              </p>
+            </div>
+            <Button asChild variant="default" className="rounded-full">
+              <Link href="/production">
+                <LanguageText en="See it live" zh="查看实时" />
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
         </div>
       </section>
 

@@ -115,6 +115,19 @@ export function normalizeMeasurements(args: {
     const partId = mapping.partId ? asString(r[mapping.partId]).trim() || undefined : undefined;
     const lot = mapping.lot ? asString(r[mapping.lot]).trim() || undefined : undefined;
 
+    const machine = mapping.machine ? asString(r[mapping.machine]).trim() || undefined : undefined;
+    const shift = mapping.shift ? asString(r[mapping.shift]).trim() || undefined : undefined;
+    const appraiser = mapping.appraiser ? asString(r[mapping.appraiser]).trim() || undefined : undefined;
+    const gage = mapping.gage ? asString(r[mapping.gage]).trim() || undefined : undefined;
+    const subgroupId = mapping.subgroupId ? asString(r[mapping.subgroupId]).trim() || undefined : undefined;
+
+    const trialRaw = mapping.trial ? asString(r[mapping.trial]) : "";
+    const trialParsed = mapping.trial ? parseNumber(trialRaw) : null;
+    const trial = trialParsed === null ? undefined : Math.round(trialParsed);
+    if (mapping.trial && trialParsed === null && trialRaw.trim()) {
+      issues.push(issue("Q_TRIAL_INVALID", "WARN", "Invalid trial value", "试次/重复次数字段不合法"));
+    }
+
     return {
       index: idx,
       characteristic,
@@ -122,6 +135,12 @@ export function normalizeMeasurements(args: {
       timestampISO,
       partId,
       lot,
+      machine,
+      shift,
+      appraiser,
+      gage,
+      trial,
+      subgroupId,
       unit,
       lsl,
       usl,

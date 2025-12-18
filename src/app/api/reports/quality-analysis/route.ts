@@ -20,6 +20,9 @@ type QualityReportRequest = {
   datasetId: string;
   mapping?: FieldMapping;
   meta?: QualityAnalysisReportModel["meta"];
+  options?: {
+    stratifyBy?: string;
+  };
 };
 
 function normalizeMapping(mapping: FieldMapping): FieldMapping {
@@ -34,6 +37,12 @@ function normalizeMapping(mapping: FieldMapping): FieldMapping {
     characteristic: clean(mapping.characteristic),
     partId: clean(mapping.partId),
     lot: clean(mapping.lot),
+    machine: clean(mapping.machine),
+    shift: clean(mapping.shift),
+    appraiser: clean(mapping.appraiser),
+    gage: clean(mapping.gage),
+    trial: clean(mapping.trial),
+    subgroupId: clean(mapping.subgroupId),
     unit: clean(mapping.unit),
     lsl: clean(mapping.lsl),
     usl: clean(mapping.usl),
@@ -65,8 +74,15 @@ export async function POST(req: NextRequest) {
     const format = req.nextUrl.searchParams.get("format") ?? "pdf";
 
     const existing = await loadAnalysis(data.datasetId);
-    const analysis = existing ?? analyzeDataset({ dataset, mapping });
-    if (!existing) {
+    const requestedStratifyBy = (data.options?.stratifyBy ?? "auto") as any;
+    const existingStratifyBy = (existing as any)?.options?.stratifyBy ?? "auto";
+
+    const shouldReuse = !!existing && requestedStratifyBy === existingStratifyBy;
+    const analysis = shouldReuse
+      ? existing
+      : analyzeDataset({ dataset, mapping, options: { stratifyBy: requestedStratifyBy } });
+
+    if (!shouldReuse) {
       await saveAnalysis(analysis);
     }
 

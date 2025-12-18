@@ -32,6 +32,12 @@ export type FieldMapping = {
   characteristic?: string;
   partId?: string;
   lot?: string;
+  machine?: string;
+  shift?: string;
+  appraiser?: string;
+  gage?: string;
+  trial?: string;
+  subgroupId?: string;
   unit?: string;
   lsl?: string;
   usl?: string;
@@ -52,6 +58,12 @@ export type NormalizedMeasurement = {
   timestampISO: string | null;
   partId?: string;
   lot?: string;
+  machine?: string;
+  shift?: string;
+  appraiser?: string;
+  gage?: string;
+  trial?: number;
+  subgroupId?: string;
   unit?: string;
   lsl?: number;
   usl?: number;
@@ -91,6 +103,71 @@ export type ImrChart = {
   lcl: number;
 };
 
+export type NelsonViolation = {
+  rule: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  startIndex: number;
+  endIndex: number;
+  direction: string;
+  points: number[];
+};
+
+export type NelsonResult = {
+  violations: NelsonViolation[];
+  counts: Record<string, number>;
+};
+
+export type XbarRSubgroupPoint = {
+  index: number;
+  subgroupId: string;
+  n: number;
+  mean: number;
+  range: number;
+  xcl: number;
+  xucl: number;
+  xlcl: number;
+  rcl: number;
+  rucl: number;
+  rlcl: number;
+  xOutOfControl: boolean;
+  rOutOfControl: boolean;
+};
+
+export type XbarRChart = {
+  subgroupSize: number;
+  xbarbar: number;
+  rbar: number;
+  xcl: number;
+  xucl: number;
+  xlcl: number;
+  rcl: number;
+  rucl: number;
+  rlcl: number;
+  constants: {
+    A2: number;
+    D3: number;
+    D4: number;
+  };
+  points: XbarRSubgroupPoint[];
+};
+
+export type MsaAssessment = "ACCEPTABLE" | "MARGINAL" | "UNACCEPTABLE" | "INSUFFICIENT_DATA";
+
+export type MsaGageRrResult = {
+  design: "crossed";
+  parts: number;
+  appraisers: number;
+  trials: number;
+  ev: number;
+  av: number;
+  iv: number;
+  pv: number;
+  grr: number;
+  tv: number;
+  pctGrr: number | null;
+  ndc: number | null;
+  assessment: MsaAssessment;
+};
+
 export type CapabilityResult = {
   mean: number;
   std: number;
@@ -109,15 +186,39 @@ export type CharacteristicAnalysis = {
   unit?: string;
   count: number;
   imr: ImrChart;
+  nelson?: NelsonResult;
+  xbarr?: XbarRChart;
+  msa?: MsaGageRrResult;
   capability: CapabilityResult;
   findings: QualityFinding[];
 };
 
-export type QualityAnalysisResult = {
-  datasetId: string;
+export type QualityStratifyBy = "auto" | "none" | "machine" | "lot" | "shift" | "appraiser" | "gage";
+
+export type QualityStratumAnalysis = {
+  key: string;
+  count: number;
   status: QualityOverallStatus;
   score: number;
   dataQuality: DataQualitySummary;
   keyFindings: QualityFinding[];
   characteristics: CharacteristicAnalysis[];
+};
+
+export type QualityStratificationResult = {
+  by: Exclude<QualityStratifyBy, "auto" | "none">;
+  strata: QualityStratumAnalysis[];
+};
+
+export type QualityAnalysisResult = {
+  datasetId: string;
+  options?: {
+    stratifyBy?: QualityStratifyBy;
+  };
+  status: QualityOverallStatus;
+  score: number;
+  dataQuality: DataQualitySummary;
+  keyFindings: QualityFinding[];
+  characteristics: CharacteristicAnalysis[];
+  stratification?: QualityStratificationResult;
 };

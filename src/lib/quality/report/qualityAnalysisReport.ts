@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { Document, Page, Text, View, StyleSheet, Svg, Path, Line } from "@react-pdf/renderer";
 
 import type { FieldMapping, QualityAnalysisResult, QualityDataset } from "../types";
+import { buildQualityReportNarrative } from "./reportNarrator";
 
 export type QualityAnalysisReportModel = {
   dataset: Pick<QualityDataset, "id" | "name" | "createdAtISO" | "source" | "headers">;
@@ -11,6 +12,14 @@ export type QualityAnalysisReportModel = {
     title?: string;
     projectName?: string;
     engineer?: string;
+    customer?: string;
+    supplier?: string;
+    partNumber?: string;
+    partName?: string;
+    rev?: string;
+    preparedBy?: string;
+    approvedBy?: string;
+    approvedAtISO?: string;
     language?: "en" | "zh" | "bilingual";
   };
 };
@@ -131,25 +140,149 @@ export function generateQualityAnalysisReportHTML(model: QualityAnalysisReportMo
   const title = model.meta?.title ?? t(lang, "Quality Analysis Report", "质量分析报告");
   const generatedAt = new Date().toLocaleString();
 
+  const narrative = buildQualityReportNarrative({ analysis: model.analysis, lang });
+
   const f = (sev: string) => (sev === "ERROR" ? "#dc2626" : sev === "WARN" ? "#d97706" : "#2563eb");
 
-  const keyFindingsHtml = model.analysis.keyFindings
-    .map((x) => `<li><span style="color:${f(x.severity)};font-weight:700">${x.severity}</span> ${x.title.en} / ${x.title.zh}</li>`)
+  const executiveReasonsHtml = narrative.executiveSummary.keyReasons
+    .map((r) => `<li>${t(lang, r.en, r.zh)}</li>`)
     .join("\n");
 
-  const charsHtml = model.analysis.characteristics
-    .map((c) => {
-      const cap = c.capability;
-      const cpk = cap.cpk === null ? "—" : fmt(cap.cpk, 3);
-      const cp = cap.cp === null ? "—" : fmt(cap.cp, 3);
+  const executiveDispositionHtml = narrative.executiveSummary.disposition
+    .map((x) => `<li>${t(lang, x.en, x.zh)}</li>`)
+    .join("\n");
+
+  const criticalByCharacteristicHtml = (() => {
+    const items = narrative.criticalFindingsByCharacteristic.items
+      .map((it) => {
+        const stability = it.stability.length
+          ? `<ul>${it.stability.map((b) => `<li>${t(lang, b.en, b.zh)}</li>`).join("\n")}</ul>`
+          : "";
+        const capability = it.capability.length
+          ? `<ul>${it.capability.map((b) => `<li>${t(lang, b.en, b.zh)}</li>`).join("\n")}</ul>`
+          : "";
+        const rec = it.recommendation.length
+          ? `<ul>${it.recommendation.map((b) => `<li>${t(lang, b.en, b.zh)}</li>`).join("\n")}</ul>`
+          : "";
+
+        return `
+          <div style="margin-bottom:12px">
+            <div style="font-weight:800;color:#0f172a;margin-bottom:6px">${it.characteristic}</div>
+            ${stability ? `<div style="margin-top:6px"><div style="font-weight:700">${t(lang, it.stabilityLabel.en, it.stabilityLabel.zh)}</div>${stability}</div>` : ""}
+            ${capability ? `<div style="margin-top:6px"><div style="font-weight:700">${t(lang, it.capabilityLabel.en, it.capabilityLabel.zh)}</div>${capability}</div>` : ""}
+            <div style="margin-top:6px"><div style="font-weight:700">${t(lang, it.assessmentLabel.en, it.assessmentLabel.zh)}</div><div>${t(lang, it.assessment.en, it.assessment.zh)}</div></div>
+            ${rec ? `<div style="margin-top:6px"><div style="font-weight:700">${t(lang, it.recommendationLabel.en, it.recommendationLabel.zh)}</div>${rec}</div>` : ""}
+          </div>
+        `;
+      })
+      .join("\n");
+
+    return items ? items : "";
+  })();
+
+  const spcInterpretationHtml = (() => {
+    const items = narrative.controlChartInterpretation.items
+      .map((it) => {
+        const bullets = it.bullets.map((b) => `<li>${t(lang, b.en, b.zh)}</li>`).join("\n");
+        return `<li><strong>${it.characteristic}</strong><ul>${bullets}</ul></li>`;
+      })
+      .join("\n");
+    return items ? `<ul>${items}</ul>` : "";
+  })();
+
+  const measurementHtml = (() => {
+    const findings = narrative.measurementSystem.findings.map((x) => `<li>${t(lang, x.en, x.zh)}</li>`).join("\n");
+    const rec = narrative.measurementSystem.recommendation.map((x) => `<li>${t(lang, x.en, x.zh)}</li>`).join("\n");
+
+    const msaRows = narrative.measurementSystem.msaSummary
+      .map((m) => {
+        const pct = m.pctGrr === null || !isFinite(m.pctGrr) ? "—" : `${m.pctGrr.toFixed(1)}%`;
+        const ndc = m.ndc === null || !isFinite(m.ndc) ? "—" : String(m.ndc);
+        return `<tr><td>${m.characteristic}</td><td style=\"text-align:right\">${pct}</td><td style=\"text-align:right\">${ndc}</td><td>${m.assessment}</td></tr>`;
+      })
+      .join("\n");
+
+    const msaTable = msaRows
+      ? `
+        <div style=\"margin-bottom:8px\">
+          <div style=\"font-weight:700\">${t(lang, narrative.measurementSystem.msaSummaryLabel.en, narrative.measurementSystem.msaSummaryLabel.zh)}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>${t(lang, "Characteristic", "特性")}</th>
+                <th style=\"text-align:right\">%GRR</th>
+                <th style=\"text-align:right\">ndc</th>
+                <th>${t(lang, "Assessment", "评价")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${msaRows}
+            </tbody>
+          </table>
+        </div>
+      `
+      : "";
+
+    return `
+      <div style="margin-bottom:8px">
+        <div style="font-weight:700">${t(lang, narrative.measurementSystem.findingsLabel.en, narrative.measurementSystem.findingsLabel.zh)}</div>
+        <ul>${findings}</ul>
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="font-weight:700">${t(lang, narrative.measurementSystem.riskLabel.en, narrative.measurementSystem.riskLabel.zh)}</div>
+        <div>${t(lang, narrative.measurementSystem.risk.en, narrative.measurementSystem.risk.zh)}</div>
+      </div>
+      ${msaTable}
+      <div>
+        <div style="font-weight:700">${t(lang, narrative.measurementSystem.recommendationLabel.en, narrative.measurementSystem.recommendationLabel.zh)}</div>
+        <ul>${rec}</ul>
+      </div>
+    `;
+  })();
+
+  const xbarrSummaryHtml = (() => {
+    const items = model.analysis.characteristics
+      .map((c) => {
+        const xb = c.xbarr;
+        if (!xb) return "";
+        const xOoc = xb.points.filter((p) => p.xOutOfControl).length;
+        const rOoc = xb.points.filter((p) => p.rOutOfControl).length;
+        return `<li><strong>${c.name}</strong>: n=${xb.subgroupSize}, subgroups=${xb.points.length}, X OOC=${xOoc}, R OOC=${rOoc}</li>`;
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    return items ? `<ul>${items}</ul>` : "";
+  })();
+
+  const stratificationSummaryHtml = (() => {
+    const s = narrative.stratification;
+    if (!s) return "";
+    const items = s.lines.map((x) => `<li><strong>${x.key}</strong>: ${x.status} / ${x.score} / n=${x.n}</li>`).join("\n");
+    return items
+      ? `<div>
+          <div style="color:#334155;margin-bottom:6px">${t(lang, "By", "维度")}: ${s.by}</div>
+          <div style="color:#334155;margin-bottom:6px">${t(lang, s.interpretation.en, s.interpretation.zh)}</div>
+          <ul>${items}</ul>
+        </div>`
+      : "";
+  })();
+
+  const charsHtml = narrative.capability.rows
+    .map((r) => {
+      const cpk = r.cpk === null ? "—" : fmt(r.cpk, 3);
+      const cp = r.cp === null ? "—" : fmt(r.cp, 3);
+      const assess = t(lang, r.assessment.en, r.assessment.zh);
+      const note = r.note ? t(lang, r.note.en, r.note.zh) : "";
       return `
         <tr>
-          <td>${c.name}</td>
-          <td style="text-align:right">${c.count}</td>
-          <td style="text-align:right">${fmt(cap.mean, 3)}</td>
-          <td style="text-align:right">${fmt(cap.std, 3)}</td>
+          <td>${r.characteristic}</td>
+          <td style="text-align:right">${r.n}</td>
+          <td style="text-align:right">${fmt(r.mean, 3)}</td>
+          <td style="text-align:right">${fmt(r.std, 3)}</td>
           <td style="text-align:right">${cp}</td>
           <td style="text-align:right">${cpk}</td>
+          <td>${assess}${note ? `<div style=\"color:#64748b;font-size:11px;margin-top:2px\">${note}</div>` : ""}</td>
         </tr>
       `;
     })
@@ -176,17 +309,78 @@ export function generateQualityAnalysisReportHTML(model: QualityAnalysisReportMo
   <div class="meta">${t(lang, "Generated", "生成")}: ${generatedAt} | ${t(lang, "Dataset", "数据集")}: ${model.dataset.name}</div>
 
   <div class="card">
-    <strong>${t(lang, "Overall", "总体")}</strong><br/>
-    ${t(lang, "Status", "状态")}: ${model.analysis.status} &nbsp; | &nbsp; ${t(lang, "Score", "评分")}: ${model.analysis.score}
+    <strong>${t(lang, "PPAP / Report Info", "PPAP / 报告信息")}</strong>
+    <table style="margin-top:8px">
+      <tbody>
+        <tr><td style="width:180px;color:#64748b">${t(lang, "Customer", "客户")}</td><td>${model.meta?.customer ?? "—"}</td></tr>
+        <tr><td style="color:#64748b">${t(lang, "Supplier", "供应商")}</td><td>${model.meta?.supplier ?? "—"}</td></tr>
+        <tr><td style="color:#64748b">${t(lang, "Part No.", "零件号")}</td><td>${model.meta?.partNumber ?? "—"}</td></tr>
+        <tr><td style="color:#64748b">${t(lang, "Part Name", "零件名称")}</td><td>${model.meta?.partName ?? "—"}</td></tr>
+        <tr><td style="color:#64748b">${t(lang, "Rev", "版本")}</td><td>${model.meta?.rev ?? "—"}</td></tr>
+        <tr><td style="color:#64748b">${t(lang, "Prepared By", "编制")}</td><td>${model.meta?.preparedBy ?? model.meta?.engineer ?? "—"}</td></tr>
+        <tr><td style="color:#64748b">${t(lang, "Approved By", "批准")}</td><td>${model.meta?.approvedBy ?? "—"}</td></tr>
+        <tr><td style="color:#64748b">${t(lang, "Approved Date", "批准日期")}</td><td>${model.meta?.approvedAtISO ?? "—"}</td></tr>
+      </tbody>
+    </table>
   </div>
 
   <div class="card">
-    <strong>${t(lang, "Key Findings", "关键发现")}</strong>
-    <ul>${keyFindingsHtml || ""}</ul>
+    <strong>${t(lang, narrative.executiveSummary.title.en, narrative.executiveSummary.title.zh)}</strong>
+    <div style="margin-top:8px;color:#334155">
+      <div><span style="font-weight:700">${t(lang, narrative.executiveSummary.overallStatusLabel.en, narrative.executiveSummary.overallStatusLabel.zh)}</span>: ${model.analysis.status}</div>
+      <div><span style="font-weight:700">${t(lang, "Score", "评分")}</span>: ${model.analysis.score}</div>
+      <div style="margin-top:8px"><span style="font-weight:700">${t(lang, narrative.executiveSummary.conclusionLabel.en, narrative.executiveSummary.conclusionLabel.zh)}</span>: ${t(lang, narrative.executiveSummary.conclusion.en, narrative.executiveSummary.conclusion.zh)}</div>
+      <div style="margin-top:8px"><span style="font-weight:700">${t(lang, narrative.executiveSummary.keyReasonsLabel.en, narrative.executiveSummary.keyReasonsLabel.zh)}</span><ul>${executiveReasonsHtml}</ul></div>
+      <div style="margin-top:8px"><span style="font-weight:700">${t(lang, narrative.executiveSummary.dispositionLabel.en, narrative.executiveSummary.dispositionLabel.zh)}</span><ul>${executiveDispositionHtml}</ul></div>
+      <div style="margin-top:6px;color:#64748b;font-size:11px">${t(lang, narrative.executiveSummary.scoreExplain.en, narrative.executiveSummary.scoreExplain.zh)}</div>
+    </div>
   </div>
 
   <div class="card">
-    <strong>${t(lang, "Capability Summary", "过程能力汇总")}</strong>
+    <strong>${t(lang, narrative.criticalFindingsByCharacteristic.title.en, narrative.criticalFindingsByCharacteristic.title.zh)}</strong>
+    ${criticalByCharacteristicHtml || ""}
+  </div>
+
+  ${spcInterpretationHtml ? `
+  <div class="card">
+    <strong>${t(lang, narrative.controlChartInterpretation.title.en, narrative.controlChartInterpretation.title.zh)}</strong>
+    ${spcInterpretationHtml}
+  </div>
+  ` : ""}
+
+  <div class="card">
+    <strong>${t(lang, narrative.measurementSystem.title.en, narrative.measurementSystem.title.zh)}</strong>
+    ${measurementHtml}
+  </div>
+
+  ${xbarrSummaryHtml ? `
+  <div class="card">
+    <strong>${t(lang, "Xbar-R", "Xbar-R")}</strong>
+    ${xbarrSummaryHtml}
+  </div>
+  ` : ""}
+
+  ${stratificationSummaryHtml ? `
+  <div class="card">
+    <strong>${t(lang, "Stratification", "分层")}</strong>
+    ${stratificationSummaryHtml}
+  </div>
+  ` : ""}
+
+  <div class="card">
+    <strong>${t(lang, narrative.engineeringJudgment.title.en, narrative.engineeringJudgment.title.zh)}</strong>
+    <div style="margin-top:6px">${t(lang, narrative.engineeringJudgment.text.en, narrative.engineeringJudgment.text.zh)}</div>
+  </div>
+
+  <div class="card">
+    <strong>${t(lang, narrative.recommendedActions.title.en, narrative.recommendedActions.title.zh)}</strong>
+    <ul>
+      ${narrative.recommendedActions.items.map((x) => `<li>${t(lang, x.en, x.zh)}</li>`).join("\n")}
+    </ul>
+  </div>
+
+  <div class="card">
+    <strong>${t(lang, narrative.capability.title.en, narrative.capability.title.zh)}</strong>
     <table>
       <thead>
         <tr>
@@ -196,6 +390,7 @@ export function generateQualityAnalysisReportHTML(model: QualityAnalysisReportMo
           <th style="text-align:right">std</th>
           <th style="text-align:right">Cp</th>
           <th style="text-align:right">Cpk</th>
+          <th>${t(lang, "Assessment", "评价")}</th>
         </tr>
       </thead>
       <tbody>
@@ -211,6 +406,90 @@ export function QualityAnalysisReportPDF({ model }: { model: QualityAnalysisRepo
   const lang = model.meta?.language ?? "bilingual";
   const title = model.meta?.title ?? t(lang, "Quality Analysis Report", "质量分析报告");
   const generatedAt = new Date().toLocaleString();
+
+  const narrative = buildQualityReportNarrative({ analysis: model.analysis, lang });
+
+  const executiveLines = [
+    `${t(lang, narrative.executiveSummary.overallStatusLabel.en, narrative.executiveSummary.overallStatusLabel.zh)}: ${model.analysis.status}`,
+    `${t(lang, "Score", "评分")}: ${model.analysis.score}`,
+    `${t(lang, narrative.executiveSummary.conclusionLabel.en, narrative.executiveSummary.conclusionLabel.zh)}: ${t(lang, narrative.executiveSummary.conclusion.en, narrative.executiveSummary.conclusion.zh)}`,
+    `${t(lang, narrative.executiveSummary.keyReasonsLabel.en, narrative.executiveSummary.keyReasonsLabel.zh)}:`,
+    ...narrative.executiveSummary.keyReasons.map((r) => `- ${t(lang, r.en, r.zh)}`),
+    `${t(lang, narrative.executiveSummary.dispositionLabel.en, narrative.executiveSummary.dispositionLabel.zh)}:`,
+    ...narrative.executiveSummary.disposition.map((r) => `- ${t(lang, r.en, r.zh)}`),
+    t(lang, narrative.executiveSummary.scoreExplain.en, narrative.executiveSummary.scoreExplain.zh),
+  ];
+
+  const criticalByCharLines = narrative.criticalFindingsByCharacteristic.items.flatMap((it) => {
+    const out: string[] = [];
+    out.push(`${it.characteristic}`);
+    if (it.stability.length) {
+      out.push(`${t(lang, it.stabilityLabel.en, it.stabilityLabel.zh)}:`);
+      out.push(...it.stability.map((b) => `- ${t(lang, b.en, b.zh)}`));
+    }
+    if (it.capability.length) {
+      out.push(`${t(lang, it.capabilityLabel.en, it.capabilityLabel.zh)}:`);
+      out.push(...it.capability.map((b) => `- ${t(lang, b.en, b.zh)}`));
+    }
+    out.push(`${t(lang, it.assessmentLabel.en, it.assessmentLabel.zh)}: ${t(lang, it.assessment.en, it.assessment.zh)}`);
+    if (it.recommendation.length) {
+      out.push(`${t(lang, it.recommendationLabel.en, it.recommendationLabel.zh)}:`);
+      out.push(...it.recommendation.map((b) => `- ${t(lang, b.en, b.zh)}`));
+    }
+    return out;
+  });
+
+  const spcLines = narrative.controlChartInterpretation.items.flatMap((it) => {
+    return [`${it.characteristic}`, ...it.bullets.map((b) => `- ${t(lang, b.en, b.zh)}`)];
+  });
+
+  const measurementLines = [
+    `${t(lang, narrative.measurementSystem.findingsLabel.en, narrative.measurementSystem.findingsLabel.zh)}:`,
+    ...narrative.measurementSystem.findings.map((x) => `- ${t(lang, x.en, x.zh)}`),
+    `${t(lang, narrative.measurementSystem.riskLabel.en, narrative.measurementSystem.riskLabel.zh)}: ${t(lang, narrative.measurementSystem.risk.en, narrative.measurementSystem.risk.zh)}`,
+    `${t(lang, narrative.measurementSystem.recommendationLabel.en, narrative.measurementSystem.recommendationLabel.zh)}:`,
+    ...narrative.measurementSystem.recommendation.map((x) => `- ${t(lang, x.en, x.zh)}`),
+  ];
+
+  const msaLines = narrative.measurementSystem.msaSummary.flatMap((m) => {
+    const pct = m.pctGrr === null || !isFinite(m.pctGrr) ? "—" : `${m.pctGrr.toFixed(1)}%`;
+    const ndc = m.ndc === null || !isFinite(m.ndc) ? "—" : String(m.ndc);
+    return [`${m.characteristic}: %GRR=${pct}, ndc=${ndc}, ${m.assessment}`];
+  });
+
+  const ppapInfoLines = [
+    `${t(lang, "Customer", "客户")}: ${model.meta?.customer ?? "—"}`,
+    `${t(lang, "Supplier", "供应商")}: ${model.meta?.supplier ?? "—"}`,
+    `${t(lang, "Part No.", "零件号")}: ${model.meta?.partNumber ?? "—"}`,
+    `${t(lang, "Part Name", "零件名称")}: ${model.meta?.partName ?? "—"}`,
+    `${t(lang, "Rev", "版本")}: ${model.meta?.rev ?? "—"}`,
+    `${t(lang, "Prepared By", "编制")}: ${model.meta?.preparedBy ?? model.meta?.engineer ?? "—"}`,
+    `${t(lang, "Approved By", "批准")}: ${model.meta?.approvedBy ?? "—"}`,
+    `${t(lang, "Approved Date", "批准日期")}: ${model.meta?.approvedAtISO ?? "—"}`,
+  ];
+
+  const xbarrLines = model.analysis.characteristics
+    .map((c) => {
+      const xb = c.xbarr;
+      if (!xb) return null;
+      const xOoc = xb.points.filter((p) => p.xOutOfControl).length;
+      const rOoc = xb.points.filter((p) => p.rOutOfControl).length;
+      return `${c.name}: n=${xb.subgroupSize}, subgroups=${xb.points.length}, X OOC=${xOoc}, R OOC=${rOoc}`;
+    })
+    .filter((x): x is string => typeof x === "string");
+
+  const stratificationLines = (() => {
+    const s = narrative.stratification;
+    if (!s) return [] as string[];
+    return [
+      `${t(lang, "By", "维度")}: ${s.by}`,
+      t(lang, s.interpretation.en, s.interpretation.zh),
+      ...s.lines.map((x) => `${x.key}: ${x.status} / ${x.score} / n=${x.n}`),
+    ];
+  })();
+
+  const judgmentLines = [t(lang, narrative.engineeringJudgment.text.en, narrative.engineeringJudgment.text.zh)];
+  const actionLines = narrative.recommendedActions.items.map((x) => `- ${t(lang, x.en, x.zh)}`);
 
   const first = model.analysis.characteristics[0];
   const chartPoints: XY[] = first
@@ -230,6 +509,17 @@ export function QualityAnalysisReportPDF({ model }: { model: QualityAnalysisRepo
         createElement(Text, { style: styles.subtitle }, `${t(lang, "Generated", "生成")}: ${generatedAt}`),
         createElement(Text, { style: styles.subtitle }, `${t(lang, "Dataset", "数据集")}: ${model.dataset.name}`)
       ),
+      ppapInfoLines.length > 0 &&
+        createElement(
+          View,
+          { style: styles.section },
+          createElement(Text, { style: styles.sectionTitle }, t(lang, "PPAP / Report Info", "PPAP / 报告信息")),
+          createElement(
+            View,
+            { style: styles.card },
+            ...ppapInfoLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+          )
+        ),
       createElement(
         View,
         { style: styles.section },
@@ -241,6 +531,105 @@ export function QualityAnalysisReportPDF({ model }: { model: QualityAnalysisRepo
           kv(`${t(lang, "Valid", "有效")}`, String(model.analysis.dataQuality.stats.validMeasurements))
         )
       ),
+      executiveLines.length > 0 &&
+        createElement(
+          View,
+          { style: styles.section },
+          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.executiveSummary.title.en, narrative.executiveSummary.title.zh)),
+          createElement(
+            View,
+            { style: styles.card },
+            ...executiveLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+          )
+        ),
+      criticalByCharLines.length > 0 &&
+        createElement(
+          View,
+          { style: styles.section },
+          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.criticalFindingsByCharacteristic.title.en, narrative.criticalFindingsByCharacteristic.title.zh)),
+          createElement(
+            View,
+            { style: styles.card },
+            ...criticalByCharLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+          )
+        ),
+      spcLines.length > 0 &&
+        createElement(
+          View,
+          { style: styles.section },
+          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.controlChartInterpretation.title.en, narrative.controlChartInterpretation.title.zh)),
+          createElement(
+            View,
+            { style: styles.card },
+            ...spcLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+          )
+        ),
+      measurementLines.length > 0 &&
+        createElement(
+          View,
+          { style: styles.section },
+          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.measurementSystem.title.en, narrative.measurementSystem.title.zh)),
+          createElement(
+            View,
+            { style: styles.card },
+            ...measurementLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+          )
+        ),
+      msaLines.length > 0 &&
+        createElement(
+          View,
+          { style: styles.section },
+          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.measurementSystem.msaSummaryLabel.en, narrative.measurementSystem.msaSummaryLabel.zh)),
+          createElement(
+            View,
+            { style: styles.card },
+            ...msaLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+          )
+        ),
+      xbarrLines.length > 0 &&
+        createElement(
+          View,
+          { style: styles.section },
+          createElement(Text, { style: styles.sectionTitle }, t(lang, "Xbar-R", "Xbar-R")),
+          createElement(
+            View,
+            { style: styles.card },
+            ...xbarrLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+          )
+        ),
+      stratificationLines.length > 0 &&
+        createElement(
+          View,
+          { style: styles.section },
+          createElement(Text, { style: styles.sectionTitle }, t(lang, "Stratification", "分层")),
+          createElement(
+            View,
+            { style: styles.card },
+            ...stratificationLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+          )
+        ),
+      judgmentLines.length > 0 &&
+        createElement(
+          View,
+          { style: styles.section },
+          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.engineeringJudgment.title.en, narrative.engineeringJudgment.title.zh)),
+          createElement(
+            View,
+            { style: styles.card },
+            ...judgmentLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+          )
+        ),
+      actionLines.length > 0 &&
+        createElement(
+          View,
+          { style: styles.section },
+          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.recommendedActions.title.en, narrative.recommendedActions.title.zh)),
+          createElement(
+            View,
+            { style: styles.card },
+            ...actionLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+          )
+        ),
       first &&
         createElement(
           View,

@@ -57,6 +57,42 @@ export function inferMapping(headers: string[]): MappingInference {
     (h) => h.includes("批") || h.includes("lot"),
   ]);
 
+  const machine = pick(headers, [
+    (h) => h === "machine" || h === "equipment" || h === "station" || h === "line",
+    (h) => h.includes("machine") || h.includes("equip") || h.includes("station") || h.includes("line"),
+    (h) => h.includes("机台") || h.includes("设备") || h.includes("工位") || h.includes("产线"),
+  ]);
+
+  const shift = pick(headers, [
+    (h) => h === "shift" || h === "team",
+    (h) => h.includes("shift") || h.includes("team"),
+    (h) => h.includes("班次") || h.includes("班组"),
+  ]);
+
+  const appraiser = pick(headers, [
+    (h) => h === "appraiser" || h === "inspector" || h === "operator" || h === "person",
+    (h) => h.includes("appraiser") || h.includes("inspector") || h.includes("operator"),
+    (h) => h.includes("检验") || h.includes("检验员") || h.includes("操作") || h.includes("人员"),
+  ]);
+
+  const gage = pick(headers, [
+    (h) => h === "gage" || h === "gauge" || h === "fixture" || h === "tool",
+    (h) => h.includes("gage") || h.includes("gauge") || h.includes("fixture") || h.includes("tool"),
+    (h) => h.includes("量具") || h.includes("夹具") || h.includes("工装"),
+  ]);
+
+  const trial = pick(headers, [
+    (h) => h === "trial" || h === "repeat" || h === "rep" || h === "iteration",
+    (h) => h.includes("trial") || h.includes("repeat") || h.includes("rep") || h.includes("iter"),
+    (h) => h.includes("重复") || h.includes("次数") || h.includes("试次"),
+  ]);
+
+  const subgroupId = pick(headers, [
+    (h) => h === "subgroup" || h === "subgroupid" || h === "group" || h === "groupid",
+    (h) => h.includes("subgroup") || h.includes("groupid") || h.includes("group"),
+    (h) => h.includes("子组") || h.includes("分组") || h.includes("组号"),
+  ]);
+
   const unit = pick(headers, [
     (h) => h === "unit" || h === "units",
     (h) => h.includes("unit"),
@@ -117,6 +153,12 @@ export function inferMapping(headers: string[]): MappingInference {
     timestamp: scoreForHeader(timestamp, !!timestamp),
     partId: scoreForHeader(partId, !!partId),
     lot: scoreForHeader(lot, !!lot),
+    machine: scoreForHeader(machine, !!machine),
+    shift: scoreForHeader(shift, !!shift),
+    appraiser: scoreForHeader(appraiser, !!appraiser),
+    gage: scoreForHeader(gage, !!gage),
+    trial: scoreForHeader(trial, !!trial),
+    subgroupId: scoreForHeader(subgroupId, !!subgroupId),
     unit: scoreForHeader(unit, !!unit),
     lsl: scoreForHeader(lsl, !!lsl),
     usl: scoreForHeader(usl, !!usl),
@@ -130,6 +172,12 @@ export function inferMapping(headers: string[]): MappingInference {
     timestamp,
     partId,
     lot,
+    machine,
+    shift,
+    appraiser,
+    gage,
+    trial,
+    subgroupId,
     unit,
     lsl,
     usl,

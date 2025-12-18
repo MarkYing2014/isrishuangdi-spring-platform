@@ -18,6 +18,10 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 
+import { QualityImrCharts } from "@/components/quality/QualityImrCharts";
+import { QualityStratificationChart } from "@/components/quality/QualityStratificationChart";
+import { QualityXbarRCharts } from "@/components/quality/QualityXbarRCharts";
+
 import type { FieldMapping, IngestPreview, QualityAnalysisResult } from "@/lib/quality";
 
 export default function QualityPage() {
@@ -25,11 +29,26 @@ export default function QualityPage() {
   const [csvText, setCsvText] = useState<string>("");
   const [delimiter, setDelimiter] = useState<string>(",");
 
+  const [stratifyBy, setStratifyBy] = useState<"auto" | "none" | "machine" | "lot" | "shift" | "appraiser" | "gage">("auto");
+
   const [dataset, setDataset] = useState<{ id: string; name: string; headers: string[] } | null>(null);
   const [preview, setPreview] = useState<IngestPreview | null>(null);
   const [mapping, setMapping] = useState<FieldMapping | null>(null);
   const [analysis, setAnalysis] = useState<QualityAnalysisResult | null>(null);
   const [reportHtml, setReportHtml] = useState<string | null>(null);
+
+  const [selectedCharacteristic, setSelectedCharacteristic] = useState<string | null>(null);
+
+  const [reportMeta, setReportMeta] = useState({
+    customer: "",
+    supplier: "",
+    partNumber: "",
+    partName: "",
+    rev: "",
+    preparedBy: "",
+    approvedBy: "",
+    approvedAtISO: "",
+  });
 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +62,109 @@ export default function QualityPage() {
       "2025-01-01 08:03:00,FreeLength,49.96,49.8,50.2,mm,L1,M01",
       "2025-01-01 08:06:00,FreeLength,50.11,49.8,50.2,mm,L1,M02",
     ].join("\n");
+  }, []);
+
+  const sampleCsvLarge = useMemo(() => {
+    let seed = 42;
+    const rand = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+
+    const approxNormal = () => {
+      let s = 0;
+      for (let i = 0; i < 6; i++) s += rand();
+      return s - 3;
+    };
+
+    const pad2 = (n: number) => String(n).padStart(2, "0");
+    const fmtTs = (d: Date) => {
+      return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}T${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}Z`;
+    };
+
+    const cols = [
+      "timestamp",
+      "characteristic",
+      "value",
+      "lsl",
+      "usl",
+      "target",
+      "unit",
+      "lot",
+      "machine",
+      "shift",
+      "appraiser",
+      "gage",
+      "partId",
+      "result",
+    ];
+
+    const base = new Date(Date.UTC(2025, 0, 1, 8, 0, 0));
+    const lines: string[] = [cols.join(",")];
+
+    const characteristics = [
+      { name: "FreeLength", mean: 50.0, std: 0.035, lsl: 49.8, usl: 50.2, target: 50.0, unit: "mm" },
+      { name: "WireDiameter", mean: 3.2, std: 0.008, lsl: 3.15, usl: 3.25, target: 3.2, unit: "mm" },
+      { name: "Load@10mm", mean: 105.0, std: 1.2, lsl: 100.0, usl: 110.0, target: 105.0, unit: "N" },
+    ] as const;
+
+    const rowsPerChar = 40;
+    let globalIdx = 0;
+
+    for (let cIdx = 0; cIdx < characteristics.length; cIdx++) {
+      const c = characteristics[cIdx];
+      for (let i = 0; i < rowsPerChar; i++) {
+        const ts = new Date(base.getTime() + globalIdx * 3 * 60 * 1000);
+        const lot = (["L1", "L2", "L3"][cIdx] ?? "L1") as string;
+        const machine = `M${pad2((globalIdx % 3) + 1)}`;
+        const shift = globalIdx % 60 < 30 ? "A" : "B";
+        const inspector = `I${pad2((globalIdx % 4) + 1)}`;
+        const gage = `G${pad2((globalIdx % 2) + 1)}`;
+        const partId = `SN${String(globalIdx + 1).padStart(4, "0")}`;
+
+        const drift = cIdx === 2 ? (globalIdx / 120) * 0.6 : cIdx === 0 ? (globalIdx / 120) * 0.05 : 0;
+        let valueNum = c.mean + drift + approxNormal() * c.std;
+
+        if (i === 9 && cIdx === 0) valueNum = c.usl + 0.25;
+        if (i === 27 && cIdx === 1) valueNum = c.lsl - 0.03;
+        if (i === 33 && cIdx === 2) valueNum = c.usl + 3.5;
+
+        const valueStr = (() => {
+          if (i === 5 && cIdx === 2) return "";
+          if (i === 18 && cIdx === 0) return "abc";
+          return valueNum.toFixed(cIdx === 1 ? 4 : 3);
+        })();
+
+        const tsStr = i === 12 && cIdx === 1 ? "not-a-time" : fmtTs(ts);
+
+        const parsedVal = Number(valueStr);
+        const pass = isFinite(parsedVal) && valueStr.trim() !== "" && parsedVal >= c.lsl && parsedVal <= c.usl;
+        const result = pass ? "PASS" : valueStr.trim() === "" || !isFinite(parsedVal) ? "UNKNOWN" : "FAIL";
+
+        lines.push(
+          [
+            tsStr,
+            c.name,
+            valueStr,
+            String(c.lsl),
+            String(c.usl),
+            String(c.target),
+            c.unit,
+            lot,
+            machine,
+            shift,
+            inspector,
+            gage,
+            partId,
+            result,
+          ].join(",")
+        );
+
+        globalIdx++;
+      }
+    }
+
+    return lines.join("\n");
   }, []);
 
   async function ingest() {
@@ -89,7 +211,7 @@ export default function QualityPage() {
       const res = await fetch("/api/quality/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ datasetId: dataset.id, mapping }),
+        body: JSON.stringify({ datasetId: dataset.id, mapping, options: { stratifyBy } }),
       });
 
       const data = await res.json();
@@ -99,6 +221,7 @@ export default function QualityPage() {
       }
 
       setAnalysis(data.analysis as QualityAnalysisResult);
+      setSelectedCharacteristic((data.analysis as QualityAnalysisResult)?.characteristics?.[0]?.name ?? null);
       setStep("analysis");
     } finally {
       setBusy(null);
@@ -117,7 +240,12 @@ export default function QualityPage() {
       const res = await fetch("/api/reports/quality-analysis?format=html", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ datasetId: dataset.id, mapping, meta: { language: "bilingual" } }),
+        body: JSON.stringify({
+          datasetId: dataset.id,
+          mapping,
+          meta: { language: "bilingual", ...reportMeta },
+          options: { stratifyBy },
+        }),
       });
 
       const text = await res.text();
@@ -144,7 +272,12 @@ export default function QualityPage() {
       const res = await fetch("/api/reports/quality-analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ datasetId: dataset.id, mapping, meta: { language: "bilingual" } }),
+        body: JSON.stringify({
+          datasetId: dataset.id,
+          mapping,
+          meta: { language: "bilingual", ...reportMeta },
+          options: { stratifyBy },
+        }),
       });
 
       if (!res.ok) {
@@ -176,7 +309,13 @@ export default function QualityPage() {
     { key: "target", label: { en: "Target", zh: "目标/名义" } },
     { key: "unit", label: { en: "Unit", zh: "单位" } },
     { key: "lot", label: { en: "Lot", zh: "批次" } },
+    { key: "machine", label: { en: "Machine", zh: "机台/设备" } },
+    { key: "shift", label: { en: "Shift", zh: "班次" } },
     { key: "partId", label: { en: "Part/Serial", zh: "件号/序列" } },
+    { key: "appraiser", label: { en: "Appraiser/Inspector", zh: "检验员" } },
+    { key: "gage", label: { en: "Gage", zh: "量具" } },
+    { key: "trial", label: { en: "Trial", zh: "试次/重复" } },
+    { key: "subgroupId", label: { en: "Subgroup", zh: "子组/分组" } },
     { key: "result", label: { en: "Result", zh: "判定" } },
   ];
 
@@ -305,6 +444,9 @@ export default function QualityPage() {
                     <Button variant="outline" onClick={() => setCsvText(sampleCsv)} disabled={busy !== null}>
                       <LanguageText en="Use sample" zh="使用示例" />
                     </Button>
+                    <Button variant="outline" onClick={() => setCsvText(sampleCsvLarge)} disabled={busy !== null}>
+                      <LanguageText en="Use large sample" zh="使用大样本" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -358,6 +500,66 @@ export default function QualityPage() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="truncate font-medium">{dataset.name}</div>
                       <div className="text-muted-foreground">{dataset.id}</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:items-center">
+                    <Label className="text-sm">
+                      <LanguageText en="Stratify By" zh="分层维度" />
+                    </Label>
+                    <Select value={stratifyBy} onValueChange={(v) => setStratifyBy(v as any)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="auto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">auto</SelectItem>
+                        <SelectItem value="none">none</SelectItem>
+                        <SelectItem value="machine">machine</SelectItem>
+                        <SelectItem value="lot">lot</SelectItem>
+                        <SelectItem value="shift">shift</SelectItem>
+                        <SelectItem value="appraiser">appraiser</SelectItem>
+                        <SelectItem value="gage">gage</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="rounded-md border p-3 space-y-3">
+                    <div className="text-sm font-medium">
+                      <LanguageText en="PPAP / Report Info" zh="PPAP / 报告信息" />
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Customer / 客户</Label>
+                        <Input value={reportMeta.customer} onChange={(e) => setReportMeta((p) => ({ ...p, customer: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Supplier / 供应商</Label>
+                        <Input value={reportMeta.supplier} onChange={(e) => setReportMeta((p) => ({ ...p, supplier: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Part No. / 零件号</Label>
+                        <Input value={reportMeta.partNumber} onChange={(e) => setReportMeta((p) => ({ ...p, partNumber: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Part Name / 零件名称</Label>
+                        <Input value={reportMeta.partName} onChange={(e) => setReportMeta((p) => ({ ...p, partName: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Rev / 版本</Label>
+                        <Input value={reportMeta.rev} onChange={(e) => setReportMeta((p) => ({ ...p, rev: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Prepared By / 编制</Label>
+                        <Input value={reportMeta.preparedBy} onChange={(e) => setReportMeta((p) => ({ ...p, preparedBy: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Approved By / 批准</Label>
+                        <Input value={reportMeta.approvedBy} onChange={(e) => setReportMeta((p) => ({ ...p, approvedBy: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Approved Date / 批准日期</Label>
+                        <Input value={reportMeta.approvedAtISO} onChange={(e) => setReportMeta((p) => ({ ...p, approvedAtISO: e.target.value }))} placeholder="YYYY-MM-DD" />
+                      </div>
                     </div>
                   </div>
 
@@ -436,6 +638,58 @@ export default function QualityPage() {
 
           {step === "analysis" && analysis && dataset && mapping && (
             <div className="space-y-4">
+              {(() => {
+                const selected =
+                  analysis.characteristics.find((c) => c.name === selectedCharacteristic) ??
+                  analysis.characteristics[0] ??
+                  null;
+
+                return selected ? (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">
+                        <LanguageText en="Charts" zh="图表" />
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:items-center">
+                        <Label className="text-sm">
+                          <LanguageText en="Characteristic" zh="特性" />
+                        </Label>
+                        <Select
+                          value={selectedCharacteristic ?? selected.name}
+                          onValueChange={(v) => setSelectedCharacteristic(v)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="—" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {analysis.characteristics.map((c) => (
+                              <SelectItem key={c.name} value={c.name}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <QualityImrCharts imr={selected.imr} height={260} />
+
+                      {selected.xbarr && <QualityXbarRCharts xbarr={selected.xbarr} height={260} />}
+
+                      {analysis.stratification && (
+                        <div className="space-y-2">
+                          <div className="text-sm text-muted-foreground">
+                            <LanguageText en="Stratification score comparison" zh="分层评分对比" />
+                          </div>
+                          <QualityStratificationChart stratification={analysis.stratification} height={260} />
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ) : null;
+              })()}
+
               <div className="grid gap-4 md:grid-cols-3">
                 <Card>
                   <CardHeader className="pb-2">
@@ -474,8 +728,8 @@ export default function QualityPage() {
                       <div className="text-muted-foreground">—</div>
                     ) : (
                       <div className="space-y-1">
-                        {analysis.keyFindings.slice(0, 10).map((f) => (
-                          <div key={f.id} className="flex gap-2">
+                        {analysis.keyFindings.slice(0, 10).map((f, idx) => (
+                          <div key={`${f.id}-${idx}`} className="flex gap-2">
                             <span className="w-[64px] shrink-0 font-mono text-xs">{f.severity}</span>
                             <span className="text-muted-foreground">{f.title.en} / {f.title.zh}</span>
                           </div>
@@ -493,6 +747,22 @@ export default function QualityPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {analysis.stratification && (
+                    <div className="rounded-md border p-3 text-sm">
+                      <div className="font-medium">
+                        <LanguageText en="Stratification" zh="分层" />: {analysis.stratification.by}
+                      </div>
+                      <div className="mt-2 grid gap-1">
+                        {analysis.stratification.strata.slice(0, 8).map((s) => (
+                          <div key={s.key} className="flex items-center justify-between">
+                            <span className="text-muted-foreground">{s.key}</span>
+                            <span className="font-mono text-xs">{s.status} / {s.score} / n={s.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <Table>
                     <TableHeader>
                       <TableRow>

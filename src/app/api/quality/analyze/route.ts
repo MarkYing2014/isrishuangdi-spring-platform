@@ -11,6 +11,9 @@ import type { FieldMapping, QualityAnalysisResult } from "@/lib/quality";
 type QualityAnalyzeRequest = {
   datasetId: string;
   mapping?: FieldMapping;
+  options?: {
+    stratifyBy?: string;
+  };
 };
 
 type QualityAnalyzeResponse = {
@@ -29,6 +32,12 @@ function normalizeMapping(mapping: FieldMapping): FieldMapping {
     characteristic: clean(mapping.characteristic),
     partId: clean(mapping.partId),
     lot: clean(mapping.lot),
+    machine: clean(mapping.machine),
+    shift: clean(mapping.shift),
+    appraiser: clean(mapping.appraiser),
+    gage: clean(mapping.gage),
+    trial: clean(mapping.trial),
+    subgroupId: clean(mapping.subgroupId),
     unit: clean(mapping.unit),
     lsl: clean(mapping.lsl),
     usl: clean(mapping.usl),
@@ -58,7 +67,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "mapping.value is required" }, { status: 400 });
     }
 
-    const analysis = analyzeDataset({ dataset, mapping });
+    const analysis = analyzeDataset({
+      dataset,
+      mapping,
+      options: {
+        stratifyBy: body.options?.stratifyBy as any,
+      },
+    });
     await saveAnalysis(analysis);
 
     const response: QualityAnalyzeResponse = { analysis };
