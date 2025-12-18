@@ -31,13 +31,13 @@ function statusIndicatorClass(status: string): string {
   const base = "h-2 w-2 rounded-full";
   switch (status) {
     case "RUNNING":
-      return `${base} bg-emerald-600 motion-reduce:animate-none animate-pulse`;
+      return `${base} bg-emerald-600`;
     case "STOPPED":
       return `${base} bg-slate-400`;
     case "ALARM":
-      return `${base} bg-rose-600 motion-reduce:animate-none animate-pulse`;
+      return `${base} bg-rose-600`;
     case "SETUP":
-      return `${base} bg-blue-600 motion-reduce:animate-none animate-pulse`;
+      return `${base} bg-blue-600`;
     default:
       return `${base} bg-slate-400`;
   }
@@ -87,7 +87,10 @@ function severityBadgeColor(severity: string): string {
 
 function MachineCardComponent({ machine }: { machine: MachineRiskCard }) {
   return (
-    <div className="rounded-lg border bg-background p-4 space-y-3">
+    <div className="relative rounded-lg border bg-background p-4 space-y-3">
+      {machine.status === "ALARM" ? (
+        <div className="pointer-events-none absolute inset-0 rounded-lg ring-2 ring-rose-200 motion-reduce:hidden animate-pulse" />
+      ) : null}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-muted/30">
@@ -95,7 +98,7 @@ function MachineCardComponent({ machine }: { machine: MachineRiskCard }) {
               className={`h-4 w-4 ${machineIconClass(machine.status)}`}
               style={
                 machine.status === "RUNNING"
-                  ? ({ animationDuration: "3s" } as React.CSSProperties)
+                  ? ({ animationDuration: "2.2s" } as React.CSSProperties)
                   : undefined
               }
             />
@@ -103,7 +106,19 @@ function MachineCardComponent({ machine }: { machine: MachineRiskCard }) {
           <div className="font-semibold truncate">{machine.machineId}</div>
         </div>
         <div className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeColor(machine.status)}`}>
-          <span className={statusIndicatorClass(machine.status)} />
+          {(machine.status === "RUNNING" || machine.status === "ALARM") && (
+            <span className="relative flex h-2 w-2">
+              <span
+                className={`absolute inline-flex h-full w-full rounded-full opacity-60 motion-reduce:hidden animate-ping ${
+                  machine.status === "ALARM" ? "bg-rose-400" : "bg-emerald-400"
+                }`}
+              />
+              <span className={`relative inline-flex ${statusIndicatorClass(machine.status)}`} />
+            </span>
+          )}
+          {machine.status !== "RUNNING" && machine.status !== "ALARM" && (
+            <span className={statusIndicatorClass(machine.status)} />
+          )}
           {machine.status}
         </div>
       </div>
