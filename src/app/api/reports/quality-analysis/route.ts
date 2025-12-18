@@ -9,7 +9,7 @@ import {
   loadDataset,
   saveAnalysis,
 } from "@/lib/quality";
-import type { FieldMapping } from "@/lib/quality";
+import type { FieldMapping, QualityDataset } from "@/lib/quality";
 import {
   generateQualityAnalysisReportHTML,
   QualityAnalysisReportPDF,
@@ -17,7 +17,8 @@ import {
 } from "@/lib/quality";
 
 type QualityReportRequest = {
-  datasetId: string;
+  datasetId?: string;
+  dataset?: QualityDataset;
   mapping?: FieldMapping;
   meta?: QualityAnalysisReportModel["meta"];
   options?: {
@@ -55,16 +56,21 @@ function normalizeMapping(mapping: FieldMapping): FieldMapping {
 export async function POST(req: NextRequest) {
   try {
     const data = (await req.json()) as QualityReportRequest;
-    if (!data?.datasetId) {
-      return NextResponse.json({ error: "datasetId is required" }, { status: 400 });
+
+    // Support both inline dataset (serverless) and datasetId (persistent storage)
+    let dataset: QualityDataset | null = null;
+
+    if (data.dataset && data.dataset.headers && data.dataset.rows) {
+      dataset = data.dataset;
+    } else if (data.datasetId) {
+      dataset = await loadDataset(data.datasetId);
     }
 
-    const dataset = await loadDataset(data.datasetId);
     if (!dataset) {
       return NextResponse.json(
         {
           error:
-            "Dataset not found. If running on serverless, tmp filesystem is not durable across requests/instances. Please re-upload, or configure QUALITY_DATA_DIR to a persistent writable path when self-hosting.",
+            "Dataset not found. Please provide dataset inline or re-upload if running on serverless.",
         },
         { status: 404 }
       );
@@ -79,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     const format = req.nextUrl.searchParams.get("format") ?? "pdf";
 
-    const existing = await loadAnalysis(data.datasetId);
+    const existing = data.datasetId ? await loadAnalysis(data.datasetId) : null;
     const requestedStratifyBy = (data.options?.stratifyBy ?? "auto") as any;
     const existingStratifyBy = (existing as any)?.options?.stratifyBy ?? "auto";
 
@@ -89,7 +95,11 @@ export async function POST(req: NextRequest) {
       : analyzeDataset({ dataset, mapping, options: { stratifyBy: requestedStratifyBy } });
 
     if (!shouldReuse) {
-      await saveAnalysis(analysis);
+      try {
+        await saveAnalysis(analysis);
+      } catch {
+        // Ignore save errors on serverless
+      }
     }
 
     const model: QualityAnalysisReportModel = {

@@ -6,10 +6,11 @@ import {
   loadDataset,
   saveAnalysis,
 } from "@/lib/quality";
-import type { FieldMapping, QualityAnalysisResult } from "@/lib/quality";
+import type { FieldMapping, QualityAnalysisResult, QualityDataset } from "@/lib/quality";
 
 type QualityAnalyzeRequest = {
-  datasetId: string;
+  datasetId?: string;
+  dataset?: QualityDataset;
   mapping?: FieldMapping;
   options?: {
     stratifyBy?: string;
@@ -51,16 +52,20 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as QualityAnalyzeRequest;
 
-    if (!body?.datasetId) {
-      return NextResponse.json({ error: "datasetId is required" }, { status: 400 });
+    // Support both inline dataset (serverless) and datasetId (persistent storage)
+    let dataset: QualityDataset | null = null;
+
+    if (body.dataset && body.dataset.headers && body.dataset.rows) {
+      dataset = body.dataset;
+    } else if (body.datasetId) {
+      dataset = await loadDataset(body.datasetId);
     }
 
-    const dataset = await loadDataset(body.datasetId);
     if (!dataset) {
       return NextResponse.json(
         {
           error:
-            "Dataset not found. If running on serverless, tmp filesystem is not durable across requests/instances. Please re-upload, or configure QUALITY_DATA_DIR to a persistent writable path when self-hosting.",
+            "Dataset not found. Please provide dataset inline or re-upload if running on serverless.",
         },
         { status: 404 }
       );
@@ -80,7 +85,12 @@ export async function POST(req: NextRequest) {
         stratifyBy: body.options?.stratifyBy as any,
       },
     });
-    await saveAnalysis(analysis);
+    // Try to save analysis (may fail on serverless)
+    try {
+      await saveAnalysis(analysis);
+    } catch {
+      // Ignore save errors on serverless
+    }
 
     const response: QualityAnalyzeResponse = { analysis };
     return NextResponse.json(response);

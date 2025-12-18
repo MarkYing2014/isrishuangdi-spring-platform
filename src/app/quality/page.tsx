@@ -22,7 +22,7 @@ import { QualityImrCharts } from "@/components/quality/QualityImrCharts";
 import { QualityStratificationChart } from "@/components/quality/QualityStratificationChart";
 import { QualityXbarRCharts } from "@/components/quality/QualityXbarRCharts";
 
-import type { FieldMapping, IngestPreview, QualityAnalysisResult } from "@/lib/quality";
+import type { FieldMapping, IngestPreview, QualityAnalysisResult, QualityDataset } from "@/lib/quality";
 
 export default function QualityPage() {
   const [step, setStep] = useState<"upload" | "mapping" | "analysis">("upload");
@@ -31,7 +31,7 @@ export default function QualityPage() {
 
   const [stratifyBy, setStratifyBy] = useState<"auto" | "none" | "machine" | "lot" | "shift" | "appraiser" | "gage">("auto");
 
-  const [dataset, setDataset] = useState<{ id: string; name: string; headers: string[] } | null>(null);
+  const [dataset, setDataset] = useState<QualityDataset | null>(null);
   const [preview, setPreview] = useState<IngestPreview | null>(null);
   const [mapping, setMapping] = useState<FieldMapping | null>(null);
   const [analysis, setAnalysis] = useState<QualityAnalysisResult | null>(null);
@@ -185,7 +185,7 @@ export default function QualityPage() {
         return;
       }
 
-      setDataset({ id: data.dataset.id, name: data.dataset.name, headers: data.dataset.headers });
+      setDataset(data.dataset as QualityDataset);
       setPreview(data.preview as IngestPreview);
       setMapping(data.mappingInference?.mapping as FieldMapping);
       setStep("mapping");
@@ -211,7 +211,7 @@ export default function QualityPage() {
       const res = await fetch("/api/quality/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ datasetId: dataset.id, mapping, options: { stratifyBy } }),
+        body: JSON.stringify({ dataset, mapping, options: { stratifyBy } }),
       });
 
       const data = await res.json();
@@ -241,7 +241,7 @@ export default function QualityPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          datasetId: dataset.id,
+          dataset,
           mapping,
           meta: { language: "bilingual", ...reportMeta },
           options: { stratifyBy },
@@ -278,7 +278,7 @@ export default function QualityPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          datasetId: dataset.id,
+          dataset,
           mapping,
           meta: { language: "bilingual", ...reportMeta },
           options: { stratifyBy },

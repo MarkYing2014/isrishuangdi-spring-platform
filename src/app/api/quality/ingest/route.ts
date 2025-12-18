@@ -16,7 +16,7 @@ type QualityIngestRequest = {
 };
 
 type QualityIngestResponse = {
-  dataset: Pick<QualityDataset, "id" | "name" | "createdAtISO" | "source" | "headers">;
+  dataset: QualityDataset;
   preview: IngestPreview;
   mappingInference: ReturnType<typeof inferMapping>;
   errors: string[];
@@ -53,21 +53,21 @@ export async function POST(req: NextRequest) {
       inferredMapping: inference.mapping,
     };
 
-    await saveDataset(dataset);
+    // Try to save to filesystem (may fail on serverless, that's ok for demo)
+    try {
+      await saveDataset(dataset);
+    } catch {
+      // Ignore save errors on serverless - frontend will hold the data
+    }
 
     const preview: IngestPreview = {
       headers: parsed.headers,
       sampleRows: parsed.rows.slice(0, 20),
     };
 
+    // Return full dataset so frontend can hold it for stateless analysis
     const response: QualityIngestResponse = {
-      dataset: {
-        id: dataset.id,
-        name: dataset.name,
-        createdAtISO: dataset.createdAtISO,
-        source: dataset.source,
-        headers: dataset.headers,
-      },
+      dataset,
       preview,
       mappingInference: inference,
       errors: [],
