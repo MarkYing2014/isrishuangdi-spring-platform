@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AlertTriangle, Cog } from "lucide-react";
 
 import { LanguageText } from "@/components/language-context";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,36 @@ function riskBadgeColor(status: LiveRiskStatus): string {
       return "bg-amber-100 text-amber-800 border-amber-200";
     case "HIGH_RISK":
       return "bg-rose-100 text-rose-800 border-rose-200";
+  }
+}
+
+function statusIndicatorClass(status: string): string {
+  const base = "h-2 w-2 rounded-full";
+  switch (status) {
+    case "RUNNING":
+      return `${base} bg-emerald-600 motion-reduce:animate-none animate-pulse`;
+    case "STOPPED":
+      return `${base} bg-slate-400`;
+    case "ALARM":
+      return `${base} bg-rose-600 motion-reduce:animate-none animate-pulse`;
+    case "SETUP":
+      return `${base} bg-blue-600 motion-reduce:animate-none animate-pulse`;
+    default:
+      return `${base} bg-slate-400`;
+  }
+}
+
+function machineIconClass(status: string): string {
+  switch (status) {
+    case "RUNNING":
+      return "text-emerald-700 motion-reduce:animate-none animate-spin";
+    case "ALARM":
+      return "text-rose-700";
+    case "SETUP":
+      return "text-blue-700";
+    case "STOPPED":
+    default:
+      return "text-slate-500";
   }
 }
 
@@ -58,8 +89,21 @@ function MachineCardComponent({ machine }: { machine: MachineRiskCard }) {
   return (
     <div className="rounded-lg border bg-background p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <div className="font-semibold">{machine.machineId}</div>
-        <div className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeColor(machine.status)}`}>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-muted/30">
+            <Cog
+              className={`h-4 w-4 ${machineIconClass(machine.status)}`}
+              style={
+                machine.status === "RUNNING"
+                  ? ({ animationDuration: "3s" } as React.CSSProperties)
+                  : undefined
+              }
+            />
+          </div>
+          <div className="font-semibold truncate">{machine.machineId}</div>
+        </div>
+        <div className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeColor(machine.status)}`}>
+          <span className={statusIndicatorClass(machine.status)} />
           {machine.status}
         </div>
       </div>
@@ -109,7 +153,7 @@ function MachineCardComponent({ machine }: { machine: MachineRiskCard }) {
 
       {machine.tempDrift && (
         <div className="text-xs text-amber-600 flex items-center gap-1">
-          <span>⚠</span>
+          <AlertTriangle className="h-3 w-3" />
           <LanguageText en="Temperature drift" zh="温度漂移" />
         </div>
       )}
