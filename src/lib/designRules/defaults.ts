@@ -68,4 +68,20 @@ export const designRulesDefaults = {
     stageProximityD: 1,
     solidProximityD: 2,
   },
+
+  spiral: {
+    strain_ok: 0.004,
+    strain_warn: 0.006,
+    diameter_ratio_ok_min: 2,
+    diameter_ratio_ok_max: 6,
+    diameter_ratio_fail_max: 10,
+    width_thickness_ok_min: 6,
+    width_thickness_ok_max: 20,
+    width_thickness_fail_min: 4,
+    width_thickness_fail_max: 30,
+    n_warn: 15,
+    n_fail: 25,
+    theta_warn_rad: 8 * Math.PI,
+    theta_fail_rad: 12 * Math.PI,
+  },
 } as const;

@@ -5,12 +5,14 @@ import { getDefaultArcSpringInput } from "@/lib/arcSpring";
 import type { CompressionSpringEds } from "@/lib/eds/engineeringDefinition";
 import type { ConicalGeometry, ExtensionGeometry, TorsionGeometry } from "@/lib/stores/springDesignStore";
 import { calculateConicalSpringNonlinear } from "@/lib/springMath";
+import type { SpiralTorsionGeometry } from "@/lib/stores/springDesignStore";
 
 import {
   buildArcSpringDesignRuleReport,
   buildCompressionDesignRuleReport,
   buildConicalDesignRuleReport,
   buildExtensionDesignRuleReport,
+  buildSpiralSpringDesignRuleReport,
   buildTorsionDesignRuleReport,
   buildVariablePitchCompressionDesignRuleReport,
 } from "@/lib/designRules";
@@ -303,5 +305,63 @@ describe("designRules framework", () => {
 
     expect(report.metrics.first_contact_deflection).toBeDefined();
     expect(report.findings.some((f: DesignRuleFinding) => f.id === "VP_NEAR_CONTACT_STAGE")).toBe(true);
+  });
+
+  test("spiral: excessive bending strain yields FAIL", () => {
+    const geom: SpiralTorsionGeometry = {
+      type: "spiralTorsion",
+      stripWidth: 10,
+      stripThickness: 1,
+      activeLength: 500,
+      innerDiameter: 10,
+      outerDiameter: 50,
+      activeCoils: 5,
+      preloadAngle: 0,
+      minWorkingAngle: 0,
+      maxWorkingAngle: 90,
+      closeOutAngle: 360,
+      windingDirection: "cw",
+      innerEndType: "fixed",
+      outerEndType: "fixed",
+      spiralMaterialId: "sae1095",
+    };
+
+    const report = buildSpiralSpringDesignRuleReport({
+      geometry: geom,
+      analysisResult: {
+        springRate: 10,
+        springRateUnit: "N·mm/deg",
+        maxStress: 100,
+        staticSafetyFactor: 2,
+        workingDeflection: 90,
+      },
+    });
+
+    expect(report.summary.status).toBe("FAIL");
+    expect(report.findings.some((f: DesignRuleFinding) => f.id === "SPIRAL_STRAIN_TOO_HIGH")).toBe(true);
+  });
+
+  test("spiral: diameter ratio outside range yields FAIL", () => {
+    const geom: SpiralTorsionGeometry = {
+      type: "spiralTorsion",
+      stripWidth: 10,
+      stripThickness: 0.5,
+      activeLength: 500,
+      innerDiameter: 30,
+      outerDiameter: 40,
+      activeCoils: 5,
+      preloadAngle: 0,
+      minWorkingAngle: 0,
+      maxWorkingAngle: 90,
+      closeOutAngle: 360,
+      windingDirection: "cw",
+      innerEndType: "fixed",
+      outerEndType: "fixed",
+      spiralMaterialId: "sae1095",
+    };
+
+    const report = buildSpiralSpringDesignRuleReport({ geometry: geom, analysisResult: null });
+    expect(report.summary.status).toBe("FAIL");
+    expect(report.findings.some((f: DesignRuleFinding) => f.id === "SPIRAL_DIAMETER_RATIO_BAD" && f.level === "error")).toBe(true);
   });
 });

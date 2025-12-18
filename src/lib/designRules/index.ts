@@ -5,6 +5,7 @@ export * from "./extensionRules";
 export * from "./torsionRules";
 export * from "./conicalRules";
 export * from "./variablePitchRules";
+export * from "./spiralSpringRules";
 export * from "./defaults";
 
 export { buildArcSpringDesignRuleReport } from "./arcSpringRules";
@@ -13,3 +14,4 @@ export { buildExtensionDesignRuleReport } from "./extensionRules";
 export { buildTorsionDesignRuleReport } from "./torsionRules";
 export { buildConicalDesignRuleReport } from "./conicalRules";
 export { buildVariablePitchCompressionDesignRuleReport } from "./variablePitchRules";
+export { buildSpiralSpringDesignRuleReport } from "./spiralSpringRules";

@@ -40,6 +40,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DimensionHint } from "./DimensionHint";
+import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import {
   Select,
   SelectContent,
@@ -58,6 +59,7 @@ import {
   getSpiralSpringMaterial,
   type SpiralSpringMaterial,
 } from "@/lib/spring3d/spiralSpringMaterials";
+import { buildSpiralSpringDesignRuleReport } from "@/lib/designRules";
 
 // ================================================================
 // Types
@@ -609,6 +611,42 @@ export function SpiralTorsionCalculator() {
     );
   }, [submitted, watchedValues, materialId]);
 
+  const designRuleReport = useMemo(() => {
+    const geometry: SpiralTorsionGeometry = {
+      type: "spiralTorsion",
+      stripWidth: watchedValues.stripWidth ?? 10,
+      stripThickness: watchedValues.stripThickness ?? 0.5,
+      activeLength: watchedValues.activeLength ?? 500,
+      innerDiameter: watchedValues.innerDiameter ?? 15,
+      outerDiameter: watchedValues.outerDiameter ?? 50,
+      activeCoils: watchedValues.activeCoils ?? 5,
+      preloadAngle: watchedValues.preloadAngle ?? 0,
+      minWorkingAngle: watchedValues.minWorkingAngle ?? 0,
+      maxWorkingAngle: watchedValues.maxWorkingAngle ?? 90,
+      closeOutAngle: watchedValues.closeOutAngle ?? 360,
+      windingDirection: watchedValues.windingDirection ?? "cw",
+      innerEndType: watchedValues.innerEndType ?? "fixed",
+      outerEndType: watchedValues.outerEndType ?? "fixed",
+      spiralMaterialId: materialId,
+    };
+
+    const analysisResult: AnalysisResult | null = results
+      ? {
+          springRate: results.springRateCorrected,
+          springRateUnit: "N·mm/deg",
+          maxStress: results.maxStressLinear,
+          staticSafetyFactor: results.safetyFactorLinear,
+          workingDeflection: watchedValues.maxWorkingAngle ?? 90,
+          maxDeflection: watchedValues.closeOutAngle ?? 360,
+        }
+      : null;
+
+    return buildSpiralSpringDesignRuleReport({
+      geometry,
+      analysisResult,
+    });
+  }, [watchedValues, materialId, results]);
+
   // 获取全局 Store 的 setDesign 方法
   const setDesign = useSpringDesignStore((state) => state.setDesign);
 
@@ -685,6 +723,10 @@ export function SpiralTorsionCalculator() {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
+      <div className="md:col-span-2">
+        <DesignRulePanel report={designRuleReport} title="Design Rules / 设计规则" />
+      </div>
+
       {/* Input Card */}
       <Card>
         <CardHeader>
