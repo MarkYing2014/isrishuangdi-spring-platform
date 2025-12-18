@@ -25,6 +25,7 @@ const navItems = [
     label: { en: "Variable Pitch", zh: "变节距压缩" },
   },
   { href: "/tools/analysis", label: { en: "Engineering Analysis", zh: "工程分析" } },
+  { href: "/quality", label: { en: "Quality Management", zh: "质量管理" } },
   // { href: "/tools/simulator", label: { en: "Spring Simulator", zh: "弹簧仿真" } }, // Hidden for now
   { href: "/tools/force-tester", label: { en: "Force Tester", zh: "力-位移测试" } },
   { href: "/tools/cad-export", label: { en: "CAD Export", zh: "CAD 导出" } },

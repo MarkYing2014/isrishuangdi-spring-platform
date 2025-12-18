@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   BarChart3,
+  ClipboardCheck,
   Box,
   Calculator,
   FileCog,
@@ -87,6 +88,15 @@ const features = [
     },
     href: "/catalog",
     icon: PackageSearch,
+  },
+  {
+    title: { en: "Quality Management", zh: "质量管理" },
+    description: {
+      en: "Import inspection data, run SPC/capability analytics, and export standardized reports (sidecar).",
+      zh: "导入质检数据，进行 SPC/过程能力分析，并导出标准化报告（旁路模块）。",
+    },
+    href: "/quality",
+    icon: ClipboardCheck,
   },
 ];
 
