@@ -295,7 +295,10 @@ export default function Home() {
             <CardHeader className="relative">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
-                  <Cog className="h-5 w-5 text-emerald-700" />
+                  <Cog
+                    className="h-5 w-5 text-emerald-700 motion-reduce:animate-none animate-spin"
+                    style={{ animationDuration: "3.5s" }}
+                  />
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Step 1</p>
@@ -344,8 +347,9 @@ export default function Home() {
             <div className="absolute top-0 right-0 w-24 h-24 bg-amber-100/50 rounded-full -translate-y-1/2 translate-x-1/2" />
             <CardHeader className="relative">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
-                  <Activity className="h-5 w-5 text-amber-700" />
+                <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
+                  <span className="pointer-events-none absolute inset-0 rounded-full bg-amber-200/50 motion-reduce:hidden animate-ping" />
+                  <Activity className="relative h-5 w-5 text-amber-700 motion-reduce:animate-none animate-pulse" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">Step 2</p>
@@ -394,8 +398,9 @@ export default function Home() {
             <div className="absolute top-0 right-0 w-24 h-24 bg-sky-100/50 rounded-full -translate-y-1/2 translate-x-1/2" />
             <CardHeader className="relative">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100">
-                  <Shield className="h-5 w-5 text-sky-700" />
+                <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-sky-100">
+                  <span className="pointer-events-none absolute inset-0 rounded-full bg-sky-200/50 motion-reduce:hidden animate-ping" />
+                  <Shield className="relative h-5 w-5 text-sky-700 motion-reduce:animate-none animate-pulse" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-sky-600">Step 3</p>
