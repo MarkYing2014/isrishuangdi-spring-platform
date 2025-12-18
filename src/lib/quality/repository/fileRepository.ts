@@ -1,10 +1,13 @@
 import path from "path";
+import os from "os";
 import { mkdir, readFile, writeFile } from "fs/promises";
 
 import type { QualityAnalysisResult, QualityDataset } from "../types";
 
 function dataDir() {
-  return path.join(process.cwd(), ".tmp", "quality");
+  const override = process.env.QUALITY_DATA_DIR;
+  if (override && override.trim()) return override.trim();
+  return path.join(os.tmpdir(), "isri-quality");
 }
 
 function datasetPath(id: string) {
