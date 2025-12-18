@@ -29,6 +29,7 @@ const navItems = [
   // { href: "/tools/simulator", label: { en: "Spring Simulator", zh: "弹簧仿真" } }, // Hidden for now
   { href: "/tools/force-tester", label: { en: "Force Tester", zh: "力-位移测试" } },
   { href: "/tools/cad-export", label: { en: "CAD Export", zh: "CAD 导出" } },
+  { href: "/about", label: { en: "About", zh: "关于" } },
   { href: "/rfq", label: { en: "RFQ", zh: "询价" } },
   { href: "/catalog", label: { en: "Catalog", zh: "产品目录" } },
 ];
