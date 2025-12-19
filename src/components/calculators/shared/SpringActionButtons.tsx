@@ -18,7 +18,7 @@ interface SpringActionButtonsProps {
   disabled?: boolean;
   isExporting?: boolean;
   onExportPdf?: () => void;
-  showTester?: boolean;
+  showAnalysis?: boolean;
   showSimulator?: boolean;
   showReport?: boolean;
   showCadExport?: boolean;
@@ -35,7 +35,7 @@ export function SpringActionButtons({
   disabled = false,
   isExporting = false,
   onExportPdf,
-  showTester = true,
+  showAnalysis = true,
   showSimulator = true,
   showReport = false,
   showCadExport = true,
@@ -44,7 +44,7 @@ export function SpringActionButtons({
   const pipeline = getPipeline(springType);
   
   // Build URLs with design parameters
-  const testerUrl = buildPipelineUrl(pipeline.testerPath, designParams);
+  const analysisUrl = buildPipelineUrl(pipeline.analysisPath, designParams);
   const simulatorUrl = buildPipelineUrl(pipeline.simulatorPath, designParams);
   const reportUrl = buildPipelineUrl(pipeline.reportPath, designParams);
   const cadExportUrl = buildPipelineUrl(pipeline.cadExportPath, designParams);
@@ -54,16 +54,16 @@ export function SpringActionButtons({
     <div className="space-y-2">
       {/* Primary Actions */}
       <div className="grid grid-cols-2 gap-2">
-        {showTester && (
+        {showAnalysis && (
           <Button 
             asChild 
             variant="default" 
             className="w-full"
             disabled={disabled}
           >
-            <a href={disabled ? "#" : testerUrl}>
+            <a href={disabled ? "#" : analysisUrl}>
               <Play className="mr-2 h-4 w-4" />
-              Force Tester
+              Engineering Analysis
             </a>
           </Button>
         )}
