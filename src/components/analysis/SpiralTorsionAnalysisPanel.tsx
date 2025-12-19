@@ -47,6 +47,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { SpiralFeaPanel } from "@/components/analysis/SpiralFeaPanel";
+import { SpiralAdvancedAnalysisPanel } from "@/components/analysis/SpiralAdvancedAnalysisPanel";
 
 const SpiralTorsionSpringVisualizer = dynamic(
   () => import("@/components/three/SpiralTorsionSpringMesh").then((mod) => mod.SpiralTorsionSpringVisualizer),
@@ -1476,6 +1477,19 @@ export function SpiralTorsionAnalysisPanel({
           </CardContent>
         </Card>
       </div>
+
+      {/* Advanced Analysis Panel */}
+      <SpiralAdvancedAnalysisPanel
+        isZh={isZh}
+        geometry={geometry}
+        springRate={springRate}
+        preloadTorque={preloadTorque}
+        maxTorque={maxTorque}
+        sigmaMin={derived.sigmaMin}
+        sigmaMax={derived.sigmaMax}
+        Su={derived.Su}
+        Se={derived.Se}
+      />
 
       {/* Formula Reference */}
       <Card className="mt-6">

@@ -5,6 +5,7 @@
  * 验收用例：SAFE / WARNING / EXCEEDED 三种工况
  */
 
+import { describe, test, expect, beforeAll } from 'vitest';
 import { 
   calculateSpiralTorsionSpring,
   type SpiralTorsionSpringInput,

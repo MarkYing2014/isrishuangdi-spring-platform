@@ -11,3 +11,4 @@ export * from "./spiralSpringCloseout";
 export * from "./spiralSpringAnalysis";
 export * from "./spiralSpringMaterials";
 export * from "./spiralSpringReview";
+export * from "./spiralSpringAdvanced";
