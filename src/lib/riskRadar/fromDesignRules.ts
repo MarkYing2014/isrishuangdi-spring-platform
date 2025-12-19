@@ -89,6 +89,12 @@ function classifyDimension(args: {
     if (id.startsWith("VP_OVER_SOLID") || id.startsWith("VP_NEAR_SOLID")) return "manufacturing";
   }
 
+  if (args.springType === "wave") {
+    if (id.startsWith("WAVE_E")) return "engineering";
+    if (id.startsWith("WAVE_M")) return "manufacturing";
+    if (id.startsWith("WAVE_Q")) return "quality";
+  }
+
   if (id.includes("READ_ONLY")) return "quality";
 
   return "engineering";

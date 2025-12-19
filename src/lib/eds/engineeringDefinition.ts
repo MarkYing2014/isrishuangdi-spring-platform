@@ -70,4 +70,28 @@ export type CompressionSpringEds = {
   process?: CompressionProcess;
 };
 
-export type SpringEds = CompressionSpringEds;
+export type WaveSpringEds = {
+  type: "wave";
+  geometry: {
+    id: EngineeringValueNumber;
+    od: EngineeringValueNumber;
+    thickness_t: EngineeringValueNumber;
+    radialWall_b: EngineeringValueNumber;
+    turns_Nt: EngineeringValueNumber;
+    wavesPerTurn_Nw: EngineeringValueNumber;
+    freeHeight_Hf: EngineeringValueNumber;
+    workingHeight_Hw: EngineeringValueNumber;
+  };
+  material: {
+    materialId?: string;
+    elasticModulus: EngineeringValueNumber;
+  };
+  targets?: {
+    mode: "loadAtWorkingHeight" | "springRate";
+    value?: EngineeringValueNumber;
+  };
+  quality?: CompressionQuality;
+  process?: CompressionProcess;
+};
+
+export type SpringEds = CompressionSpringEds | WaveSpringEds;

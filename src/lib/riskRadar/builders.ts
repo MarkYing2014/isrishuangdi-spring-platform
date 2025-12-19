@@ -19,6 +19,8 @@ import { buildExtensionDesignRuleReport } from "@/lib/designRules/extensionRules
 import { buildSpiralSpringDesignRuleReport } from "@/lib/designRules/spiralSpringRules";
 import { buildTorsionDesignRuleReport } from "@/lib/designRules/torsionRules";
 import { buildVariablePitchCompressionDesignRuleReport } from "@/lib/designRules/variablePitchRules";
+import { buildWaveSpringDesignRuleReport } from "@/lib/designRules/waveSpringRules";
+import type { WaveSpringInput, WaveSpringResult } from "@/lib/waveSpring/math";
 
 import type { EngineeringRiskRadar } from "./types";
 import { radarFromDesignRuleReport } from "./fromDesignRules";
@@ -89,4 +91,12 @@ export function buildVariablePitchRiskRadar(params: {
 }): EngineeringRiskRadar {
   const report = buildVariablePitchCompressionDesignRuleReport(params);
   return radarFromDesignRuleReport({ springType: "variablePitch", report });
+}
+
+export function buildWaveRiskRadar(params: {
+  input: WaveSpringInput | null | undefined;
+  result?: WaveSpringResult | null;
+}): EngineeringRiskRadar {
+  const report = buildWaveSpringDesignRuleReport(params);
+  return radarFromDesignRuleReport({ springType: "wave", report });
 }

@@ -1,0 +1,494 @@
+/**
+ * Wave Spring Calculator V1
+ * 波形弹簧计算器 V1
+ * 
+ * Features:
+ * - Input form for wave spring geometry
+ * - DesignRulePanel integration
+ * - RiskRadar integration
+ * - Key derived outputs: travel, k, load@Hw
+ */
+
+"use client";
+
+import { useMemo, useState, lazy, Suspense } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Waves, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+
+import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
+
+import {
+  calculateWaveSpring,
+  getDefaultWaveSpringInput,
+  DEFAULT_WAVE_SPRING_MATERIAL,
+  type WaveSpringInput,
+  type WaveSpringGeometry,
+  type WaveSpringMode,
+} from "@/lib/waveSpring/math";
+import { buildWaveSpringDesignRuleReport } from "@/lib/designRules/waveSpringRules";
+import { buildWaveRiskRadar } from "@/lib/riskRadar/builders";
+
+const WaveSpringVisualizer = lazy(() => import("@/components/three/WaveSpringVisualizer"));
+
+interface WaveSpringCalculatorProps {
+  isZh?: boolean;
+}
+
+function ResultRow({ label, value, unit }: { label: string; value: string; unit?: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono font-medium">
+        {value}
+        {unit && <span className="ml-1 text-muted-foreground">{unit}</span>}
+      </span>
+    </div>
+  );
+}
+
+export function WaveSpringCalculator({ isZh = false }: WaveSpringCalculatorProps) {
+  // Geometry state
+  const [id, setId] = useState(20);
+  const [od, setOd] = useState(30);
+  const [thickness_t, setThickness] = useState(0.5);
+  const [radialWall_b, setRadialWall] = useState(4);
+  const [turns_Nt, setTurns] = useState(5);
+  const [wavesPerTurn_Nw, setWavesPerTurn] = useState(3);
+  const [freeHeight_Hf, setFreeHeight] = useState(10);
+  const [workingHeight_Hw, setWorkingHeight] = useState(7);
+
+  // Material state
+  const [materialId, setMaterialId] = useState(DEFAULT_WAVE_SPRING_MATERIAL.id);
+  const [E_MPa, setE] = useState(DEFAULT_WAVE_SPRING_MATERIAL.E_MPa);
+
+  // Mode state (for future use)
+  const [mode, setMode] = useState<WaveSpringMode>("loadAtWorkingHeight");
+
+  // Build input object
+  const input = useMemo<WaveSpringInput>(() => ({
+    units: "mm",
+    geometry: {
+      id,
+      od,
+      thickness_t,
+      radialWall_b,
+      turns_Nt,
+      wavesPerTurn_Nw,
+      freeHeight_Hf,
+      workingHeight_Hw,
+    },
+    material: {
+      id: materialId,
+      E_MPa,
+      name: DEFAULT_WAVE_SPRING_MATERIAL.name,
+    },
+    targets: {
+      mode,
+    },
+  }), [id, od, thickness_t, radialWall_b, turns_Nt, wavesPerTurn_Nw, freeHeight_Hf, workingHeight_Hw, materialId, E_MPa, mode]);
+
+  // Calculate result
+  const result = useMemo(() => calculateWaveSpring(input), [input]);
+
+  // Design rules report
+  const designRuleReport = useMemo(() => buildWaveSpringDesignRuleReport({ input, result }), [input, result]);
+
+  // Risk radar
+  const riskRadar = useMemo(() => buildWaveRiskRadar({ input, result }), [input, result]);
+
+  // Format number helper
+  const fmt = (n: number, decimals = 2) => {
+    if (!isFinite(n)) return "—";
+    return n.toFixed(decimals);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Design Rules Panel */}
+      <DesignRulePanel
+        report={designRuleReport}
+        title={isZh ? "设计规则 / Design Rules" : "Design Rules"}
+      />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Waves className="w-5 h-5" />
+            {isZh ? "波形弹簧计算器" : "Wave Spring Calculator"}
+            <Badge variant="outline" className="ml-2">V1</Badge>
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            {isZh
+              ? "轴向承载，超薄安装高度 / Crest-to-crest wave spring"
+              : "Axial load, ultra-low height / Crest-to-crest wave spring"}
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Left: Input Form */}
+            <div className="space-y-5">
+              {/* Geometry Section */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium">
+                  {isZh ? "几何参数" : "Geometry"}
+                </h3>
+                <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/20 p-4">
+                  <div className="space-y-1">
+                    <Label>{isZh ? "内径 ID (mm)" : "Inner Diameter ID (mm)"}</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={id}
+                      onChange={(e) => setId(parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>{isZh ? "外径 OD (mm)" : "Outer Diameter OD (mm)"}</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={od}
+                      onChange={(e) => setOd(parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>{isZh ? "厚度 t (mm)" : "Thickness t (mm)"}</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={thickness_t}
+                      onChange={(e) => setThickness(parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>{isZh ? "径向壁宽 b (mm)" : "Radial Wall b (mm)"}</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={radialWall_b}
+                      onChange={(e) => setRadialWall(parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>{isZh ? "圈数 Nt" : "Turns Nt"}</Label>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="1"
+                      value={turns_Nt}
+                      onChange={(e) => setTurns(parseFloat(e.target.value) || 1)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>{isZh ? "每圈波数 Nw" : "Waves/Turn Nw"}</Label>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="1"
+                      value={wavesPerTurn_Nw}
+                      onChange={(e) => setWavesPerTurn(parseFloat(e.target.value) || 1)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>{isZh ? "自由高度 Hf (mm)" : "Free Height Hf (mm)"}</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={freeHeight_Hf}
+                      onChange={(e) => setFreeHeight(parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>{isZh ? "工作高度 Hw (mm)" : "Working Height Hw (mm)"}</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={workingHeight_Hw}
+                      onChange={(e) => setWorkingHeight(parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Material Section */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium">
+                  {isZh ? "材料" : "Material"}
+                </h3>
+                <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/20 p-4">
+                  <div className="space-y-1">
+                    <Label>{isZh ? "材料" : "Material"}</Label>
+                    <Select value={materialId} onValueChange={setMaterialId}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="17-7PH">17-7PH Stainless Steel</SelectItem>
+                        <SelectItem value="302SS">302 Stainless Steel</SelectItem>
+                        <SelectItem value="Inconel">Inconel X-750</SelectItem>
+                        <SelectItem value="BeCu">Beryllium Copper</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>{isZh ? "弹性模量 E (MPa)" : "Elastic Modulus E (MPa)"}</Label>
+                    <Input
+                      type="number"
+                      step="1000"
+                      min="0"
+                      value={E_MPa}
+                      onChange={(e) => setE(parseFloat(e.target.value) || 0)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Errors and Warnings */}
+              {result.errors.length > 0 && (
+                <Alert variant="destructive">
+                  <XCircle className="w-4 h-4" />
+                  <AlertTitle>{isZh ? "错误" : "Errors"}</AlertTitle>
+                  <AlertDescription>
+                    <ul className="mt-1 space-y-1 text-xs">
+                      {result.errors.map((err, i) => (
+                        <li key={i}>• {err}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {result.warnings.length > 0 && (
+                <Alert>
+                  <AlertTriangle className="w-4 h-4" />
+                  <AlertTitle>{isZh ? "警告" : "Warnings"}</AlertTitle>
+                  <AlertDescription>
+                    <ul className="mt-1 space-y-1 text-xs">
+                      {result.warnings.map((warn, i) => (
+                        <li key={i}>• {warn}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* V2 Placeholder */}
+              <div className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">
+                {isZh
+                  ? "V2 预留：子类型选择（波形垫圈 / 多圈嵌套）"
+                  : "V2 Reserved: Subtype selection (wave washer / multi-turn nested)"}
+              </div>
+            </div>
+
+            {/* Right: Results and Risk Radar */}
+            <div className="space-y-5">
+              {/* Key Results */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    {result.isValid ? (
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-red-600" />
+                    )}
+                    {isZh ? "计算结果" : "Results"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <ResultRow
+                    label={isZh ? "行程 (Hf - Hw)" : "Travel (Hf - Hw)"}
+                    value={fmt(result.travel_mm)}
+                    unit="mm"
+                  />
+                  <ResultRow
+                    label={isZh ? "刚度 k" : "Spring Rate k"}
+                    value={fmt(result.springRate_Nmm, 3)}
+                    unit="N/mm"
+                  />
+                  <ResultRow
+                    label={isZh ? "工作高度载荷" : "Load @ Hw"}
+                    value={fmt(result.loadAtWorkingHeight_N)}
+                    unit="N"
+                  />
+                  <div className="border-t pt-3 mt-3">
+                    <ResultRow
+                      label={isZh ? "中径 Dm" : "Mean Diameter Dm"}
+                      value={fmt(result.meanDiameter_mm)}
+                      unit="mm"
+                    />
+                    <ResultRow
+                      label={isZh ? "波幅" : "Wave Amplitude"}
+                      value={fmt(result.waveAmplitude_mm, 3)}
+                      unit="mm"
+                    />
+                    <ResultRow
+                      label={isZh ? "总波数" : "Total Waves"}
+                      value={result.totalWaves.toString()}
+                    />
+                    <ResultRow
+                      label={isZh ? "最大应力 σ" : "Max Stress σ"}
+                      value={fmt(result.stressMax_MPa, 1)}
+                      unit="MPa"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 3D Preview */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">
+                    {isZh ? "3D 预览" : "3D Preview"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px] rounded-md border bg-slate-50">
+                    <Suspense fallback={
+                      <div className="flex h-full items-center justify-center text-muted-foreground">
+                        {isZh ? "加载中..." : "Loading..."}
+                      </div>
+                    }>
+                      <WaveSpringVisualizer
+                        meanDiameter={result.meanDiameter_mm}
+                        thickness={thickness_t}
+                        width={radialWall_b}
+                        amplitude={result.waveAmplitude_mm}
+                        waves={wavesPerTurn_Nw}
+                        turns={turns_Nt}
+                        phase={0}
+                        color="#6b9bd1"
+                      />
+                    </Suspense>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Risk Radar Summary */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">
+                    {isZh ? "风险雷达" : "Risk Radar"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      {isZh ? "总体状态" : "Overall Status"}
+                    </span>
+                    <Badge
+                      className={
+                        riskRadar.overallStatus === "ENGINEERING_OK"
+                          ? "bg-green-600"
+                          : riskRadar.overallStatus === "MANUFACTURING_RISK"
+                          ? "bg-yellow-500 text-black"
+                          : "bg-red-600"
+                      }
+                    >
+                      {riskRadar.overallStatus === "ENGINEERING_OK"
+                        ? isZh ? "工程通过" : "OK"
+                        : riskRadar.overallStatus === "MANUFACTURING_RISK"
+                        ? isZh ? "制造风险" : "Mfg Risk"
+                        : isZh ? "高风险" : "High Risk"}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="rounded border p-2">
+                      <div className="text-muted-foreground">{isZh ? "工程" : "Eng"}</div>
+                      <Badge
+                        variant="outline"
+                        className={
+                          riskRadar.dimensions.engineering.status === "OK"
+                            ? "border-green-500 text-green-600"
+                            : riskRadar.dimensions.engineering.status === "WARN"
+                            ? "border-yellow-500 text-yellow-600"
+                            : "border-red-500 text-red-600"
+                        }
+                      >
+                        {riskRadar.dimensions.engineering.status}
+                      </Badge>
+                    </div>
+                    <div className="rounded border p-2">
+                      <div className="text-muted-foreground">{isZh ? "制造" : "Mfg"}</div>
+                      <Badge
+                        variant="outline"
+                        className={
+                          riskRadar.dimensions.manufacturing.status === "OK"
+                            ? "border-green-500 text-green-600"
+                            : riskRadar.dimensions.manufacturing.status === "WARN"
+                            ? "border-yellow-500 text-yellow-600"
+                            : "border-red-500 text-red-600"
+                        }
+                      >
+                        {riskRadar.dimensions.manufacturing.status}
+                      </Badge>
+                    </div>
+                    <div className="rounded border p-2">
+                      <div className="text-muted-foreground">{isZh ? "质量" : "Quality"}</div>
+                      <Badge
+                        variant="outline"
+                        className={
+                          riskRadar.dimensions.quality.status === "OK"
+                            ? "border-green-500 text-green-600"
+                            : riskRadar.dimensions.quality.status === "WARN"
+                            ? "border-yellow-500 text-yellow-600"
+                            : "border-red-500 text-red-600"
+                        }
+                      >
+                        {riskRadar.dimensions.quality.status}
+                      </Badge>
+                    </div>
+                  </div>
+                  {riskRadar.findings.length > 0 && (
+                    <div className="mt-2 space-y-1 text-xs">
+                      {riskRadar.findings.slice(0, 3).map((f, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <Badge
+                            variant="outline"
+                            className={
+                              f.level === "ERROR"
+                                ? "border-red-500 text-red-600"
+                                : f.level === "WARNING"
+                                ? "border-yellow-500 text-yellow-600"
+                                : "border-blue-500 text-blue-600"
+                            }
+                          >
+                            {f.level}
+                          </Badge>
+                          <span>{isZh ? f.title.zh : f.title.en}</span>
+                        </div>
+                      ))}
+                      {riskRadar.findings.length > 3 && (
+                        <div className="text-muted-foreground">
+                          +{riskRadar.findings.length - 3} {isZh ? "更多" : "more"}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export default WaveSpringCalculator;

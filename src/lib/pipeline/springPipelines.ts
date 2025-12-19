@@ -101,6 +101,18 @@ export const SPRING_PIPELINES: Record<SpringType, SpringPipelineConfig> = {
     icon: "Disc",
     implemented: false, // 3D model and other features coming soon
   },
+  wave: {
+    type: "wave",
+    label: { en: "Wave Spring", zh: "波形弹簧" },
+    calculatorPath: "/tools/wave-spring",
+    analysisPath: "/tools/analysis?type=wave",
+    simulatorPath: "/tools/simulator?type=wave",
+    reportPath: "/tools/report?type=wave",
+    cadExportPath: "/tools/cad-export?type=wave",
+    rfqPath: "/rfq?springType=wave",
+    icon: "Waves",
+    implemented: true,
+  },
 };
 
 /**

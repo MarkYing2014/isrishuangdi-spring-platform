@@ -5,7 +5,8 @@ export type RiskRadarSpringType =
   | "extension"
   | "torsion"
   | "conical"
-  | "variablePitch";
+  | "variablePitch"
+  | "wave";
 
 export type RiskDimensionKey = "engineering" | "manufacturing" | "quality";
 
