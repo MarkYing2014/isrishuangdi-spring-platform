@@ -9,6 +9,7 @@ import { UnifiedForceTester } from "@/components/force-tester";
 import { AdvancedAnalysisPanel } from "@/components/analysis/AdvancedAnalysisPanel";
 import { SmartAnalysisPanel } from "@/components/analysis/SmartAnalysisPanel";
 import { AdvancedSimulationPanel } from "@/components/analysis/AdvancedSimulationPanel";
+import { SpringTypeSpecificPanel } from "@/components/analysis/SpringTypeSpecificPanel";
 import { FeaPanel } from "@/components/analysis/FeaPanel";
 import { getMaterialOptions, type SpringMaterialId } from "@/lib/materials/springMaterials";
 import type { SpringGeometry as EngineSpringGeometry, WorkingConditions } from "@/lib/engine/types";
@@ -681,6 +682,14 @@ function AnalysisReady({
       {/* Advanced Analysis Panel */}
       {analysisResult && (
         <div className="mt-6 space-y-6">
+          {/* Type-Specific Analysis Panel */}
+          <SpringTypeSpecificPanel
+            geometry={engineGeometry}
+            analysisResult={analysisResult}
+            springRate={analysisResult.geometry.springIndex > 0 ? estimatedSpringRate : 10}
+            maxForce={estimatedSpringRate * maxDeflection}
+          />
+          
           <AdvancedAnalysisPanel
             geometry={engineGeometry}
             analysisResult={analysisResult}
