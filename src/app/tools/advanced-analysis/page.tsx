@@ -155,6 +155,55 @@ export default function AdvancedAnalysisPage() {
           scragTest: null as any,
         });
         
+        // Run manufacturability check for torsion springs
+        setRunProgress(70);
+        const torsionGeometry = geometry as any;
+        const torsionMeanDiam = torsionGeometry.meanDiameter;
+        const torsionBodyLength = torsionGeometry.bodyLength || geometry.wireDiameter * geometry.activeCoils;
+        const torsionPitch = geometry.wireDiameter * 1.1; // Close-wound
+        
+        const torsionManufacturabilityResult = checkManufacturability({
+          wireDiameter: geometry.wireDiameter,
+          meanDiameter: torsionMeanDiam,
+          outerDiameter: torsionMeanDiam + geometry.wireDiameter,
+          innerDiameter: torsionMeanDiam - geometry.wireDiameter,
+          freeLength: torsionBodyLength,
+          activeCoils: geometry.activeCoils,
+          totalCoils: geometry.activeCoils + 2,
+          pitch: torsionPitch,
+          endType: 'closed',
+          springType: 'torsion',
+          productionVolume: 'medium',
+        });
+        
+        setRunProgress(85);
+        
+        const torsionStandardsResult = runAllStandardChecks({
+          wireDiameter: geometry.wireDiameter,
+          meanDiameter: torsionMeanDiam,
+          outerDiameter: torsionMeanDiam + geometry.wireDiameter,
+          freeLength: torsionBodyLength,
+          activeCoils: geometry.activeCoils,
+          totalCoils: geometry.activeCoils + 2,
+          springRate: analysisResult.springRate,
+          maxStress: analysisResult.stress.tauEffective,
+          meanStress: analysisResult.fatigue.tauMean,
+          alternatingStress: analysisResult.fatigue.tauAlt,
+          safetyFactor: analysisResult.safety.staticSafetyFactor,
+          materialId: geometry.materialId,
+          operatingTemperature: 20,
+          fatigueLife: analysisResult.fatigue.estimatedCycles,
+        });
+        
+        setPhase6Quality({
+          manufacturability: torsionManufacturabilityResult,
+          standardsCheck: {
+            asme: torsionStandardsResult.asme,
+            sae: torsionStandardsResult.sae,
+            din: torsionStandardsResult.din,
+          },
+        });
+        
         setRunProgress(100);
         setIsRunning(false);
         return;
@@ -210,10 +259,12 @@ export default function AdvancedAnalysisPage() {
         scragTest: scragResult,
       });
 
-      // 2. Quality & Standards (60%)
+      // 2. Quality & Standards (60%) - for compression/extension/conical springs
+      // Note: torsion springs are handled above and return early
       setRunProgress(40);
 
-      const pitch = ((geometry as any).freeLength - geometry.wireDiameter * 2) / geometry.activeCoils;
+      const freeLength = (geometry as any).freeLength;
+      const pitch = (freeLength - geometry.wireDiameter * 2) / geometry.activeCoils;
       const meanDiameter = (geometry as any).meanDiameter || (geometry as any).largeOuterDiameter - geometry.wireDiameter;
       const outerDiameter = meanDiameter + geometry.wireDiameter;
       const innerDiameter = meanDiameter - geometry.wireDiameter;
@@ -223,12 +274,12 @@ export default function AdvancedAnalysisPage() {
         meanDiameter,
         outerDiameter,
         innerDiameter,
-        freeLength: (geometry as any).freeLength,
+        freeLength,
         activeCoils: geometry.activeCoils,
         totalCoils: (geometry as any).totalCoils || geometry.activeCoils + 2,
         pitch,
         endType: 'closed_ground',
-        springType: geometry.type as any,
+        springType: geometry.type as 'compression' | 'extension' | 'conical',
         productionVolume: 'medium',
       });
 
@@ -790,11 +841,30 @@ function SummaryTab({ manufacturing, quality, ai, analysisResult }: any) {
   const overallScore = useMemo(() => {
     let score = 100;
     
-    // Deduct for manufacturability issues
+    // Critical: Manufacturability - if not manufacturable, major penalty
     if (quality?.manufacturability) {
-      score -= quality.manufacturability.criticalCount * 20;
+      if (!quality.manufacturability.isManufacturable) {
+        // Not manufacturable = automatic fail (max 40 points)
+        score = Math.min(score, 40);
+      }
+      // Additional deductions for issues
+      score -= quality.manufacturability.criticalCount * 25;
       score -= quality.manufacturability.majorCount * 10;
       score -= quality.manufacturability.minorCount * 2;
+    }
+    
+    // Critical: Safety factor - if below 1.0, design is unsafe
+    const safetyFactor = analysisResult?.safety?.staticSafetyFactor;
+    if (safetyFactor !== undefined) {
+      if (safetyFactor < 1.0) {
+        // Unsafe design = automatic fail (max 30 points)
+        score = Math.min(score, 30);
+        score -= Math.round((1.0 - safetyFactor) * 30);
+      } else if (safetyFactor < 1.2) {
+        score -= 20; // Marginal safety
+      } else if (safetyFactor < 1.5) {
+        score -= 10; // Below recommended
+      }
     }
     
     // Deduct for standards failures
@@ -810,7 +880,7 @@ function SummaryTab({ manufacturing, quality, ai, analysisResult }: any) {
     if (ai?.mlFatiguePrediction?.predictedCycles > 1e7) score += 5;
     
     return Math.max(0, Math.min(100, score));
-  }, [quality, ai]);
+  }, [quality, ai, analysisResult]);
 
   const getGrade = (score: number) => {
     if (score >= 90) return { grade: 'A', color: 'text-green-600', bg: 'bg-green-100' };
