@@ -43,6 +43,7 @@ import {
 } from "@/components/charts/VariablePitchCurvesChart";
 
 import { VariablePitchCompressionSpringVisualizer } from "@/components/three/VariablePitchCompressionSpringVisualizer";
+import { VariablePitchAdvancedPanel } from "@/components/calculators/VariablePitchAdvancedPanel";
 
 import { mapToVariablePitchCompressionReportPayload } from "@/lib/reports/variablePitchCompressionReport";
 import {
@@ -872,6 +873,20 @@ export function VariablePitchCompressionCalculator() {
           </div>
         </CardContent>
       </Card>
+
+      <VariablePitchAdvancedPanel
+        wireDiameter={wireDiameter}
+        meanDiameter={meanDiameter}
+        shearModulus={shearModulus}
+        activeCoils={activeCoils0}
+        freeLength={freeLength}
+        segments={l0Dominant.segmentsUsed}
+        currentDeflection={deflectionUsed}
+        currentLoad={result.load}
+        currentSpringRate={result.springRate}
+        currentShearStress={result.shearStress}
+        allowableShearStress={selectedMaterial.allowShearStatic}
+      />
     </div>
   );
 }
