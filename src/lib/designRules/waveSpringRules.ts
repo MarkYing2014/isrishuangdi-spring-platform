@@ -134,8 +134,8 @@ export function buildWaveSpringDesignRuleReport(params: {
 
   metrics["springIndex"] = {
     value: springIndex.toFixed(2),
-    labelEn: "Spring Index (Dm/t)",
-    labelZh: "弹簧指数 (Dm/t)",
+    labelEn: "Geometry Slenderness (Dm/t)",
+    labelZh: "几何细长比 (Dm/t)",
   };
 
   metrics["thicknessRatio"] = {
@@ -186,6 +186,32 @@ export function buildWaveSpringDesignRuleReport(params: {
     labelZh: "变形/可用比",
   };
 
+  // ===== Crest-to-crest contact geometry (multi-turn wave spring) =====
+  const pitchPerTurn = g.freeHeight_Hf / g.turns_Nt; // P
+  const targetAmplitude = 0.5 * pitchPerTurn;        // A_target so that 2A = P
+  const contactRatio = (2 * targetAmplitude) / pitchPerTurn; // always 1 with this definition
+
+  metrics["pitchPerTurn"] = {
+    value: pitchPerTurn.toFixed(3),
+    unit: "mm/turn",
+    labelEn: "Helix Pitch per Turn P",
+    labelZh: "每圈螺旋节距 P",
+  };
+
+  metrics["targetWaveAmplitude"] = {
+    value: targetAmplitude.toFixed(3),
+    unit: "mm",
+    labelEn: "Target Wave Amplitude A (crest-to-crest)",
+    labelZh: "目标波幅 A（波峰顶住）",
+  };
+
+  metrics["crestContactRatio"] = {
+    value: (contactRatio * 100).toFixed(1),
+    unit: "%",
+    labelEn: "Crest Contact Ratio (2A/P)",
+    labelZh: "顶住比 (2A/P)",
+  };
+
   // ========== Engineering Rules (E*) ==========
 
   // E1: Geometry validation (already handled above)
@@ -220,6 +246,21 @@ export function buildWaveSpringDesignRuleReport(params: {
       titleZh: `应力超过屈服强度的 ${WAVE_SPRING_THRESHOLDS.maxStressRatio * 100}% (${(stressRatio * 100).toFixed(1)}%)`,
       suggestionEn: "Reduce load, increase thickness, or use stronger material",
       suggestionZh: "减小载荷、增加厚度或使用更强材料",
+    });
+  }
+
+  // E4: Crest-to-crest contact requirement for multi-turn wave springs
+  if (g.turns_Nt >= 2) {
+    // Multi-turn wave spring should be designed with crest-to-crest contact
+    // Geometry builder uses: z = (P/2π)*θ + A*sin(Nw*θ)*s(θ), where s(θ) = (-1)^floor(θ/2π)
+    // With A = P/2, adjacent turns touch at wave peaks
+    findings.push({
+      id: "WAVE_E4_CREST_CONTACT",
+      level: "info",
+      titleEn: `Multi-turn wave spring designed for crest-to-crest contact (P=${pitchPerTurn.toFixed(2)}mm, A=${targetAmplitude.toFixed(2)}mm)`,
+      titleZh: `多圈波形弹簧按波峰顶住设计 (P=${pitchPerTurn.toFixed(2)}mm, A=${targetAmplitude.toFixed(2)}mm)`,
+      detailEn: "Continuous helix with alternating wave phase per turn; wave amplitude A = P/2 ensures adjacent turn peaks touch in free state.",
+      detailZh: "采用连续螺旋上升并每圈波形交错；波幅 A = P/2，使相邻圈波峰在自由态接触。",
     });
   }
 
