@@ -17,8 +17,7 @@ import {
 const navItems = [
   { href: "/", label: { en: "Home", zh: "首页" } },
   { href: "/tools/calculator", label: { en: "Spring Calculator", zh: "弹簧计算" } },
-  { href: "/tools/simulator", label: { en: "Spring Simulator", zh: "三维仿真" } },
-  { href: "/tools/force-tester", label: { en: "Force Tester", zh: "力-位移曲线" } },
+  { href: "/tools/analysis", label: { en: "Engineering Analysis", zh: "工程分析" } },
   { href: "/tools/cad-export", label: { en: "CAD Export", zh: "CAD 导出" } },
   { href: "/catalog", label: { en: "Catalog", zh: "产品目录" } },
   { href: "/rfq", label: { en: "RFQ", zh: "询价" } },

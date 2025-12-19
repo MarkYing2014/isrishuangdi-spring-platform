@@ -57,15 +57,6 @@ const features = [
     icon: Move3D,
   },
   {
-    title: { en: "Force Tester", zh: "力–位移测试" },
-    description: {
-      en: "Generate force–displacement curves and export test envelopes instantly.",
-      zh: "快速生成力–位移曲线并导出测试包。",
-    },
-    href: "/tools/force-tester",
-    icon: Box,
-  },
-  {
     title: { en: "CAD Export", zh: "CAD 导出" },
     description: {
       en: "Creo-ready PDF, STEP, and native files powered by automated drafting pipelines.",

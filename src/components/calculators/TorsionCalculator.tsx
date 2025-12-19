@@ -397,22 +397,6 @@ export function TorsionCalculator() {
     }
   };
 
-  // Generate force tester URL
-  const forceTesterUrl = useMemo(() => {
-    const meanDiameter = (watchedValues.outerDiameter ?? 15) - (watchedValues.wireDiameter ?? 1.5);
-    const params = new URLSearchParams({
-      type: "torsion",
-      d: (watchedValues.wireDiameter ?? 1.5).toString(),
-      Dm: meanDiameter.toString(),
-      Na: (watchedValues.activeCoils ?? 6).toString(),
-      L1: (watchedValues.armLength1 ?? 25).toString(),
-      L2: (watchedValues.armLength2 ?? 25).toString(),
-      Lb: (watchedValues.bodyLength ?? 10).toString(),
-      dxMax: (watchedValues.workingAngle ?? 45).toString(),
-    });
-    return `/tools/force-tester?${params.toString()}`;
-  }, [watchedValues]);
-
   // Generate analysis URL with all parameters
   const analysisUrl = useMemo(() => {
     const meanDiameter = (watchedValues.outerDiameter ?? 15) - (watchedValues.wireDiameter ?? 1.5);
@@ -707,13 +691,6 @@ export function TorsionCalculator() {
               <a href={analysisUrl}>Generate 3D Model / 生成3D模型</a>
             </Button>
             */}
-            <Button 
-              asChild 
-              variant="outline" 
-              className="w-full border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 hover:border-emerald-400 hover:text-emerald-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/10"
-            >
-              <a href={forceTesterUrl}>Send to Force Tester / 发送到力–位移测试</a>
-            </Button>
             <Button 
               asChild 
               variant="outline" 

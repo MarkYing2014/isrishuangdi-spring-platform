@@ -172,19 +172,6 @@ export function CompressionCalculator() {
   // Watch form values for URL generation
   const watchedValues = form.watch();
 
-  const forceTesterUrl = useMemo(() => {
-    const params = new URLSearchParams({
-      type: "compression",
-      d: watchedValues.wireDiameter?.toString() ?? "3.2",
-      Dm: watchedValues.meanDiameter?.toString() ?? "24",
-      Na: watchedValues.activeCoils?.toString() ?? "8",
-      G: watchedValues.shearModulus?.toString() ?? "79300",
-      L0: watchedValues.freeLength?.toString() ?? "50",
-      dxMax: watchedValues.deflection?.toString() ?? "10",
-    });
-    return `/tools/force-tester?${params.toString()}`;
-  }, [watchedValues]);
-
   const analysisUrl = useMemo(() => {
     const params = new URLSearchParams({
       type: "compression",
@@ -880,13 +867,6 @@ export function CompressionCalculator() {
               <a href={simulatorUrl || "#"}>Generate 3D Model / 生成3D模型</a>
             </Button>
             */}
-            <Button 
-              asChild 
-              variant="outline" 
-              className="w-full border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 hover:border-emerald-400 hover:text-emerald-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/10"
-            >
-              <a href={forceTesterUrl}>Send to Force Tester / 发送到力–位移测试</a>
-            </Button>
             <Button 
               asChild 
               variant="outline" 

@@ -3,7 +3,7 @@
  * 弹簧工作流程配置
  * 
  * Defines the unified workflow for all spring types:
- * Calculator → Force Tester → Simulator → Report → CAD/RFQ
+ * Calculator → Analysis → Simulator → Report → CAD/RFQ
  */
 
 import type { SpringType } from "@/lib/springTypes";
@@ -20,8 +20,8 @@ export interface SpringPipelineConfig {
   };
   /** Path to the calculator page */
   calculatorPath: string;
-  /** Path to the force/torque tester page */
-  testerPath: string;
+  /** Path to the engineering analysis page */
+  analysisPath: string;
   /** Path to the 3D simulator page */
   simulatorPath: string;
   /** Path to the design report page */
@@ -45,7 +45,7 @@ export const SPRING_PIPELINES: Record<SpringType, SpringPipelineConfig> = {
     type: "compression",
     label: { en: "Compression Spring", zh: "压缩弹簧" },
     calculatorPath: "/tools/calculator?tab=compression",
-    testerPath: "/tools/force-tester?type=compression",
+    analysisPath: "/tools/analysis?type=compression",
     simulatorPath: "/tools/simulator?type=compression",
     reportPath: "/tools/report?type=compression",
     cadExportPath: "/tools/cad-export?type=compression",
@@ -57,7 +57,7 @@ export const SPRING_PIPELINES: Record<SpringType, SpringPipelineConfig> = {
     type: "extension",
     label: { en: "Extension Spring", zh: "拉伸弹簧" },
     calculatorPath: "/tools/calculator?tab=extension",
-    testerPath: "/tools/force-tester?type=extension",
+    analysisPath: "/tools/analysis?type=extension",
     simulatorPath: "/tools/simulator?type=extension",
     reportPath: "/tools/report?type=extension",
     cadExportPath: "/tools/cad-export?type=extension",
@@ -69,7 +69,7 @@ export const SPRING_PIPELINES: Record<SpringType, SpringPipelineConfig> = {
     type: "torsion",
     label: { en: "Torsion Spring", zh: "扭转弹簧" },
     calculatorPath: "/tools/calculator?tab=torsion",
-    testerPath: "/tools/force-tester?type=torsion",
+    analysisPath: "/tools/analysis?type=torsion",
     simulatorPath: "/tools/simulator?type=torsion",
     reportPath: "/tools/report?type=torsion",
     cadExportPath: "/tools/cad-export?type=torsion",
@@ -81,7 +81,7 @@ export const SPRING_PIPELINES: Record<SpringType, SpringPipelineConfig> = {
     type: "conical",
     label: { en: "Conical Spring", zh: "锥形弹簧" },
     calculatorPath: "/tools/calculator?tab=conical",
-    testerPath: "/tools/force-tester?type=conical",
+    analysisPath: "/tools/analysis?type=conical",
     simulatorPath: "/tools/simulator?type=conical",
     reportPath: "/tools/report?type=conical",
     cadExportPath: "/tools/cad-export?type=conical",
@@ -93,7 +93,7 @@ export const SPRING_PIPELINES: Record<SpringType, SpringPipelineConfig> = {
     type: "spiralTorsion",
     label: { en: "Spiral Torsion Spring", zh: "螺旋扭转弹簧" },
     calculatorPath: "/tools/calculator?tab=spiralTorsion",
-    testerPath: "/tools/force-tester?type=spiralTorsion",
+    analysisPath: "/tools/analysis?type=spiralTorsion",
     simulatorPath: "/tools/simulator?type=spiralTorsion",
     reportPath: "/tools/report?type=spiralTorsion",
     cadExportPath: "/tools/cad-export?type=spiralTorsion",

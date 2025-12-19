@@ -86,13 +86,13 @@ function SimulatorContent() {
     return `/tools/calculator?${params.toString()}`;
   }, [wireDiameter, meanDiameter, activeCoils, shearModulus, deflection]);
 
-  const forceTesterParams = useMemo(() => {
+  const analysisParams = useMemo(() => {
     const params = new URLSearchParams({
       k: toStableParam(springRate),
       L0: toStableParam(freeLength),
       dx: toStableParam(deflection),
     });
-    return `/tools/force-tester?${params.toString()}`;
+    return `/tools/analysis?${params.toString()}`;
   }, [springRate, freeLength, deflection]);
 
   const handleNumber = (setter: (value: number) => void) => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,7 +176,7 @@ function SimulatorContent() {
                 <a href={calculatorParams}>Back to Calculator</a>
               </Button>
               <Button asChild>
-                <a href={forceTesterParams}>Go to Force Tester</a>
+                <a href={analysisParams}>Go to Engineering Analysis</a>
               </Button>
             </div>
           </CardContent>

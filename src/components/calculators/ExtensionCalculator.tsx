@@ -189,26 +189,6 @@ export function ExtensionCalculator() {
     }
   };
 
-  const forceTesterUrl = useMemo(() => {
-    const values = form.getValues();
-    const params = new URLSearchParams({
-      type: "extension",
-      OD: values.outerDiameter.toString(),
-      d: values.wireDiameter.toString(),
-      Na: values.activeCoils.toString(),
-      Lb: values.bodyLength.toString(),
-      Li: values.freeLengthInsideHooks.toString(),
-      G: values.shearModulus.toString(),
-      F0: values.initialTension.toString(),
-      dxMax: values.workingDeflection.toString(),
-      hookType: values.hookType,  // 传递钩类型
-    });
-    return `/tools/force-tester?${params.toString()}`;
-  }, [form]);
-
-  // Simulator URL for 3D model - same as force tester for extension springs
-  const simulatorUrl = forceTesterUrl;
-
   // Watch form values for URL generation
   const watchedValues = form.watch();
 
@@ -483,13 +463,6 @@ export function ExtensionCalculator() {
               <a href={simulatorUrl || "#"}>Generate 3D Model / 生成3D模型</a>
             </Button>
             */}
-            <Button 
-              asChild 
-              variant="outline" 
-              className="w-full border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 hover:border-emerald-400 hover:text-emerald-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/10"
-            >
-              <a href={forceTesterUrl}>Send to Force Tester / 发送到力–位移测试</a>
-            </Button>
             <Button 
               asChild 
               variant="outline" 

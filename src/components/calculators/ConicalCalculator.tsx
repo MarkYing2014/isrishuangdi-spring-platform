@@ -148,21 +148,6 @@ export function ConicalCalculator() {
     return `/tools/simulator?${params.toString()}`;
   }, [result, form]);
 
-  const forceTesterUrl = useMemo(() => {
-    const values = form.getValues();
-    const params = new URLSearchParams({
-      type: "conical",
-      d: values.wireDiameter.toString(),
-      D1: values.largeDiameter.toString(),
-      D2: values.smallDiameter.toString(),
-      Na: values.activeCoils.toString(),
-      G: values.shearModulus.toString(),
-      L0: values.freeLength.toString(),
-      dxMax: values.deflection.toString(),
-    });
-    return `/tools/force-tester?${params.toString()}`;
-  }, [form]);
-
   // Watch form values for URL generation
   const watchedValues = form.watch();
 
@@ -682,13 +667,6 @@ export function ConicalCalculator() {
               <a href={simulatorUrl || "#"}>Generate 3D Model / 生成3D模型</a>
             </Button>
             */}
-            <Button 
-              asChild 
-              variant="outline" 
-              className="w-full border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 hover:border-emerald-400 hover:text-emerald-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/10"
-            >
-              <a href={forceTesterUrl}>Send to Force Tester / 发送到力–位移测试</a>
-            </Button>
             <Button 
               asChild 
               variant="outline" 

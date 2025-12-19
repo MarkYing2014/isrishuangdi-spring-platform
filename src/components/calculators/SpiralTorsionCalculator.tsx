@@ -1312,16 +1312,6 @@ export function SpiralTorsionCalculator() {
             */}
             <Button 
               variant="outline" 
-              className="w-full border-emerald-500/50 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 hover:border-emerald-400 hover:text-emerald-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/10"
-              disabled={!results?.isValid || results?.operatingStatus === "EXCEEDED"}
-              title={results?.operatingStatus === "EXCEEDED" ? "超出线性范围，载荷曲线不可用" : undefined}
-              onClick={() => router.push("/tools/force-tester")}
-            >
-              Send to Force Tester / 发送到力–位移测试
-              {results?.operatingStatus === "EXCEEDED" && " ⚠️"}
-            </Button>
-            <Button 
-              variant="outline" 
               className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
               disabled={!results?.isValid}
               onClick={() => router.push("/tools/analysis")}
