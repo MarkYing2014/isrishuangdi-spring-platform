@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer } from "lucide-react";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
+import { ArcSpringAdvancedPanel } from "@/components/calculators/ArcSpringAdvancedPanel";
 import {
   ArcSpringInput,
   ArcSpringResult,
@@ -1081,6 +1082,16 @@ export function ArcSpringCalculator() {
           </Card>
         </div>
       </div>
+
+      {/* Advanced Analysis Panel */}
+      {calculated && isFinite(result.k) && (
+        <ArcSpringAdvancedPanel
+          isZh={false}
+          input={input}
+          result={result}
+          allowableTau={allowableTau}
+        />
+      )}
     </div>
   );
 }
