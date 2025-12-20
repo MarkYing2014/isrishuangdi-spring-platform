@@ -547,8 +547,10 @@ export function buildExtensionSpringGeometry(
   // === PART 2: Generate hook points (both ends) ===
   
   // Scaled dimensions for hooks
+  // Note: meanRadius is already scaled (line 521), so we use it directly
+  // wireDiameter needs to be scaled for hook generation
   const scaledWireDiameter = wireDiameter * scale;
-  const scaledMeanRadius = meanRadius * scale;
+  const scaledMeanRadius = meanRadius;  // Already scaled, don't scale again!
   
   // Get hook specification based on hookType
   const hookSpec = getHookSpec(hookType ?? "machine");
