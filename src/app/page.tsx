@@ -114,26 +114,26 @@ export default function Home() {
             </div>
             <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
               <LanguageText
-                en="See Spring Design, Manufacturing, and Quality Risks — Before They Become Problems"
-                zh="让弹簧设计、制造与质量风险，在问题发生前被看见"
+                en="Engineering-First Spring Design & Manufacturing Platform"
+                zh="以工程为核心的弹簧设计与制造平台"
               />
             </h1>
             <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
               <LanguageText
-                en="From engineering calculation to shopfloor reality — one system that connects design decisions, manufacturing risk, and quality outcomes."
-                zh="从工程计算 → 生产状态 → 质量数据，用一个系统打通 设计判断、制造风险、质量结论。"
+                en="From Geometry → Risk → Production → Quality. Replace tribal knowledge with engineering certainty."
+                zh="从几何到风险，从设计到生产。用工程确定性替代‘老师傅经验’。"
               />
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg" className="rounded-full">
                 <Link href="/tools/calculator">
-                  <LanguageText en="Start with calculation" zh="从计算开始" />
+                  <LanguageText en="Try Engineering Calculator" zh="使用工程计算器" />
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="rounded-full">
                 <Link href="/production">
-                  <LanguageText en="Explore live production" zh="探索真实生产场景" />
+                  <LanguageText en="See Manufacturing Dashboard Demo" zh="查看制造看板演示" />
                 </Link>
               </Button>
             </div>
