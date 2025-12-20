@@ -25,8 +25,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Waves, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
+import { buildPipelineUrl } from "@/lib/pipeline/springPipelines";
 
 import {
   calculateWaveSpring,
@@ -106,6 +108,30 @@ export function WaveSpringCalculator({ isZh = false }: WaveSpringCalculatorProps
 
   // Risk radar
   const riskRadar = useMemo(() => buildWaveRiskRadar({ input, result }), [input, result]);
+
+  // Build URLs for pipeline navigation
+  const designParams = useMemo(() => ({
+    id: String(id),
+    od: String(od),
+    t: String(thickness_t),
+    b: String(radialWall_b),
+    Nt: String(turns_Nt),
+    Nw: String(wavesPerTurn_Nw),
+    Hf: String(freeHeight_Hf),
+    Hw: String(workingHeight_Hw),
+    E: String(E_MPa),
+    material: materialId,
+  }), [id, od, thickness_t, radialWall_b, turns_Nt, wavesPerTurn_Nw, freeHeight_Hf, workingHeight_Hw, E_MPa, materialId]);
+
+  const analysisUrl = useMemo(() => 
+    buildPipelineUrl("/tools/analysis?type=wave", designParams), 
+    [designParams]
+  );
+
+  const cadExportUrl = useMemo(() => 
+    buildPipelineUrl("/tools/cad-export?type=wave", designParams), 
+    [designParams]
+  );
 
   // Format number helper
   const fmt = (n: number, decimals = 2) => {
@@ -294,6 +320,29 @@ export function WaveSpringCalculator({ isZh = false }: WaveSpringCalculatorProps
                 {isZh
                   ? "V2 预留：子类型选择（波形垫圈 / 多圈嵌套）"
                   : "V2 Reserved: Subtype selection (wave washer / multi-turn nested)"}
+              </div>
+
+              {/* Action Buttons - 工程分析和CAD出图 */}
+              <div className="space-y-3 pt-4 border-t">
+                <Button 
+                  asChild 
+                  variant="outline" 
+                  className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
+                >
+                  <a href={analysisUrl}>
+                    {isZh ? "发送到工程分析 / Engineering Analysis" : "Send to Engineering Analysis / 发送到工程分析"}
+                  </a>
+                </Button>
+                <Button 
+                  asChild 
+                  variant="outline" 
+                  className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10"
+                  disabled={!result.isValid}
+                >
+                  <a href={cadExportUrl}>
+                    {isZh ? "导出 CAD / Export CAD" : "Export CAD / 导出 CAD"}
+                  </a>
+                </Button>
               </div>
             </div>
 

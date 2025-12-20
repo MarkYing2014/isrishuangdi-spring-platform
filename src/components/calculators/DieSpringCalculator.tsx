@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Select,
@@ -28,6 +29,7 @@ import {
 import { Cog, AlertTriangle, CheckCircle, XCircle, Thermometer, Loader2 } from "lucide-react";
 
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
+import { buildPipelineUrl } from "@/lib/pipeline/springPipelines";
 
 const DieSpringVisualizer = lazy(() => import("@/components/three/DieSpringVisualizer"));
 
@@ -114,6 +116,31 @@ export function DieSpringCalculator({ isZh = false }: DieSpringCalculatorProps) 
     input,
     result,
   }), [input, result]);
+
+  // Build URLs for pipeline navigation
+  const designParams = useMemo(() => ({
+    od: String(od_mm),
+    L0: String(freeLength_mm),
+    Lw: String(workingLength_mm),
+    coils: String(coils),
+    wire_b: String(wire_b_mm),
+    wire_t: String(wire_t_mm),
+    endStyle,
+    material,
+    temperature: temperature_C !== undefined ? String(temperature_C) : undefined,
+    holeDia: holeDiameter_mm !== undefined ? String(holeDiameter_mm) : undefined,
+    rodDia: rodDiameter_mm !== undefined ? String(rodDiameter_mm) : undefined,
+  }), [od_mm, freeLength_mm, workingLength_mm, coils, wire_b_mm, wire_t_mm, endStyle, material, temperature_C, holeDiameter_mm, rodDiameter_mm]);
+
+  const analysisUrl = useMemo(() => 
+    buildPipelineUrl("/tools/analysis?type=dieSpring", designParams), 
+    [designParams]
+  );
+
+  const cadExportUrl = useMemo(() => 
+    buildPipelineUrl("/tools/cad-export?type=dieSpring", designParams), 
+    [designParams]
+  );
 
   // Compute deflection risk for visualization
   const deflectionRisk = useMemo(() => computeDieSpringRisk({
@@ -388,6 +415,29 @@ export function DieSpringCalculator({ isZh = false }: DieSpringCalculatorProps) 
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Action Buttons - 工程分析和CAD出图 */}
+              <div className="space-y-3 pt-4 border-t">
+                <Button 
+                  asChild 
+                  variant="outline" 
+                  className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
+                >
+                  <a href={analysisUrl}>
+                    {isZh ? "发送到工程分析 / Engineering Analysis" : "Send to Engineering Analysis / 发送到工程分析"}
+                  </a>
+                </Button>
+                <Button 
+                  asChild 
+                  variant="outline" 
+                  className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10"
+                  disabled={!result.ok}
+                >
+                  <a href={cadExportUrl}>
+                    {isZh ? "导出 CAD / Export CAD" : "Export CAD / 导出 CAD"}
+                  </a>
+                </Button>
               </div>
             </div>
 

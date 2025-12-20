@@ -22,6 +22,47 @@ export function checkSuspensionSpringDesignRules(
 ): DesignRuleFinding[] {
   const findings: DesignRuleFinding[] = [];
 
+  // 0. Active Coils Validity (Na > 0 且 Nt ≥ Na)
+  const Na = input.geometry.activeCoils_Na;
+  const Nt = result.derived.totalCoils_Nt;
+  
+  if (Na <= 0) {
+    findings.push({
+      id: "active_coils_invalid",
+      name: "Active Coils",
+      severity: "error",
+      message: `Na = ${Na} must be > 0`,
+      value: Na,
+      limit: 0,
+    });
+  } else if (Nt < Na) {
+    findings.push({
+      id: "total_coils_invalid",
+      name: "Total Coils",
+      severity: "error",
+      message: `Nt (${Nt}) < Na (${Na}): Total coils must be ≥ active coils`,
+      value: Nt,
+      limit: Na,
+    });
+  } else if (Na < 2) {
+    findings.push({
+      id: "active_coils_low",
+      name: "Active Coils",
+      severity: "warning",
+      message: `Na = ${Na} < 2: Very few active coils, consider redesign`,
+      value: Na,
+      limit: 2,
+    });
+  } else {
+    findings.push({
+      id: "active_coils",
+      name: "Active Coils",
+      severity: "ok",
+      message: `Na = ${Na}, Nt = ${Nt}`,
+      value: Na,
+    });
+  }
+
   // 1. Spring Index C
   const C = result.derived.springIndex_C;
   if (C < 4) {
@@ -220,7 +261,41 @@ export function checkSuspensionSpringDesignRules(
     });
   }
 
-  // 7. Natural Frequency (if dynamics provided)
+  // 7. Loadcase Consistency (H_preload ≥ H_ride ≥ H_bump)
+  // Hf already declared above in buckling check
+  const H_preload = Hf - result.preloadDeflection_mm;
+  const H_ride = result.rideHeight_mm;
+  const H_bump = result.bumpHeight_mm;
+  
+  if (H_preload < H_ride) {
+    findings.push({
+      id: "loadcase_preload_ride",
+      name: "Loadcase Consistency",
+      severity: "error",
+      message: `H_preload (${H_preload.toFixed(1)}mm) < H_ride (${H_ride.toFixed(1)}mm): Preload height must be ≥ ride height`,
+      value: H_preload,
+      limit: H_ride,
+    });
+  } else if (H_ride < H_bump) {
+    findings.push({
+      id: "loadcase_ride_bump",
+      name: "Loadcase Consistency",
+      severity: "error",
+      message: `H_ride (${H_ride.toFixed(1)}mm) < H_bump (${H_bump.toFixed(1)}mm): Ride height must be ≥ bump height`,
+      value: H_ride,
+      limit: H_bump,
+    });
+  } else {
+    findings.push({
+      id: "loadcase_consistency",
+      name: "Loadcase Consistency",
+      severity: "ok",
+      message: `H_preload (${H_preload.toFixed(1)}mm) ≥ H_ride (${H_ride.toFixed(1)}mm) ≥ H_bump (${H_bump.toFixed(1)}mm)`,
+      value: H_ride,
+    });
+  }
+
+  // 8. Natural Frequency (if dynamics provided)
   if (result.dynamics) {
     const fn = result.dynamics.naturalFreq_Hz;
     const target = input.loadcase.targetFreq_Hz;

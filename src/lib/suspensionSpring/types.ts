@@ -4,9 +4,10 @@
  * 
  * V1: Linear round wire compression spring
  * V2 预留: Progressive/dual-rate springs
+ * V2 预留: 旋向(右旋/左旋)、涂层厚度、磨平比例、高度定义方式
  */
 
-export type EndType = "closed" | "closed_ground";
+export type EndType = "open" | "closed" | "closed_ground";
 
 export interface SuspensionSpringGeometry {
   // 任选一种输入方式：OD/ID 或 Dm

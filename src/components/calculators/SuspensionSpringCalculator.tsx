@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { ChevronDown, AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { SuspensionSpringVisualizer } from "@/components/three/SuspensionSpringVisualizer";
+import { buildPipelineUrl } from "@/lib/pipeline/springPipelines";
 import {
   calculateSuspensionSpring,
   calculateStressRatioAtDeflection,
@@ -115,6 +116,36 @@ export function SuspensionSpringCalculator() {
     [input, result]
   );
   const overallStatus = getOverallStatus(findings);
+
+  // Build URLs for pipeline navigation
+  const designParams = useMemo(() => ({
+    d: String(wireDiameter),
+    od: String(od),
+    Na: String(activeCoils),
+    Nt: String(totalCoils),
+    Hf: String(freeLength),
+    endType,
+    material: materialPreset,
+    preload: String(preloadN),
+    rideLoad: String(rideLoadN),
+    bumpTravel: String(bumpTravel),
+    solidMargin: String(solidMargin),
+    holeDia: holeDiameter !== undefined ? String(holeDiameter) : undefined,
+    rodDia: rodDiameter !== undefined ? String(rodDiameter) : undefined,
+    cornerMass: cornerMass !== undefined ? String(cornerMass) : undefined,
+    motionRatio: String(motionRatio),
+    targetFreq: targetFreq !== undefined ? String(targetFreq) : undefined,
+  }), [wireDiameter, od, activeCoils, totalCoils, freeLength, endType, materialPreset, preloadN, rideLoadN, bumpTravel, solidMargin, holeDiameter, rodDiameter, cornerMass, motionRatio, targetFreq]);
+
+  const analysisUrl = useMemo(() => 
+    buildPipelineUrl("/tools/analysis?type=suspensionSpring", designParams), 
+    [designParams]
+  );
+
+  const cadExportUrl = useMemo(() => 
+    buildPipelineUrl("/tools/cad-export?type=suspensionSpring", designParams), 
+    [designParams]
+  );
 
   const currentStressRatio = useMemo(() => {
     if (result.errors.length > 0) return 0;
@@ -239,6 +270,7 @@ export function SuspensionSpringCalculator() {
                 <SelectContent>
                   <SelectItem value="closed_ground">并紧磨平 / Closed & Ground</SelectItem>
                   <SelectItem value="closed">并紧 / Closed</SelectItem>
+                  <SelectItem value="open">开放 / Open</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -584,6 +616,34 @@ export function SuspensionSpringCalculator() {
             </CardContent>
           </Card>
         )}
+
+        {/* Action Buttons - 工程分析和CAD出图 */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">工程工具 / Engineering Tools</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button 
+              asChild 
+              variant="outline" 
+              className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
+            >
+              <a href={analysisUrl}>
+                Send to Engineering Analysis / 发送到工程分析
+              </a>
+            </Button>
+            <Button 
+              asChild 
+              variant="outline" 
+              className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10"
+              disabled={result.errors.length > 0}
+            >
+              <a href={cadExportUrl}>
+                Export CAD / 导出 CAD
+              </a>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

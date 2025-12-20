@@ -178,8 +178,20 @@ function shearStress(Kw: number, F: number, Dm: number, d: number): number {
 }
 
 function solidFactor(endType: EndType): number {
-  // Ground ends slightly smaller (empirical)
-  return endType === "closed_ground" ? 0.98 : 1.0;
+  // Solid height factor based on end type
+  // Open ends: fewer dead coils, Hs ≈ (Nt + 1) * d → factor ~1.0 but fewer total coils contribute
+  // Closed: Hs ≈ Nt * d
+  // Closed & Ground: slightly smaller due to grinding
+  switch (endType) {
+    case "open":
+      return 1.0; // Open ends have less material at ends
+    case "closed":
+      return 1.0;
+    case "closed_ground":
+      return 0.98; // Ground ends slightly smaller
+    default:
+      return 1.0;
+  }
 }
 
 function guideChecks(
