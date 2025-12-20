@@ -7,7 +7,8 @@
  * 显示工单列表，支持点击查看详情
  */
 
-import { Clock, Package, Play, Pause, CheckCircle, XCircle } from "lucide-react";
+import Link from "next/link";
+import { Clock, Package, Play, Pause, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import type { WorkOrderRow, WorkOrderStatus } from "@/lib/manufacturing/types";
-import { WORK_ORDER_STATUS_COLORS } from "@/lib/manufacturing/types";
+import { WORK_ORDER_STATUS_COLORS, getDesignCodeRoute, getDesignCodeLabel } from "@/lib/manufacturing/types";
 
 interface WorkOrderTableProps {
   workOrders: WorkOrderRow[];
@@ -104,7 +105,17 @@ export function WorkOrderTable({ workOrders, onRowClick, className = "" }: WorkO
                       onClick={() => onRowClick?.(wo)}
                     >
                       <TableCell className="font-medium">{wo.workOrderId}</TableCell>
-                      <TableCell className="font-mono text-xs">{wo.designCode}</TableCell>
+                      <TableCell>
+                        <Link
+                          href={getDesignCodeRoute(wo.designCode)}
+                          className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                          title={`查看 ${getDesignCodeLabel(wo.designCode).zh} 计算器`}
+                        >
+                          {wo.designCode}
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      </TableCell>
                       <TableCell>{wo.partNo ?? "—"}</TableCell>
                       <TableCell>
                         <div className="w-24">

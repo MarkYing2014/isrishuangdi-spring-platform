@@ -354,8 +354,34 @@ export default function ProductionPage() {
         </div>
       )}
 
-      {/* KPI Strip - Always visible when mfgData is available */}
-      {mfgData && <KpiStrip kpis={mfgData.kpis} />}
+      {/* Shift Badge + KPI Strip */}
+      {mfgData && (
+        <div className="space-y-4">
+          {/* Current Shift Badge */}
+          {mfgData.shift && (
+            <div className="flex items-center gap-3">
+              <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium ${
+                mfgData.shift.id === "NIGHT" 
+                  ? "bg-indigo-100 text-indigo-800 border border-indigo-200" 
+                  : "bg-amber-100 text-amber-800 border border-amber-200"
+              }`}>
+                <span className={`h-2 w-2 rounded-full ${mfgData.shift.id === "NIGHT" ? "bg-indigo-500" : "bg-amber-500"}`} />
+                <span>{mfgData.shift.name}</span>
+                <span className="text-xs opacity-70">
+                  ({mfgData.shift.startTime} - {mfgData.shift.endTime})
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                <LanguageText 
+                  en={mfgData.shift.id === "NIGHT" ? "Night shift: slightly lower targets" : "Day shift: standard targets"} 
+                  zh={mfgData.shift.id === "NIGHT" ? "夜班：目标略低" : "白班：标准目标"} 
+                />
+              </span>
+            </div>
+          )}
+          <KpiStrip kpis={mfgData.kpis} />
+        </div>
+      )}
 
       {/* Tabs for switching between Risk View and Operations View */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

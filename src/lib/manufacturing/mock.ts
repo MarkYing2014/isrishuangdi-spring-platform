@@ -75,10 +75,13 @@ const MACHINE_NAMES: Record<string, string> = {
 const DESIGN_CODES = [
   "CS-2024-001",
   "CS-2024-002",
+  "CS-2024-003",
   "EX-2024-001",
   "EX-2024-002",
   "TS-2024-001",
   "TS-2024-002",
+  "CN-2024-001",
+  "AS-2024-001",
 ];
 
 const PART_NOS = [
@@ -127,8 +130,18 @@ export function generateMockDashboard(options: MockGeneratorOptions = {}): Dashb
   // Generate machines
   const machines = generateMachines(rand, machineIds, lines, riskLevel);
 
+  // Get current shift
+  const currentHour = now.getHours();
+  const currentShift = MOCK_SHIFTS.find((s) => {
+    if (s.startHour < s.endHour) {
+      return currentHour >= s.startHour && currentHour < s.endHour;
+    }
+    return currentHour >= s.startHour || currentHour < s.endHour;
+  }) ?? MOCK_SHIFTS[0];
+  const isNightShift = currentShift.shiftId === "NIGHT";
+
   // Generate KPIs
-  const kpis = generateKpis(rand, machines, riskLevel);
+  const kpis = generateKpis(rand, machines, riskLevel, isNightShift);
 
   // Generate Andon events
   const andon = generateAndonEvents(rand, machines, riskLevel);
@@ -143,15 +156,6 @@ export function generateMockDashboard(options: MockGeneratorOptions = {}): Dashb
   // Generate work orders
   const workOrders = generateWorkOrders(rand, machines);
 
-  // Get current shift
-  const currentHour = now.getHours();
-  const shift = MOCK_SHIFTS.find((s) => {
-    if (s.startHour < s.endHour) {
-      return currentHour >= s.startHour && currentHour < s.endHour;
-    }
-    return currentHour >= s.startHour || currentHour < s.endHour;
-  }) ?? MOCK_SHIFTS[0];
-
   return {
     kpis,
     machines,
@@ -161,10 +165,10 @@ export function generateMockDashboard(options: MockGeneratorOptions = {}): Dashb
     downtimePareto,
     workOrders,
     shift: {
-      id: shift.shiftId,
-      name: shift.name.en,
-      startTime: `${String(shift.startHour).padStart(2, "0")}:00`,
-      endTime: `${String(shift.endHour).padStart(2, "0")}:00`,
+      id: currentShift.shiftId,
+      name: currentShift.name.zh,
+      startTime: `${String(currentShift.startHour).padStart(2, "0")}:00`,
+      endTime: `${String(currentShift.endHour).padStart(2, "0")}:00`,
     },
   };
 }
@@ -226,24 +230,28 @@ function generateMachines(
   });
 }
 
-function generateKpis(rand: () => number, machines: MachineTile[], riskLevel: string): KpiSummary {
+function generateKpis(rand: () => number, machines: MachineTile[], riskLevel: string, isNightShift: boolean): KpiSummary {
   const runningCount = machines.filter((m) => m.state === "RUN").length;
   const totalMachines = machines.filter((m) => m.state !== "OFF").length;
 
-  const baseOee = riskLevel === "high" ? 0.55 : riskLevel === "medium" ? 0.72 : 0.85;
-  const baseFpy = riskLevel === "high" ? 0.88 : riskLevel === "medium" ? 0.94 : 0.98;
+  // Night shift typically has slightly lower efficiency
+  const shiftFactor = isNightShift ? 0.95 : 1.0;
 
-  const planQty = 5000;
+  const baseOee = (riskLevel === "high" ? 0.55 : riskLevel === "medium" ? 0.72 : 0.85) * shiftFactor;
+  const baseFpy = (riskLevel === "high" ? 0.88 : riskLevel === "medium" ? 0.94 : 0.98) * shiftFactor;
+
+  // Night shift has lower plan qty
+  const planQty = isNightShift ? 4000 : 5000;
   const actualQty = Math.floor(planQty * (0.6 + rand() * 0.35));
 
   return {
     planQty,
     actualQty,
-    oee: baseOee + (rand() - 0.5) * 0.1,
-    fpy: baseFpy + (rand() - 0.5) * 0.04,
+    oee: Math.min(baseOee + (rand() - 0.5) * 0.1, 0.99),
+    fpy: Math.min(baseFpy + (rand() - 0.5) * 0.04, 0.995),
     activeAlarmsCount: machines.filter((m) => m.alarmCode).length,
     uph: Math.floor(actualQty / 8),
-    ctAvgSec: 2.8 + rand() * 0.8,
+    ctAvgSec: 2.8 + rand() * 0.8 + (isNightShift ? 0.2 : 0),
     lastUpdatedAt: new Date().toISOString(),
   };
 }

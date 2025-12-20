@@ -237,7 +237,7 @@ export interface ShiftConfig {
 
 export interface DesignCodeSnapshot {
   designCode: string;
-  springType: string;
+  springType: "compression" | "extension" | "torsion" | "conical" | "arc";
   geometry: {
     wireDiameter: number;
     meanDiameter?: number;
@@ -255,4 +255,32 @@ export interface DesignCodeSnapshot {
 
 export interface WorkOrderWithDesign extends WorkOrderRow {
   designSnapshot?: DesignCodeSnapshot;
+}
+
+/**
+ * Design Code to Calculator URL mapping
+ * 设计编码到计算器 URL 的映射
+ */
+export const DESIGN_CODE_ROUTES: Record<string, { type: string; route: string; label: { en: string; zh: string } }> = {
+  "CS": { type: "compression", route: "/tools/calculator?tab=compression", label: { en: "Compression Spring", zh: "压缩弹簧" } },
+  "EX": { type: "extension", route: "/tools/calculator?tab=extension", label: { en: "Extension Spring", zh: "拉伸弹簧" } },
+  "TS": { type: "torsion", route: "/tools/calculator?tab=torsion", label: { en: "Torsion Spring", zh: "扭转弹簧" } },
+  "CN": { type: "conical", route: "/tools/calculator?tab=conical", label: { en: "Conical Spring", zh: "锥形弹簧" } },
+  "AS": { type: "arc", route: "/tools/arc-spring", label: { en: "Arc Spring", zh: "弧形弹簧" } },
+};
+
+/**
+ * Get calculator route from design code
+ */
+export function getDesignCodeRoute(designCode: string): string {
+  const prefix = designCode.split("-")[0];
+  return DESIGN_CODE_ROUTES[prefix]?.route ?? "/tools/calculator";
+}
+
+/**
+ * Get spring type label from design code
+ */
+export function getDesignCodeLabel(designCode: string): { en: string; zh: string } {
+  const prefix = designCode.split("-")[0];
+  return DESIGN_CODE_ROUTES[prefix]?.label ?? { en: "Spring", zh: "弹簧" };
 }

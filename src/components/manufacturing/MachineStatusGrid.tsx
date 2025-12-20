@@ -7,11 +7,12 @@
  * 显示所有机台的实时状态
  */
 
-import { Cog } from "lucide-react";
+import Link from "next/link";
+import { Cog, ExternalLink } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { MachineTile, MachineState } from "@/lib/manufacturing/types";
-import { MACHINE_STATE_COLORS, MACHINE_STATE_LABELS, STOP_REASON_LABELS } from "@/lib/manufacturing/types";
+import { MACHINE_STATE_COLORS, MACHINE_STATE_LABELS, STOP_REASON_LABELS, getDesignCodeRoute, getDesignCodeLabel } from "@/lib/manufacturing/types";
 
 interface MachineStatusGridProps {
   machines: MachineTile[];
@@ -97,9 +98,17 @@ function MachineCard({ machine, onClick }: MachineCardProps) {
               <span className="font-medium">{machine.workOrderId}</span>
             </div>
             {machine.designCode && (
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">设计码</span>
-                <span className="font-mono text-xs">{machine.designCode}</span>
+                <Link
+                  href={getDesignCodeRoute(machine.designCode)}
+                  className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-0.5"
+                  onClick={(e) => e.stopPropagation()}
+                  title={`查看 ${getDesignCodeLabel(machine.designCode).zh} 计算器`}
+                >
+                  {machine.designCode}
+                  <ExternalLink className="h-2.5 w-2.5" />
+                </Link>
               </div>
             )}
           </div>
