@@ -27,6 +27,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { HomeRiskRadar } from "@/components/home/HomeRiskRadar";
 import { HoverGlassCard } from "@/components/home/HoverGlassCard";
+import { HeroSpline } from "@/components/home/hero-spline";
 
 const features = [
   {
@@ -140,13 +141,7 @@ export default function Home() {
 
           <div className="relative">
             <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border bg-muted/30 shadow-sm">
-              <div className="flex h-full w-full items-center justify-center p-2">
-                <img
-                  src="/hero.png"
-                  alt="Hero"
-                  className="h-full w-full object-contain"
-                />
-              </div>
+              <HeroSpline />
             </div>
           </div>
         </div>
