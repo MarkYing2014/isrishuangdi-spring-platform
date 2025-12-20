@@ -27,6 +27,7 @@ import {
   ThroughputTrend,
   DowntimePareto,
 } from "@/components/manufacturing";
+import { CameraMonitorCard } from "@/components/production";
 
 function riskBadgeColor(status: LiveRiskStatus): string {
   switch (status) {
@@ -554,6 +555,15 @@ export default function ProductionPage() {
                 <WorkOrderTable
                   workOrders={mfgData.workOrders}
                   className="lg:col-span-2"
+                />
+              </div>
+
+              {/* Camera Monitor */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <CameraMonitorCard
+                  lineId={mfgData.machines[0]?.lineId}
+                  workOrderId={mfgData.workOrders[0]?.workOrderId}
+                  className="lg:col-span-1"
                 />
               </div>
             </div>
