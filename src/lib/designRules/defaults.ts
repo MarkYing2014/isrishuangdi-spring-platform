@@ -37,6 +37,24 @@ export const designRulesDefaults = {
     extensionRatioHigh: 0.4,
     initialTensionPreExtRatioLow: 0.01,
     initialTensionPreExtRatioHigh: 0.08,
+    // 新增：尺寸/成形要求
+    activeCoilsMin: 3,                    // Na 最小值
+    activeCoilsWarn: 5,                   // Na 推荐最小值
+    wireOdRatioMin: 0.05,                 // d/OD 最小值 (太小难成形)
+    wireOdRatioMax: 0.25,                 // d/OD 最大值 (太大刚度过高)
+    wireOdRatioWarn: 0.20,                // d/OD 警告阈值
+    bodyDmRatioMin: 0.5,                  // bodyLength/Dm 最小值
+    bodyDmRatioMax: 20,                   // bodyLength/Dm 最大值 (太长不稳定)
+    bodyDmRatioWarn: 15,                  // bodyLength/Dm 警告阈值
+    freeLengthBodyLengthMin: 1.0,         // freeLengthInsideHooks/bodyLength 最小值
+    // 钩型对弹簧指数的要求
+    hookIndexRequirements: {
+      machine: { min: 4, max: 16 },       // Machine Hook 适用范围
+      side: { min: 5, max: 14 },          // Side Hook 需要稍大的 C
+      crossover: { min: 4, max: 12 },     // Crossover Hook 适用范围
+      extended: { min: 6, max: 16 },      // Extended Hook 需要较大的 C
+      doubleLoop: { min: 5, max: 14 },    // Double Loop 需要稍大的 C
+    } as Record<string, { min: number; max: number }>,
   },
 
   torsion: {

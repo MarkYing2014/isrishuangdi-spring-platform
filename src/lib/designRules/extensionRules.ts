@@ -81,6 +81,167 @@ export function buildExtensionDesignRuleReport(params: {
     });
   }
 
+  // ========== 新增：尺寸/成形要求规则 ==========
+  
+  const Na = g.activeCoils;
+  const OD = g.outerDiameter;
+  const freeLength = g.freeLength;
+  
+  // 1. 有效圈数合理性检查
+  if (isFinite(Na)) {
+    if (Na < designRulesDefaults.extension.activeCoilsMin) {
+      findings.push({
+        id: "EXT_ACTIVE_COILS_LOW",
+        level: "error",
+        titleEn: "Active coils too few",
+        titleZh: "有效圈数过少",
+        detailEn: `Na=${Na} < ${designRulesDefaults.extension.activeCoilsMin}. Spring will be unstable and difficult to manufacture.`,
+        detailZh: `有效圈数 Na=${Na} < ${designRulesDefaults.extension.activeCoilsMin}，弹簧刚度不稳定且难以成形。`,
+        evidence: { field: "activeCoils", Na },
+      });
+    } else if (Na < designRulesDefaults.extension.activeCoilsWarn) {
+      findings.push({
+        id: "EXT_ACTIVE_COILS_WARN",
+        level: "warning",
+        titleEn: "Active coils on the low side",
+        titleZh: "有效圈数偏少",
+        detailEn: `Na=${Na} < ${designRulesDefaults.extension.activeCoilsWarn}. Consider increasing for better stability.`,
+        detailZh: `有效圈数 Na=${Na} < ${designRulesDefaults.extension.activeCoilsWarn}，建议增加以提高稳定性。`,
+        evidence: { field: "activeCoils", Na },
+      });
+    }
+  }
+
+  // 2. 线径与外径比检查 (成形难度)
+  if (isFinite(d) && isFinite(OD) && OD > 0) {
+    const wireOdRatio = d / OD;
+    metrics.wire_od_ratio = {
+      value: Number(wireOdRatio.toFixed(3)),
+      labelEn: "Wire/OD ratio d/OD",
+      labelZh: "线径外径比 d/OD",
+    };
+    
+    if (wireOdRatio < designRulesDefaults.extension.wireOdRatioMin) {
+      findings.push({
+        id: "EXT_WIRE_OD_RATIO_LOW",
+        level: "warning",
+        titleEn: "Wire diameter too small relative to OD",
+        titleZh: "线径相对外径过小",
+        detailEn: `d/OD=${wireOdRatio.toFixed(3)} < ${designRulesDefaults.extension.wireOdRatioMin}. Very thin wire, difficult to form and handle.`,
+        detailZh: `d/OD=${wireOdRatio.toFixed(3)} < ${designRulesDefaults.extension.wireOdRatioMin}，线材过细，成形和操作困难。`,
+        evidence: { field: "wireDiameter", wireOdRatio },
+      });
+    } else if (wireOdRatio > designRulesDefaults.extension.wireOdRatioMax) {
+      findings.push({
+        id: "EXT_WIRE_OD_RATIO_HIGH",
+        level: "error",
+        titleEn: "Wire diameter too large relative to OD",
+        titleZh: "线径相对外径过大",
+        detailEn: `d/OD=${wireOdRatio.toFixed(3)} > ${designRulesDefaults.extension.wireOdRatioMax}. Difficult to coil, high residual stress.`,
+        detailZh: `d/OD=${wireOdRatio.toFixed(3)} > ${designRulesDefaults.extension.wireOdRatioMax}，难以卷绑，残余应力高。`,
+        evidence: { field: "wireDiameter", wireOdRatio },
+      });
+    } else if (wireOdRatio > designRulesDefaults.extension.wireOdRatioWarn) {
+      findings.push({
+        id: "EXT_WIRE_OD_RATIO_WARN",
+        level: "warning",
+        titleEn: "Wire diameter relatively large",
+        titleZh: "线径相对较大",
+        detailEn: `d/OD=${wireOdRatio.toFixed(3)} > ${designRulesDefaults.extension.wireOdRatioWarn}. May be difficult to form.`,
+        detailZh: `d/OD=${wireOdRatio.toFixed(3)} > ${designRulesDefaults.extension.wireOdRatioWarn}，成形可能有难度。`,
+        evidence: { field: "wireDiameter", wireOdRatio },
+      });
+    }
+  }
+
+  // 3. 钩内自由长度合理性检查
+  if (freeLength !== undefined && isFinite(freeLength) && isFinite(bodyLength) && bodyLength > 0) {
+    const freeLengthRatio = freeLength / bodyLength;
+    if (freeLengthRatio < designRulesDefaults.extension.freeLengthBodyLengthMin) {
+      findings.push({
+        id: "EXT_FREE_LENGTH_SHORT",
+        level: "error",
+        titleEn: "Free length inside hooks too short",
+        titleZh: "钩内自由长度过短",
+        detailEn: `Free length (${freeLength?.toFixed(1)}mm) < body length (${bodyLength.toFixed(1)}mm). Hooks would overlap with coils.`,
+        detailZh: `钩内自由长度 (${freeLength?.toFixed(1)}mm) < 本体长度 (${bodyLength.toFixed(1)}mm)，钩子会与线圈重叠。`,
+        evidence: { field: "freeLengthInsideHooks", freeLength, bodyLength },
+      });
+    }
+  }
+
+  // 4. 本体长度与中径比检查 (稳定性)
+  if (isFinite(bodyLength) && isFinite(Dm) && Dm > 0) {
+    const bodyDmRatio = bodyLength / Dm;
+    metrics.body_dm_ratio = {
+      value: Number(bodyDmRatio.toFixed(2)),
+      labelEn: "Body/Dm ratio Lb/Dm",
+      labelZh: "本体中径比 Lb/Dm",
+    };
+    
+    if (bodyDmRatio < designRulesDefaults.extension.bodyDmRatioMin) {
+      findings.push({
+        id: "EXT_BODY_DM_RATIO_LOW",
+        level: "warning",
+        titleEn: "Body length very short relative to diameter",
+        titleZh: "本体长度相对直径过短",
+        detailEn: `Lb/Dm=${bodyDmRatio.toFixed(2)} < ${designRulesDefaults.extension.bodyDmRatioMin}. Very short spring, limited extension range.`,
+        detailZh: `Lb/Dm=${bodyDmRatio.toFixed(2)} < ${designRulesDefaults.extension.bodyDmRatioMin}，弹簧过短，伸长范围有限。`,
+        evidence: { field: "bodyLength", bodyDmRatio },
+      });
+    } else if (bodyDmRatio > designRulesDefaults.extension.bodyDmRatioMax) {
+      findings.push({
+        id: "EXT_BODY_DM_RATIO_HIGH",
+        level: "error",
+        titleEn: "Body length too long relative to diameter",
+        titleZh: "本体长度相对直径过长",
+        detailEn: `Lb/Dm=${bodyDmRatio.toFixed(2)} > ${designRulesDefaults.extension.bodyDmRatioMax}. Spring may buckle or tangle.`,
+        detailZh: `Lb/Dm=${bodyDmRatio.toFixed(2)} > ${designRulesDefaults.extension.bodyDmRatioMax}，弹簧可能屈曲或缠绕。`,
+        evidence: { field: "bodyLength", bodyDmRatio },
+      });
+    } else if (bodyDmRatio > designRulesDefaults.extension.bodyDmRatioWarn) {
+      findings.push({
+        id: "EXT_BODY_DM_RATIO_WARN",
+        level: "warning",
+        titleEn: "Body length relatively long",
+        titleZh: "本体长度相对较长",
+        detailEn: `Lb/Dm=${bodyDmRatio.toFixed(2)} > ${designRulesDefaults.extension.bodyDmRatioWarn}. Consider guidance or support.`,
+        detailZh: `Lb/Dm=${bodyDmRatio.toFixed(2)} > ${designRulesDefaults.extension.bodyDmRatioWarn}，建议考虑导向或支撑。`,
+        evidence: { field: "bodyLength", bodyDmRatio },
+      });
+    }
+  }
+
+  // 5. 钩型与弹簧指数匹配检查
+  if (g.hookType && isFinite(C)) {
+    const hookReqs = designRulesDefaults.extension.hookIndexRequirements[g.hookType];
+    if (hookReqs) {
+      if (C < hookReqs.min) {
+        findings.push({
+          id: "EXT_HOOK_INDEX_LOW",
+          level: "warning",
+          titleEn: `Spring index too low for ${g.hookType} hook`,
+          titleZh: `弹簧指数对于${g.hookType}钩型过低`,
+          detailEn: `C=${C.toFixed(2)} < ${hookReqs.min} for ${g.hookType} hook. Hook forming may be difficult.`,
+          detailZh: `C=${C.toFixed(2)} < ${hookReqs.min}，${g.hookType}钩型成形可能困难。`,
+          evidence: { field: "hookType", C, hookType: g.hookType, required: hookReqs },
+        });
+      } else if (C > hookReqs.max) {
+        findings.push({
+          id: "EXT_HOOK_INDEX_HIGH",
+          level: "warning",
+          titleEn: `Spring index too high for ${g.hookType} hook`,
+          titleZh: `弹簧指数对于${g.hookType}钩型过高`,
+          detailEn: `C=${C.toFixed(2)} > ${hookReqs.max} for ${g.hookType} hook. Hook may be weak or deform.`,
+          detailZh: `C=${C.toFixed(2)} > ${hookReqs.max}，${g.hookType}钩型可能强度不足或变形。`,
+          evidence: { field: "hookType", C, hookType: g.hookType, required: hookReqs },
+        });
+      }
+    }
+  }
+
+  // ========== 原有规则继续 ==========
+
   if (isFinite(C)) {
     if (C < designRulesDefaults.extension.springIndexPrefMin || C > designRulesDefaults.extension.springIndexPrefMax) {
       findings.push({
