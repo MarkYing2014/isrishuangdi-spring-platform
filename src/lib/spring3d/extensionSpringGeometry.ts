@@ -526,14 +526,11 @@ export function buildExtensionSpringGeometry(
   // solidBodyLength = activeCoils × wireDiameter（线圈贴紧时的长度）
   // 拉伸后才出现节距
   // 
-  // freeLengthInsideHooks (钩内自由长度) 是用户输入的总长度
-  // 如果提供了 freeLengthInsideHooks，使用它来计算实际的弹簧体长度
-  // 否则使用 solidBodyLength 作为默认值
+  // 重要：拉簧的弹簧体在自由状态下始终是紧密贴合的！
+  // freeLengthInsideHooks 只影响钩子的位置，不影响弹簧体的节距
+  // 只有 currentExtension > 0 时才会出现节距
   const solidBodyLength = activeCoils * wireDiameter;
-  const actualBodyLength = freeLengthInsideHooks 
-    ? Math.max(solidBodyLength, freeLengthInsideHooks - wireDiameter * 4) // 减去两端钩子的估计长度
-    : solidBodyLength;
-  const extendedLength = (actualBodyLength + currentExtension) * scale;
+  const extendedLength = (solidBodyLength + currentExtension) * scale;
   
   const totalAngle = 2 * Math.PI * activeCoils;
 

@@ -212,14 +212,16 @@ export function ExtensionCalculator() {
       const meanDiameter = values.outerDiameter - values.wireDiameter;
       
       // Update store for live 3D preview
+      // 拉簧本体长度 = Na × d（紧密贴合，无节距）
+      const solidBodyLength = values.activeCoils * values.wireDiameter;
       const geometry: ExtensionGeometry = {
         type: "extension",
         wireDiameter: values.wireDiameter,
         outerDiameter: values.outerDiameter,
         meanDiameter,
         activeCoils: values.activeCoils,
-        bodyLength: values.bodyLength || meanDiameter * values.activeCoils,
-        freeLength: values.freeLengthInsideHooks || 35,
+        bodyLength: values.bodyLength || solidBodyLength,
+        freeLength: values.freeLengthInsideHooks || (solidBodyLength + values.wireDiameter * 4),
         hookType: values.hookType || "machine",
         initialTension: values.initialTension || 0,
         shearModulus: values.shearModulus || 79300,
