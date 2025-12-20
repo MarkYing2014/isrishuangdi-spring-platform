@@ -89,7 +89,8 @@ export function Calculator3DPreview({
       const meanDiameter =
         geometry.meanDiameter ?? geometry.outerDiameter - geometry.wireDiameter;
 
-      const freeLengthUsed = Math.max(1e-6, maxDeflectionUsed * 2);
+      // Use actual freeLength from geometry (钩内自由长度), fallback to calculated value
+      const freeLengthUsed = geometry.freeLength ?? Math.max(1e-6, maxDeflectionUsed * 2);
 
       const params: SpringPreviewParams = {
         type: "extension",

@@ -87,10 +87,12 @@ export function CadPreview3D({ params, className = "" }: CadPreview3DProps) {
       case 'extension': {
         const outerDiameter = meanDiameter + wireDiameter;
         const calculatedBodyLength = bodyLength ?? activeCoils * wireDiameter;
+        // Use freeLength from params (钩内自由长度), fallback to calculated value
+        const freeLengthInsideHooks = freeLength ?? (calculatedBodyLength + wireDiameter * 4);
         const design: ExtensionDesignMeta = {
           type: 'extension', wireDiameter, outerDiameter, activeCoils,
           bodyLength: calculatedBodyLength,
-          freeLengthInsideHooks: calculatedBodyLength + wireDiameter * 4,
+          freeLengthInsideHooks,
           shearModulus, springRate, initialTension, hookType,
         };
         initializeExtension(curve, design, maxDeflection);
