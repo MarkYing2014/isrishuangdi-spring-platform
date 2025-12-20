@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Cog } from "lucide-react";
+import { AlertTriangle, Cog, RefreshCw } from "lucide-react";
 
 import { LanguageText } from "@/components/language-context";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import type { DashboardVM, LiveRiskStatus, MachineRiskCard, Alert } from "@/lib/liveRiskBrain/types";
+import type { DashboardSummaryResponse, TimeRange } from "@/lib/manufacturing/types";
+import { TIME_RANGE_OPTIONS, MOCK_PLANTS } from "@/lib/manufacturing";
+import {
+  KpiStrip,
+  MachineStatusGrid,
+  AndonFeed,
+  WorkOrderTable,
+  CycleTimeTrend,
+  ThroughputTrend,
+  DowntimePareto,
+} from "@/components/manufacturing";
 
 function riskBadgeColor(status: LiveRiskStatus): string {
   switch (status) {
@@ -211,12 +223,20 @@ function AlertCard({ alert }: { alert: Alert }) {
 }
 
 export default function ProductionPage() {
+  // Live Risk Brain state
   const [dashboard, setDashboard] = useState<DashboardVM | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [riskPreset, setRiskPreset] = useState<"OK" | "WARN" | "HIGH">("OK");
   const [autoRefresh, setAutoRefresh] = useState(false);
 
+  // Manufacturing Dashboard state
+  const [mfgData, setMfgData] = useState<DashboardSummaryResponse | null>(null);
+  const [mfgLoading, setMfgLoading] = useState(false);
+  const [timeRange, setTimeRange] = useState<TimeRange>("1h");
+  const [activeTab, setActiveTab] = useState<string>("risk");
+
+  // Fetch Live Risk Brain data
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -235,15 +255,37 @@ export default function ProductionPage() {
     }
   }, [riskPreset]);
 
+  // Fetch Manufacturing Dashboard data
+  const fetchMfgData = useCallback(async () => {
+    setMfgLoading(true);
+    try {
+      const riskLevel = riskPreset === "OK" ? "low" : riskPreset === "WARN" ? "medium" : "high";
+      const res = await fetch(`/api/manufacturing/summary?plantId=P01&range=${timeRange}&risk=${riskLevel}&seed=${Date.now()}`);
+      if (!res.ok) throw new Error("Failed to fetch manufacturing data");
+      const data = await res.json();
+      setMfgData(data);
+    } catch (e) {
+      console.error("Manufacturing data fetch error:", e);
+    } finally {
+      setMfgLoading(false);
+    }
+  }, [riskPreset, timeRange]);
+
+  // Fetch both on mount and when params change
   useEffect(() => {
     fetchDashboard();
-  }, [fetchDashboard]);
+    fetchMfgData();
+  }, [fetchDashboard, fetchMfgData]);
 
+  // Auto refresh
   useEffect(() => {
     if (!autoRefresh) return;
-    const interval = setInterval(fetchDashboard, 5000);
+    const interval = setInterval(() => {
+      fetchDashboard();
+      fetchMfgData();
+    }, 5000);
     return () => clearInterval(interval);
-  }, [autoRefresh, fetchDashboard]);
+  }, [autoRefresh, fetchDashboard, fetchMfgData]);
 
   return (
     <section className="space-y-6">
@@ -280,8 +322,22 @@ export default function ProductionPage() {
           </SelectContent>
         </Select>
 
-        <Button onClick={fetchDashboard} disabled={loading} variant="outline">
-          <LanguageText en={loading ? "Loading..." : "Refresh"} zh={loading ? "加载中..." : "刷新"} />
+        <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
+          <SelectTrigger className="w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TIME_RANGE_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label.zh}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Button onClick={() => { fetchDashboard(); fetchMfgData(); }} disabled={loading || mfgLoading} variant="outline">
+          <RefreshCw className={`h-4 w-4 mr-1 ${loading || mfgLoading ? "animate-spin" : ""}`} />
+          <LanguageText en="Refresh" zh="刷新" />
         </Button>
 
         <Button
@@ -298,133 +354,186 @@ export default function ProductionPage() {
         </div>
       )}
 
-      {dashboard && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">
-                  <LanguageText en="Factory Overview" zh="全厂概览" />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <div className="rounded-lg border bg-emerald-50 p-3 text-center">
-                    <div className="text-2xl font-bold text-emerald-700">{dashboard.factorySummary.runningCount}</div>
-                    <div className="text-xs text-emerald-600">
-                      <LanguageText en="Running" zh="运行中" />
-                    </div>
-                  </div>
-                  <div className="rounded-lg border bg-slate-50 p-3 text-center">
-                    <div className="text-2xl font-bold text-slate-600">{dashboard.factorySummary.stoppedCount}</div>
-                    <div className="text-xs text-slate-500">
-                      <LanguageText en="Stopped" zh="停机" />
-                    </div>
-                  </div>
-                  <div className="rounded-lg border bg-rose-50 p-3 text-center">
-                    <div className="text-2xl font-bold text-rose-700">{dashboard.factorySummary.alarmCount}</div>
-                    <div className="text-xs text-rose-600">
-                      <LanguageText en="Alarm" zh="报警" />
-                    </div>
-                  </div>
-                  <div className="rounded-lg border bg-blue-50 p-3 text-center">
-                    <div className="text-2xl font-bold text-blue-700">{dashboard.factorySummary.setupCount}</div>
-                    <div className="text-xs text-blue-600">
-                      <LanguageText en="Setup" zh="调机" />
-                    </div>
-                  </div>
-                </div>
+      {/* KPI Strip - Always visible when mfgData is available */}
+      {mfgData && <KpiStrip kpis={mfgData.kpis} />}
 
-                <div className="mt-4 flex items-center justify-between rounded-lg border p-3">
-                  <div>
-                    <div className="text-sm text-muted-foreground">
-                      <LanguageText en="Overall Live Risk" zh="总体实时风险" />
-                    </div>
-                    <div className={`mt-1 inline-block rounded-full border px-3 py-1 text-sm font-semibold ${riskBadgeColor(dashboard.factorySummary.overallLiveRisk)}`}>
-                      {dashboard.factorySummary.overallLiveRisk} ({dashboard.factorySummary.overallScore})
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-muted-foreground">
-                      <LanguageText en="Throughput" zh="产量" />
-                    </div>
-                    <div className="text-lg font-semibold">{dashboard.factorySummary.throughputNow.toLocaleString()}/h</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      {/* Tabs for switching between Risk View and Operations View */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="risk">
+            <LanguageText en="Risk Analysis" zh="风险分析" />
+          </TabsTrigger>
+          <TabsTrigger value="operations">
+            <LanguageText en="Operations" zh="生产运营" />
+          </TabsTrigger>
+        </TabsList>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">
-                  <LanguageText en="Machine Status" zh="机台状态" />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {dashboard.machines.map((m) => (
-                    <MachineCardComponent key={m.machineId} machine={m} />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        {/* Risk Analysis Tab - Original Live Risk Brain content */}
+        <TabsContent value="risk" className="mt-6">
+          {dashboard && (
+            <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">
+                      <LanguageText en="Factory Overview" zh="全厂概览" />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                      <div className="rounded-lg border bg-emerald-50 p-3 text-center">
+                        <div className="text-2xl font-bold text-emerald-700">{dashboard.factorySummary.runningCount}</div>
+                        <div className="text-xs text-emerald-600">
+                          <LanguageText en="Running" zh="运行中" />
+                        </div>
+                      </div>
+                      <div className="rounded-lg border bg-slate-50 p-3 text-center">
+                        <div className="text-2xl font-bold text-slate-600">{dashboard.factorySummary.stoppedCount}</div>
+                        <div className="text-xs text-slate-500">
+                          <LanguageText en="Stopped" zh="停机" />
+                        </div>
+                      </div>
+                      <div className="rounded-lg border bg-rose-50 p-3 text-center">
+                        <div className="text-2xl font-bold text-rose-700">{dashboard.factorySummary.alarmCount}</div>
+                        <div className="text-xs text-rose-600">
+                          <LanguageText en="Alarm" zh="报警" />
+                        </div>
+                      </div>
+                      <div className="rounded-lg border bg-blue-50 p-3 text-center">
+                        <div className="text-2xl font-bold text-blue-700">{dashboard.factorySummary.setupCount}</div>
+                        <div className="text-xs text-blue-600">
+                          <LanguageText en="Setup" zh="调机" />
+                        </div>
+                      </div>
+                    </div>
 
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">
-                  <LanguageText en="Alerts" zh="告警" />
-                  {dashboard.alerts.length > 0 && (
-                    <span className="ml-2 rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
-                      {dashboard.alerts.length}
-                    </span>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {dashboard.alerts.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">
-                    <LanguageText en="No active alerts" zh="暂无告警" />
-                  </div>
-                ) : (
-                  dashboard.alerts.slice(0, 8).map((a) => (
-                    <AlertCard key={a.id} alert={a} />
-                  ))
-                )}
-              </CardContent>
-            </Card>
+                    <div className="mt-4 flex items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <div className="text-sm text-muted-foreground">
+                          <LanguageText en="Overall Live Risk" zh="总体实时风险" />
+                        </div>
+                        <div className={`mt-1 inline-block rounded-full border px-3 py-1 text-sm font-semibold ${riskBadgeColor(dashboard.factorySummary.overallLiveRisk)}`}>
+                          {dashboard.factorySummary.overallLiveRisk} ({dashboard.factorySummary.overallScore})
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-muted-foreground">
+                          <LanguageText en="Throughput" zh="产量" />
+                        </div>
+                        <div className="text-lg font-semibold">{dashboard.factorySummary.throughputNow.toLocaleString()}/h</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">
-                  <LanguageText en="What's Different" zh="差异点" />
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>
-                  <LanguageText
-                    en="✓ Live Risk Brain: Production + Quality + Engineering"
-                    zh="✓ Live Risk Brain：生产 + 质量 + 工程"
-                  />
-                </p>
-                <p>
-                  <LanguageText
-                    en="✓ Explainable drivers, not just numbers"
-                    zh="✓ 可解释的原因，而非仅数字"
-                  />
-                </p>
-                <p>
-                  <LanguageText
-                    en="✓ Demo-first, production-ready architecture"
-                    zh="✓ 演示优先，生产就绪架构"
-                  />
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">
+                      <LanguageText en="Machine Status (Risk View)" zh="机台状态（风险视图）" />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {dashboard.machines.map((m) => (
+                        <MachineCardComponent key={m.machineId} machine={m} />
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">
+                      <LanguageText en="Risk Alerts" zh="风险告警" />
+                      {dashboard.alerts.length > 0 && (
+                        <span className="ml-2 rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
+                          {dashboard.alerts.length}
+                        </span>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {dashboard.alerts.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">
+                        <LanguageText en="No active alerts" zh="暂无告警" />
+                      </div>
+                    ) : (
+                      dashboard.alerts.slice(0, 8).map((a) => (
+                        <AlertCard key={a.id} alert={a} />
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">
+                      <LanguageText en="Live Risk Brain" zh="实时风险大脑" />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm text-muted-foreground">
+                    <p>
+                      <LanguageText
+                        en="✓ Production + Quality + Engineering"
+                        zh="✓ 生产 + 质量 + 工程"
+                      />
+                    </p>
+                    <p>
+                      <LanguageText
+                        en="✓ Explainable drivers"
+                        zh="✓ 可解释的原因"
+                      />
+                    </p>
+                    <p>
+                      <LanguageText
+                        en="✓ Real-time risk scoring"
+                        zh="✓ 实时风险评分"
+                      />
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Operations Tab - New Manufacturing Dashboard content */}
+        <TabsContent value="operations" className="mt-6">
+          {mfgData && (
+            <div className="space-y-6">
+              {/* Machine Status Grid */}
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">
+                  <LanguageText en="Machine Status" zh="设备状态" />
+                </h3>
+                <MachineStatusGrid machines={mfgData.machines} />
+              </div>
+
+              {/* Charts Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <CycleTimeTrend data={mfgData.ctTrend} targetCt={3.0} />
+                <ThroughputTrend data={mfgData.throughputTrend} />
+                <DowntimePareto data={mfgData.downtimePareto} />
+              </div>
+
+              {/* Andon & Work Orders Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <AndonFeed
+                  events={mfgData.andon}
+                  maxHeight="350px"
+                  className="lg:col-span-1"
+                />
+                <WorkOrderTable
+                  workOrders={mfgData.workOrders}
+                  className="lg:col-span-2"
+                />
+              </div>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }
