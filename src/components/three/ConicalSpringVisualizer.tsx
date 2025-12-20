@@ -330,19 +330,14 @@ function ConicalMaxStressMarker({
  */
 function Legend() {
   return (
-    <div className="absolute bottom-2 left-2 bg-white/90 rounded-md px-3 py-2 text-xs text-slate-900 max-w-[200px] shadow">
-      <div className="flex items-center gap-2 mb-1">
+    <div className="absolute top-2 left-2 bg-white/90 rounded-md px-2 py-1.5 text-xs text-slate-900 shadow">
+      <div className="flex items-center gap-2">
         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: ACTIVE_COLOR }} />
-        <span>Active coils / 工作圈</span>
+        <span>工作圈</span>
       </div>
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mt-1">
         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLLAPSED_COLOR }} />
-        <span>Collapsed coils / 贴底圈</span>
-      </div>
-      <div className="text-[10px] text-slate-600 border-t border-slate-200 pt-1">
-        Continuous helical tube. Grey = collapsed, Blue = active.
-        <br />
-        <span className="text-slate-500">连续螺旋管显示，灰色为贴底圈，蓝色为工作圈。</span>
+        <span>贴底圈</span>
       </div>
     </div>
   );
@@ -503,8 +498,8 @@ export function ConicalSpringVisualizer() {
         <gridHelper args={[80, 16, previewTheme.grid.major, previewTheme.grid.minor]} position={[0, -2, 0]} />
       </Canvas>
       
-      {/* Animation control - top left */}
-      <div className="absolute top-2 left-2">
+      {/* Animation control - top center */}
+      <div className="absolute top-2 left-1/2 -translate-x-1/2">
         <Button
           variant={isAnimating ? "default" : "secondary"}
           size="sm"
@@ -526,8 +521,8 @@ export function ConicalSpringVisualizer() {
         </Button>
       </div>
 
-      {/* View selector - bottom right */}
-      <div className="absolute bottom-2 right-2 flex gap-1">
+      {/* View selector - bottom left */}
+      <div className="absolute bottom-2 left-2 flex gap-1">
         <Button
           variant={currentView === "perspective" ? "default" : "secondary"}
           size="sm"

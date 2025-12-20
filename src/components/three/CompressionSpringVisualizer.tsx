@@ -364,8 +364,8 @@ export function CompressionSpringVisualizer() {
         />
       </Canvas>
 
-      {/* View selector - bottom right */}
-      <div className="absolute bottom-2 right-2 flex gap-1">
+      {/* View selector - bottom left */}
+      <div className="absolute bottom-2 left-2 flex gap-1">
         <Button
           variant={currentView === "perspective" ? "default" : "secondary"}
           size="sm"
@@ -405,8 +405,8 @@ export function CompressionSpringVisualizer() {
         </Button>
       </div>
 
-      {/* Legend overlay */}
-      <div className="absolute bottom-2 left-2 rounded bg-white/90 px-2 py-1.5 text-xs shadow">
+      {/* Legend overlay - top left */}
+      <div className="absolute top-2 left-2 rounded bg-white/90 px-2 py-1.5 text-xs shadow">
         <div className="flex items-center gap-2">
           <div className="h-3 w-3 rounded-full" style={{ backgroundColor: SPRING_COLOR }} />
           <span>有效圈</span>
