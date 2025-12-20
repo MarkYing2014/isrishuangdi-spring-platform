@@ -12,6 +12,7 @@ import { ConicalCalculator } from "@/components/calculators/ConicalCalculator";
 import { SpiralTorsionCalculator } from "@/components/calculators/SpiralTorsionCalculator";
 import { WaveSpringCalculator } from "@/components/calculators/WaveSpringCalculator";
 import { DieSpringCalculator } from "@/components/calculators/DieSpringCalculator";
+import { SuspensionSpringCalculator } from "@/components/calculators/SuspensionSpringCalculator";
 
 const springTypes: {
   type: SpringType;
@@ -76,6 +77,14 @@ const springTypes: {
     nameZh: "模具弹簧",
     descEn: "Rectangular wire, high-load tooling",
     descZh: "矩形线材，高载荷模具",
+  },
+  {
+    type: "suspensionSpring",
+    icon: "🚗",
+    nameEn: "Suspension Spring",
+    nameZh: "减震器弹簧",
+    descEn: "Shock absorber, vehicle suspension",
+    descZh: "减震器，车辆悬挂系统",
   },
 ];
 
@@ -203,6 +212,7 @@ export default function SpringCalculatorPage() {
         {selectedType === "spiralTorsion" && <SpiralTorsionCalculator />}
         {selectedType === "wave" && <WaveSpringCalculator isZh={isZh} />}
         {selectedType === "dieSpring" && <DieSpringCalculator isZh={isZh} />}
+        {selectedType === "suspensionSpring" && <SuspensionSpringCalculator />}
       </div>
     </section>
   );

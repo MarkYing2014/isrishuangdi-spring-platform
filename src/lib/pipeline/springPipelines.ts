@@ -125,6 +125,18 @@ export const SPRING_PIPELINES: Record<SpringType, SpringPipelineConfig> = {
     icon: "Square",
     implemented: true,
   },
+  suspensionSpring: {
+    type: "suspensionSpring",
+    label: { en: "Suspension Spring", zh: "减震器弹簧" },
+    calculatorPath: "/tools/suspension-spring",
+    analysisPath: "/tools/analysis?type=suspensionSpring",
+    simulatorPath: "/tools/simulator?type=suspensionSpring",
+    reportPath: "/tools/report?type=suspensionSpring",
+    cadExportPath: "/tools/cad-export?type=suspensionSpring",
+    rfqPath: "/rfq?springType=suspensionSpring",
+    icon: "Car",
+    implemented: true,
+  },
 };
 
 /**
