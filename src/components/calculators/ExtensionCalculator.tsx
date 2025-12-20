@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
 import { calculateExtensionSpring, type ExtensionSpringInput } from "@/lib/springMath";
@@ -189,8 +189,88 @@ export function ExtensionCalculator() {
     }
   };
 
-  // Watch form values for URL generation
+  // Watch form values for URL generation and live preview
   const watchedValues = form.watch();
+
+  // Live preview: auto-update store when form values change (debounced)
+  useEffect(() => {
+    const values = watchedValues;
+    if (!values.outerDiameter || !values.wireDiameter || !values.activeCoils) return;
+    
+    // Calculate for preview (without full validation)
+    try {
+      const input: ExtensionSpringInput = {
+        outerDiameter: values.outerDiameter,
+        wireDiameter: values.wireDiameter,
+        activeCoils: values.activeCoils,
+        shearModulus: values.shearModulus || 79300,
+        initialTension: values.initialTension || 0,
+        workingDeflection: values.workingDeflection || 10,
+      };
+      
+      const calc = calculateExtensionSpring(input);
+      const meanDiameter = values.outerDiameter - values.wireDiameter;
+      
+      // Update store for live 3D preview
+      const geometry: ExtensionGeometry = {
+        type: "extension",
+        wireDiameter: values.wireDiameter,
+        outerDiameter: values.outerDiameter,
+        meanDiameter,
+        activeCoils: values.activeCoils,
+        bodyLength: values.bodyLength || meanDiameter * values.activeCoils,
+        freeLength: values.freeLengthInsideHooks || 35,
+        hookType: values.hookType || "machine",
+        initialTension: values.initialTension || 0,
+        shearModulus: values.shearModulus || 79300,
+        materialId: selectedMaterial.id,
+      };
+      
+      const material: MaterialInfo = {
+        id: selectedMaterial.id,
+        name: selectedMaterial.nameEn,
+        shearModulus: values.shearModulus || 79300,
+        elasticModulus: selectedMaterial.elasticModulus ?? 206000,
+        density: selectedMaterial.density ?? 7850,
+      };
+      
+      const analysisResult: AnalysisResult = {
+        springRate: calc.springRate,
+        springRateUnit: "N/mm",
+        workingLoad: calc.totalLoad,
+        initialTension: calc.initialTension,
+        workingDeflection: calc.workingDeflection,
+        maxDeflection: values.workingDeflection || 10,
+        shearStress: calc.shearStress,
+        springIndex: calc.springIndex,
+        wahlFactor: calc.wahlFactor,
+      };
+      
+      setDesign({
+        springType: "extension",
+        geometry,
+        material,
+        analysisResult,
+        meta: {
+          designCode: generateDesignCode(geometry),
+        },
+      });
+    } catch {
+      // Ignore calculation errors during live preview
+    }
+  }, [
+    watchedValues.outerDiameter,
+    watchedValues.wireDiameter,
+    watchedValues.activeCoils,
+    watchedValues.bodyLength,
+    watchedValues.freeLengthInsideHooks,
+    watchedValues.shearModulus,
+    watchedValues.initialTension,
+    watchedValues.hookType,
+    watchedValues.workingDeflection,
+    selectedMaterial,
+    setDesign,
+  ]);
 
   const analysisUrl = useMemo(() => {
     const meanDiameter = (watchedValues.outerDiameter ?? 20) - (watchedValues.wireDiameter ?? 2);
