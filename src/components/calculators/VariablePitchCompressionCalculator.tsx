@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileText, Printer } from "lucide-react";
+import { FileText, Printer, Download } from "lucide-react";
 
 import {
   calculateVariablePitchCompressionAtDeflection,
@@ -769,6 +769,18 @@ export function VariablePitchCompressionCalculator() {
                 >
                   <FileText className="w-4 h-4 mr-1" />
                   Export PDF
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  asChild
+                  disabled={issues.length > 0}
+                  className="border-violet-500/50 text-violet-600 bg-violet-500/10 hover:bg-violet-500/20"
+                >
+                  <a href={`/tools/cad-export?type=variablePitchCompression&d=${wireDiameter}&Dm=${meanDiameter}&Na=${activeCoils0}&L0=${freeLength}&G=${shearModulus}&mat=${materialId}`}>
+                    <Download className="w-4 h-4 mr-1" />
+                    Export CAD
+                  </a>
                 </Button>
               </div>
 

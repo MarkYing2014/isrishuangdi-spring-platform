@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer } from "lucide-react";
+import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer, Download } from "lucide-react";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { ArcSpringAdvancedPanel } from "@/components/calculators/ArcSpringAdvancedPanel";
 import {
@@ -873,6 +873,18 @@ export function ArcSpringCalculator() {
                 >
                   <FileText className="w-4 h-4 mr-1" />
                   Export PDF
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  asChild
+                  disabled={!calculated || (result.warnings.length > 0 && !isFinite(result.k))}
+                  className="border-violet-500/50 text-violet-600 bg-violet-500/10 hover:bg-violet-500/20"
+                >
+                  <a href={`/tools/cad-export?type=arcSpring&d=${input.d}&D=${input.D}&Na=${input.n}&alpha0=${input.alpha0}&r=${input.r}&mat=${input.materialKey}`}>
+                    <Download className="w-4 h-4 mr-1" />
+                    Export CAD
+                  </a>
                 </Button>
               </div>
             </CardHeader>
