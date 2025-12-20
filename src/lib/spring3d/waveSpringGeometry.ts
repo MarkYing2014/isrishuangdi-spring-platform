@@ -222,16 +222,13 @@ function generateCenterline(
     const tangent = new THREE.Vector3(dxdt, dydt, dzdt).normalize();
 
     // Radial direction (pointing outward from center axis in XY plane)
+    // FIXED: Use constant radial direction, not dependent on tangent
     const radialDir = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
 
-    // Axial direction (z-axis, orthogonalized to tangent for strip thickness direction)
-    const zAxis = new THREE.Vector3(0, 0, 1);
-    const axialDir = zAxis.clone().sub(tangent.clone().multiplyScalar(zAxis.dot(tangent))).normalize();
-
-    // Handle edge case where tangent is nearly vertical
-    if (axialDir.length() < 0.001) {
-      axialDir.copy(radialDir).cross(tangent).normalize();
-    }
+    // Axial direction - FIXED: Always use pure Z axis
+    // Wave spring cross-section should NOT rotate with the wave oscillation
+    // The strip should maintain constant orientation: width=radial, thickness=axial
+    const axialDir = new THREE.Vector3(0, 0, 1);
 
     points.push({
       position,

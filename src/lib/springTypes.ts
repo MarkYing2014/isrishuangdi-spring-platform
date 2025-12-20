@@ -5,7 +5,7 @@ import type { SpringMaterialId } from "@/lib/materials/springMaterials";
 // 弹簧类型定义
 // ============================================================================
 
-export type SpringType = "compression" | "extension" | "torsion" | "conical" | "spiralTorsion" | "wave";
+export type SpringType = "compression" | "extension" | "torsion" | "conical" | "spiralTorsion" | "wave" | "dieSpring";
 
 export const SPRING_TYPE_LABELS: Record<SpringType, { en: string; zh: string }> = {
   compression: { en: "Compression Spring", zh: "压缩弹簧" },
@@ -14,6 +14,7 @@ export const SPRING_TYPE_LABELS: Record<SpringType, { en: string; zh: string }> 
   conical: { en: "Conical Spring", zh: "锥形弹簧" },
   spiralTorsion: { en: "Spiral Torsion Spring", zh: "螺旋扭转弹簧" },
   wave: { en: "Wave Spring", zh: "波形弹簧" },
+  dieSpring: { en: "Die Spring", zh: "模具弹簧" },
 };
 
 // ============================================================================

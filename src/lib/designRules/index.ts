@@ -7,6 +7,7 @@ export * from "./conicalRules";
 export * from "./variablePitchRules";
 export * from "./spiralSpringRules";
 export * from "./waveSpringRules";
+export * from "./dieSpringRules";
 export * from "./defaults";
 
 export { buildArcSpringDesignRuleReport } from "./arcSpringRules";
@@ -17,3 +18,4 @@ export { buildConicalDesignRuleReport } from "./conicalRules";
 export { buildVariablePitchCompressionDesignRuleReport } from "./variablePitchRules";
 export { buildSpiralSpringDesignRuleReport } from "./spiralSpringRules";
 export { buildWaveSpringDesignRuleReport } from "./waveSpringRules";
+export { buildDieSpringDesignRuleReport } from "./dieSpringRules";

@@ -306,13 +306,10 @@ function buildContinuousHelixGeometry(params: BuildContinuousHelixParams): {
     return safeNormalize(p1.sub(p0));
   }
 
-  // Initialize PTF at theta=0
-  const P0 = centerlinePoint(0);
-  let Tprev = centerlineTangent(0);
-  const radial0 = new THREE.Vector3(P0.x, P0.y, 0);
-  let Nprev = safeNormalize(radial0.length() < EPS ? new THREE.Vector3(1, 0, 0) : radial0.clone());
-  Nprev = safeNormalize(Nprev.sub(Tprev.clone().multiplyScalar(Nprev.dot(Tprev))));
-  let Bprev = safeNormalize(new THREE.Vector3().crossVectors(Tprev, Nprev));
+  // FIXED: Use fixed frame instead of PTF
+  // Wave spring cross-section should NOT rotate with the wave oscillation
+  // The strip should maintain constant orientation: width=radial, thickness=axial
+  // This is the same approach as Die Spring geometry
 
   let prevP: THREE.Vector3 | null = null;
   let firstSectionIdx = 0;
@@ -322,32 +319,22 @@ function buildContinuousHelixGeometry(params: BuildContinuousHelixParams): {
   for (let i = 0; i <= totalSegments; i++) {
     const theta = i * dTheta;
     const P = centerlinePoint(theta);
-    const T = centerlineTangent(theta);
+    // Note: tangent is computed but not used for frame - we use fixed frame instead
 
-    // Update PTF
-    const axis = new THREE.Vector3().crossVectors(Tprev, T);
-    const axisLen = axis.length();
-    if (axisLen > 1e-7) {
-      const angle = Math.atan2(axisLen, THREE.MathUtils.clamp(Tprev.dot(T), -1, 1));
-      Nprev = rotateAroundAxis(Nprev, axis, angle);
-      Bprev = rotateAroundAxis(Bprev, axis, angle);
-    }
-
-    // Re-orthonormalize
-    const N = safeNormalize(Nprev.clone().sub(T.clone().multiplyScalar(Nprev.dot(T))));
-    const B = safeNormalize(new THREE.Vector3().crossVectors(T, N));
-
-    Tprev = T;
-    Nprev = N;
-    Bprev = B;
+    // FIXED FRAME: radial direction based on angular position, axial always Z
+    // This ensures cross-section does not rotate with wave oscillation
+    const th = dirSign * theta;
+    const N = new THREE.Vector3(Math.cos(th), Math.sin(th), 0);  // radial (width direction)
+    const B = new THREE.Vector3(0, 0, 1);  // axial (thickness direction)
 
     // Corner positions (rectangular cross-section)
+    // N = radial direction (for width), B = axial direction (for thickness)
     const c0 = P.clone().add(N.clone().multiplyScalar(+halfW)).add(B.clone().multiplyScalar(+halfT));
     const c1 = P.clone().add(N.clone().multiplyScalar(+halfW)).add(B.clone().multiplyScalar(-halfT));
     const c2 = P.clone().add(N.clone().multiplyScalar(-halfW)).add(B.clone().multiplyScalar(-halfT));
     const c3 = P.clone().add(N.clone().multiplyScalar(-halfW)).add(B.clone().multiplyScalar(+halfT));
 
-    // Smooth corner normals
+    // Smooth corner normals (blend of radial and axial)
     const n0 = safeNormalize(N.clone().add(B.clone()));
     const n1 = safeNormalize(N.clone().sub(B.clone()));
     const n2 = safeNormalize(N.clone().negate().sub(B.clone()));

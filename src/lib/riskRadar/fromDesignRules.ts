@@ -95,6 +95,14 @@ function classifyDimension(args: {
     if (id.startsWith("WAVE_Q")) return "quality";
   }
 
+  if (args.springType === "dieSpring") {
+    if (id.startsWith("DIE_E")) return "engineering";
+    if (id.startsWith("DIE_M")) return "manufacturing";
+    if (id.startsWith("DIE_Q")) return "quality";
+    // Installation rules (I*) map to manufacturing (assembly/installation concerns)
+    if (id.startsWith("DIE_I")) return "manufacturing";
+  }
+
   if (id.includes("READ_ONLY")) return "quality";
 
   return "engineering";

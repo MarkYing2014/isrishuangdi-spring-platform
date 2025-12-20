@@ -113,6 +113,18 @@ export const SPRING_PIPELINES: Record<SpringType, SpringPipelineConfig> = {
     icon: "Waves",
     implemented: true,
   },
+  dieSpring: {
+    type: "dieSpring",
+    label: { en: "Die Spring", zh: "模具弹簧" },
+    calculatorPath: "/tools/die-spring",
+    analysisPath: "/tools/analysis?type=dieSpring",
+    simulatorPath: "/tools/simulator?type=dieSpring",
+    reportPath: "/tools/report?type=dieSpring",
+    cadExportPath: "/tools/cad-export?type=dieSpring",
+    rfqPath: "/rfq?springType=dieSpring",
+    icon: "Square",
+    implemented: true,
+  },
 };
 
 /**
