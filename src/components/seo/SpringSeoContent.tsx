@@ -307,29 +307,33 @@ const seoContent: Record<string, SeoData> = {
         },
         {
           title: "ISO 10243 Color Codes (Standard)",
-          content: "Globally recognized color coding for load classes:\n• Green: Light Load\n• Blue: Medium Load\n• Red: Heavy Load\n• Yellow: Extra Heavy Load\nNote: Always verify the standard. ISO 10243 is the most common in Europe/Global, but Japanese JIS B 5012 uses different colors for similar loads (e.g., JIS Red is not ISO Red)."
+          content: "Globally recognized color coding for load classes:\n• Green: Light Load\n• Blue: Medium Load\n• Red: Heavy Load\n• Yellow: Extra Heavy Load\nNote: Always verify the standard. ISO 10243 is the most common in Europe/Global, but Japanese JIS B 5012 uses different colors for similar loads (e.g., JIS Red is not ISO Red). Mixing these is dangerous."
+        },
+        {
+          title: "Material Selection & Temperature Limits",
+          content: "• Chrome Vanadium (50CrV4): Good for general use, max operating temp approx 200°C (390°F).\n• Chrome Silicon (55CrSi): Superior heat resistance and fatigue life, capable of operating up to 246°C (475°F). Most premium ISO die springs are now made of Chrome Silicon to prevent 'setting' (loss of height) under heat."
         },
         {
           title: "Life Expectancy vs Deflection",
-          content: "Die springs are rated for millions of cycles ONLY if operated within strict deflection limits.\n• Long Life (1,000,000+ cycles): Use < 25% deflection.\n• Average Life: Use ~30% deflection.\n• Max Deflection: Pushing near 40-50% deflection drops life drastically to < 100,000 cycles. Never compress to solid!"
+          content: "Die springs are rated for millions of cycles ONLY if operated within strict deflection limits.\n• Long Life (1,000,000+ cycles): Use < 25% deflection.\n• Average Life: Use ~30% deflection.\n• Max Deflection: Pushing near 40% deflection drops life drastically to < 100,000 cycles. Never compress to solid height!"
         },
         {
-          title: "High-Speed Applications",
-          content: "Die springs are often used in high-speed punch presses. Mass and friction become issues. High-quality die springs use trapezoidal wire sections that become rectangular AFTER coiling to minimize internal friction and heat generation."
+          title: "High-Speed Stamping Considerations",
+          content: "In high-speed presses (>500 SPM), 'Spring Surge' (resonance) becomes a killer. Friction generates massive heat. High-end die springs use a 'Trapezoidal' cross-section wire that deforms into a perfect rectangle only when coiled, ensuring optimal contact and heat dissipation."
         }
       ],
       faqs: [
         {
           q: "Are ISO and JIS die springs interchangeable?",
-          a: "NO. While dimensions may look similar, the color codes mean completely different load ratings. Always check the catalog standard."
+          a: "NO. While dimensions may look similar, the color codes mean completely different load ratings. Always check the catalog standard (ISO 10243 vs JIS B 5012)."
         },
         {
           q: "Why use rectangular wire?",
           a: "It maximizes the cross-sectional area in the available space, providing maximum energy storage density."
         },
         {
-          q: "Can I compress a die spring to solid height?",
-          a: "No. This is catastrophic for die springs. Safe maximum deflection is typically marked in catalogs (usually 40-50% of free length)."
+          q: "What is the max operating temperature for die springs?",
+          a: "Typically 200°C for Chrome Vanadium and up to 246°C for Chrome Silicon. Above this, the spring will permanently shorten (relax)."
         }
       ]
     },
@@ -338,33 +342,37 @@ const seoContent: Record<string, SeoData> = {
       sections: [
         {
           title: "矩形截面的优势",
-          content: "模具弹簧（Die Spring）采用扁平的矩形截面线材。这种几何结构使得在相同空间内可以容纳更多的金属材料（高填充密度）。因此，模具弹簧的承载能力比同体积圆丝弹簧高出 30% 到 50%，非常的适合模具等空间受限的大力载场合。"
+          content: "模具弹簧（Die Spring）采用扁平的矩形截面线材。这种几何结构使得在相同空间内可以容纳更多的金属材料（高填充密度）。因此，模具弹簧的承载能力比同体积圆丝弹簧高出 30% 到 50%，非常适合模具等空间受限的大力载场合。"
         },
         {
           title: "ISO 10243 颜色代码标准",
           content: "国际通用的载荷等级色标：\n• 绿色 (Green)：轻载荷\n• 蓝色 (Blue)：中载荷\n• 红色 (Red)：重载荷\n• 黄色 (Yellow)：超重载荷\n警告：务必确认标准！ISO 10243 与日标 JIS B 5012 的颜色含义不同（例如 JIS 的红色可能对应不同的载荷等级），不可混用。"
         },
         {
-          title: "疲劳寿命与压缩量",
-          content: "模具弹簧只有在严格限制压缩量的前提下才能达到百万次寿命。\n• 长寿命 (100万次+)：控制压缩量 < 25% 自由长。\n• 一般寿命：压缩量 ~30%。\n• 极限使用：若压缩量接近 40-50%，寿命将急剧下降至 <10万次。严禁压死（Solid）！"
+          title: "材料选择与耐温极限",
+          content: "• 铬钒钢 (50CrV4)：通用材料，最高工作温度约 200°C。\n• 铬硅钢 (55CrSi)：具有更优异的抗疲劳和耐热性能，最高工作温度可达 246°C (475°F)。为了防止在高温下发生“热衰减”（自由长缩短），高端模具弹簧现多采用铬硅钢制造。"
         },
         {
-          title: "梯形转矩形工艺",
-          content: "高端模具弹簧在卷绕前并非标准矩形，而是“梯形”截面。卷绕后，内侧受压变形，截面才变为完美的矩形。这种工艺能确保工作时线圈间接触面平整，减少摩擦生热。"
+          title: "疲劳寿命与压缩量关系",
+          content: "模具弹簧只有在严格限制压缩量的前提下才能达到百万次寿命。\n• 长寿命 (100万次+)：控制压缩量 < 25% 自由长。\n• 一般寿命：压缩量 ~30%。\n• 极限使用：若压缩量接近 40%，寿命将急剧下降至 <10万次。严禁压死（Solid）！"
+        },
+        {
+          title: "高速冲压中的共振问题",
+          content: "在高速冲床 (>500 SPM) 中，弹簧容易产生“驻波” (Surge)。为了减少内部摩擦生热，高端模具弹簧采用“梯形”截面线材卷绕，卷绕后内侧受压变形，截面才变为完美的矩形，从而由线接触变为面接触，散热更好。"
         }
       ],
       faqs: [
         {
           q: "ISO 模具弹簧和 JIS 模具弹簧能互换吗？",
-          a: "不能。虽然尺寸可能接近，但颜色代表的载荷等级完全不同。混用会导致模具受力不平衡或弹簧断裂。"
+          a: "不能。虽然尺寸可能接近，但颜色代表的载荷等级完全不同。混用会导致模具受力不平衡或弹簧早期断裂。"
         },
         {
-          q: "为什么是矩形丝？",
-          a: "为了获取最大的单位体积能量密度。在孔径受限的情况下提供最大的力。"
+          q: "模具弹簧的最高工作温度是多少？",
+          a: "铬钒钢通常为 200°C，铬硅钢可达 246°C。超过此温度弹簧会发生永久塑性变形（变短）。"
         },
         {
           q: "模具弹簧能被压到底吗？",
-          a: "绝对不行。模具弹簧是针对高周疲劳设计的，压死瞬间的应力会直接导致早期断裂。"
+          a: "绝对不行。模具弹簧是针对高周疲劳设计的，压死瞬间的应力会远超屈服极限。"
         }
       ]
     }
@@ -547,40 +555,72 @@ const seoContent: Record<string, SeoData> = {
   },
   suspensionSpring: {
     en: {
-      h1: "Vehicle Suspension Spring Calculator",
+      h1: "Vehicle Shock Absorber Spring & Suspension Design",
       sections: [
         {
-          title: "Automotive Grade Requirements",
-          content: "Suspension springs are safety-critical. They typically require 'Shot Peening' to induce compressive residual stress, drastically improving fatigue life against road bumps. Materials are typically high-tensile Chrome-Silicon alloys."
+          title: "Cold Coiling vs Hot Coiling",
+          content: "Manufacturing method depends on wire diameter.\n• Cold Coiling: Used for d < 20mm. High precision, excellent surface finish. Ideal for passenger cars and light trucks.\n• Hot Coiling: Used for d > 20mm (up to 65mm). The bar is heated to ~900°C to be malleable. Used for heavy trucks, trains, and industrial isolators."
         },
         {
-          title: "Ride Height & Settling",
-          content: "Springs will 'settle' (relax) slightly after initial use. Manufacturers perform a 'Presetting' (Scragging) operation—compressing the spring to solid height during manufacture—to remove this permanent set before the spring is installed on a car."
+          title: "Ride Frequency (Natural Frequency)",
+          content: "The single most important comfort metric. \n• Comfort (Sedans): 1.0 - 1.2 Hz (Matches human walking cadence).\n• Performance (Sports): 1.5 - 2.0 Hz.\n• Racing (Downforce): > 3.0 Hz.\nFrequency (Hz) ≈ 0.5 * √(Rate / Mass). To stiffen a car without ruining comfort, you must reduce unsprung mass along with increasing rate."
+        },
+        {
+          title: "Progressive Rate Designs",
+          content: "Most modern stock springs are 'Progressive'. This is achieved by Tapered Wire (variable diameter) or Variable Pitch (changing gap). Soft initial coils absorb small road cracks (highway comfort), while stiffer final coils prevent bottoming out during hard cornering or potholes."
+        },
+        {
+          title: "Corrosion Protection: 500h+ Salt Spray",
+          content: "Suspension springs face the harshest environment: road salt, gravel impact, and water. Automotive standards (e.g., ASTM B117) require passing 500 to 1000 hours of salt spray testing. This is achieved via a dual-layer coating: Zinc-Phosphate pretreatment followed by High-Performance Epoxy Powder Coating."
         }
       ],
       faqs: [
         {
-          q: "What is progressive rate in suspension?",
-          a: "A spring that gets stiffer as it compresses, preventing bottoming out on harsh bumps while keeping a soft ride for small bumps."
+          q: "What is the difference between linear and progressive springs?",
+          a: "Linear springs have a constant stiffness (k). Progressive springs get stiffer as they compress, offering a dual-nature ride: soft for comfort, stiff for control."
+        },
+        {
+          q: "Why are suspension springs shot peened?",
+          a: "Shot peening bombards the surface with steel beads to induce compressive stress. This prevents micro-cracks from opening, extending fatigue life by 5-10x."
+        },
+        {
+          q: "How often should suspension springs be replaced?",
+          a: "They normally last the life of the vehicle, but should be replaced if they sag (ride height loss) or if the coating is compromised by rust."
         }
       ]
     },
     zh: {
-      h1: "汽车悬挂弹簧计算器",
+      h1: "汽车减震弹簧计算器与悬挂工程设计",
       sections: [
         {
-          title: "汽车级制造标准",
-          content: "悬挂弹簧是关乎生命安全的部件。制造时必须进行 **喷丸处理 (Shot Peening)**，在表层引入压应力，从而大幅提高抗疲劳能力以应对路面颠簸。材料通常采用高强度的铬硅合金钢。"
+          title: "冷卷 (Cold Coiling) vs 热卷 (Hot Coiling)",
+          content: "制造工艺取决于线径：\n• 冷卷工艺：适用于线径 d < 20mm。精度极高，表面质量好，是轿车和轻卡悬挂的主流工艺。\n• 热卷工艺：适用于线径 d > 20mm（最大可达 65mm）。钢棒需加热至 900°C 以上才能卷绕。主要用于重卡、火车和大型工业减震器。"
         },
         {
-          title: "预置处理 (Presetting/Scragging)",
-          content: "新弹簧如果不处理，在使用初期会发生“沉降”。为了防止这种情况，工厂在制造时会将弹簧强行压缩至压并高度（超过屈服点），消除永久变形。这一工序称为“强压处理”或“立定处理”。"
+          title: "行驶频率 (Ride Frequency) 与舒适度",
+          content: "这是衡量悬挂舒适度的核心指标（自然频率）。\n• 舒适型 (轿车)：1.0 - 1.2 Hz (接近人类步行频率，大脑最适应)。\n• 运动型 (跑车)：1.5 - 2.0 Hz。\n• 赛车型 (下压力)：> 3.0 Hz。\n频率 Hz ≈ 0.5 * √(刚度 / 簧上质量)。要想车身更稳而不颠，必须精确匹配刚度与质量比。"
+        },
+        {
+          title: "渐进式刚度 (Progressive Rate) 设计",
+          content: "现代原厂弹簧多为“渐进式”。通过 **变节距 (Variable Pitch)** 或 **变截面 (Tapered Wire)** 实现。疏松的线圈先工作，吸收细微震动（高速巡航）；密集的线圈后工作，在剧烈过弯或大坑洼时提供强大支撑，防止触底。"
+        },
+        {
+          title: "防腐蚀标准：500小时+ 盐雾测试",
+          content: "底盘环境极其恶劣（融雪剂、碎石）。汽车级标准（ASTM B117）通常要求通过 500-1000 小时的中性盐雾测试。标准工艺为：锌磷化前处理 + 高性能环氧粉末涂层 (Epoxy Powder Coating)，漆膜厚度需 > 80μm。"
         }
       ],
       faqs: [
         {
-          q: "什么是渐进式悬挂 (Progressive Rate)？",
-          a: "指弹簧刚度随压缩量增加而变硬。这能保证小颠簸时舒适（软），大坑洼时不触底（硬）。"
+          q: "线性弹簧和渐进式弹簧有什么区别？",
+          a: "线性弹簧刚度恒定。渐进式弹簧越压越硬，能兼顾“软”的初段舒适性和“硬”的末段支撑性。"
+        },
+        {
+          q: "为什么减震弹簧必须喷丸 (Shot Peening)？",
+          a: "喷丸能在金属表层产生压应力，抵消拉伸应力，防止微裂纹扩展。经过喷丸的弹簧疲劳寿命通常是未经处理的 5-10 倍。"
+        },
+        {
+          q: "减震弹簧大概多久更换？",
+          a: "通常与车同寿。但如果发现车身高度降低（弹簧塌陷）或涂层剥落生锈，应立即更换以免断裂刺破轮胎。"
         }
       ]
     }
