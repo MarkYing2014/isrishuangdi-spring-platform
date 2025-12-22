@@ -127,12 +127,14 @@ export default function Home() {
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <Button asChild size="lg" className="rounded-full">
                 <Link href="/tools/calculator">
+                  <Calculator className="mr-2 size-4" />
                   <LanguageText en="Try Engineering Calculator" zh="使用工程计算器" />
-                  <ArrowRight className="size-4" />
+                  <ArrowRight className="ml-2 size-4" />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="rounded-full">
                 <Link href="/production">
+                  <Activity className="mr-2 size-4" />
                   <LanguageText en="See Manufacturing Dashboard Demo" zh="查看制造看板演示" />
                 </Link>
               </Button>
