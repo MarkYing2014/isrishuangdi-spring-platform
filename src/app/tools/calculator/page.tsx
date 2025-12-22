@@ -13,6 +13,7 @@ import { SpiralTorsionCalculator } from "@/components/calculators/SpiralTorsionC
 import { WaveSpringCalculator } from "@/components/calculators/WaveSpringCalculator";
 import { DieSpringCalculator } from "@/components/calculators/DieSpringCalculator";
 import { SuspensionSpringCalculator } from "@/components/calculators/SuspensionSpringCalculator";
+import { SpringSeoContent } from "@/components/seo/SpringSeoContent";
 
 const springTypes: {
   type: SpringType;
@@ -213,6 +214,9 @@ export default function SpringCalculatorPage() {
         {selectedType === "wave" && <WaveSpringCalculator isZh={isZh} />}
         {selectedType === "dieSpring" && <DieSpringCalculator isZh={isZh} />}
         {selectedType === "suspensionSpring" && <SuspensionSpringCalculator />}
+
+        {/* SEO Content Section */}
+        <SpringSeoContent type={selectedType} />
       </div>
     </section>
   );
