@@ -81,7 +81,13 @@ async def generate(request: ExportRequest):
         # Run FreeCAD
         # We assume freecadcmd is in PATH. 
         # Note: In some environments 'freecadcmd' might be 'FreeCADCmd' or just 'freecad'
-        cmd = [FREECAD_CMD, SCRIPT_PATH, design_path, job_dir]
+        
+        # FIX: Pass arguments via environment variables to avoid FreeCAD trying to "open" the JSON file
+        env = os.environ.copy()
+        env["DESIGN_FILE"] = design_path
+        env["OUTPUT_DIR"] = job_dir
+        
+        cmd = [FREECAD_CMD, SCRIPT_PATH]
         
         print(f"Running command: {' '.join(cmd)}")
         
@@ -90,7 +96,8 @@ async def generate(request: ExportRequest):
             cmd,
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=120, # Increased timeout
+            env=env
         )
         
         if result.returncode != 0:
@@ -103,7 +110,10 @@ async def generate(request: ExportRequest):
         
         result_json_marker = "RESULT_JSON:"
         if result_json_marker not in stdout:
-             raise HTTPException(status_code=500, detail="Could not find RESULT_JSON in FreeCAD output")
+             # Include stdout/stderr in the error to facilitate debugging from the client
+             debug_info = f"STDOUT: {stdout[:1000]}... STDERR: {result.stderr[:1000]}..."
+             print(f"Failed to find RESULT_JSON. {debug_info}")
+             raise HTTPException(status_code=500, detail=f"Could not find RESULT_JSON in FreeCAD output. {debug_info}")
              
         json_str = stdout.split(result_json_marker)[1].strip()
         export_result = json.loads(json_str)

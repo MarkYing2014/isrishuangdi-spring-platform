@@ -2344,12 +2344,23 @@ def generate_gb_spring_svg(Nt, Na, d, Dm, L0, scale):
 # =============================================================================
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python run_export.py design.json [output_dir]")
-        sys.exit(1)
+    # Priority: Environment Variables -> Command Line Arguments
+    design_file = os.environ.get("DESIGN_FILE")
+    output_dir = os.environ.get("OUTPUT_DIR")
+
+    if not design_file:
+        if len(sys.argv) < 2:
+            print("Usage: python run_export.py design.json [output_dir]")
+            # Also support env vars: DESIGN_FILE, OUTPUT_DIR
+            sys.exit(1)
+        design_file = sys.argv[1]
+        output_dir = sys.argv[2] if len(sys.argv) > 2 else None
+
+    if not output_dir:
+        output_dir = os.path.dirname(design_file) or "."
     
-    design_file = sys.argv[1]
-    output_dir = sys.argv[2] if len(sys.argv) > 2 else os.path.dirname(design_file) or "."
+    # Debug info
+    print(f"Running with: design_file={design_file}, output_dir={output_dir}")
     
     with open(design_file, "r", encoding="utf-8") as f:
         design = json.load(f)
@@ -2490,4 +2501,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"CRITICAL ERROR in run_export.py: {e}")
+        sys.exit(1)
