@@ -45,6 +45,7 @@ interface CameraMonitorCardProps {
   stationId?: string;
   workOrderId?: string;
   className?: string;
+  initialMode?: CameraSourceMode;
 }
 
 export function CameraMonitorCard({
@@ -52,6 +53,7 @@ export function CameraMonitorCard({
   stationId,
   workOrderId,
   className = "",
+  initialMode = "local",
 }: CameraMonitorCardProps) {
   // Demo role - in production, get from auth context
   const role: UserRole = "manager";
@@ -61,7 +63,7 @@ export function CameraMonitorCard({
   const { stream, status, error, devices, start, stop, refreshDevices } = useCameraStream();
 
   // State
-  const [sourceMode, setSourceMode] = useState<CameraSourceMode>("local");
+  const [sourceMode, setSourceMode] = useState<CameraSourceMode>(initialMode);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [isMirrored, setIsMirrored] = useState(false);
@@ -374,26 +376,43 @@ export function CameraMonitorCard({
 
           {/* Demo Tab */}
           <TabsContent value="demo" className="space-y-3 mt-3">
-            <div className="flex justify-end">
+            <div className="flex justify-end items-center gap-2 mb-2">
+              <span className="flex items-center gap-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 animate-pulse">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                AI Analysis Active
+              </span>
               <Button size="sm" variant="secondary" onClick={handleCapture}>
                 <Aperture className="h-4 w-4 mr-1" />
                 截图
               </Button>
             </div>
 
-            <div className="relative aspect-video bg-slate-900 rounded-lg overflow-hidden">
-              <video
-                ref={demoVideoRef}
-                src="/demo/factory.mp4"
-                controls
-                loop
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-                onError={() => {
-                  // Show placeholder if demo video doesn't exist
-                }}
+            <div className="relative aspect-video bg-slate-900 rounded-lg overflow-hidden group">
+              {/* Simulated Camera Feed (Spring Coiling Machine) */}
+              <iframe 
+                className="w-full h-full object-cover scale-150 pointer-events-none"
+                src="https://www.youtube.com/embed/5T7Mv-2XN6s?autoplay=1&mute=1&controls=0&loop=1&playlist=5T7Mv-2XN6s&start=30" 
+                title="Spring Coiling Machine Demo"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
               />
+              
+              {/* AI Overlay Layer */}
+              <div className="absolute inset-0 pointer-events-none">
+                {/* Simulated Bounding Box */}
+                <div className="absolute top-1/4 left-1/3 w-32 h-32 border-2 border-emerald-500/70 rounded-sm">
+                   <div className="absolute -top-6 left-0 bg-emerald-500/70 text-white text-[10px] px-1 py-0.5">
+                      Spring OD: 24.02mm (OK)
+                   </div>
+                </div>
+                
+                {/* Tech Grid Overlay */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.03)_1px,transparent_1px)] bg-[size:20px_20px]" />
+                
+                {/* Timestamp */}
+                <div className="absolute bottom-2 right-2 font-mono text-xs text-emerald-500/80 bg-black/50 px-2 rounded">
+                  CAM-02 | {new Date().toLocaleTimeString()} | 30FPS
+                </div>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
