@@ -13,28 +13,9 @@ app = FastAPI()
 
 # Configuration
 # Configuration
-def find_freecad_binary():
-    candidates = ["freecadcmd", "FreeCADCmd", "freecad", "FreeCAD"]
-    for c in candidates:
-        path = shutil.which(c)
-        if path:
-            print(f"Found FreeCAD binary: {path}")
-            return path
-    
-    # Fallback to hardcoded paths if shutil.which fails
-    common_paths = [
-        "/usr/bin/freecadcmd",
-        "/usr/bin/freecad",
-        "/usr/local/bin/freecadcmd"
-    ]
-    for p in common_paths:
-        if os.path.exists(p):
-            print(f"Found FreeCAD binary at: {p}")
-            return p
-            
-    return "freecadcmd" # Default fallback
-
-FREECAD_CMD = find_freecad_binary()
+# FreeCAD execution configuration
+# We won't use freecadcmd anymore, but direct python execution
+# FREECAD_CMD is no longer needed
 SCRIPT_PATH = "/app/freecad/run_export.py"
 TEMP_DIR = "/tmp/freecad_worker"
 
@@ -78,16 +59,36 @@ async def generate(request: ExportRequest):
         with open(design_path, "w") as f:
             json.dump(request.model_dump(), f)
             
-        # Run FreeCAD
-        # We assume freecadcmd is in PATH. 
-        # Note: In some environments 'freecadcmd' might be 'FreeCADCmd' or just 'freecad'
+        # Run FreeCAD using python3 directly with PYTHONPATH set
+        # This is more robust than using freecadcmd for headless scripts
         
-        # FIX: Pass arguments via environment variables to avoid FreeCAD trying to "open" the JSON file
+        # Find FreeCAD library path
+        freecad_lib_path = None
+        lib_candidates = [
+            "/usr/lib/freecad/lib",
+            "/usr/lib/freecad-python3/lib",
+            "/usr/lib/x86_64-linux-gnu/freecad/lib",
+            "/Applications/FreeCAD.app/Contents/Resources/lib"
+        ]
+        
+        for p in lib_candidates:
+            if os.path.exists(p):
+                freecad_lib_path = p
+                print(f"Found FreeCAD lib at: {p}")
+                break
+                
+        if not freecad_lib_path:
+            # Fallback: assume it might be in python path or we can't find it
+            print("Warning: Could not find FreeCAD lib path, hoping it is in sys.path")
+        
         env = os.environ.copy()
         env["DESIGN_FILE"] = design_path
         env["OUTPUT_DIR"] = job_dir
+        if freecad_lib_path:
+            env["PYTHONPATH"] = freecad_lib_path + ":" + env.get("PYTHONPATH", "")
         
-        cmd = [FREECAD_CMD, SCRIPT_PATH]
+        # Use python3 to run the script directly
+        cmd = ["python3", SCRIPT_PATH]
         
         print(f"Running command: {' '.join(cmd)}")
         
