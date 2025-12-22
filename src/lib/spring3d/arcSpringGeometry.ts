@@ -34,7 +34,7 @@ export function sampleArcSpringCenterline(
     tightnessSigma?: number;
   }
 ): THREE.Vector3[] {
-  const { d, D, n, r, alpha0Deg } = params;
+  const { D, n, r, alpha0Deg } = params;
   const theta0Deg = params.theta0Deg ?? 0;
 
   const centerArc = options?.centerArc ?? true;
@@ -77,8 +77,8 @@ export function sampleArcSpringCenterline(
     const I =
       s +
       tightnessK *
-        tightnessSigma *
-        (1 - e1 + (e2 - expNegInvSigma));
+      tightnessSigma *
+      (1 - e1 + (e2 - expNegInvSigma));
     return I / denomLambda;
   };
 

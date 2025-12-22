@@ -104,7 +104,7 @@ const initialState: Omit<
 
 export const useVariablePitchCompressionStore = create<VariablePitchCompressionState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       ...initialState,
 
       setWireDiameter: (wireDiameter) => set({ wireDiameter }),

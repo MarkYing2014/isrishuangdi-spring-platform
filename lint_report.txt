@@ -1,0 +1,50 @@
+
+/Users/markying/isrishuangdi-spring-platform/src/lib/spring3d/arcSpringGeometry.ts
+  37:11  warning  'd' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/markying/isrishuangdi-spring-platform/src/lib/spring3d/conicalSpringGeometry.ts
+  351:19  warning  'coilData' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  594:9   error    'prevCollapsed' is never reassigned. Use 'const' instead  prefer-const
+  594:9   warning  'prevCollapsed' is assigned a value but never used        @typescript-eslint/no-unused-vars
+
+/Users/markying/isrishuangdi-spring-platform/src/lib/spring3d/extensionSpringGeometry.ts
+  219:5  warning  'bodyLength' is assigned a value but never used             @typescript-eslint/no-unused-vars
+  220:5  warning  'freeLengthInsideHooks' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  276:3  error    'startHookPts' is never reassigned. Use 'const' instead     prefer-const
+  283:3  error    'endHookPts' is never reassigned. Use 'const' instead       prefer-const
+
+/Users/markying/isrishuangdi-spring-platform/src/lib/spring3d/extrudeRectAlongCurve.ts
+  355:20  warning  '_endGrindTurns' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  466:9   warning  '_closedFraction' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  471:9   warning  '_startRad' is assigned a value but never used        @typescript-eslint/no-unused-vars
+  472:9   warning  '_endRad' is assigned a value but never used          @typescript-eslint/no-unused-vars
+
+/Users/markying/isrishuangdi-spring-platform/src/lib/spring3d/spiralSpringAdvanced.ts
+   10:10  warning  'clampPositive' is defined but never used        @typescript-eslint/no-unused-vars
+   14:8   warning  'SpiralHeatTreatment' is defined but never used  @typescript-eslint/no-unused-vars
+  309:33  warning  '_params' is defined but never used              @typescript-eslint/no-unused-vars
+
+/Users/markying/isrishuangdi-spring-platform/src/lib/spring3d/spiralSpringAnalysis.ts
+  3:3  warning  'clampPositive' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/markying/isrishuangdi-spring-platform/src/lib/spring3d/spiralTorsionGeometry.ts
+  353:9  warning  'hookTopMode' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/markying/isrishuangdi-spring-platform/src/lib/spring3d/torsionSpringGeometry.ts
+  158:5  warning  'wireDiameter' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  245:5  warning  'activeCoils' is assigned a value but never used      @typescript-eslint/no-unused-vars
+  252:9  warning  'R' is assigned a value but never used                @typescript-eslint/no-unused-vars
+  262:9  warning  'currentAngleRad' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/markying/isrishuangdi-spring-platform/src/lib/spring3d/waveSpringGeometry.ts
+  350:43  warning  'amplitude' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  432:5   warning  'totalIndices' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  440:9   warning  'indexOffset' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+/Users/markying/isrishuangdi-spring-platform/src/lib/spring3d/waveSpringGeometryV2.ts
+  171:10  warning  'rotateAroundAxis' is defined but never used      @typescript-eslint/no-unused-vars
+  467:9   warning  'outerRadius' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 26 problems (3 errors, 23 warnings)
+  1 error and 0 warnings potentially fixable with the `--fix` option.
+

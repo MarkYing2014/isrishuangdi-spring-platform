@@ -108,7 +108,7 @@ export function validateWaveSpringGeometry(
   // Multi-turn specific checks
   if (input.turns > 1) {
     const stackingMode = input.stackingMode ?? "axial";
-    
+
     if (stackingMode === "axial") {
       // Check if turns might overlap axially
       const turnSpacing = input.amplitude * 2 + input.thickness * 1.5;
@@ -182,11 +182,11 @@ function generateCenterline(
   const amplitude = options.amplitudeOverride ?? input.amplitude;
   const waves = options.wavesOverride ?? input.waves;
   const phase = options.phaseOverride ?? input.phase ?? 0;
-  
+
   // Calculate radius based on stacking mode
   let R = options.radiusOverride ?? (meanDiameter / 2);
   let turnZOffset = 0;
-  
+
   if (stackingMode === "axial") {
     // Axial stacking: same radius, offset in Z
     turnZOffset = turnIndex * (amplitude * 2 + thickness * 1.5);
@@ -197,7 +197,7 @@ function generateCenterline(
     turnZOffset = 0;
   }
   // For nested mode, radius is set via radiusOverride
-  
+
   const turnPhase = phase + (turnIndex * Math.PI / waves);
   const points: CenterlinePoint[] = [];
 
@@ -347,7 +347,7 @@ export function buildWaveSpringMeshGeometry(
   input: WaveSpringGeometryInput
 ): WaveSpringGeometryResult {
   const scale = input.scale ?? 1;
-  const { meanDiameter, thickness, width, amplitude, waves, turns, stackingMode = "axial", nestedLayers } = input;
+  const { meanDiameter, thickness, width, waves, turns, stackingMode = "axial", nestedLayers } = input;
 
   // Calculate segment count based on geometry complexity
   const minSegmentsPerWave = 32;
@@ -362,7 +362,7 @@ export function buildWaveSpringMeshGeometry(
     for (let layerIdx = 0; layerIdx < nestedLayers.length; layerIdx++) {
       const layer = nestedLayers[layerIdx];
       const layerRadius = (meanDiameter / 2) + layer.radiusOffset;
-      
+
       const centerline = generateCenterline(input, segmentsPerTurn, layerIdx, {
         radiusOverride: layerRadius,
         amplitudeOverride: layer.amplitude,
@@ -423,53 +423,52 @@ export function buildWaveSpringMeshGeometry(
 
 function mergeBufferGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry {
   const merged = new THREE.BufferGeometry();
-  
+
   let totalVertices = 0;
-  let totalIndices = 0;
-  
+
   for (const g of geometries) {
     totalVertices += g.getAttribute("position").count;
-    totalIndices += g.getIndex()?.count ?? 0;
   }
-  
+
+
   const positions = new Float32Array(totalVertices * 3);
   const normals = new Float32Array(totalVertices * 3);
   const indices: number[] = [];
-  
+
   let vertexOffset = 0;
-  let indexOffset = 0;
-  
+
+
   for (const g of geometries) {
     const pos = g.getAttribute("position");
     const norm = g.getAttribute("normal");
     const idx = g.getIndex();
-    
+
     // Copy positions
     for (let i = 0; i < pos.count * 3; i++) {
       positions[vertexOffset * 3 + i] = (pos.array as Float32Array)[i];
     }
-    
+
     // Copy normals
     if (norm) {
       for (let i = 0; i < norm.count * 3; i++) {
         normals[vertexOffset * 3 + i] = (norm.array as Float32Array)[i];
       }
     }
-    
+
     // Copy indices with offset
     if (idx) {
       for (let i = 0; i < idx.count; i++) {
         indices.push((idx.array as Uint16Array | Uint32Array)[i] + vertexOffset);
       }
     }
-    
+
     vertexOffset += pos.count;
   }
-  
+
   merged.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   merged.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
   merged.setIndex(indices);
-  
+
   return merged;
 }
 

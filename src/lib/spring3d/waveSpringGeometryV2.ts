@@ -168,19 +168,6 @@ function safeNormalize(v: THREE.Vector3): THREE.Vector3 {
   return v.multiplyScalar(1 / len);
 }
 
-function rotateAroundAxis(v: THREE.Vector3, axis: THREE.Vector3, angle: number): THREE.Vector3 {
-  const k = axis.clone().normalize();
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const cross = new THREE.Vector3().crossVectors(k, v);
-  const dot = k.dot(v);
-  return v
-    .clone()
-    .multiplyScalar(cos)
-    .add(cross.multiplyScalar(sin))
-    .add(k.multiplyScalar(dot * (1 - cos)));
-}
-
 // ============================================================================
 // Core Geometry Builder (V2 - Continuous Helix with Sign-Flip Wave)
 // ============================================================================
@@ -282,19 +269,19 @@ function buildContinuousHelixGeometry(params: BuildContinuousHelixParams): {
     const th = dirSign * theta;
     const x = meanRadius * Math.cos(th);
     const y = meanRadius * Math.sin(th);
-    
+
     // z_base: linear helix rise
     const z_base = (pitch / (2 * Math.PI)) * theta;
-    
+
     // Sign flip per turn: s(θ) = (-1)^floor(θ / 2π)
     const turnIndex = Math.floor(theta / (2 * Math.PI));
     const s = (turnIndex % 2 === 0) ? 1 : -1;
-    
+
     // z_wave: wave with sign flip
     const z_wave = amplitude * Math.sin(waves * theta + phase) * s;
-    
+
     const z = z_base + z_wave;
-    
+
     return new THREE.Vector3(x, y, z);
   }
 
@@ -443,14 +430,14 @@ export function buildWaveSpringMeshGeometry(
 
   // Calculate total height: totalHeight takes precedence, then axialPitch * turns, then default
   // Default: (2 * amplitude + thickness) * turns to show visible helix rise
-  const effectiveTotalHeight = inputTotalHeight 
+  const effectiveTotalHeight = inputTotalHeight
     ?? (inputAxialPitch ? inputAxialPitch * turns : (2 * amplitude + thickness * 1.5) * turns);
 
   // Calculate pitch per turn using corrected formula: p = Hf / (Nt + 1)
   // This accounts for wave amplitude at both ends: Hf ≈ Nt * p + 2A, with p = 2A
   // Solving: Hf = (Nt + 1) * p
   const pitchPerTurn = effectiveTotalHeight / (turns + 1);
-  
+
   // Auto-calculate amplitude for crest-to-valley contact condition: A = p/2
   // With safety clamp to avoid self-intersection: A <= 0.45 * p or A <= (p - t) / 2
   const maxSafeAmplitude = Math.min(0.45 * pitchPerTurn, (pitchPerTurn - thickness) / 2);
@@ -458,13 +445,11 @@ export function buildWaveSpringMeshGeometry(
 
   // Determine inner/outer radius
   // If innerDiameter provided, use it; otherwise derive from meanDiameter
-  const innerRadius = innerDiameter 
-    ? innerDiameter / 2 
-    : meanDiameter / 2 - (radialPitch * turns / 2);
-  
+
+
   // Outer radius: innerRadius + radialPitch * turns
   // If no radialPitch, outer = inner (constant radius)
-  const outerRadius = innerRadius + radialPitch * turns;
+
 
   let geometry: THREE.BufferGeometry;
   let totalWireLength = 0;
@@ -475,11 +460,11 @@ export function buildWaveSpringMeshGeometry(
   if (stackingMode === "nested" && nestedLayers && nestedLayers.length > 0) {
     // Nested mode: multiple independent layers at different radii
     const allGeometries: THREE.BufferGeometry[] = [];
-    
+
     for (let layerIdx = 0; layerIdx < nestedLayers.length; layerIdx++) {
       const layer = nestedLayers[layerIdx];
       const layerRadius = meanRadius + layer.radiusOffset;
-      
+
       const result = buildContinuousHelixGeometry({
         meanRadius: layerRadius,
         pitch: pitchPerTurn,
@@ -497,9 +482,9 @@ export function buildWaveSpringMeshGeometry(
       allGeometries.push(result.geometry);
       totalWireLength += result.wireLength;
     }
-    
-    geometry = allGeometries.length === 1 
-      ? allGeometries[0] 
+
+    geometry = allGeometries.length === 1
+      ? allGeometries[0]
       : mergeBufferGeometries(allGeometries);
   } else {
     // Default mode: Continuous helix with sign-flip wave for crest-to-crest contact

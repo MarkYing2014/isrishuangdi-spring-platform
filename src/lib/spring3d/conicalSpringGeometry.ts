@@ -110,16 +110,16 @@ function calculatePitchDistribution(
 ): { pitches: number[]; deadCoilsBottom: number; deadCoilsTop: number } {
   const deadCoilsBottom = endType === 'closed_ground' || endType === 'closed' ? 1 : 0;
   const deadCoilsTop = endType === 'closed_ground' || endType === 'closed' ? 1 : 0;
-  
+
   const totalCoils = activeCoils + deadCoilsBottom + deadCoilsTop;
   const pitches: number[] = [];
-  
+
   // Dead coils have pitch = wire diameter (touching)
   // Active coils share the remaining height
   const deadHeight = (deadCoilsBottom + deadCoilsTop) * wireDiameter;
   const activeHeight = freeLength - deadHeight;
   const activePitch = activeHeight / activeCoils;
-  
+
   for (let i = 0; i < totalCoils; i++) {
     if (i < deadCoilsBottom) {
       // Bottom dead coil
@@ -132,7 +132,7 @@ function calculatePitchDistribution(
       pitches.push(activePitch);
     }
   }
-  
+
   return { pitches, deadCoilsBottom, deadCoilsTop };
 }
 
@@ -336,33 +336,7 @@ export function generateConicalSpringCenterline(
  * Generate closed ground end geometry
  * 生成并紧磨平端几何
  */
-function generateGroundEndGeometry(
-  centerPoint: THREE.Vector3,
-  radius: number,
-  wireRadius: number,
-  isBottom: boolean,
-  scale: number
-): THREE.TubeGeometry | null {
-  // Create a flat arc for the ground end
-  const arcPoints: THREE.Vector3[] = [];
-  const arcAngle = Math.PI * 0.8; // 80% of a full turn for ground end
-  const numPoints = 20;
-  
-  for (let i = 0; i <= numPoints; i++) {
-    const t = i / numPoints;
-    const angle = t * arcAngle;
-    const x = radius * Math.cos(angle);
-    const z = radius * Math.sin(angle);
-    const y = centerPoint.y;
-    
-    arcPoints.push(new THREE.Vector3(x, y, z));
-  }
-  
-  if (arcPoints.length < 2) return null;
-  
-  const curve = new THREE.CatmullRomCurve3(arcPoints);
-  return new THREE.TubeGeometry(curve, numPoints, wireRadius, 12, false);
-}
+
 
 /**
  * Build complete conical spring geometry
@@ -372,13 +346,13 @@ export function buildConicalSpringGeometry(
   params: ConicalSpringParams
 ): ConicalSpringGeometry {
   const { wireDiameter, endType, scale } = params;
-  
+
   // Generate centerline
-  const { points, coilData, collapsedPoints, activePoints, collapsedRatio } = 
+  const { points, collapsedPoints, activePoints, collapsedRatio } =
     generateConicalSpringCenterline(params);
-  
+
   const wireRadius = (wireDiameter / 2) * scale;
-  
+
   // Create main body curve
   const bodyCurve = new THREE.CatmullRomCurve3(points);
   const bodyGeometry = new THREE.TubeGeometry(
@@ -388,7 +362,7 @@ export function buildConicalSpringGeometry(
     16,
     false
   );
-  
+
   // Create collapsed section geometry
   let collapsedGeometry: THREE.TubeGeometry | null = null;
   if (collapsedPoints.length >= 2) {
@@ -401,7 +375,7 @@ export function buildConicalSpringGeometry(
       false
     );
   }
-  
+
   // Create active section geometry
   let activeGeometry: THREE.TubeGeometry | null = null;
   if (activePoints.length >= 2) {
@@ -414,48 +388,48 @@ export function buildConicalSpringGeometry(
       false
     );
   }
-  
+
   // Create ground end geometries (partial arcs for visual reference)
-  let bottomEndGeometry: THREE.TubeGeometry | null = null;
-  let topEndGeometry: THREE.TubeGeometry | null = null;
-  
+  const bottomEndGeometry: THREE.TubeGeometry | null = null;
+  const topEndGeometry: THREE.TubeGeometry | null = null;
+
   // Calculate radii at ends
   const largeMeanDiameter = params.largeOuterDiameter - wireDiameter;
   const smallMeanDiameter = params.smallOuterDiameter - wireDiameter;
   const largeRadius = (largeMeanDiameter / 2) * scale;
   const smallRadius = (smallMeanDiameter / 2) * scale;
-  
+
   // Calculate min/max Y for clipping
   const minY = points.length > 0 ? points[0].y : 0;
   const maxY = points.length > 0 ? points[points.length - 1].y : 0;
-  
+
   // Grind depth: typically 30% of wire diameter for good flat surface
   const grindDepth = wireRadius * 0.6; // 30% of wire diameter
-  
+
   // Total height before grinding
   const rawHeight = maxY - minY;
-  
+
   // Create clipping planes for ground ends
   // Note: Clipping planes work in world coordinates, but we apply them
   // BEFORE the group transform, so they use local coordinates
   let clipPlanes: { bottom: THREE.Plane; top: THREE.Plane } | null = null;
   let endDiscs: ConicalSpringGeometry['endDiscs'] = null;
-  
+
   if (endType === 'closed_ground') {
     // Bottom plane: normal pointing up (+Y), clips below grindDepth from bottom
     const bottomPlane = new THREE.Plane(
       new THREE.Vector3(0, 1, 0),
       -(minY + grindDepth)
     );
-    
+
     // Top plane: normal pointing down (-Y), clips above (maxY - grindDepth)
     const topPlane = new THREE.Plane(
       new THREE.Vector3(0, -1, 0),
       maxY - grindDepth
     );
-    
+
     clipPlanes = { bottom: bottomPlane, top: topPlane };
-    
+
     // End disc positions - these are in LOCAL coordinates (relative to group)
     // The group will be offset by -totalHeight/2, so we need positions relative to minY
     endDiscs = {
@@ -466,10 +440,10 @@ export function buildConicalSpringGeometry(
       wireRadius,
     };
   }
-  
+
   // Total height is the raw height (we'll handle clipping visually)
   const totalHeight = rawHeight;
-  
+
   return {
     bodyGeometry,
     bottomEndGeometry,
@@ -538,39 +512,39 @@ export function calculateConicalSpringRate(
   // Mean diameters
   const D1 = largeOuterDiameter - d; // Large mean diameter
   const D2 = smallOuterDiameter - d; // Small mean diameter
-  
+
   // Calculate individual coil properties
   const coilRates: number[] = [];
   const coilHeights: number[] = [];
   const coilDiameters: number[] = [];
-  
+
   // Pitch for active coils (assuming closed ground ends)
   const deadCoils = 2; // 1 at each end
   const activeHeight = L0 - deadCoils * d;
   const pitch = activeHeight / Na;
-  
+
   for (let i = 0; i < Na; i++) {
     // Coil position ratio (0 = bottom/large, 1 = top/small)
     const ratio = i / (Na - 1);
-    
+
     // Mean diameter at this coil
     const Dm = D1 + (D2 - D1) * ratio;
     coilDiameters.push(Dm);
-    
+
     // Height of this coil from bottom
     const height = d + i * pitch; // Start after bottom dead coil
     coilHeights.push(height);
-    
+
     // Spring rate for this single coil
     // k = G * d^4 / (8 * Dm^3 * 1)
     const k = (G * Math.pow(d, 4)) / (8 * Math.pow(Dm, 3) * 1);
     coilRates.push(k);
   }
-  
+
   // Calculate solid height
   const solidHeight = (Na + deadCoils) * d;
   const maxDeflection = L0 - solidHeight;
-  
+
   // Calculate initial spring rate (all coils active, series combination)
   // 1/k_total = Σ(1/k_i)
   let invKTotal = 0;
@@ -578,21 +552,21 @@ export function calculateConicalSpringRate(
     invKTotal += 1 / k;
   }
   const initialSpringRate = 1 / invKTotal;
-  
+
   // Generate force-deflection curve
   const forceDeflectionCurve: { deflection: number; force: number; springRate: number }[] = [];
   const numPoints = 50;
-  
+
   let collapsedCoils = 0;
-  
+
   for (let i = 0; i <= numPoints; i++) {
     const deflection = (i / numPoints) * maxDeflection;
-    
+
     // Determine which coils are collapsed
     // Larger diameter coils collapse first (they have lower spring rate)
     let collapsed = 0;
     let remainingDeflection = deflection;
-    
+
     // Calculate deflection at which each coil collapses
     // A coil collapses when its pitch reduces to wire diameter
     for (let c = 0; c < Na; c++) {
@@ -604,24 +578,24 @@ export function calculateConicalSpringRate(
         break;
       }
     }
-    
+
     // Calculate current spring rate with collapsed coils
     let invK = 0;
     for (let c = collapsed; c < Na; c++) {
       invK += 1 / coilRates[c];
     }
     const currentK = invK > 0 ? 1 / invK : coilRates[Na - 1];
-    
+
     // Calculate force using progressive spring rate
     // For non-linear springs, we integrate: F = ∫k(δ)dδ
     // Simplified: use average spring rate up to this point
     let force = 0;
     let prevDeflection = 0;
-    let prevCollapsed = 0;
-    
+
+
     for (let j = 0; j <= i; j++) {
       const d_j = (j / numPoints) * maxDeflection;
-      
+
       // Recalculate collapsed coils at this point
       let c_j = 0;
       let rd = d_j;
@@ -634,37 +608,36 @@ export function calculateConicalSpringRate(
           break;
         }
       }
-      
+
       // Spring rate at this point
       let invK_j = 0;
       for (let c = c_j; c < Na; c++) {
         invK_j += 1 / coilRates[c];
       }
       const k_j = invK_j > 0 ? 1 / invK_j : coilRates[Na - 1];
-      
+
       // Incremental force
       const dDeflection = d_j - prevDeflection;
       force += k_j * dDeflection;
-      
+
       prevDeflection = d_j;
-      prevCollapsed = c_j;
     }
-    
+
     forceDeflectionCurve.push({
       deflection,
       force,
       springRate: currentK,
     });
-    
+
     if (deflection <= currentDeflection) {
       collapsedCoils = collapsed;
     }
   }
-  
+
   // Get current values
-  const currentPoint = forceDeflectionCurve.find(p => p.deflection >= currentDeflection) 
+  const currentPoint = forceDeflectionCurve.find(p => p.deflection >= currentDeflection)
     || forceDeflectionCurve[forceDeflectionCurve.length - 1];
-  
+
   return {
     initialSpringRate,
     currentSpringRate: currentPoint.springRate,

@@ -73,7 +73,7 @@ function computeBishopFrames(
   }
   safeNormalize(n0);
 
-  let b0 = new THREE.Vector3().crossVectors(tangents[0], n0);
+  const b0 = new THREE.Vector3().crossVectors(tangents[0], n0);
   safeNormalize(b0);
 
   normals.push(n0);
@@ -294,7 +294,7 @@ export class HelixCurve extends THREE.Curve<THREE.Vector3> {
     const dTheta = 2 * Math.PI * this.turns;
     // derivatives wrt t
     const dx = -this.R * Math.sin(theta) * dTheta;
-    const dy =  this.R * Math.cos(theta) * dTheta;
+    const dy = this.R * Math.cos(theta) * dTheta;
     const dz = this.L;
     return target.set(dx, dy, dz).normalize();
   }
@@ -352,7 +352,6 @@ export function buildDieSpringGeometryFixedFrame(params: {
     scale = 1,
     caps = true,
     endStyle = "closed_ground",
-    endGrindTurns = 0.25,
   } = params;
 
   const Rm = (meanDiameter * 0.5) * scale;
@@ -362,27 +361,27 @@ export function buildDieSpringGeometryFixedFrame(params: {
   const ht = (wire_t * scale) / 2;   // half thickness (axial)
 
   const Nt = coils;  // total coils
-  
+
   // End coil parameters - CRITICAL for realistic die spring appearance
   // Real die springs have "closed" end coils where pitch → 0
   const doGrind = endStyle === "closed_ground" || endStyle === "closed";
-  
+
   // closedTurnsPerEnd: how many turns at each end have pitch → 0 (closed/dead coils)
   // Direct parameter: 1.5 turns gives realistic "last coil lies flat" appearance
   // No indirect mapping - this is the actual number of closed turns per end
   const closedTurnsPerEnd = doGrind ? 1.5 : 0;
-  
+
   // Active turns = total - 2 * closed turns per end
   const activeTurns = Math.max(0.5, Nt - 2 * closedTurnsPerEnd);
-  
+
   // Total angle - full coils, NO reduction (real die springs have complete coils)
   const totalAngle = 2 * Math.PI * Nt;
   // Higher segment count for smoother end coil transitions
   const segments = Math.max(60, Math.floor(Nt * Math.max(segmentsPerCoil, 200)));
-  
+
   // Closed zone angle (per end)
   const thetaClosed = 2 * Math.PI * closedTurnsPerEnd;
-  
+
   // Active zone pitch: distribute remaining height over active turns
   // seatHeight = height occupied by closed coils (approximately wire thickness)
   const seatHeight = wire_t * scale * 0.9;  // closed coils occupy ~0.9t each
@@ -401,7 +400,7 @@ export function buildDieSpringGeometryFixedFrame(params: {
   // End zone: θ ∈ [totalAngle - thetaClosed, totalAngle] → pitch ramps from pActive to 0
   const pitchAtTheta = (theta: number): number => {
     if (!doGrind) return L / Nt;  // uniform pitch for open springs
-    
+
     if (theta < thetaClosed) {
       // Start closed zone: ramp from 0 to pActive (w: 0→1)
       const w = smoothstep(0, thetaClosed, theta);
@@ -447,7 +446,7 @@ export function buildDieSpringGeometryFixedFrame(params: {
   const zValues: number[] = [];
   let zAccum = 0;
   const dTheta = totalAngle / segments;
-  
+
   for (let i = 0; i <= segments; i++) {
     if (i === 0) {
       zValues.push(0);
@@ -462,20 +461,18 @@ export function buildDieSpringGeometryFixedFrame(params: {
     }
   }
 
-  // Closed zone fraction for frame blending
-  const closedFraction = closedTurnsPerEnd / Nt;
+
 
   // Store first and last radial directions for frame locking at ends
   const startTheta = 0;
   const endTheta = totalAngle;
-  const startRad = new THREE.Vector3(Math.cos(startTheta), Math.sin(startTheta), 0);
-  const endRad = new THREE.Vector3(Math.cos(endTheta), Math.sin(endTheta), 0);
+
 
   // Generate ring points with FIXED frame
   // Lock frame direction at closed end zones to prevent twisting
   const ringPts: THREE.Vector3[][] = [];
   const ringRadDirs: THREE.Vector3[] = [];  // Store Rad directions for continuity check
-  
+
   for (let i = 0; i <= segments; i++) {
     const s = i / segments;
     const theta = s * totalAngle;
@@ -486,7 +483,8 @@ export function buildDieSpringGeometryFixedFrame(params: {
 
     // Determine radial direction
     // At closed ends, blend toward locked direction to prevent visual twisting
-    let Rad: THREE.Vector3;
+    // Determine radial direction
+    // At closed ends, blend toward locked direction to prevent visual twisting
     const Up = new THREE.Vector3(0, 0, 1);
     const currentRad = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0);
 
@@ -494,7 +492,7 @@ export function buildDieSpringGeometryFixedFrame(params: {
     // The dot continuity check below prevents sign flips
     // No need to lerp toward startRad/endRad - that can cause shape distortion
     // especially when coils is not an integer
-    Rad = currentRad.clone();
+    const Rad = currentRad.clone();
 
     // CRITICAL: Normalize after lerp (lerp can produce non-unit vectors)
     Rad.normalize();
@@ -561,15 +559,15 @@ export function buildDieSpringGeometryFixedFrame(params: {
       const cy = Rm * Math.sin(theta);
       const zStart = zValues[0];
       const P = new THREE.Vector3(cx, cy, zStart);
-      
+
       // For ground ends, cap faces down (-Z); for open ends, use tangent
-      const t = doGrind 
+      const t = doGrind
         ? new THREE.Vector3(0, 0, -1)
         : new THREE.Vector3(
-            -Rm * Math.sin(theta) * 2 * Math.PI * Nt,
-            Rm * Math.cos(theta) * 2 * Math.PI * Nt,
-            L
-          ).normalize().multiplyScalar(-1);
+          -Rm * Math.sin(theta) * 2 * Math.PI * Nt,
+          Rm * Math.cos(theta) * 2 * Math.PI * Nt,
+          L
+        ).normalize().multiplyScalar(-1);
 
       const ring = ringPts[0];
       for (let f = 0; f < 4; f++) {
@@ -587,15 +585,15 @@ export function buildDieSpringGeometryFixedFrame(params: {
       const cy = Rm * Math.sin(theta);
       const zEnd = zValues[segments];
       const P = new THREE.Vector3(cx, cy, zEnd);
-      
+
       // For ground ends, cap faces up (+Z); for open ends, use tangent
       const t = doGrind
         ? new THREE.Vector3(0, 0, 1)
         : new THREE.Vector3(
-            -Rm * Math.sin(theta) * 2 * Math.PI * Nt,
-            Rm * Math.cos(theta) * 2 * Math.PI * Nt,
-            L
-          ).normalize();
+          -Rm * Math.sin(theta) * 2 * Math.PI * Nt,
+          Rm * Math.cos(theta) * 2 * Math.PI * Nt,
+          L
+        ).normalize();
 
       const ring = ringPts[segments];
       for (let f = 0; f < 4; f++) {

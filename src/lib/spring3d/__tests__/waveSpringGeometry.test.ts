@@ -7,7 +7,6 @@ import {
   estimateWaveSpringWireLength,
   getDefaultWaveSpringGeometryInput,
   type WaveSpringGeometryInput,
-  type WaveSpringNestedLayer,
 } from "@/lib/spring3d/waveSpringGeometryV2";
 
 describe("Wave Spring Geometry Validation", () => {
@@ -170,8 +169,7 @@ describe("Wave Spring Radial Stacking Mode", () => {
     expect(result.wireLength).toBeGreaterThan(0);
 
     // Bounding box should be larger than single turn due to radial expansion
-    const { min, max } = result.boundingBox;
-    const expectedOuterRadius = (input.meanDiameter / 2) + (input.turns - 1) * input.radialPitch! + input.width / 2;
+    const { max } = result.boundingBox;
     expect(max.x).toBeGreaterThan(input.meanDiameter / 2);
   });
 

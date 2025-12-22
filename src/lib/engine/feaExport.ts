@@ -635,7 +635,7 @@ export function generateResidualStressField(
   for (const node of mesh.nodes) {
     let axial = 0;
     let hoop = 0;
-    let radial = 0;
+    const radial = 0;
     
     // Add coiling residual stress (varies through wire cross-section)
     if (coilingResult) {

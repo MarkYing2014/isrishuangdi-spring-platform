@@ -335,7 +335,7 @@ export function analyzeMeasurements(args: {
     const candidates: Array<Exclude<QualityStratifyBy, "auto" | "none">> = ["machine", "lot", "shift", "appraiser", "gage"];
     for (const c of candidates) {
       const values = args.measurements
-        .map((m) => (m as any)[c] as string | undefined)
+        .map((m) => (m as unknown as Record<string, unknown>)[c] as string | undefined)
         .map((v) => (typeof v === "string" ? v.trim() : ""))
         .filter((v) => v);
 
@@ -358,7 +358,7 @@ export function analyzeMeasurements(args: {
 
     const buckets = new Map<string, NormalizedMeasurement[]>();
     for (const m of args.measurements) {
-      const raw = (m as any)[stratBy] as string | undefined;
+      const raw = (m as unknown as Record<string, unknown>)[stratBy] as string | undefined;
       const key = typeof raw === "string" ? raw.trim() : "";
       if (!key) continue;
       const arr = buckets.get(key) ?? [];

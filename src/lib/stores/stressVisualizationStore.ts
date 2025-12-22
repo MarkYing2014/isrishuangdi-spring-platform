@@ -26,7 +26,7 @@ interface StressVisualizationState {
   showLegend: boolean;
   /** Selected point index for tooltip */
   selectedPointIndex: number | null;
-  
+
   // Actions
   setMode: (mode: VisualizationMode) => void;
   setStressDistribution: (data: StressDistributionResult | null) => void;
@@ -50,21 +50,21 @@ const initialState = {
 
 export const useStressVisualizationStore = create<StressVisualizationState>((set) => ({
   ...initialState,
-  
+
   setMode: (mode) => set({ mode }),
-  
+
   setStressDistribution: (data) => set({ stressDistribution: data }),
-  
+
   setFatigueDamage: (data) => set({ fatigueDamage: data }),
-  
+
   setPulsePhase: (phase) => set({ pulsePhase: phase }),
-  
+
   setShowHotSpots: (show) => set({ showHotSpots: show }),
-  
+
   setShowLegend: (show) => set({ showLegend: show }),
-  
+
   setSelectedPointIndex: (index) => set({ selectedPointIndex: index }),
-  
+
   reset: () => set(initialState),
 }));
 
@@ -75,11 +75,11 @@ export function getVertexColorsForMode(
   state: StressVisualizationState
 ): Float32Array | null {
   const { mode, stressDistribution, fatigueDamage, pulsePhase } = state;
-  
+
   if (mode === 'normal' || (!stressDistribution && !fatigueDamage)) {
     return null;
   }
-  
+
   if (mode === 'stress' && stressDistribution) {
     const colors = new Float32Array(stressDistribution.points.length * 3);
     for (let i = 0; i < stressDistribution.points.length; i++) {
@@ -90,25 +90,28 @@ export function getVertexColorsForMode(
     }
     return colors;
   }
-  
+
   if (mode === 'damage' && fatigueDamage) {
     const colors = new Float32Array(fatigueDamage.points.length * 3);
     for (let i = 0; i < fatigueDamage.points.length; i++) {
       const point = fatigueDamage.points[i];
-      let [r, g, b] = point.damageColor;
-      
+      const originalColor = point.damageColor;
+      let r = originalColor[0];
+      const g = originalColor[1];
+      const b = originalColor[2];
+
       // Add pulse effect for failure zones
       if (point.damageCategory === 'failure') {
         const pulse = 0.3 * Math.sin(pulsePhase * Math.PI * 2);
         r = Math.min(1, r + pulse);
       }
-      
+
       colors[i * 3] = r;
       colors[i * 3 + 1] = g;
       colors[i * 3 + 2] = b;
     }
     return colors;
   }
-  
+
   return null;
 }

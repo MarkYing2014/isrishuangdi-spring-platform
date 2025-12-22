@@ -887,7 +887,7 @@ export function calculateArcCreep(params: {
   const warningsZh: string[] = [];
   
   // Base creep rate at 20°C (% per 1000 hours)
-  let baseCreepRate = 0.1;
+  const baseCreepRate = 0.1;
   
   // Temperature acceleration
   const tempFactor = Math.exp((temperature_C - 20) / 50);

@@ -1,6 +1,6 @@
 import type { MaterialInfo } from "@/lib/stores/springDesignStore";
 import {
-  clampPositive,
+
   computeEndKt,
   nominalStressAtTorque_MPa,
   type EndKtType,
@@ -117,18 +117,18 @@ export function computeSpiralSpringAdvancedDerived(p: SpiralSpringAdvancedAnalys
 
   const shotPeenAssumptions = p.engineeringMaterial?.shotPeened
     ? [
-        "Shot peening is modeled as an endurance-limit multiplier only (k_peen applied to Se').",
-        "Residual stress and mean-stress shift are not explicitly modeled.",
-      ]
+      "Shot peening is modeled as an endurance-limit multiplier only (k_peen applied to Se').",
+      "Residual stress and mean-stress shift are not explicitly modeled.",
+    ]
     : [];
 
   const strengthAdj = p.engineeringMaterial
     ? adjustSpiralStrengthByThicknessAndHeatTreatment({
-        materialId: p.engineeringMaterial.materialId,
-        thickness_mm: p.t_mm,
-        basis: p.engineeringMaterial.strengthBasis ?? "nominal",
-        heatTreatment: p.engineeringMaterial.heatTreatment ?? "default",
-      })
+      materialId: p.engineeringMaterial.materialId,
+      thickness_mm: p.t_mm,
+      basis: p.engineeringMaterial.strengthBasis ?? "nominal",
+      heatTreatment: p.engineeringMaterial.heatTreatment ?? "default",
+    })
     : null;
 
   const SuUsed =

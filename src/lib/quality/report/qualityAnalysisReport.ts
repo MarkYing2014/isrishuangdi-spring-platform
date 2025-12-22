@@ -142,7 +142,7 @@ export function generateQualityAnalysisReportHTML(model: QualityAnalysisReportMo
 
   const narrative = buildQualityReportNarrative({ analysis: model.analysis, lang });
 
-  const f = (sev: string) => (sev === "ERROR" ? "#dc2626" : sev === "WARN" ? "#d97706" : "#2563eb");
+
 
   const executiveReasonsHtml = narrative.executiveSummary.keyReasons
     .map((r) => `<li>${t(lang, r.en, r.zh)}</li>`)
@@ -510,16 +510,16 @@ export function QualityAnalysisReportPDF({ model }: { model: QualityAnalysisRepo
         createElement(Text, { style: styles.subtitle }, `${t(lang, "Dataset", "数据集")}: ${model.dataset.name}`)
       ),
       ppapInfoLines.length > 0 &&
+      createElement(
+        View,
+        { style: styles.section },
+        createElement(Text, { style: styles.sectionTitle }, t(lang, "PPAP / Report Info", "PPAP / 报告信息")),
         createElement(
           View,
-          { style: styles.section },
-          createElement(Text, { style: styles.sectionTitle }, t(lang, "PPAP / Report Info", "PPAP / 报告信息")),
-          createElement(
-            View,
-            { style: styles.card },
-            ...ppapInfoLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
-          )
-        ),
+          { style: styles.card },
+          ...ppapInfoLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+        )
+      ),
       createElement(
         View,
         { style: styles.section },
@@ -532,123 +532,124 @@ export function QualityAnalysisReportPDF({ model }: { model: QualityAnalysisRepo
         )
       ),
       executiveLines.length > 0 &&
+      createElement(
+        View,
+        { style: styles.section },
+        createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.executiveSummary.title.en, narrative.executiveSummary.title.zh)),
         createElement(
           View,
-          { style: styles.section },
-          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.executiveSummary.title.en, narrative.executiveSummary.title.zh)),
-          createElement(
-            View,
-            { style: styles.card },
-            ...executiveLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
-          )
-        ),
+          { style: styles.card },
+          ...executiveLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+        )
+      ),
       criticalByCharLines.length > 0 &&
+      createElement(
+        View,
+        { style: styles.section },
+        createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.criticalFindingsByCharacteristic.title.en, narrative.criticalFindingsByCharacteristic.title.zh)),
         createElement(
           View,
-          { style: styles.section },
-          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.criticalFindingsByCharacteristic.title.en, narrative.criticalFindingsByCharacteristic.title.zh)),
-          createElement(
-            View,
-            { style: styles.card },
-            ...criticalByCharLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
-          )
-        ),
+          { style: styles.card },
+          ...criticalByCharLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+        )
+      ),
       spcLines.length > 0 &&
+      createElement(
+        View,
+        { style: styles.section },
+        createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.controlChartInterpretation.title.en, narrative.controlChartInterpretation.title.zh)),
         createElement(
           View,
-          { style: styles.section },
-          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.controlChartInterpretation.title.en, narrative.controlChartInterpretation.title.zh)),
-          createElement(
-            View,
-            { style: styles.card },
-            ...spcLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
-          )
-        ),
+          { style: styles.card },
+          ...spcLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+        )
+      ),
       measurementLines.length > 0 &&
+      createElement(
+        View,
+        { style: styles.section },
+        createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.measurementSystem.title.en, narrative.measurementSystem.title.zh)),
         createElement(
           View,
-          { style: styles.section },
-          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.measurementSystem.title.en, narrative.measurementSystem.title.zh)),
-          createElement(
-            View,
-            { style: styles.card },
-            ...measurementLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
-          )
-        ),
+          { style: styles.card },
+          ...measurementLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+        )
+      ),
       msaLines.length > 0 &&
+      createElement(
+        View,
+        { style: styles.section },
+        createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.measurementSystem.msaSummaryLabel.en, narrative.measurementSystem.msaSummaryLabel.zh)),
         createElement(
           View,
-          { style: styles.section },
-          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.measurementSystem.msaSummaryLabel.en, narrative.measurementSystem.msaSummaryLabel.zh)),
-          createElement(
-            View,
-            { style: styles.card },
-            ...msaLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
-          )
-        ),
+          { style: styles.card },
+          ...msaLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+        )
+      ),
       xbarrLines.length > 0 &&
+      createElement(
+        View,
+        { style: styles.section },
+        createElement(Text, { style: styles.sectionTitle }, t(lang, "Xbar-R", "Xbar-R")),
         createElement(
           View,
-          { style: styles.section },
-          createElement(Text, { style: styles.sectionTitle }, t(lang, "Xbar-R", "Xbar-R")),
-          createElement(
-            View,
-            { style: styles.card },
-            ...xbarrLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
-          )
-        ),
+          { style: styles.card },
+          ...xbarrLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+        )
+      ),
       stratificationLines.length > 0 &&
+      createElement(
+        View,
+        { style: styles.section },
+        createElement(Text, { style: styles.sectionTitle }, t(lang, "Stratification", "分层")),
         createElement(
           View,
-          { style: styles.section },
-          createElement(Text, { style: styles.sectionTitle }, t(lang, "Stratification", "分层")),
-          createElement(
-            View,
-            { style: styles.card },
-            ...stratificationLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
-          )
-        ),
+          { style: styles.card },
+          ...stratificationLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+        )
+      ),
       judgmentLines.length > 0 &&
+      createElement(
+        View,
+        { style: styles.section },
+        createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.engineeringJudgment.title.en, narrative.engineeringJudgment.title.zh)),
         createElement(
           View,
-          { style: styles.section },
-          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.engineeringJudgment.title.en, narrative.engineeringJudgment.title.zh)),
-          createElement(
-            View,
-            { style: styles.card },
-            ...judgmentLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
-          )
-        ),
+          { style: styles.card },
+          ...judgmentLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+        )
+      ),
       actionLines.length > 0 &&
+      createElement(
+        View,
+        { style: styles.section },
+        createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.recommendedActions.title.en, narrative.recommendedActions.title.zh)),
         createElement(
           View,
-          { style: styles.section },
-          createElement(Text, { style: styles.sectionTitle }, t(lang, narrative.recommendedActions.title.en, narrative.recommendedActions.title.zh)),
-          createElement(
-            View,
-            { style: styles.card },
-            ...actionLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
-          )
-        ),
+          { style: styles.card },
+          ...actionLines.map((line, idx) => createElement(Text, { key: `${idx}-${line}` }, line))
+        )
+      ),
       first &&
+      createElement(
+        View,
+        { style: styles.section },
         createElement(
-          View,
-          { style: styles.section },
-          createElement(
-            Text,
-            { style: styles.sectionTitle },
-            `${t(lang, "I Chart (first characteristic)", "I 图（首个特性）")}: ${first.name}`
-          ),
-          createElement(SimpleLineChart, {
-            title: `${t(lang, "Individuals", "单值")}`,
-            points: chartPoints,
-          })
+          Text,
+          { style: styles.sectionTitle },
+          `${t(lang, "I Chart (first characteristic)", "I 图（首个特性）")}: ${first.name}`
         ),
+        createElement(SimpleLineChart, {
+          title: `${t(lang, "Individuals", "单值")}`,
+          points: chartPoints,
+        })
+      ),
       createElement(
         Text,
         {
           style: styles.footer,
           render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) => `${pageNumber} / ${totalPages}`,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           fixed: true,
         } as any,
         ""

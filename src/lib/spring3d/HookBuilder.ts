@@ -23,33 +23,33 @@ import type { ExtensionHookType } from "@/lib/springTypes";
  */
 export interface HookSpec {
   type: ExtensionHookType;
-  
+
   // 环参数
   loopCount: 1 | 2;                    // 1 = 单环, 2 = 双环
   loopAngleDeg: number;                // 环弧度数 (例如 270)
   loopStartAngle: number;              // 环起始角 (rad)
-  
+
   // 环平面类型
   loopPlaneType: "axis-plane" | "orthogonal-plane";
   // axis-plane: 环平面包含轴线 (Machine Hook, Crossover Hook)
   // orthogonal-plane: 环平面垂直于轴线 (Side Hook, Extended Hook)
-  
+
   // 环中心位置
   centerMode: "on-axis" | "radial-offset" | "crossover";
   // on-axis: 环中心在轴线上 (Machine Hook)
   // radial-offset: 环中心在弹簧外侧 (Side Hook)
   // crossover: 线材跨过中心后形成环 (Crossover Hook)
-  
+
   // 间隙参数 (以 wireDiameter 为单位)
   axialGapFactor: number;              // 轴向间隙 = factor * wireDiameter
   radialOffsetFactor: number;          // 径向偏移 = factor * wireDiameter
-  
+
   // Hook 半径因子 (以 meanRadius 为单位)
   hookRadiusFactor: number;            // hookRadius = factor * meanRadius
-  
+
   // 过渡段参数
   handleLengthFactor: number;          // 控制点距离 = factor * wireDiameter
-  
+
   // 延长段 (仅 Extended Hook)
   hasExtendedLeg: boolean;
   extendedLegLengthFactor: number;     // 延长段长度 = factor * meanDiameter
@@ -79,7 +79,7 @@ export function getHookSpec(hookType: ExtensionHookType): HookSpec {
         hasExtendedLeg: false,
         extendedLegLengthFactor: 0,
       };
-      
+
     case "side":
       // Side Hook: 环在侧面，环平面包含轴线（拉力方向沿轴线）
       // 参考图片：环从弹簧末端开始，向上弯曲，开口朝上
@@ -98,7 +98,7 @@ export function getHookSpec(hookType: ExtensionHookType): HookSpec {
         hasExtendedLeg: false,
         extendedLegLengthFactor: 0,
       };
-      
+
     case "crossover":
       return {
         type: "crossover",
@@ -114,7 +114,7 @@ export function getHookSpec(hookType: ExtensionHookType): HookSpec {
         hasExtendedLeg: false,
         extendedLegLengthFactor: 0,
       };
-      
+
     case "extended":
       // Extended Hook: 类似 Side Hook，但有延长段
       // 环平面仍然包含轴线（拉力方向沿轴线）
@@ -132,7 +132,7 @@ export function getHookSpec(hookType: ExtensionHookType): HookSpec {
         hasExtendedLeg: true,
         extendedLegLengthFactor: 0.5,   // 延长段 = 0.5 * meanDiameter
       };
-      
+
     case "doubleLoop":
       return {
         type: "doubleLoop",
@@ -148,7 +148,7 @@ export function getHookSpec(hookType: ExtensionHookType): HookSpec {
         hasExtendedLeg: false,
         extendedLegLengthFactor: 0,
       };
-      
+
     default:
       // 默认使用 Machine Hook
       return getHookSpec("machine");
@@ -205,12 +205,12 @@ function buildCrossoverHookCenterline(
   const axisDir = springAxisDir.clone().normalize();       // (0,0,1)
   const axisPoint = new THREE.Vector3(0, 0, endPos.z);
 
-  let radialDir = endPos.clone().sub(axisPoint);
+  const radialDir = endPos.clone().sub(axisPoint);
   if (radialDir.lengthSq() < 1e-10) radialDir.set(1, 0, 0);
   radialDir.normalize();
 
   // ✅ tanDir 统一：用 axis × radial（右手系）
-  let tanDir = new THREE.Vector3().crossVectors(axisDir, radialDir).normalize();
+  const tanDir = new THREE.Vector3().crossVectors(axisDir, radialDir).normalize();
   if (tanDir.lengthSq() < 1e-10) tanDir.set(0, 1, 0);
 
   // ✅ 统一手性：保证 (axis × tan) · radial > 0
@@ -317,13 +317,13 @@ export function buildHookCenterline(
   // 1) 确定端点和方向
   // ---------------------------------------------------------------
   const isEnd = whichEnd === "end";
-  const endPos = isEnd 
+  const endPos = isEnd
     ? bodyHelixPts[bodyHelixPts.length - 1].clone()
     : bodyHelixPts[0].clone();
   const prevPos = isEnd
     ? bodyHelixPts[bodyHelixPts.length - 2].clone()
     : bodyHelixPts[1].clone();
-  
+
   // ---------------------------------------------------------------
   // Crossover Hook: 使用专门的构建函数
   // ---------------------------------------------------------------
@@ -362,7 +362,7 @@ export function buildHookCenterline(
   // End Hook: endPos - prevPos（沿螺旋前进方向）
   // Start Hook: endPos - prevPos（与螺旋前进方向相反，离开弹簧体）
   const helixTangent3D = endPos.clone().sub(prevPos).normalize();
-  
+
   // XY 平面内的切向方向（用于定义钩弧平面）
   const tangentApprox = helixTangent3D.clone();
   tangentApprox.z = 0;
@@ -383,7 +383,7 @@ export function buildHookCenterline(
   // ---------------------------------------------------------------
   let u: THREE.Vector3;
   let v: THREE.Vector3;
-  
+
   if (spec.loopPlaneType === "axis-plane") {
     // Machine Hook / Crossover / Side Hook: 环平面包含轴线
     // u = 轴向（拉力方向）
@@ -401,24 +401,24 @@ export function buildHookCenterline(
   // ---------------------------------------------------------------
   // 真实拉簧钩 = 轴向直线段 + 弯折 + 钩弧
   // 钩弧平面必须垂直于弹簧端面（即包含轴线）
-  
+
   const hookLoopPts: THREE.Vector3[] = [];
-  
+
   if (spec.centerMode === "radial-offset") {
     // ===== Side Hook =====
     // 钩弧平面 = 包含 Z 轴的竖直平面
     // 钩弧平面法向量 = radialDir
     // 钩弧平面基向量 = tangentDir + springAxisDir
-    
+
     const sideHookRadius = hookRadius * 0.7;
-    
+
     // 钩弧平面的两个基向量：
     // arcU = tangentDir（切向，在 XY 平面内）
     // arcV = springAxisDir（轴向，Z 方向）
     // 这样钩弧平面的法向量 = cross(tangentDir, axisDir) = radialDir ✅
     const arcU = tangentDir.clone();
     const arcV = springAxisDir.clone();
-    
+
     // 计算起始角度，使弧的起点切线方向与 helixTangent3D 一致
     // 弧上的点：P(θ) = center + R*cos(θ)*arcU + R*sin(θ)*arcV
     // 切线方向：dP/dθ = -R*sin(θ)*arcU + R*cos(θ)*arcV
@@ -428,19 +428,19 @@ export function buildHookCenterline(
     const sinTheta0 = -helixTangent3D.dot(arcU);
     const cosTheta0 = helixTangent3D.dot(arcV);
     const arcStartAngle = Math.atan2(sinTheta0, cosTheta0);
-    
+
     // 弧的起点位置
     const arcStartPos = new THREE.Vector3()
       .addScaledVector(arcU, sideHookRadius * Math.cos(arcStartAngle))
       .addScaledVector(arcV, sideHookRadius * Math.sin(arcStartAngle));
-    
+
     // 钩弧中心 = endPos - arcStartPos
     // 这样弧的起点正好在 endPos
     const hookArcCenter = endPos.clone().sub(arcStartPos);
-    
+
     const arcTotalAngle = THREE.MathUtils.degToRad(300);
     const arcSegments = 36;
-    
+
     for (let i = 1; i <= arcSegments; i++) {
       const t = i / arcSegments;
       const theta = arcStartAngle + arcTotalAngle * t;
@@ -453,7 +453,7 @@ export function buildHookCenterline(
     // ===== Machine Hook: 原有逻辑 =====
     // 环中心在轴线上
     const loopCenter = new THREE.Vector3(0, 0, endPos.z + (isEnd ? hookGap : -hookGap));
-    
+
     const totalArc = THREE.MathUtils.degToRad(spec.loopAngleDeg);
     const loopSegments = 48;
 
@@ -474,7 +474,7 @@ export function buildHookCenterline(
   // ---------------------------------------------------------------
   // 6) 组合最终中心线
   // ---------------------------------------------------------------
-  
+
   if (spec.centerMode === "radial-offset") {
     // Side Hook: 直接输出三段式结构的点（已在上面生成）
     if (isEnd) {
@@ -487,7 +487,7 @@ export function buildHookCenterline(
   } else {
     // Machine Hook / Crossover: 需要过渡段
     const attachPoint = hookLoopPts[0].clone();
-    
+
     // 计算线圈端点的切线方向
     const helixTangent = isEnd
       ? endPos.clone().sub(prevPos).normalize()
@@ -507,14 +507,14 @@ export function buildHookCenterline(
 
     const transitionPts: THREE.Vector3[] = [];
     const transitionSegments = 24;
-    
+
     for (let i = 1; i <= transitionSegments; i++) {
       const t = i / transitionSegments;
       transitionPts.push(
         cubicBezier(endPos, control1, control2, attachPoint, t)
       );
     }
-    
+
     if (transitionPts.length > 0) {
       transitionPts[transitionPts.length - 1].copy(attachPoint);
     }

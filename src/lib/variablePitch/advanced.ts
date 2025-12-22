@@ -873,7 +873,7 @@ export function calculateVPCreep(params: {
   const warnings: string[] = [];
   const warningsZh: string[] = [];
   
-  let baseCreepRate = 0.1;
+  const baseCreepRate = 0.1;
   const tempFactor = Math.exp((temperature_C - 20) / 50);
   const stressFactor = Math.pow(stressRatio, 2);
   const creepRate = (baseCreepRate / 1000) * tempFactor * stressFactor;

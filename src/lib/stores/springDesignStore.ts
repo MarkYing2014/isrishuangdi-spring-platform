@@ -10,7 +10,7 @@
  * TODO: 逐步将这些类型迁移到 springTypes.ts 统一管理
  */
 
-import { create } from "zustand";
+import { create, type StoreApi } from "zustand";
 import { persist } from "zustand/middleware";
 import type { SpringType, ExtensionHookType } from "@/lib/springTypes";
 import type { SpringMaterialId } from "@/lib/materials/springMaterials";
@@ -27,11 +27,7 @@ import type { CompressionSpringDesign } from "@/lib/springTypes";
 import { calculateLoadAndStress } from "@/lib/springMath";
 import { createJSONStorage } from "zustand/middleware";
 
-let storeApi:
-  | {
-      setState: (...args: any[]) => any;
-    }
-  | undefined;
+let storeApi: StoreApi<SpringDesignState> | undefined;
 
 const memoryStorage = (() => {
   const map = new Map<string, string>();
@@ -137,10 +133,10 @@ export interface SpiralTorsionGeometry {
 }
 
 /** 所有几何参数联合类型 - 这是 Store 的核心类型 */
-export type SpringGeometry = 
-  | CompressionGeometry 
-  | ExtensionGeometry 
-  | TorsionGeometry 
+export type SpringGeometry =
+  | CompressionGeometry
+  | ExtensionGeometry
+  | TorsionGeometry
   | ConicalGeometry
   | SpiralTorsionGeometry;
 
@@ -167,26 +163,26 @@ export interface AnalysisResult {
   // 基本计算结果
   springRate: number;  // 刚度 (N/mm 或 N·mm/deg)
   springRateUnit: "N/mm" | "N·mm/deg";
-  
+
   // 载荷
   workingLoad?: number;  // 工作载荷 (N)
   maxLoad?: number;  // 最大载荷 (N)
   initialTension?: number; // 初拉力 (N) - 拉簧专用
-  
+
   // 应力
   shearStress?: number;  // 剪切应力 (MPa)
   maxStress?: number;  // 最大应力 (MPa)
   wahlFactor?: number;  // Wahl 系数
   springIndex?: number;  // 旋绕比 C
-  
+
   // 安全系数
   staticSafetyFactor?: number;  // 静态安全系数
   fatigueSafetyFactor?: number;  // 疲劳安全系数
-  
+
   // 疲劳分析
   fatigueLife?: number;  // 疲劳寿命 (cycles)
   enduranceLimit?: number;  // 疲劳极限 (MPa)
-  
+
   // 变形
   workingDeflection?: number;  // 工作变形 (mm)
   maxDeflection?: number;  // 最大变形 (mm)
@@ -223,29 +219,29 @@ interface SpringDesignState {
    * @deprecated 使用 geometry 字段，currentDesign 是别名
    */
   springType: SpringType | null;
-  
+
   /**
    * 当前设计几何参数 - 这是真正的数据源
    * CAD 导出、3D 预览、FreeCAD 都应该读取这个字段
    */
   geometry: SpringGeometry | null;
-  
+
   /** 材料信息 */
   material: MaterialInfo | null;
-  
+
   /** 分析结果 */
   analysisResult: AnalysisResult | null;
-  
+
   /** 设计元数据 */
   meta: DesignMeta | null;
 
   eds: SpringEds | null;
 
   resolved: ResolvedCompressionDesign | null;
-  
+
   /** 是否有有效设计 */
   hasValidDesign: boolean;
-  
+
   // ========== 操作方法 ==========
   setSpringType: (type: SpringType) => void;
   setGeometry: (geometry: SpringGeometry) => void;
@@ -257,7 +253,7 @@ interface SpringDesignState {
 
   updateCompressionPpap: (ppap: Partial<CompressionPpap>) => void;
   updateCompressionProcessRoute: (route: CompressionProcessStep[]) => void;
-  
+
   /** 
    * 完整设置（计算器使用）
    * 所有计算器在计算完成后都应该调用这个方法
@@ -270,7 +266,7 @@ interface SpringDesignState {
     meta?: Partial<DesignMeta>;
     eds?: SpringEds | null;
   }) => void;
-  
+
   /** 清除所有数据 */
   clear: () => void;
 }
@@ -309,322 +305,7 @@ export const useSpringDesignStore = create<SpringDesignState>()(
       storeApi = api;
 
       return {
-      // 初始状态
-      springType: null,
-      geometry: null,
-      material: null,
-      analysisResult: null,
-      meta: null,
-      eds: null,
-      resolved: null,
-      hasValidDesign: false,
-      
-      // 设置弹簧类型
-      setSpringType: (type) => set({ 
-        springType: type,
-        hasValidDesign: false,
-      }),
-      
-      // 设置几何参数
-      setGeometry: (geometry) => {
-        if (geometry.type === "compression") {
-          const currentMaterial = get().material;
-          const shearModulus =
-            geometry.shearModulus ?? currentMaterial?.shearModulus ?? 0;
-
-          const eds = toEdsFromLegacyForm({
-            wireDiameter: geometry.wireDiameter,
-            meanDiameter: geometry.meanDiameter,
-            activeCoils: geometry.activeCoils,
-            totalCoils: geometry.totalCoils,
-            shearModulus,
-            freeLength: geometry.freeLength,
-            topGround: geometry.topGround,
-            bottomGround: geometry.bottomGround,
-            materialId: geometry.materialId ?? currentMaterial?.id,
-          });
-
-          const resolved = resolveCompressionNominal(eds);
-          const nextGeometry: CompressionGeometry = {
-            type: "compression",
-            wireDiameter: resolved.design.wireDiameter,
-            meanDiameter: resolved.design.meanDiameter,
-            activeCoils: resolved.design.activeCoils,
-            totalCoils: resolved.design.totalCoils ?? geometry.totalCoils,
-            freeLength: resolved.design.freeLength ?? geometry.freeLength,
-            topGround: resolved.design.topGround,
-            bottomGround: resolved.design.bottomGround,
-            shearModulus: resolved.design.shearModulus,
-            materialId: resolved.design.materialId,
-          };
-
-          const prevAnalysis = get().analysisResult;
-          const dx = prevAnalysis?.workingDeflection ?? 0;
-          const calc = calculateLoadAndStress(resolved.design, dx);
-          const nextAnalysis: AnalysisResult | null = prevAnalysis
-            ? {
-                ...prevAnalysis,
-                springRate: calc.k,
-                workingLoad: calc.load,
-                shearStress: calc.shearStress,
-                springIndex: calc.springIndex,
-                wahlFactor: calc.wahlFactor,
-              }
-            : null;
-
-          set({
-            geometry: nextGeometry,
-            springType: nextGeometry.type,
-            eds,
-            resolved: { type: "compression", design: resolved.design, issues: resolved.issues },
-            analysisResult: nextAnalysis ?? get().analysisResult,
-            hasValidDesign: !!(nextGeometry && get().material && (nextAnalysis ?? get().analysisResult)),
-          });
-          return;
-        }
-
-        set({ 
-          geometry,
-          springType: geometry.type,
-          hasValidDesign: !!(geometry && get().material && get().analysisResult),
-        });
-      },
-      
-      // 设置材料
-      setMaterial: (material) => {
-        const g = get().geometry;
-        const currentEds = get().eds;
-        if (g?.type === "compression" && currentEds && currentEds.type === "compression") {
-          const eds: CompressionSpringEds = {
-            ...currentEds,
-            material: {
-              ...currentEds.material,
-              materialId: material.id,
-              shearModulus: { ...currentEds.material.shearModulus, nominal: material.shearModulus },
-            },
-          };
-
-          const resolved = resolveCompressionNominal(eds);
-
-          const nextGeometry: CompressionGeometry = {
-            ...g,
-            wireDiameter: resolved.design.wireDiameter,
-            meanDiameter: resolved.design.meanDiameter,
-            activeCoils: resolved.design.activeCoils,
-            totalCoils: resolved.design.totalCoils ?? g.totalCoils,
-            freeLength: resolved.design.freeLength ?? g.freeLength,
-            topGround: resolved.design.topGround,
-            bottomGround: resolved.design.bottomGround,
-            shearModulus: resolved.design.shearModulus,
-            materialId: resolved.design.materialId,
-          };
-
-          const prevAnalysis = get().analysisResult;
-          const dx = prevAnalysis?.workingDeflection ?? 0;
-          const calc = calculateLoadAndStress(resolved.design, dx);
-          const nextAnalysis: AnalysisResult | null = prevAnalysis
-            ? {
-                ...prevAnalysis,
-                springRate: calc.k,
-                workingLoad: calc.load,
-                shearStress: calc.shearStress,
-                springIndex: calc.springIndex,
-                wahlFactor: calc.wahlFactor,
-              }
-            : null;
-
-          set({
-            material,
-            geometry: nextGeometry,
-            eds,
-            resolved: { type: "compression", design: resolved.design, issues: resolved.issues },
-            analysisResult: nextAnalysis,
-            hasValidDesign: !!(nextGeometry && material && (nextAnalysis ?? get().analysisResult)),
-          });
-          return;
-        }
-
-        set({ 
-          material,
-          hasValidDesign: !!(get().geometry && material && get().analysisResult),
-        });
-      },
-      
-      // 设置分析结果
-      setAnalysisResult: (analysisResult) => set({ 
-        analysisResult,
-        hasValidDesign: !!(get().geometry && get().material && analysisResult),
-      }),
-      
-      // 设置元数据
-      setMeta: (metaUpdate) => set((state) => ({
-        meta: {
-          ...state.meta,
-          ...metaUpdate,
-          updatedAt: new Date().toISOString(),
-        } as DesignMeta,
-      })),
-
-      setEds: (eds) => {
-        if (eds?.type !== "compression") {
-          set({ eds: eds ?? null });
-          return;
-        }
-
-        const resolved = resolveCompressionNominal(eds);
-
-        const prevGeometry = get().geometry;
-        const fallbackFreeLength =
-          prevGeometry?.type === "compression" ? prevGeometry.freeLength : 50;
-
-        const nextGeometry: CompressionGeometry = {
-          type: "compression",
-          wireDiameter: resolved.design.wireDiameter,
-          meanDiameter: resolved.design.meanDiameter,
-          activeCoils: resolved.design.activeCoils,
-          totalCoils: resolved.design.totalCoils ?? (prevGeometry?.type === "compression" ? prevGeometry.totalCoils : 0),
-          freeLength: resolved.design.freeLength ?? fallbackFreeLength,
-          topGround: resolved.design.topGround,
-          bottomGround: resolved.design.bottomGround,
-          shearModulus: resolved.design.shearModulus,
-          materialId: resolved.design.materialId,
-        };
-
-        const prevAnalysis = get().analysisResult;
-        const dx = prevAnalysis?.workingDeflection ?? 0;
-        const calc = calculateLoadAndStress(resolved.design, dx);
-        const nextAnalysis: AnalysisResult | null = prevAnalysis
-          ? {
-              ...prevAnalysis,
-              springRate: calc.k,
-              workingLoad: calc.load,
-              shearStress: calc.shearStress,
-              springIndex: calc.springIndex,
-              wahlFactor: calc.wahlFactor,
-            }
-          : prevAnalysis;
-
-        set({
-          springType: "compression",
-          eds,
-          resolved: { type: "compression", design: resolved.design, issues: resolved.issues },
-          geometry: nextGeometry,
-          analysisResult: nextAnalysis,
-          hasValidDesign: !!(nextGeometry && get().material && nextAnalysis),
-        });
-      },
-
-      updateCompressionPpap: (ppap) => {
-        const current = get().eds;
-        if (!current || current.type !== "compression") return;
-        set({
-          eds: {
-            ...current,
-            quality: {
-              ...(current.quality ?? {}),
-              ppap: {
-                ...(current.quality?.ppap ?? {}),
-                ...ppap,
-              },
-            },
-          },
-        });
-      },
-
-      updateCompressionProcessRoute: (route) => {
-        const current = get().eds;
-        if (!current || current.type !== "compression") return;
-        set({
-          eds: {
-            ...current,
-            process: {
-              ...(current.process ?? {}),
-              route,
-            },
-          },
-        });
-      },
-      
-      // 完整设置（一次性设置所有数据）
-      setDesign: ({ springType, geometry, material, analysisResult, meta, eds }) => {
-        const now = new Date().toISOString();
-
-        if (springType === "compression" && geometry.type === "compression") {
-          const nextEds: CompressionSpringEds =
-            (eds?.type === "compression" ? eds : null) ??
-            toEdsFromLegacyForm({
-              wireDiameter: geometry.wireDiameter,
-              meanDiameter: geometry.meanDiameter,
-              activeCoils: geometry.activeCoils,
-              totalCoils: geometry.totalCoils,
-              shearModulus: geometry.shearModulus ?? material.shearModulus,
-              freeLength: geometry.freeLength,
-              topGround: geometry.topGround,
-              bottomGround: geometry.bottomGround,
-              materialId: material.id,
-            });
-
-          const resolved = resolveCompressionNominal(nextEds);
-
-          const nextGeometry: CompressionGeometry = {
-            type: "compression",
-            wireDiameter: resolved.design.wireDiameter,
-            meanDiameter: resolved.design.meanDiameter,
-            activeCoils: resolved.design.activeCoils,
-            totalCoils: resolved.design.totalCoils ?? geometry.totalCoils,
-            freeLength: resolved.design.freeLength ?? geometry.freeLength,
-            topGround: resolved.design.topGround,
-            bottomGround: resolved.design.bottomGround,
-            shearModulus: resolved.design.shearModulus,
-            materialId: resolved.design.materialId,
-          };
-
-          const dx = analysisResult.workingDeflection ?? 0;
-          const calc = calculateLoadAndStress(resolved.design, dx);
-          const nextAnalysis: AnalysisResult = {
-            ...analysisResult,
-            springRate: calc.k,
-            workingLoad: calc.load,
-            shearStress: calc.shearStress,
-            springIndex: calc.springIndex,
-            wahlFactor: calc.wahlFactor,
-          };
-
-          set({
-            springType,
-            geometry: nextGeometry,
-            material,
-            analysisResult: nextAnalysis,
-            meta: {
-              createdAt: get().meta?.createdAt ?? now,
-              updatedAt: now,
-              ...meta,
-            },
-            eds: nextEds,
-            resolved: { type: "compression", design: resolved.design, issues: resolved.issues },
-            hasValidDesign: true,
-          });
-          return;
-        }
-
-        set({
-          springType,
-          geometry,
-          material,
-          analysisResult,
-          meta: {
-            createdAt: get().meta?.createdAt ?? now,
-            updatedAt: now,
-            ...meta,
-          },
-          eds: eds ?? get().eds,
-          resolved: get().resolved,
-          hasValidDesign: true,
-        });
-      },
-      
-      // 清除所有数据
-      clear: () => set({
+        // 初始状态
         springType: null,
         geometry: null,
         material: null,
@@ -633,7 +314,322 @@ export const useSpringDesignStore = create<SpringDesignState>()(
         eds: null,
         resolved: null,
         hasValidDesign: false,
-      }),
+
+        // 设置弹簧类型
+        setSpringType: (type) => set({
+          springType: type,
+          hasValidDesign: false,
+        }),
+
+        // 设置几何参数
+        setGeometry: (geometry) => {
+          if (geometry.type === "compression") {
+            const currentMaterial = get().material;
+            const shearModulus =
+              geometry.shearModulus ?? currentMaterial?.shearModulus ?? 0;
+
+            const eds = toEdsFromLegacyForm({
+              wireDiameter: geometry.wireDiameter,
+              meanDiameter: geometry.meanDiameter,
+              activeCoils: geometry.activeCoils,
+              totalCoils: geometry.totalCoils,
+              shearModulus,
+              freeLength: geometry.freeLength,
+              topGround: geometry.topGround,
+              bottomGround: geometry.bottomGround,
+              materialId: geometry.materialId ?? currentMaterial?.id,
+            });
+
+            const resolved = resolveCompressionNominal(eds);
+            const nextGeometry: CompressionGeometry = {
+              type: "compression",
+              wireDiameter: resolved.design.wireDiameter,
+              meanDiameter: resolved.design.meanDiameter,
+              activeCoils: resolved.design.activeCoils,
+              totalCoils: resolved.design.totalCoils ?? geometry.totalCoils,
+              freeLength: resolved.design.freeLength ?? geometry.freeLength,
+              topGround: resolved.design.topGround,
+              bottomGround: resolved.design.bottomGround,
+              shearModulus: resolved.design.shearModulus,
+              materialId: resolved.design.materialId,
+            };
+
+            const prevAnalysis = get().analysisResult;
+            const dx = prevAnalysis?.workingDeflection ?? 0;
+            const calc = calculateLoadAndStress(resolved.design, dx);
+            const nextAnalysis: AnalysisResult | null = prevAnalysis
+              ? {
+                ...prevAnalysis,
+                springRate: calc.k,
+                workingLoad: calc.load,
+                shearStress: calc.shearStress,
+                springIndex: calc.springIndex,
+                wahlFactor: calc.wahlFactor,
+              }
+              : null;
+
+            set({
+              geometry: nextGeometry,
+              springType: nextGeometry.type,
+              eds,
+              resolved: { type: "compression", design: resolved.design, issues: resolved.issues },
+              analysisResult: nextAnalysis ?? get().analysisResult,
+              hasValidDesign: !!(nextGeometry && get().material && (nextAnalysis ?? get().analysisResult)),
+            });
+            return;
+          }
+
+          set({
+            geometry,
+            springType: geometry.type,
+            hasValidDesign: !!(geometry && get().material && get().analysisResult),
+          });
+        },
+
+        // 设置材料
+        setMaterial: (material) => {
+          const g = get().geometry;
+          const currentEds = get().eds;
+          if (g?.type === "compression" && currentEds && currentEds.type === "compression") {
+            const eds: CompressionSpringEds = {
+              ...currentEds,
+              material: {
+                ...currentEds.material,
+                materialId: material.id,
+                shearModulus: { ...currentEds.material.shearModulus, nominal: material.shearModulus },
+              },
+            };
+
+            const resolved = resolveCompressionNominal(eds);
+
+            const nextGeometry: CompressionGeometry = {
+              ...g,
+              wireDiameter: resolved.design.wireDiameter,
+              meanDiameter: resolved.design.meanDiameter,
+              activeCoils: resolved.design.activeCoils,
+              totalCoils: resolved.design.totalCoils ?? g.totalCoils,
+              freeLength: resolved.design.freeLength ?? g.freeLength,
+              topGround: resolved.design.topGround,
+              bottomGround: resolved.design.bottomGround,
+              shearModulus: resolved.design.shearModulus,
+              materialId: resolved.design.materialId,
+            };
+
+            const prevAnalysis = get().analysisResult;
+            const dx = prevAnalysis?.workingDeflection ?? 0;
+            const calc = calculateLoadAndStress(resolved.design, dx);
+            const nextAnalysis: AnalysisResult | null = prevAnalysis
+              ? {
+                ...prevAnalysis,
+                springRate: calc.k,
+                workingLoad: calc.load,
+                shearStress: calc.shearStress,
+                springIndex: calc.springIndex,
+                wahlFactor: calc.wahlFactor,
+              }
+              : null;
+
+            set({
+              material,
+              geometry: nextGeometry,
+              eds,
+              resolved: { type: "compression", design: resolved.design, issues: resolved.issues },
+              analysisResult: nextAnalysis,
+              hasValidDesign: !!(nextGeometry && material && (nextAnalysis ?? get().analysisResult)),
+            });
+            return;
+          }
+
+          set({
+            material,
+            hasValidDesign: !!(get().geometry && material && get().analysisResult),
+          });
+        },
+
+        // 设置分析结果
+        setAnalysisResult: (analysisResult) => set({
+          analysisResult,
+          hasValidDesign: !!(get().geometry && get().material && analysisResult),
+        }),
+
+        // 设置元数据
+        setMeta: (metaUpdate) => set((state) => ({
+          meta: {
+            ...state.meta,
+            ...metaUpdate,
+            updatedAt: new Date().toISOString(),
+          } as DesignMeta,
+        })),
+
+        setEds: (eds) => {
+          if (eds?.type !== "compression") {
+            set({ eds: eds ?? null });
+            return;
+          }
+
+          const resolved = resolveCompressionNominal(eds);
+
+          const prevGeometry = get().geometry;
+          const fallbackFreeLength =
+            prevGeometry?.type === "compression" ? prevGeometry.freeLength : 50;
+
+          const nextGeometry: CompressionGeometry = {
+            type: "compression",
+            wireDiameter: resolved.design.wireDiameter,
+            meanDiameter: resolved.design.meanDiameter,
+            activeCoils: resolved.design.activeCoils,
+            totalCoils: resolved.design.totalCoils ?? (prevGeometry?.type === "compression" ? prevGeometry.totalCoils : 0),
+            freeLength: resolved.design.freeLength ?? fallbackFreeLength,
+            topGround: resolved.design.topGround,
+            bottomGround: resolved.design.bottomGround,
+            shearModulus: resolved.design.shearModulus,
+            materialId: resolved.design.materialId,
+          };
+
+          const prevAnalysis = get().analysisResult;
+          const dx = prevAnalysis?.workingDeflection ?? 0;
+          const calc = calculateLoadAndStress(resolved.design, dx);
+          const nextAnalysis: AnalysisResult | null = prevAnalysis
+            ? {
+              ...prevAnalysis,
+              springRate: calc.k,
+              workingLoad: calc.load,
+              shearStress: calc.shearStress,
+              springIndex: calc.springIndex,
+              wahlFactor: calc.wahlFactor,
+            }
+            : prevAnalysis;
+
+          set({
+            springType: "compression",
+            eds,
+            resolved: { type: "compression", design: resolved.design, issues: resolved.issues },
+            geometry: nextGeometry,
+            analysisResult: nextAnalysis,
+            hasValidDesign: !!(nextGeometry && get().material && nextAnalysis),
+          });
+        },
+
+        updateCompressionPpap: (ppap) => {
+          const current = get().eds;
+          if (!current || current.type !== "compression") return;
+          set({
+            eds: {
+              ...current,
+              quality: {
+                ...(current.quality ?? {}),
+                ppap: {
+                  ...(current.quality?.ppap ?? {}),
+                  ...ppap,
+                },
+              },
+            },
+          });
+        },
+
+        updateCompressionProcessRoute: (route) => {
+          const current = get().eds;
+          if (!current || current.type !== "compression") return;
+          set({
+            eds: {
+              ...current,
+              process: {
+                ...(current.process ?? {}),
+                route,
+              },
+            },
+          });
+        },
+
+        // 完整设置（一次性设置所有数据）
+        setDesign: ({ springType, geometry, material, analysisResult, meta, eds }) => {
+          const now = new Date().toISOString();
+
+          if (springType === "compression" && geometry.type === "compression") {
+            const nextEds: CompressionSpringEds =
+              (eds?.type === "compression" ? eds : null) ??
+              toEdsFromLegacyForm({
+                wireDiameter: geometry.wireDiameter,
+                meanDiameter: geometry.meanDiameter,
+                activeCoils: geometry.activeCoils,
+                totalCoils: geometry.totalCoils,
+                shearModulus: geometry.shearModulus ?? material.shearModulus,
+                freeLength: geometry.freeLength,
+                topGround: geometry.topGround,
+                bottomGround: geometry.bottomGround,
+                materialId: material.id,
+              });
+
+            const resolved = resolveCompressionNominal(nextEds);
+
+            const nextGeometry: CompressionGeometry = {
+              type: "compression",
+              wireDiameter: resolved.design.wireDiameter,
+              meanDiameter: resolved.design.meanDiameter,
+              activeCoils: resolved.design.activeCoils,
+              totalCoils: resolved.design.totalCoils ?? geometry.totalCoils,
+              freeLength: resolved.design.freeLength ?? geometry.freeLength,
+              topGround: resolved.design.topGround,
+              bottomGround: resolved.design.bottomGround,
+              shearModulus: resolved.design.shearModulus,
+              materialId: resolved.design.materialId,
+            };
+
+            const dx = analysisResult.workingDeflection ?? 0;
+            const calc = calculateLoadAndStress(resolved.design, dx);
+            const nextAnalysis: AnalysisResult = {
+              ...analysisResult,
+              springRate: calc.k,
+              workingLoad: calc.load,
+              shearStress: calc.shearStress,
+              springIndex: calc.springIndex,
+              wahlFactor: calc.wahlFactor,
+            };
+
+            set({
+              springType,
+              geometry: nextGeometry,
+              material,
+              analysisResult: nextAnalysis,
+              meta: {
+                createdAt: get().meta?.createdAt ?? now,
+                updatedAt: now,
+                ...meta,
+              },
+              eds: nextEds,
+              resolved: { type: "compression", design: resolved.design, issues: resolved.issues },
+              hasValidDesign: true,
+            });
+            return;
+          }
+
+          set({
+            springType,
+            geometry,
+            material,
+            analysisResult,
+            meta: {
+              createdAt: get().meta?.createdAt ?? now,
+              updatedAt: now,
+              ...meta,
+            },
+            eds: eds ?? get().eds,
+            resolved: get().resolved,
+            hasValidDesign: true,
+          });
+        },
+
+        // 清除所有数据
+        clear: () => set({
+          springType: null,
+          geometry: null,
+          material: null,
+          analysisResult: null,
+          meta: null,
+          eds: null,
+          resolved: null,
+          hasValidDesign: false,
+        }),
       };
     },
     {
@@ -705,16 +701,16 @@ export function generateDesignCode(geometry: SpringGeometry): string {
     spiralTorsion: "STS",
   };
   const prefix = prefixMap[geometry.type];
-  
+
   const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
-  
+
   // 螺旋扭转弹簧使用带材尺寸，其他使用线径
   if (geometry.type === "spiralTorsion") {
     const b = geometry.stripWidth.toFixed(1);
     const t = geometry.stripThickness.toFixed(2);
     return `${prefix}-${b}x${t}-${timestamp}`;
   }
-  
+
   const d = geometry.wireDiameter.toFixed(1);
   let dim = "";
   if (geometry.type === "compression" || geometry.type === "torsion") {
@@ -724,7 +720,7 @@ export function generateDesignCode(geometry: SpringGeometry): string {
   } else if (geometry.type === "conical") {
     dim = geometry.largeOuterDiameter.toFixed(0);
   }
-  
+
   return `${prefix}-${d}x${dim}-${timestamp}`;
 }
 

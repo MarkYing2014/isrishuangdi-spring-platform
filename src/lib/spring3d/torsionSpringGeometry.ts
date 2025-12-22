@@ -55,14 +55,14 @@ function calculateHelixTotalAngle(
   windingDirection: "left" | "right"
 ): number {
   const dirMult = windingDirection === "right" ? 1 : -1;
-  
+
   // Current angle between legs (degrees)
   const currentLegAngleDeg = freeAngle - workingAngle;
   const currentLegAngleRad = degToRad(currentLegAngleDeg);
-  
+
   // Base helix angle for full coils
   const baseAngle = TWO_PI * activeCoils;
-  
+
   // For a helix with θ_total:
   // - Leg1 at θ=0, tangent = (0, 1), leg direction = (0, -1), angle = -π/2
   // - Leg2 at θ=θ_total, tangent = (-sin(θ), cos(θ)), leg direction same
@@ -74,22 +74,22 @@ function calculateHelixTotalAngle(
   //
   // We want: π - θ_total ≡ currentLegAngleRad (mod 2π)
   // So: θ_total ≡ π - currentLegAngleRad (mod 2π)
-  
+
   // Calculate the target ending angle (mod 2π)
   const targetEndAngle = normalizeAngle(Math.PI - currentLegAngleRad);
-  
+
   // Current ending angle from base coils (mod 2π)
   const baseEndAngle = normalizeAngle(baseAngle);
-  
+
   // Extra rotation needed
   let extraAngle = targetEndAngle - baseEndAngle;
-  
+
   // Normalize to get the smallest adjustment
   extraAngle = normalizeAngle(extraAngle);
-  
+
   // Total helix angle
   const totalAngle = baseAngle + extraAngle;
-  
+
   return totalAngle * dirMult;
 }
 
@@ -155,7 +155,6 @@ export function generateTorsionBodyCenterline(
   params: TorsionSpringParams
 ): { points: THREE.Vector3[]; startPoint: THREE.Vector3; endPoint: THREE.Vector3; startAngle: number; endAngle: number } {
   const {
-    wireDiameter,
     meanDiameter,
     activeCoils,
     freeAngle,
@@ -167,14 +166,14 @@ export function generateTorsionBodyCenterline(
 
   // Scaled dimensions
   const R = (meanDiameter / 2) * scale;
-  
+
   // Use pitch to calculate body length
   const scaledPitch = pitch * scale;
-  
+
   // Calculate the total helix angle to achieve desired leg angle
   // This is the key: we adjust the helix ending angle to control leg2 direction
   const totalAngle = calculateHelixTotalAngle(activeCoils, freeAngle, workingAngle, windingDirection);
-  
+
   // Body length is based on the actual rotation (may be slightly more/less than activeCoils)
   const actualCoils = Math.abs(totalAngle) / TWO_PI;
   const L = scaledPitch * actualCoils;
@@ -201,9 +200,9 @@ export function generateTorsionBodyCenterline(
   const startPoint = points[0].clone();
   const endPoint = points[points.length - 1].clone();
 
-  return { 
-    points, 
-    startPoint, 
+  return {
+    points,
+    startPoint,
     endPoint,
     startAngle: 0,
     endAngle: totalAngle, // Already includes direction from calculateHelixTotalAngle
@@ -238,34 +237,32 @@ export function generateLegGeometry(
   bodyEndPoint: THREE.Vector3,
   bodyEndAngle: number
 ): LegGeometry {
-  const { 
-    meanDiameter, 
-    legLength1, 
-    legLength2, 
-    activeCoils,
+  const {
+    meanDiameter,
+    legLength1,
+    legLength2,
     freeAngle,
     workingAngle,
     windingDirection,
     scale,
   } = params;
 
-  const R = (meanDiameter / 2) * scale;
+
   const legLength = (isLeg1 ? legLength1 : legLength2) * scale;
-  
+
   const points: THREE.Vector3[] = [];
-  
+
   // Direction multiplier for winding
   const dirMult = windingDirection === "right" ? 1 : -1;
-  
-  // Current angle between legs (decreases as spring is wound)
-  const currentAngleBetweenLegs = freeAngle - workingAngle;
-  const currentAngleRad = currentAngleBetweenLegs * (Math.PI / 180);
-  
+
+
+
+
   // The position on the helix at this point
   const posX = bodyEndPoint.x;
   const posY = bodyEndPoint.y;
   const posZ = bodyEndPoint.z;
-  
+
   // Calculate leg direction based on helix tangent at the connection point
   // For helix: x = R*cos(θ), y = R*sin(θ)
   // Tangent direction: dx/dθ = -R*sin(θ), dy/dθ = R*cos(θ)
@@ -277,16 +274,16 @@ export function generateLegGeometry(
   //
   // The angle between legs is controlled by the helix total angle,
   // NOT by rotating the legs. This ensures both legs are always tangent.
-  
+
   let legDirX: number;
   let legDirY: number;
-  
+
   if (isLeg1) {
     // Leg1 at start of coil (θ = 0)
     // Tangent at θ=0: (-sin(0), cos(0)) = (0, 1)
     const tangentX = 0;
     const tangentY = 1;
-    
+
     // Leg1 extends OPPOSITE to helix travel (backward from start)
     // For right-hand: opposite of (0, 1) is (0, -1)
     legDirX = -tangentX * dirMult;
@@ -296,25 +293,25 @@ export function generateLegGeometry(
     // This angle was calculated by calculateHelixTotalAngle to achieve
     // the desired angle between legs
     const helixEndAngle = bodyEndAngle;
-    
+
     // Tangent at helix end: (-sin(θ), cos(θ))
     const tangentX = -Math.sin(helixEndAngle);
     const tangentY = Math.cos(helixEndAngle);
-    
+
     // Leg2 extends in SAME direction as helix travel (forward from end)
     // For right-hand winding, tangent direction is the travel direction
     const sign = windingDirection === "right" ? 1 : -1;
     legDirX = tangentX * sign;
     legDirY = tangentY * sign;
   }
-  
+
   // Generate straight leg points along leg direction
   // Start from the body connection point and extend outward
   const numSegments = 30;
-  
+
   // First point: exactly at body connection
   points.push(new THREE.Vector3(posX, posY, posZ));
-  
+
   // Remaining points: extend along leg direction
   for (let i = 1; i <= numSegments; i++) {
     const t = i / numSegments;
@@ -323,11 +320,11 @@ export function generateLegGeometry(
     const z = posZ; // Legs stay in the same Z plane as their connection point
     points.push(new THREE.Vector3(x, y, z));
   }
-  
-  const endPosition = points.length > 0 
-    ? points[points.length - 1].clone() 
+
+  const endPosition = points.length > 0
+    ? points[points.length - 1].clone()
     : bodyEndPoint.clone();
-  
+
   return { points, endPosition };
 }
 
@@ -353,16 +350,16 @@ export function buildTorsionSpringGeometry(
   params: TorsionSpringParams
 ): TorsionSpringGeometry {
   const { wireDiameter, freeAngle, workingAngle, scale } = params;
-  
+
   // Generate body centerline - this calculates the adjusted helix angle
   const { points, startPoint, endPoint, startAngle, endAngle } = generateTorsionBodyCenterline(params);
-  
+
   // Create body curve
   const bodyCurve = new THREE.CatmullRomCurve3(points);
-  
+
   // Wire radius for tube
   const wireRadius = (wireDiameter / 2) * scale;
-  
+
   // Create body tube geometry
   const bodyGeometry = new THREE.TubeGeometry(
     bodyCurve,
@@ -371,15 +368,15 @@ export function buildTorsionSpringGeometry(
     16,
     false
   );
-  
+
   // Generate legs using the actual helix angles
   // Leg1 at start (angle = 0), Leg2 at end (angle = endAngle from helix calculation)
   const leg1 = generateLegGeometry(params, true, startPoint, startAngle);
   const leg2 = generateLegGeometry(params, false, endPoint, endAngle);
-  
+
   let leg1Geometry: THREE.TubeGeometry | null = null;
   let leg2Geometry: THREE.TubeGeometry | null = null;
-  
+
   if (leg1.points.length > 2) {
     const leg1Curve = new THREE.CatmullRomCurve3(leg1.points);
     leg1Geometry = new THREE.TubeGeometry(
@@ -390,7 +387,7 @@ export function buildTorsionSpringGeometry(
       false
     );
   }
-  
+
   if (leg2.points.length > 2) {
     const leg2Curve = new THREE.CatmullRomCurve3(leg2.points);
     leg2Geometry = new THREE.TubeGeometry(
@@ -401,11 +398,11 @@ export function buildTorsionSpringGeometry(
       false
     );
   }
-  
+
   // Calculate state
   const currentAngle = freeAngle - workingAngle;
   const isAtRest = workingAngle <= 0;
-  
+
   // Find min/max Z for total height
   let minZ = Infinity;
   let maxZ = -Infinity;
@@ -413,7 +410,7 @@ export function buildTorsionSpringGeometry(
     minZ = Math.min(minZ, p.z);
     maxZ = Math.max(maxZ, p.z);
   }
-  
+
   return {
     bodyGeometry,
     leg1Geometry,
