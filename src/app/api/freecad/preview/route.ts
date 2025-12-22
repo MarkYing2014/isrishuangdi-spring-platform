@@ -175,7 +175,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         });
 
         if (!workerRes.ok) {
-          throw new Error(`Worker returned ${workerRes.status}`);
+          const errorText = await workerRes.text();
+          console.error(`[FreeCAD Preview] Worker failed: ${workerRes.status} ${errorText}`);
+          return NextResponse.json({
+            status: "error",
+            message: `Cloud worker failed (${workerRes.status}): ${errorText.slice(0, 100)}`
+          }, { status: 500 });
         }
 
         const workerData = await workerRes.json();
@@ -186,7 +191,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const stlFile = workerData.files?.find((f: { format: string }) => f.format === "STL");
 
         if (!stlFile || !stlFile.downloadUrl) {
-          throw new Error("Worker did not return STL file");
+          return NextResponse.json({
+            status: "error",
+            message: "Worker did not return STL file"
+          }, { status: 500 });
         }
 
         // downloadUrl is "data:application/sla;base64,..."
@@ -201,8 +209,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         });
 
       } catch (e) {
-        console.error(`[FreeCAD Preview] Worker delegation failed: ${e}, falling back to local.`);
-        // Fallback to local execution if worker fails
+        console.error(`[FreeCAD Preview] Worker error: ${e}`);
+        // If the worker is configured but unreachable, we should probably fail rather than fallback, 
+        // to avoid misleading "Not Installed" message.
+        return NextResponse.json({
+          status: "error", // Use error status, not unavailable
+          message: `Worker connection refused: ${e instanceof Error ? e.message : String(e)}`
+        }, { status: 502 });
       }
     }
 

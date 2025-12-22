@@ -12,7 +12,29 @@ from pydantic import BaseModel
 app = FastAPI()
 
 # Configuration
-FREECAD_CMD = "freecadcmd"
+# Configuration
+def find_freecad_binary():
+    candidates = ["freecadcmd", "FreeCADCmd", "freecad", "FreeCAD"]
+    for c in candidates:
+        path = shutil.which(c)
+        if path:
+            print(f"Found FreeCAD binary: {path}")
+            return path
+    
+    # Fallback to hardcoded paths if shutil.which fails
+    common_paths = [
+        "/usr/bin/freecadcmd",
+        "/usr/bin/freecad",
+        "/usr/local/bin/freecadcmd"
+    ]
+    for p in common_paths:
+        if os.path.exists(p):
+            print(f"Found FreeCAD binary at: {p}")
+            return p
+            
+    return "freecadcmd" # Default fallback
+
+FREECAD_CMD = find_freecad_binary()
 SCRIPT_PATH = "/app/freecad/run_export.py"
 TEMP_DIR = "/tmp/freecad_worker"
 

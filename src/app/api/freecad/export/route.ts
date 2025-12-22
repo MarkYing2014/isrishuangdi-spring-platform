@@ -168,14 +168,19 @@ export async function POST(request: NextRequest): Promise<NextResponse<ExportRes
         });
 
         if (!workerRes.ok) {
-          throw new Error(`Worker returned ${workerRes.status}`);
+          const errorText = await workerRes.text();
+          throw new Error(`Worker returned ${workerRes.status}: ${errorText}`);
         }
 
         const workerData = await workerRes.json();
         return NextResponse.json(workerData);
       } catch (e) {
-        console.error(`[FreeCAD] Worker delegation failed: ${e}, falling back to local.`);
-        // Fallback to local execution if worker fails (or proceed to below if desired, but typically we want fallback)
+        console.error(`[FreeCAD] Worker delegation failed: ${e}`);
+        // Return 502 Bad Gateway to indicate upstream worker failure
+        return NextResponse.json({
+          status: "error",
+          message: `Cloud CAD worker failed: ${e instanceof Error ? e.message : String(e)}`
+        }, { status: 502 });
       }
     }
 
