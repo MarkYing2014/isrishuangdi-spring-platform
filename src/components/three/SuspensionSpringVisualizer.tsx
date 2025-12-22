@@ -43,6 +43,8 @@ function CameraController({
   return null;
 }
 
+import type { PitchProfile, DiameterProfile } from "@/lib/springTypes";
+
 export interface SuspensionSpringVisualizerProps {
   wireDiameter: number;
   meanDiameter: number;
@@ -54,6 +56,8 @@ export interface SuspensionSpringVisualizerProps {
   solidHeight: number;
   currentLoad: number;
   springRate: number;
+  pitchProfile?: PitchProfile;
+  diameterProfile?: DiameterProfile;
 }
 
 export function SuspensionSpringVisualizer({
@@ -67,6 +71,8 @@ export function SuspensionSpringVisualizer({
   solidHeight,
   currentLoad,
   springRate,
+  pitchProfile,
+  diameterProfile,
 }: SuspensionSpringVisualizerProps) {
   const controlsRef = useRef<any>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
@@ -117,7 +123,6 @@ export function SuspensionSpringVisualizer({
 
         <SuspensionSpringMesh
           wireDiameter={wireDiameter}
-          meanDiameter={meanDiameter}
           activeCoils={activeCoils}
           totalCoils={totalCoils}
           freeLength={freeLength}
@@ -125,6 +130,8 @@ export function SuspensionSpringVisualizer({
           stressRatio={stressRatio}
           solidHeight={solidHeight}
           scale={scale}
+          pitchProfile={pitchProfile}
+          diameterProfile={diameterProfile}
         />
 
         <OrbitControls

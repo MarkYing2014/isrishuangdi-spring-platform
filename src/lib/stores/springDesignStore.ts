@@ -23,7 +23,7 @@ import type {
 } from "@/lib/eds/engineeringDefinition";
 import { resolveCompressionNominal } from "@/lib/eds/compressionResolver";
 import { toEdsFromLegacyForm } from "@/lib/eds/legacyAdapters";
-import type { CompressionSpringDesign } from "@/lib/springTypes";
+import type { CompressionSpringDesign, PitchProfile, DiameterProfile } from "@/lib/springTypes";
 import { calculateLoadAndStress } from "@/lib/springMath";
 import { createJSONStorage } from "zustand/middleware";
 
@@ -132,13 +132,27 @@ export interface SpiralTorsionGeometry {
   spiralMaterialId?: SpiralSpringMaterial["id"];
 }
 
+/** 减震器弹簧几何参数 (高级) */
+export interface SuspensionGeometry {
+  type: "suspensionSpring";
+  wireDiameter: number;
+  activeCoils: number;
+  totalCoils: number;
+  freeLength: number;
+  pitchProfile: PitchProfile; // 变节距配置
+  diameterProfile: DiameterProfile; // 变中径配置 (Barrel/Conical)
+  materialId?: SpringMaterialId;
+  shearModulus?: number;
+}
+
 /** 所有几何参数联合类型 - 这是 Store 的核心类型 */
 export type SpringGeometry =
   | CompressionGeometry
   | ExtensionGeometry
   | TorsionGeometry
   | ConicalGeometry
-  | SpiralTorsionGeometry;
+  | SpiralTorsionGeometry
+  | SuspensionGeometry;
 
 // ============================================================================
 // 材料信息
@@ -699,6 +713,7 @@ export function generateDesignCode(geometry: SpringGeometry): string {
     torsion: "TS",
     conical: "CN",
     spiralTorsion: "STS",
+    suspensionSpring: "SUS",
   };
   const prefix = prefixMap[geometry.type];
 

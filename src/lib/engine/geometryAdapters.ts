@@ -106,5 +106,18 @@ export function convertStoreGeometryToEngine(
       // 螺旋扭转弹簧暂不支持通用几何适配器
       // 返回 null 或抛出错误
       throw new Error("Spiral torsion spring geometry adapter not yet implemented");
+    case "suspensionSpring":
+      // Fallback: use start diameter as mean diameter for basic engine calcs
+      const startDm = geometry.diameterProfile?.DmStart ?? 100;
+      return {
+        type: "compression", // Map to compression for engine
+        wireDiameter: geometry.wireDiameter,
+        meanDiameter: startDm,
+        activeCoils: geometry.activeCoils,
+        totalCoils: geometry.totalCoils,
+        freeLength: geometry.freeLength,
+        materialId,
+        // pitch is complex, engine usually calculates it from L0/Na if undefined
+      };
   }
 }

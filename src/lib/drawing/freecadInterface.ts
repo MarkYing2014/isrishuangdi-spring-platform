@@ -42,7 +42,7 @@ export function generateCompressionSpringScript(params: {
   const { wireDiameter: d, meanDiameter: Dm, activeCoils: Na, totalCoils: Nt, freeLength: L0 } = params;
   const pitch = params.pitch ?? L0 / Na;
   const radius = Dm / 2;
-  
+
   return `
 # FreeCAD Compression Spring Generator
 # 压缩弹簧生成脚本
@@ -102,7 +102,7 @@ export function generateExtensionSpringScript(params: {
   const { wireDiameter: d, outerDiameter: OD, activeCoils: Na, bodyLength: Lb, hookType } = params;
   const Dm = OD - d;
   const radius = Dm / 2;
-  
+
   return `
 # FreeCAD Extension Spring Generator
 # 拉伸弹簧生成脚本
@@ -179,7 +179,7 @@ export function generateTorsionSpringScript(params: {
   const { wireDiameter: d, meanDiameter: Dm, activeCoils: Na, bodyLength: Lb, legLength1: L1, legLength2: L2, windingDirection } = params;
   const radius = Dm / 2;
   const pitch = Lb / Na;
-  
+
   return `
 # FreeCAD Torsion Spring Generator
 # 扭转弹簧生成脚本
@@ -249,7 +249,7 @@ export function generateConicalSpringScript(params: {
   freeLength: number;
 }): string {
   const { wireDiameter: d, largeOuterDiameter: D1, smallOuterDiameter: D2, activeCoils: Na, freeLength: L0 } = params;
-  
+
   return `
 # FreeCAD Conical Spring Generator
 # 锥形弹簧生成脚本
@@ -319,7 +319,7 @@ export function generateSpiralTorsionSpringScript(params: {
   handedness: "cw" | "ccw";
 }): string {
   const { innerDiameter: Di, outerDiameter: Do, turns: N, stripWidth: b, stripThickness: t, handedness } = params;
-  
+
   return `
 # FreeCAD Spiral Torsion Spring Generator
 # 螺旋扭转弹簧生成脚本
@@ -444,9 +444,9 @@ export async function checkFreeCADStatus(): Promise<FreeCADServiceStatus> {
       capabilities: data.capabilities,
     };
   } catch (error) {
-    return { 
-      available: false, 
-      error: error instanceof Error ? error.message : "Connection failed" 
+    return {
+      available: false,
+      error: error instanceof Error ? error.message : "Connection failed"
     };
   }
 }
@@ -463,7 +463,7 @@ export async function requestFreeCADExport(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       return {
@@ -474,7 +474,7 @@ export async function requestFreeCADExport(
         },
       };
     }
-    
+
     return await response.json();
   } catch (error) {
     return {
@@ -511,16 +511,32 @@ export function buildFreeCADRequest(
       generateDrawing: false, // 螺旋扭转弹簧暂不支持 2D 工程图
     };
   }
-  
+
   const design: FreeCADExportRequest["design"] = {
     springType: geometry.type,
     wireDiameter: geometry.wireDiameter,
     activeCoils: geometry.activeCoils,
   };
-  
+
   switch (geometry.type) {
     case "compression":
       design.meanDiameter = geometry.meanDiameter;
+      design.totalCoils = geometry.totalCoils;
+      design.freeLength = geometry.freeLength;
+      break;
+    case "suspensionSpring":
+      // Fallback to compression params for now
+      // Ideally we should pass pitch/diameter profiles, but FreeCAD script needs update
+      design.meanDiameter = (geometry as any).meanDiameter ?? (geometry.activeCoils > 0 ? 100 : 0); // Hack if meanDiameter missing from SuspensionGeometry type
+      // Actually SuspensionGeometry doesn't have meanDiameter field in new definition?
+      // It has diameterProfile.
+      // let's infer mean diameter from OD - d
+      // Store doesn't save OD in geometry, only diameterProfile.
+      // We can use diameterProfile.DmStart or 100 as fallback.
+      if ('diameterProfile' in geometry) {
+        design.meanDiameter = geometry.diameterProfile.DmStart ?? 100;
+        // Or if we want to be safe, calculation results usually have derived meanDiameter
+      }
       design.totalCoils = geometry.totalCoils;
       design.freeLength = geometry.freeLength;
       break;
@@ -540,7 +556,7 @@ export function buildFreeCADRequest(
       design.freeLength = geometry.freeLength;
       break;
   }
-  
+
   return {
     design,
     outputFormats,
@@ -560,6 +576,18 @@ export function generateFreeCADScript(geometry: SpringGeometry): string {
         activeCoils: geometry.activeCoils,
         totalCoils: geometry.totalCoils ?? geometry.activeCoils + 2,
         freeLength: geometry.freeLength ?? 50,
+      });
+    case "suspensionSpring":
+      // Temporary fallback to standard compression spring script
+      // TODO: Implement advanced parametric script
+      const susGeo = geometry as any;
+      const susDm = susGeo.diameterProfile?.DmStart ?? 100;
+      return generateCompressionSpringScript({
+        wireDiameter: geometry.wireDiameter,
+        meanDiameter: susDm,
+        activeCoils: geometry.activeCoils,
+        totalCoils: geometry.totalCoils ?? geometry.activeCoils + 2,
+        freeLength: geometry.freeLength ?? 100,
       });
     case "extension":
       return generateExtensionSpringScript({

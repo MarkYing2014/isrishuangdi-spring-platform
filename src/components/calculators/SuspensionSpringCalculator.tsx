@@ -26,6 +26,7 @@ import {
   type SuspensionSpringInput,
   type EndType,
 } from "@/lib/suspensionSpring";
+import type { PitchMode, DiameterMode } from "@/lib/springTypes";
 
 type LoadcaseMode = "preload" | "ride" | "bump";
 
@@ -53,6 +54,32 @@ export function SuspensionSpringCalculator() {
 
   const [dynamicsOpen, setDynamicsOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [progressiveOpen, setProgressiveOpen] = useState(false);
+  const [variableDiameterOpen, setVariableDiameterOpen] = useState(false);
+
+  // Advanced Geometry State
+  const [pitchMode, setPitchMode] = useState<PitchMode>("uniform");
+  const [pitchCenter, setPitchCenter] = useState<number>(0); // 0 means auto
+  const [pitchEnd, setPitchEnd] = useState<number>(0); 
+  const [endClosedTurns, setEndClosedTurns] = useState<number>(1);
+  const [transitionTurns, setTransitionTurns] = useState<number>(0.75);
+
+  const [diameterMode, setDiameterMode] = useState<DiameterMode>("constant");
+  const [dmStart, setDmStart] = useState<number>(0);
+  const [dmMid, setDmMid] = useState<number>(0);
+  const [dmEnd, setDmEnd] = useState<number>(0);
+
+  // Init/Update defaults
+  React.useEffect(() => {
+    // Only set if 0 (uninitialized)
+    const currentMean = od - wireDiameter;
+    if (dmStart === 0) setDmStart(currentMean);
+    if (dmMid === 0) setDmMid(currentMean * 1.1); // slightly barrel by default
+    if (dmEnd === 0) setDmEnd(currentMean);
+    
+    // Auto pitch estimation
+    // if pitchCenter is 0
+  }, [od, wireDiameter]);
 
   const [currentDeflection, setCurrentDeflection] = useState(0);
   const [loadcaseMode, setLoadcaseMode] = useState<LoadcaseMode>("ride");
@@ -440,6 +467,140 @@ export function SuspensionSpringCalculator() {
             </CardContent>
           )}
         </Card>
+
+        {/* Progressive Geometry Section */}
+        <Card>
+          <CardHeader 
+            className="pb-3 cursor-pointer hover:bg-muted/50"
+            onClick={() => setProgressiveOpen(!progressiveOpen)}
+          >
+            <CardTitle className="text-lg flex items-center justify-between">
+              渐进节距 / Progressive Pitch
+              <ChevronDown className={`h-4 w-4 transition-transform ${progressiveOpen ? "rotate-180" : ""}`} />
+            </CardTitle>
+          </CardHeader>
+          {progressiveOpen && (
+            <CardContent className="space-y-3">
+              <div>
+                <Label>模式 / Mode</Label>
+                <Select value={pitchMode} onValueChange={(v) => setPitchMode(v as PitchMode)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="uniform">均匀 (Uniform)</SelectItem>
+                    <SelectItem value="twoStage">两段式 (Two-Stage)</SelectItem>
+                    <SelectItem value="threeStage">三段式 (Three-Stage)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {pitchMode !== "uniform" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>端部并紧圈数</Label>
+                    <Input 
+                      type="number" 
+                      value={endClosedTurns} 
+                      onChange={e => setEndClosedTurns(Number(e.target.value))}
+                      step={0.25}
+                    />
+                  </div>
+                  <div>
+                    <Label>过渡圈数</Label>
+                    <Input 
+                      type="number" 
+                      value={transitionTurns} 
+                      onChange={e => setTransitionTurns(Number(e.target.value))}
+                      step={0.25}
+                    />
+                  </div>
+                  <div>
+                    <Label>中间节距 (mm)</Label>
+                    <Input 
+                      type="number" 
+                      value={pitchCenter || ""} 
+                      placeholder="Auto"
+                      onChange={e => setPitchCenter(Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <Label>端部节距 (mm)</Label>
+                    <Input 
+                      type="number" 
+                      value={pitchEnd || ""} 
+                      placeholder="Auto"
+                      onChange={e => setPitchEnd(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Variable Diameter Section */}
+        <Card>
+          <CardHeader 
+            className="pb-3 cursor-pointer hover:bg-muted/50"
+            onClick={() => setVariableDiameterOpen(!variableDiameterOpen)}
+          >
+            <CardTitle className="text-lg flex items-center justify-between">
+              变中径 / Variable Diameter
+              <ChevronDown className={`h-4 w-4 transition-transform ${variableDiameterOpen ? "rotate-180" : ""}`} />
+            </CardTitle>
+          </CardHeader>
+          {variableDiameterOpen && (
+            <CardContent className="space-y-3">
+              <div>
+                <Label>模式 / Mode</Label>
+                <Select value={diameterMode} onValueChange={(v) => setDiameterMode(v as DiameterMode)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="constant">恒定 (Constant)</SelectItem>
+                    <SelectItem value="barrel">桶形 (Barrel)</SelectItem>
+                    <SelectItem value="conical">锥形 (Conical)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {diameterMode !== "constant" && (
+                <div className="grid grid-cols-2 gap-3">
+                   <div>
+                    <Label>起始中径 Dm_start</Label>
+                    <Input 
+                      type="number" 
+                      value={dmStart} 
+                      onChange={e => setDmStart(Number(e.target.value))}
+                    />
+                  </div>
+                  
+                  {diameterMode === "barrel" && (
+                    <div>
+                      <Label>中间中径 Dm_mid</Label>
+                      <Input 
+                        type="number" 
+                        value={dmMid} 
+                        onChange={e => setDmMid(Number(e.target.value))}
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <Label>结束中径 Dm_end</Label>
+                    <Input 
+                      type="number" 
+                      value={dmEnd} 
+                      onChange={e => setDmEnd(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          )}
+        </Card>
       </div>
 
       <div className="space-y-4">
@@ -464,6 +625,19 @@ export function SuspensionSpringCalculator() {
                   solidHeight={result.derived.solidHeight_Hs_mm}
                   currentLoad={currentLoad}
                   springRate={result.springRate_N_per_mm}
+                  pitchProfile={{
+                    mode: pitchMode,
+                    pitchCenter: pitchCenter || undefined,
+                    pitchEnd: pitchEnd || undefined,
+                    endClosedTurns,
+                    transitionTurns,
+                  }}
+                  diameterProfile={{
+                    mode: diameterMode,
+                    DmStart: dmStart,
+                    DmMid: dmMid,
+                    DmEnd: dmEnd,
+                  }}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center bg-slate-100">

@@ -4,16 +4,13 @@ import React, { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import {
-  generateCompressionCenterline,
-  createClipPlanes,
-  calculateEndDiscs,
-  type CompressionSpringParams,
-} from "@/lib/spring3d/compressionSpringGeometry";
+  buildSuspensionSpringGeometry,
+} from "@/lib/spring3d/suspensionSpringGeometry";
+import type { PitchProfile, DiameterProfile } from "@/lib/springTypes";
 import { previewTheme } from "@/lib/three/previewTheme";
 
 export interface SuspensionSpringMeshProps {
   wireDiameter: number;
-  meanDiameter: number;
   activeCoils: number;
   totalCoils: number;
   freeLength: number;
@@ -21,6 +18,8 @@ export interface SuspensionSpringMeshProps {
   stressRatio: number;
   solidHeight: number;
   scale?: number;
+  pitchProfile?: PitchProfile;
+  diameterProfile?: DiameterProfile;
 }
 
 function getStressColor(ratio: number): THREE.Color {
@@ -41,7 +40,6 @@ function getStressColor(ratio: number): THREE.Color {
 
 export function SuspensionSpringMesh({
   wireDiameter,
-  meanDiameter,
   activeCoils,
   totalCoils,
   freeLength,
@@ -49,6 +47,8 @@ export function SuspensionSpringMesh({
   stressRatio,
   solidHeight,
   scale = 1,
+  pitchProfile,
+  diameterProfile,
 }: SuspensionSpringMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.MeshStandardMaterial>(null);
@@ -58,28 +58,34 @@ export function SuspensionSpringMesh({
   const isAtSolid = compressedLength <= solidHeight * 1.01;
 
   const geometry = useMemo(() => {
-    const params: CompressionSpringParams = {
-      totalCoils,
-      activeCoils,
-      meanDiameter,
+    // Default profiles if not provided
+    const effectivePitchProfile: PitchProfile = pitchProfile ?? { mode: "uniform" };
+    const effectiveDiameterProfile: DiameterProfile = diameterProfile ?? { mode: "constant", DmStart: 100 }; // Fallback Dm if not provided? Actually Dm is usually passed.
+    // Wait, DmStart should likely default to meanDiameter if passed?
+    // SuspensionSpringMeshProps doesn't have meanDiameter anymore.
+    // We should rely on DiameterProfile being fully populated by the caller (Visualizer).
+    
+    const result = buildSuspensionSpringGeometry({
       wireDiameter,
+      activeCoils,
+      totalCoils,
       freeLength,
-      currentDeflection,
-      scale,
+      pitchProfile: effectivePitchProfile,
+      diameterProfile: effectiveDiameterProfile,
+      targetHeight: compressedLength, 
+    });
+
+    // Scale geometry
+    if (scale !== 1) {
+      result.geometry.scale(scale, scale, scale);
+    }
+    
+    return {
+      tubeGeometry: result.geometry,
+      // Minimal dummy end discs to satisfy return type structure if needed, or we just use tubeGeometry
+      endDiscs: { bottomPosition: 0, topPosition: 0, innerRadius: 0, outerRadius: 0 } 
     };
-
-    const { points, minZ, maxZ } = generateCompressionCenterline(params);
-
-    const curve = new THREE.CatmullRomCurve3(points, false, "catmullrom", 0.5);
-    const wireRadius = (wireDiameter / 2) * scale;
-    const tubeGeometry = new THREE.TubeGeometry(curve, points.length * 2, wireRadius, 16, false);
-
-    const grindDepth = wireRadius * 0.3;
-    const clipPlanes = createClipPlanes(minZ, maxZ, grindDepth);
-    const endDiscs = calculateEndDiscs(minZ, maxZ, grindDepth, meanDiameter, wireDiameter, scale);
-
-    return { tubeGeometry, clipPlanes, endDiscs };
-  }, [wireDiameter, meanDiameter, activeCoils, totalCoils, freeLength, currentDeflection, scale]);
+  }, [wireDiameter, activeCoils, totalCoils, freeLength, currentDeflection, scale, pitchProfile, diameterProfile]);
 
   const springColor = useMemo(() => getStressColor(stressRatio), [stressRatio]);
 
@@ -92,7 +98,7 @@ export function SuspensionSpringMesh({
     }
   });
 
-  const { tubeGeometry, clipPlanes, endDiscs } = geometry;
+  const { tubeGeometry } = geometry;
 
   return (
     <group>
@@ -105,33 +111,12 @@ export function SuspensionSpringMesh({
           metalness={0.3}
           roughness={0.4}
           side={THREE.DoubleSide}
-          clippingPlanes={[clipPlanes.bottom, clipPlanes.top]}
-          clipShadows
         />
       </mesh>
 
-      <mesh position={[0, 0, endDiscs.bottomPosition]}>
-        <ringGeometry args={[endDiscs.innerRadius, endDiscs.outerRadius, 32]} />
-        <meshStandardMaterial
-          color={previewTheme.material.endCap.color}
-          metalness={previewTheme.material.endCap.metalness}
-          roughness={previewTheme.material.endCap.roughness}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-
-      <mesh position={[0, 0, endDiscs.topPosition]}>
-        <ringGeometry args={[endDiscs.innerRadius, endDiscs.outerRadius, 32]} />
-        <meshStandardMaterial
-          color={previewTheme.material.endCap.color}
-          metalness={previewTheme.material.endCap.metalness}
-          roughness={previewTheme.material.endCap.roughness}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-
+      {/* Shadows/Guides */}
       <mesh position={[0, 0, -0.5]} rotation={[0, 0, 0]}>
-        <circleGeometry args={[endDiscs.outerRadius * 1.5, 32]} />
+        <circleGeometry args={[100 * scale, 32]} />
         <meshStandardMaterial
           color={previewTheme.material.groundShadow.color}
           transparent

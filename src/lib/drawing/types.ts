@@ -33,7 +33,7 @@ export type SheetOrientation = "landscape" | "portrait";
 // ============================================================================
 
 /** 视图投影类型 */
-export type ProjectionType = 
+export type ProjectionType =
   | "front"      // 主视图
   | "right"      // 右视图
   | "left"       // 左视图
@@ -84,7 +84,7 @@ export interface ViewSpec {
 // ============================================================================
 
 /** 尺寸标注类型 */
-export type DimensionType = 
+export type DimensionType =
   | "linear"     // 线性尺寸
   | "diameter"   // 直径
   | "radius"     // 半径
@@ -93,15 +93,15 @@ export type DimensionType =
   | "leader";    // 引线标注
 
 /** 尺寸标注方向 */
-export type DimensionOrientation = 
-  | "horizontal" 
-  | "vertical" 
-  | "aligned" 
-  | "radial" 
+export type DimensionOrientation =
+  | "horizontal"
+  | "vertical"
+  | "aligned"
+  | "radial"
   | "angular";
 
 /** 公差类型 */
-export type ToleranceType = 
+export type ToleranceType =
   | "symmetric"   // ±0.1
   | "deviation"   // +0.2/-0.1
   | "limits"      // 24.2/23.9
@@ -393,7 +393,7 @@ export interface ConicalSpringDimensionRules {
 export interface FreeCADExportRequest {
   /** 设计参数 */
   design: {
-    springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion";
+    springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion" | "suspensionSpring";
     wireDiameter?: number;
     meanDiameter?: number;
     outerDiameter?: number;

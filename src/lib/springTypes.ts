@@ -322,3 +322,31 @@ export function isExtensionDesign(design: SpringDesign): design is ExtensionSpri
 export function isTorsionDesign(design: SpringDesign): design is TorsionSpringDesign {
   return design.type === "torsion";
 }
+
+// ============================================================================
+// SUSPENSION SPRING GEOMETRY
+// 减震器弹簧/悬架弹簧高级几何
+// ============================================================================
+
+export type PitchMode = "uniform" | "twoStage" | "threeStage";
+export type DiameterMode = "constant" | "barrel" | "conical";
+
+export interface PitchProfile {
+  mode: PitchMode;
+  pitchCenter?: number;
+  pitchEnd?: number;
+  endClosedTurns?: number;
+  transitionTurns?: number;
+}
+
+export interface DiameterProfile {
+  mode: DiameterMode;
+  DmStart?: number;
+  DmMid?: number;
+  DmEnd?: number;
+}
+
+export interface SuspensionGeometry {
+  pitchProfile: PitchProfile;
+  diameterProfile: DiameterProfile;
+}
