@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 type SeoContentBlock = {
   h1: string;
-  h2s: string[];
+  sections: { title: string; content: string }[];
   faqs: { q: string; a: string }[];
 };
 
@@ -16,11 +16,19 @@ type SeoData = {
   zh: SeoContentBlock;
 };
 
+// Helper: fallback sections for unpopulated types
+const createFallback = (h2s: string[]): { title: string; content: string }[] => {
+  return h2s.map(h2 => ({
+    title: h2,
+    content: `Technical analysis and engineering definitions for ${h2.toLowerCase()}.`
+  }));
+};
+
 const seoContent: Record<string, SeoData> = {
   compression: {
     en: {
       h1: "Compression Spring Calculator & Design Tool",
-      h2s: [
+      sections: createFallback([
         "What Is a Compression Spring?",
         "Compression Spring Rate Calculation (k)",
         "Shear Stress, Wahl Factor & Safety Factor",
@@ -29,7 +37,7 @@ const seoContent: Record<string, SeoData> = {
         "Closed Ends vs Closed & Ground Ends",
         "3D Compression Spring Visualization",
         "Engineering Design Rules for Compression Springs"
-      ],
+      ]),
       faqs: [
         {
           q: "How do you calculate compression spring rate?",
@@ -47,7 +55,7 @@ const seoContent: Record<string, SeoData> = {
     },
     zh: {
       h1: "压缩弹簧计算器与工程设计工具",
-      h2s: [
+      sections: createFallback([
         "什么是压缩弹簧？",
         "压缩弹簧刚度 (k) 的计算公式",
         "剪切应力、Wahl 修正系数与安全系数",
@@ -56,7 +64,7 @@ const seoContent: Record<string, SeoData> = {
         "并紧端 vs 并紧磨平端",
         "3D 压缩弹簧可视化",
         "压缩弹簧工程设计准则"
-      ],
+      ]),
       faqs: [
         {
           q: "如何计算压缩弹簧的刚度？",
@@ -76,15 +84,39 @@ const seoContent: Record<string, SeoData> = {
   extension: {
     en: {
       h1: "Extension Spring Calculator with Hook Types & Initial Tension",
-      h2s: [
-        "What Is an Extension Spring?",
-        "Extension Spring Rate vs Compression Spring Rate",
-        "Initial Tension Explained",
-        "Hook Types: Machine, Cross-Over, Full Loop",
-        "Stress Concentration at Hooks",
-        "Working Deflection & Total Load Calculation",
-        "3D Extension Spring with Proportional Hooks",
-        "Engineering Design Rules for Extension Springs"
+      sections: [
+        {
+          title: "What Is an Extension Spring?",
+          content: "An extension spring is a helical spring designed to store energy and resist a pulling force. Unlike compression springs, which have zero load at zero deflection, extension springs are wound with 'Initial Tension'—an internal force that keeps the coils tightly closed together. This initial tension must be overcome before the spring begins to extend."
+        },
+        {
+          title: "Extension Spring Rate vs Compression Spring Rate",
+          content: "Physically, the spring rate factor (k) formula is identical: k = Gd⁴ / 8D³Nₐ. However, the Force behavior differs significantly. For a compression spring, Force F = kx. For an extension spring, Total Force = Initial Tension (Pᵢ) + kx. This means an extension spring requires a specific threshold force just to start opening."
+        },
+        {
+          title: "Initial Tension Explained",
+          content: "Initial Tension (Pᵢ) is the preload force resulting from the coiling process (twisting the wire against the bending direction). It is strictly limited by the Spring Index (C). Higher indices (C > 12) enable less initial tension. Engineering formula: Pᵢ ≈ (π d³ / 8 D) * Initial Stress. Verification: Measure loads at two lengths (L₁ and L₂) where coils are open, then extrapolate back to zero deflection: Pᵢ = 2L₁ - L₂."
+        },
+        {
+          title: "Hook Types: Machine, Cross-Over, Full Loop",
+          content: "• Machine Hook: Formed by bending ~75% of a coil directly outwards. Strongest standard hook due to larger bend radii.\n• Cross-Over Center (Side Loop): Last coil twisted to the center. Most common, cheap, but higher stress concentration.\n• Full Loop: A complete 360° closed circle. Prevents slip-off, widely used in safety-critical assemblies."
+        },
+        {
+          title: "Stress Concentration at Hooks",
+          content: "Hooks are the Achilles' heel of extension springs. While the body only sees torsional stress, the hook bend sees both Bending Stress and Torsional Stress. Local stress at the hook transition can be 2-3x higher than body stress. We apply separate stress correction factors (K₁ for bending, K₂ for torsion) based on the bend radius ratio (r/d)."
+        },
+        {
+          title: "Working Deflection & Total Load Calculation",
+          content: "Total Load P = Pᵢ + k(L - L₀), where Pᵢ is Initial Tension, k is Rate, L is extended length, L₀ is free length inside hooks. Do not simply use k * deflection. Ensure the max working load stays below the 'Proportional Limit' of the hook bending stress, not just the body torsional stress."
+        },
+        {
+          title: "3D Extension Spring with Proportional Hooks",
+          content: "Our 3D visualizer generates physically accurate hooks relative to the body diameter. It checks for 'Body Length' vs 'Free Length' constraints to ensure hooks fit within the specified L₀ envelope."
+        },
+        {
+          title: "Engineering Design Rules for Extension Springs",
+          content: "1. Always account for Initial Tension (±15% variance manufacturing tolerance).\n2. Hooks often fail before the body; reduce hook stress by increasing bend radius.\n3. Avoid 'Hard Drawing' plated wire if possible; plating inside coils is difficult.\n4. Design for a Spring Index (C) between 5 and 15 for optimal specific tension control."
+        }
       ],
       faqs: [
         {
@@ -103,15 +135,39 @@ const seoContent: Record<string, SeoData> = {
     },
     zh: {
       h1: "拉伸弹簧计算器：钩环类型与初张力分析",
-      h2s: [
-        "什么是拉伸弹簧？",
-        "拉伸弹簧与压缩弹簧的刚度对比",
-        "初张力 (Initial Tension) 详解",
-        "钩环类型：机械钩、侧钩、满环",
-        "钩环处的应力集中",
-        "工作变形量与总载荷计算",
-        "3D 拉伸弹簧与标准钩环",
-        "拉伸弹簧工程设计准则"
+      sections: [
+        {
+          title: "什么是拉伸弹簧？",
+          content: "拉伸弹簧（Extension Spring）是一种旨在承受轴向拉力的螺旋弹簧。与压缩弹簧不同，拉伸弹簧在卷绕时具有“初张力”（Initial Tension），这是一种使线圈在无外力状态下紧密闭合的内部预紧力。施加的拉力必须先克服这一初张力，弹簧才会开始发生弹性变形。"
+        },
+        {
+          title: "拉伸弹簧与压缩弹簧的刚度对比",
+          content: "虽然刚度系数 (k) 的理论公式是相同的：k = Gd⁴ / 8D³Nₐ，但力学行为截然不同。压缩弹簧的力与位移关系为 F = kx；而拉伸弹簧的总拉力公式为 F_total = 初张力 (Pᵢ) + kx。这意味着拉伸弹簧并不是从零力开始变形的，它有一个“启动门槛”。"
+        },
+        {
+          title: "初张力 (Initial Tension) 详解",
+          content: "初张力 (Pᵢ) 是在冷卷过程中，通过反向扭转线材产生的内应力。其大小受限于旋绕比 (Index C)。旋绕比越大 (C > 12)，难以产生较大的初张力。工程验证方法：测量弹簧拉开后的两个不同长度 L₁ 和 L₂ 对应的载荷，利用线性回归外推至零位移点计算 Pᵢ。标准公差通常为 ±10%~15%。"
+        },
+        {
+          title: "钩环类型：机械钩、侧钩、满环",
+          content: "• 机械钩 (Machine Hook)：直接将约 3/4 圈线圈向外折弯而成，过渡半径大，强度最高。\n• 侧钩/过中钩 (Cross-Over Center)：末圈扭转至中心。最常见且成本低，但根部应力集中最严重。\n• 满环 (Full Loop)：完全闭合的 360° 圆环，安全性高，防止挂钩脱落。"
+        },
+        {
+          title: "钩环处的应力集中",
+          content: "钩环是拉伸弹簧的“阿喀琉斯之踵”。弹簧体主要承受剪切应力 (Torsional Stress)，而钩环根部同时承受极高的弯曲应力 (Bending Stress)。局部的应力集中系数可能是簧身的 2-3 倍。工程计算必须对钩环进行单独的应力校核（基于弯曲半径比 r/d 的 K₁ 修正系数）。"
+        },
+        {
+          title: "工作变形量与总载荷计算",
+          content: "计算总载荷 P = Pᵢ + k(L - L₀)。其中 Pᵢ 为初张力，k 为刚度，L 为拉伸后长度，L₀ 为含钩自由长。切勿简单地用 刚度 × 变形量。安全系数校核应基于钩环的断裂强度，而非仅仅是弹簧身的屈服极限。"
+        },
+        {
+          title: "3D 拉伸弹簧与标准钩环",
+          content: "此工具生成的 3D 模型具备精确的工程比例。它会根据线径和中径自动生成符合制造标准的钩环几何（如过中钩的扭转半径），并校验“体长” (Body Length) 是否在自由长范围内。"
+        },
+        {
+          title: "拉伸弹簧工程设计准则",
+          content: "1. 务必在设计中预留初张力的制造公差。\n2. 优先通过增大钩环根部过渡半径 (Bend Radius) 来降低应力，而非仅仅增加线径。\n3. 高频疲劳应用应慎用拉伸弹簧，或采用“活塞式压簧”替代方案，因为钩环几乎总是疲劳失效点。\n4. 推荐旋绕比 (Index) 控制在 5-15 之间以获得最佳的初张力控制能力。"
+        }
       ],
       faqs: [
         {
@@ -119,8 +175,8 @@ const seoContent: Record<string, SeoData> = {
           a: "初张力是在弹簧开始拉伸之前必须克服的预紧力，由卷绕工艺中线圈紧密接触产生。"
         },
         {
-          q: "钩环会影响拉伸弹簧的强度吗？",
-          a: "是的。钩环根部通常是应力最集中的区域，也是疲劳断裂最常见的位置。设计时需特别关注弯曲应力和扭转应力的叠加。"
+          q: "钩环会影响拉伸弹簧的强度吗？（重点）",
+          a: "是影响最大的因素。钩环根部的弯曲应力远高于簧身的剪切应力，90% 的拉伸弹簧失效都发生在钩环根部。必须进行独立的应力验算。"
         },
         {
           q: "如何计算拉伸弹簧的总载荷？",
@@ -132,7 +188,7 @@ const seoContent: Record<string, SeoData> = {
   torsion: {
     en: {
       h1: "Torsion Spring Calculator & Angular Load Analysis",
-      h2s: [
+      sections: createFallback([
         "What Is a Torsion Spring?",
         "Torque vs Angular Deflection",
         "Leg Length, Orientation & Mounting",
@@ -140,7 +196,7 @@ const seoContent: Record<string, SeoData> = {
         "Direction of Winding (CW vs CCW)",
         "3D Torsion Spring Visualization",
         "Engineering Limits & Design Rules"
-      ],
+      ]),
       faqs: [
         {
           q: "How is torque calculated in a torsion spring?",
@@ -154,7 +210,7 @@ const seoContent: Record<string, SeoData> = {
     },
     zh: {
       h1: "扭转弹簧计算器与力矩分析",
-      h2s: [
+      sections: createFallback([
         "什么是扭转弹簧？",
         "扭矩 (Torque) 与角度变形",
         "力臂长度、角度定位与安装",
@@ -162,7 +218,7 @@ const seoContent: Record<string, SeoData> = {
         "旋向：左旋 (CCW) vs 右旋 (CW)",
         "3D 扭转弹簧可视化",
         "工程极限与设计准则"
-      ],
+      ]),
       faqs: [
         {
           q: "如何计算扭转弹簧的扭矩？",
@@ -178,7 +234,7 @@ const seoContent: Record<string, SeoData> = {
   dieSpring: {
     en: {
       h1: "Die Spring Calculator & 3D Model (Rectangular Wire)",
-      h2s: [
+      sections: createFallback([
         "What Is a Die Spring?",
         "Rectangular Wire vs Round Wire Springs",
         "Load Rate & Color Code (ISO / Industry Standard)",
@@ -187,7 +243,7 @@ const seoContent: Record<string, SeoData> = {
         "Stress Analysis for Die Springs",
         "Realistic Die Spring 3D Geometry",
         "Manufacturing Constraints for Die Springs"
-      ],
+      ]),
       faqs: [
         {
           q: "Why do die springs use rectangular wire?",
@@ -205,7 +261,7 @@ const seoContent: Record<string, SeoData> = {
     },
     zh: {
       h1: "模具弹簧计算器与 3D 建模（矩形截面）",
-      h2s: [
+      sections: createFallback([
         "什么是模具弹簧？",
         "矩形丝 vs 圆丝弹簧",
         "载荷等级与色标标准 (ISO/JIS)",
@@ -214,7 +270,7 @@ const seoContent: Record<string, SeoData> = {
         "模具弹簧应力分析",
         "真实的 3D 模具弹簧几何",
         "模具弹簧的制造约束"
-      ],
+      ]),
       faqs: [
         {
           q: "为什么模具弹簧使用矩形截面线材？",
@@ -234,7 +290,7 @@ const seoContent: Record<string, SeoData> = {
   wave: {
     en: {
       h1: "Wave Spring Calculator & Compact Spring Design Tool",
-      h2s: [
+      sections: createFallback([
         "What Is a Wave Spring?",
         "Wave Spring vs Compression Spring",
         "Load-Deflection Behavior",
@@ -242,7 +298,7 @@ const seoContent: Record<string, SeoData> = {
         "Multi-Turn vs Single-Turn Wave Springs",
         "Stress & Fatigue Considerations",
         "3D Wave Spring Visualization"
-      ],
+      ]),
       faqs: [
         {
           q: "Why use a wave spring instead of a compression spring?",
@@ -256,7 +312,7 @@ const seoContent: Record<string, SeoData> = {
     },
     zh: {
       h1: "波形弹簧计算器及紧凑型设计工具",
-      h2s: [
+      sections: createFallback([
         "什么是波形弹簧？",
         "波形弹簧 vs 螺旋压缩弹簧",
         "载荷-变形特性",
@@ -264,7 +320,7 @@ const seoContent: Record<string, SeoData> = {
         "多层对顶 (Multi-Turn) vs 单层 (Single-Turn)",
         "应力与疲劳寿命考量",
         "3D 波形弹簧可视化"
-      ],
+      ]),
       faqs: [
         {
           q: "为什么要用波簧替代普通压簧？",
@@ -280,14 +336,14 @@ const seoContent: Record<string, SeoData> = {
   conical: {
     en: {
       h1: "Conical Spring Calculator & Progressive Rate Design",
-      h2s: [
+      sections: createFallback([
         "What Is a Conical Spring?",
         "Progressive Spring Rate Explained",
         "Buckling Resistance",
         "Telescoping & Solid Height Reduction",
         "Load Curve Analysis",
         "3D Conical Spring Visualization"
-      ],
+      ]),
       faqs: [
         {
           q: "Why do conical springs resist buckling better?",
@@ -297,14 +353,14 @@ const seoContent: Record<string, SeoData> = {
     },
     zh: {
       h1: "锥形弹簧计算器与变刚度设计",
-      h2s: [
+      sections: createFallback([
         "什么是锥形弹簧？",
         "非线性（渐进式）刚度详解",
         "抗屈曲 (Buckling Resistance) 特性",
         "嵌套效应与压并高度降低",
         "载荷-位移曲线分析",
         "3D 锥形弹簧可视化"
-      ],
+      ]),
       faqs: [
         {
           q: "为什么锥形弹簧不易侧弯（屈曲）？",
@@ -316,14 +372,14 @@ const seoContent: Record<string, SeoData> = {
   spiralTorsion: {
     en: {
       h1: "Spiral Torsion Spring Calculator & Energy Storage Analysis",
-      h2s: [
+      sections: createFallback([
         "What Is a Spiral Spring?",
         "Torque Storage & Angular Travel",
         "Strip Material & Thickness Effects",
         "Stress Distribution in Spiral Springs",
         "Clock Spring vs Torsion Spring",
         "3D Spiral Spring Visualization"
-      ],
+      ]),
       faqs: [
         {
           q: "Where are spiral springs commonly used?",
@@ -333,14 +389,14 @@ const seoContent: Record<string, SeoData> = {
     },
     zh: {
       h1: "螺旋扭转弹簧计算器（平面涡卷弹簧）",
-      h2s: [
+      sections: createFallback([
         "什么是螺旋扭转弹簧？",
         "储能与角位移分析",
         "带材厚度与宽度的影响",
         "应力分布特征",
         "发条弹簧 vs 扭转弹簧",
         "3D 螺旋弹簧可视化"
-      ],
+      ]),
       faqs: [
         {
           q: "螺旋弹簧常用于哪些领域？",
@@ -349,16 +405,15 @@ const seoContent: Record<string, SeoData> = {
       ]
     }
   },
-  // Fallback / Placeholder for others
   suspensionSpring: {
     en: {
       h1: "Vehicle Suspension Spring Calculator",
-      h2s: ["Suspension Geometry", "Ride Height & Stiffness"],
+      sections: createFallback(["Suspension Geometry", "Ride Height & Stiffness"]),
       faqs: []
     },
     zh: {
       h1: "汽车悬挂弹簧计算器",
-      h2s: ["悬挂几何", "行驶高度与刚度"],
+      sections: createFallback(["悬挂几何", "行驶高度与刚度"]),
       faqs: []
     }
   }
@@ -386,15 +441,11 @@ export function SpringSeoContent({ type, className }: SpringSeoContentProps) {
         </h1>
         
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-          {content.h2s.map((h2, i) => (
+          {content.sections.map((section, i) => (
             <section key={i} className="prose prose-sm prose-slate">
-              <h2 className="text-lg font-semibold text-slate-800 mb-2">{h2}</h2>
-              <p className="text-slate-500">
-                {/* Fallback description based on language */}
-                {isZh
-                  ? `关于${h2.replace("什么是", "").replace("？", "")}的工程定义与技术分析。`
-                  : `Technical analysis and engineering definitions for ${h2.toLowerCase()}.`
-                }
+              <h2 className="text-lg font-semibold text-slate-800 mb-2">{section.title}</h2>
+              <p className="text-slate-500 whitespace-pre-line leading-relaxed">
+                {section.content}
               </p>
             </section>
           ))}
