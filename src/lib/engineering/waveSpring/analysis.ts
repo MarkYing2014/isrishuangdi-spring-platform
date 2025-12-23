@@ -74,14 +74,22 @@ export function computeWaveSpringEngineeringSummary(
     let verdict = "Design is safe.";
     let verdictZh = "设计结果安全。";
 
-    if (stressIndex > 0.9) {
+    // Strict Engineering Thresholds (Phase 0 Rule)
+    // < 0.6 PASS
+    // 0.6 - 0.8 WARNING
+    // > 0.8 FAIL
+    if (stressIndex > 1.0) {
         designStatus = "FAIL";
-        verdict = `High equivalent crest stress (${(stressIndex * 100).toFixed(0)}%). Risk of permanent set.`;
-        verdictZh = `等效波峰利用率过高 (${(stressIndex * 100).toFixed(0)}%)。存在永久变形风险。`;
+        verdict = `Stress Utilization > 100% (${(stressIndex * 100).toFixed(0)}%). FAIL.`;
+        verdictZh = `应力利用率 > 100% (${(stressIndex * 100).toFixed(0)}%)。失效风险极高。`;
     } else if (stressIndex > 0.8) {
+        designStatus = "FAIL";
+        verdict = `High crest bending stress > 80% (${(stressIndex * 100).toFixed(0)}%). Risk of permanent set.`;
+        verdictZh = `波峰弯曲应力 > 80% (${(stressIndex * 100).toFixed(0)}%)。存在永久变形风险。`;
+    } else if (stressIndex > 0.6) {
         designStatus = "MARGINAL";
-        verdict = `Stress Utilization > 80% (${(stressIndex * 100).toFixed(0)}%). Fatigue life may be limited.`;
-        verdictZh = `应力利用率 > 80% (${(stressIndex * 100).toFixed(0)}%)。疲劳寿命可能受限。`;
+        verdict = `Moderate stress (${(stressIndex * 100).toFixed(0)}%). Acceptable for static, check fatigue.`;
+        verdictZh = `中等应力水平 (${(stressIndex * 100).toFixed(0)}%)。静态工况可接受，需注意疲劳。`;
     }
 
     if (solidClearance < 0.5 && designStatus !== "FAIL") {
@@ -113,46 +121,56 @@ export function computeWaveSpringEngineeringSummary(
 /**
  * Generate load-deflection curve points
  */
+/**
+ * Generate load-deflection curve points
+ * Uses Engineering Quadratic Model: k(x) = k0 * (1 + alpha * x/H0)
+ */
 export function computeWaveSpringCurve(input: WaveSpringInput, points = 20) {
     const g = input.geometry;
     const solidHeight = g.turns_Nt * g.thickness_t;
     const maxTravel = g.freeHeight_Hf - solidHeight;
 
+    // Base Rate k0 (Linear approximation from math lib)
+    // We assume the math lib returns the 'initial' or 'average' rate.
+    // For Phase 0 Demo, we treat it as k0.
+    const res0 = calculateWaveSpring({ ...input, geometry: { ...g, workingHeight_Hw: g.freeHeight_Hf - 0.1 } });
+    const k0 = res0.springRate_Nmm;
+
+    // Non-linearity factor alpha
+    // Heuristic: Higher wave density -> more non-linear?
+    // For demo, alpha = 0.5 ~ 1.2
+    // Let's settle on 0.8 as a "standard" look
+    const alpha = 0.8;
+
     const curve = [];
     for (let i = 0; i <= points; i++) {
-        const travel = (maxTravel / points) * i;
+        const travel = (maxTravel / points) * i; // x
         const height = g.freeHeight_Hf - travel;
 
-        // Use V1 calc for each point
-        const pointInput: WaveSpringInput = {
-            ...input,
-            geometry: {
-                ...input.geometry,
-                workingHeight_Hw: height
-            }
-        };
+        // k(x) = k0 * (1 + alpha * (x / maxTravel))
+        // F(x) = integral k(x) dx = k0 * x * (1 + 0.5 * alpha * (x / maxTravel))
+        const x_ratio = travel / maxTravel;
+        const load = k0 * travel * (1 + 0.5 * alpha * x_ratio);
 
-        // Simplify: for V1, k is constant.
-        // In reality, as it approaches solid height, k increases (progressive)
-        // We can simulate this by adding a small non-linear factor near solid
-        const res = calculateWaveSpring(pointInput);
+        // Analytical Stress Calculation for consistency
+        // Uses the same logic as Summary but applied to this load point
+        const eta = 0.75;
+        const Neff = g.wavesPerTurn_Nw * g.turns_Nt * eta;
+        const Fi = load / Neff;
 
-        let effectiveLoad = res.loadAtWorkingHeight_N;
-        const clearanceRatio = (height - solidHeight) / g.freeHeight_Hf;
-
-        if (clearanceRatio < 0.1 && clearanceRatio > 0) {
-            // Progressive hardening near solid
-            const factor = 1 + Math.pow(1 - (clearanceRatio / 0.1), 2) * 0.5;
-            effectiveLoad *= factor;
-        } else if (clearanceRatio <= 0) {
-            effectiveLoad *= 2; // Arbitrary jump to show solid contact
-        }
+        const Dm = (g.od + g.id) / 2;
+        const kL = 0.30;
+        const Leff = (Math.PI * Dm / g.wavesPerTurn_Nw) * kL;
+        const kM = 1.3;
+        const Mmax = Fi * Leff * kM;
+        const Z = (g.radialWall_b * Math.pow(g.thickness_t, 2)) / 6;
+        const stress = Mmax / Z;
 
         curve.push({
             travel: Number(travel.toFixed(2)),
             height: Number(height.toFixed(2)),
-            load: Number(effectiveLoad.toFixed(2)),
-            stress: Number(res.stressMax_MPa.toFixed(1))
+            load: Number(load.toFixed(2)),
+            stress: Number(stress.toFixed(1))
         });
     }
 

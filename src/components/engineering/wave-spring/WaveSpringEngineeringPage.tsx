@@ -129,11 +129,14 @@ export function WaveSpringEngineeringPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
               {isZh ? "波形弹簧工程分析" : "Wave Spring Engineering Analysis"}
+              <Badge variant="secondary" className="text-sm font-normal">
+                ⚡ Quick Mode
+              </Badge>
             </h1>
             <div className="flex items-center gap-2 text-muted-foreground mt-1">
-              <Badge variant="outline" className="text-[10px] uppercase">V2 Standard</Badge>
+              <Badge variant="outline" className="text-[10px] uppercase">V2 Analytical</Badge>
               <span className="text-sm">Wave: {geometry.wavesPerTurn_Nw} · Layers: {geometry.turns_Nt} · Material: {material?.name || "17-7PH"}</span>
             </div>
           </div>
@@ -178,11 +181,11 @@ export function WaveSpringEngineeringPage() {
 
       <Tabs defaultValue="load" className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto p-1 bg-muted/50">
-          <TabsTrigger value="load">{isZh ? "载荷-变形" : "Load-Deflection"}</TabsTrigger>
+          <TabsTrigger value="load">{isZh ? "载荷-变形 (Non-linear)" : "Load-Deflection (Non-linear)"}</TabsTrigger>
           <TabsTrigger value="stress">{isZh ? "应力分析" : "Stress Analysis"}</TabsTrigger>
           <TabsTrigger value="fatigue">{isZh ? "疲劳评估" : "Fatigue"}</TabsTrigger>
           <TabsTrigger value="packaging">{isZh ? "装配尺寸" : "Packaging"}</TabsTrigger>
-          <TabsTrigger value="fea">{isZh ? "FEA 验证" : "FEA (Beta)"}</TabsTrigger>
+          <TabsTrigger value="fea">{isZh ? "FEA (Beta)" : "FEA (Beta)"}</TabsTrigger>
         </TabsList>
 
         <div className="mt-6">
