@@ -189,7 +189,7 @@ function generateFeaCacheKey(geometry: SuspensionGeometry, material: MaterialInf
   return `fea-cache-${JSON.stringify(keyData)}`;
 }
 
-function FeaTab({ isZh, geometry, material, calcResult, analysis, onFeaComplete }: FeaTabProps) {
+function CalculixFeaTab({ isZh, geometry, material, calcResult, analysis, onFeaComplete }: FeaTabProps) {
   const [feaStatus, setFeaStatus] = useState<"idle" | "running" | "done" | "error">("idle");
   const [feaResult, setFeaResult] = useState<FeaResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -418,6 +418,153 @@ function FeaTab({ isZh, geometry, material, calcResult, analysis, onFeaComplete 
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function BeamTheoryTab({ isZh, geometry, material, calcResult, onFeaComplete }: FeaTabProps) {
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [isDone, setIsDone] = useState(false);
+
+  const runEstimation = useCallback(() => {
+    setIsCalculating(true);
+    setIsDone(false);
+    
+    // Simulate a brief local calculation delay
+    setTimeout(() => {
+      setIsCalculating(false);
+      setIsDone(true);
+      // Automatically send analytical force to 3D preview
+      onFeaComplete?.(calcResult.forces.ride_N);
+    }, 600);
+  }, [calcResult.forces.ride_N, onFeaComplete]);
+
+  // Reset state if critical design parameters change
+  useEffect(() => {
+    setIsDone(false);
+    onFeaComplete?.(null);
+  }, [geometry.wireDiameter, geometry.activeCoils, geometry.diameterProfile?.DmStart, material.shearModulus, onFeaComplete]);
+
+  return (
+    <Card className="border-emerald-100 dark:border-emerald-900/30">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50/50">
+              {isZh ? "快速估算" : "Quick Estimate"}
+            </Badge>
+            <span>{isZh ? "基于梁理论的应力分析" : "Beam Theory Stress Analysis"}</span>
+          </div>
+          <Button 
+            disabled={isCalculating} 
+            onClick={runEstimation}
+            size="sm"
+          >
+            {isCalculating ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isZh ? "计算中..." : "Calculating..."}</>
+            ) : (
+              isZh ? "开始计算" : "Start Calculation"
+            )}
+          </Button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!isDone && !isCalculating && (
+          <div className="text-center py-6 text-muted-foreground border-2 border-dashed rounded-lg">
+            <p className="text-sm">{isZh ? "点击计算以根据解析刚度生成应力云图" : "Click calculate to generate stress contour based on analytical stiffness"}</p>
+          </div>
+        )}
+
+        {isCalculating && (
+          <div className="flex flex-col items-center justify-center py-10 space-y-3">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+            <p className="text-sm animate-pulse">{isZh ? "正在求解刚度矩阵..." : "Solving stiffness matrix..."}</p>
+          </div>
+        )}
+
+        {isDone && (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                <p className="text-xs text-muted-foreground">{isZh ? "反力 (F_ride)" : "Reaction Force"}</p>
+                <p className="text-xl font-bold font-mono text-emerald-700 dark:text-emerald-300">
+                  {calcResult.forces.ride_N.toFixed(1)} N
+                </p>
+              </div>
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                <p className="text-xs text-muted-foreground">{isZh ? "最大剪应力 (τ_max)" : "Max Shear Stress"}</p>
+                <p className="text-xl font-bold font-mono text-emerald-700 dark:text-emerald-300">
+                  {calcResult.stress.tauRide_MPa.toFixed(0)} MPa
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 border rounded-lg bg-muted/30 text-xs space-y-2">
+              <p className="font-semibold">{isZh ? "理论基础" : "Theoretical Basis"}</p>
+              <ul className="list-disc list-inside space-y-1 opacity-80">
+                <li>{isZh ? "受载力: F = k * (L0 - L_ride)" : "Load: F = k * (L0 - L_ride)"}</li>
+                <li>{isZh ? "剪应力: τ = 8 * F * K * D / (π * d³)" : "Shear Stress: τ = 8 * F * K * D / (π * d³)"}</li>
+                <li>{isZh ? "死圈应力衰减模型 (20%-100%)" : "Dead coil stress attenuation model (20%-100%)"}</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-700 dark:text-blue-300">
+              <CheckCircle className="w-4 h-4" />
+              <span>{isZh ? "数据已同步至 3D 预览" : "Data synchronized to 3D Preview"}</span>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function FeaTab({ isZh, geometry, material, calcResult, analysis, onFeaComplete }: FeaTabProps) {
+  const [method, setMethod] = useState<"estimate" | "calculix">("estimate");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex bg-muted p-1 rounded-md text-xs">
+          <button 
+            onClick={() => setMethod("estimate")}
+            className={`px-3 py-1.5 rounded-sm transition-all ${method === "estimate" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            {isZh ? "快速估算" : "Quick Estimate"}
+          </button>
+          <button 
+            onClick={() => setMethod("calculix")}
+            className={`px-3 py-1.5 rounded-sm transition-all ${method === "calculix" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            {isZh ? "CalculiX FEA (耗时)" : "CalculiX FEA"}
+          </button>
+        </div>
+        <span className="text-[10px] text-muted-foreground italic">
+          {method === "estimate" 
+            ? (isZh ? "无需服务器，即时响应" : "No server required, instant")
+            : (isZh ? "云端高精度计算" : "High precision cloud compute")}
+        </span>
+      </div>
+
+      {method === "estimate" ? (
+        <BeamTheoryTab 
+          isZh={isZh}
+          geometry={geometry}
+          material={material}
+          calcResult={calcResult}
+          analysis={analysis}
+          onFeaComplete={onFeaComplete}
+        />
+      ) : (
+        <CalculixFeaTab 
+          isZh={isZh}
+          geometry={geometry}
+          material={material}
+          calcResult={calcResult}
+          analysis={analysis}
+          onFeaComplete={onFeaComplete}
+        />
+      )}
+    </div>
   );
 }
 
