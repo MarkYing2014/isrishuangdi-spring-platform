@@ -63,6 +63,7 @@ export function SuspensionSpringCalculator() {
   const [pitchEnd, setPitchEnd] = useState<number>(0); 
   const [endClosedTurns, setEndClosedTurns] = useState<number>(1);
   const [transitionTurns, setTransitionTurns] = useState<number>(0.75);
+  const [groundTurnsPerEnd, setGroundTurnsPerEnd] = useState<number>(0.5);
 
   const [diameterMode, setDiameterMode] = useState<DiameterMode>("constant");
   const [dmStart, setDmStart] = useState<number>(0);
@@ -300,7 +301,31 @@ export function SuspensionSpringCalculator() {
                   <SelectItem value="open">开放 / Open</SelectItem>
                 </SelectContent>
               </Select>
+              {/* Design hint for end type */}
+              <p className="text-xs text-muted-foreground mt-1">
+                {endType === "closed_ground" && "端面贴平用于稳定接触/降低偏载"}
+                {endType === "closed" && "并紧端适合多数悬架弹簧座圈装配"}
+                {endType === "open" && "开放端更像通用弹簧，需注意座圈接触"}
+              </p>
             </div>
+            {/* Conditional groundTurnsPerEnd for Closed & Ground */}
+            {endType === "closed_ground" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="groundTurns">磨平影响圈数 / Ground Turns</Label>
+                  <Input
+                    id="groundTurns"
+                    type="number"
+                    value={groundTurnsPerEnd}
+                    onChange={(e) => setGroundTurnsPerEnd(Number(e.target.value))}
+                    step={0.25}
+                    min={0.25}
+                    max={1.5}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">每端磨平影响范围（圈）</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -632,6 +657,13 @@ export function SuspensionSpringCalculator() {
                     endClosedTurns,
                     transitionTurns,
                     endType,
+                    endSpec: {
+                      type: endType,
+                      closedTurnsPerEnd: endClosedTurns,
+                      groundTurnsPerEnd: endType === "closed_ground" ? groundTurnsPerEnd : 0,
+                      seatDrop: 0,
+                      endAngleExtra: endType === "closed_ground" ? 0.25 : 0, // Longer contact arc for ground ends
+                    },
                   }}
                   diameterProfile={{
                     mode: diameterMode,
