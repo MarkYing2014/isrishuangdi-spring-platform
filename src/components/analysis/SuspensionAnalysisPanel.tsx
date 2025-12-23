@@ -607,7 +607,7 @@ function BeamTheoryTab({ isZh, geometry, material, calcResult, onFeaComplete }: 
   useEffect(() => {
     setIsDone(false);
     onFeaComplete?.(null);
-  }, [geometry.wireDiameter, geometry.activeCoils, geometry.diameterProfile?.DmStart, material.shearModulus, onFeaComplete]);
+  }, [geometry.wireDiameter, geometry.activeCoils, geometry.diameterProfile?.DmStart, material.shearModulus]);
 
   return (
     <Card className="border-emerald-100 dark:border-emerald-900/30">
@@ -766,6 +766,10 @@ export function SuspensionAnalysisPanel({
   // FEA stress visualization state
   const [feaForce, setFeaForce] = useState<number | null>(null);
   const [showStressContour, setShowStressContour] = useState(true);
+
+  const handleFeaComplete = useCallback((force: number | null) => {
+    setFeaForce(force);
+  }, []);
 
   const calcResult = useMemo(() => calculateSuspensionSpring(input), [input]);
 
@@ -1021,7 +1025,7 @@ export function SuspensionAnalysisPanel({
                 material={material}
                 calcResult={calcResult}
                 analysis={analysis}
-                onFeaComplete={(force) => setFeaForce(force)}
+                onFeaComplete={handleFeaComplete}
               />
             </TabsContent>
           </Tabs>
