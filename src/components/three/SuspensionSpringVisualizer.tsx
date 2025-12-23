@@ -138,6 +138,7 @@ export function SuspensionSpringVisualizer({
             totalCoils={totalCoils}
             axialForce={feaForce}
             showStress={true}
+            scale={scale}
           />
         ) : (
           <SuspensionSpringMesh

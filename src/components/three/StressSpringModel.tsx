@@ -25,6 +25,7 @@ interface StressSpringModelProps {
   axialForce: number;        // N - from FEA reaction force
   maxStress?: number;        // MPa - for color scale max (optional)
   showStress?: boolean;      // Toggle stress visualization
+  scale?: number;            // Scene scale factor (default: 50/max(D*1.5, L0))
 }
 
 // Color interpolation: blue (low) → green → yellow → red (high)
@@ -128,9 +129,11 @@ export function StressSpringModel({
   axialForce,
   maxStress,
   showStress = true,
+  scale: scaleProp,
 }: StressSpringModelProps) {
-  // Scale factor: 1 mm = 0.02 scene units
-  const SCALE = 0.02;
+  // Scale factor: use prop if provided, otherwise calculate from geometry
+  const freeLength = pitch * activeCoils + wireDiameter * (totalCoils ?? activeCoils);
+  const SCALE = scaleProp ?? 50 / Math.max(meanDiameter * 1.5, freeLength);
   const radius = (meanDiameter / 2) * SCALE;
   const thickness = wireDiameter * SCALE;
   const pitchScaled = pitch * SCALE;
