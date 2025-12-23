@@ -117,10 +117,13 @@ export function convertStoreGeometryToEngine(
         totalCoils: geometry.totalCoils,
         freeLength: geometry.freeLength,
         materialId,
-        // pitch is complex, engine usually calculates it from L0/Na if undefined
       };
     case "dieSpring":
-      // dieSpring has its own dedicated analysis - not supported in generic engine
-      throw new Error("Die spring geometry adapter not implemented - use dedicated die spring analysis");
+      throw new Error("Die spring should not use the general engine adapter");
+    case "wave":
+      // Wave spring is complex and typically requires specialized analysis.
+      // If a basic compression model is needed, define `startDm` locally or pass it.
+      // For now, throwing an error as a placeholder.
+      throw new Error("Wave spring should not use the general engine adapter");
   }
 }

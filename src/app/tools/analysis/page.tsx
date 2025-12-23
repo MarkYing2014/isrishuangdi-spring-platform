@@ -165,6 +165,9 @@ function AnalysisReady({
   if (designGeometry.type === "dieSpring") {
     throw new Error("dieSpring should be handled by DieSpringEngineeringPage");
   }
+  if (designGeometry.type === "wave") {
+    throw new Error("waveSpring should be handled by WaveSpringEngineeringPage");
+  }
   
   const springType = designGeometry.type;
   const materialId = designMaterial.id;

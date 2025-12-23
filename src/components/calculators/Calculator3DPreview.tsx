@@ -66,6 +66,11 @@ export function Calculator3DPreview({
     if (geometry.type === "dieSpring") {
       return null;
     }
+    
+    // waveSpring has its own visualizer or is not supported here yet
+    if (geometry.type === "wave") {
+      return null;
+    }
 
     const shearModulus = geometry.shearModulus ?? material?.shearModulus ?? 79300;
 
