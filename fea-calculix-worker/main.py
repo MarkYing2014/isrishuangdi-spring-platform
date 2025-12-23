@@ -353,6 +353,46 @@ U
         shutil.rmtree(job_dir)
 
 
+@app.post("/debug/raw-files")
+async def debug_raw_files(request: FeaJobRequest):
+    """Run FEA and return raw output file contents for debugging"""
+    job_dir = Path(tempfile.mkdtemp(prefix="fea_debug_"))
+    job_name = "spring"
+    
+    try:
+        geom = SuspensionSpringGeometry(
+            wire_diameter=request.geometry.wire_diameter,
+            mean_diameter=request.geometry.mean_diameter,
+            active_coils=request.geometry.active_coils,
+            total_coils=request.geometry.total_coils,
+            free_length=request.geometry.free_length,
+            end_type=request.geometry.end_type,
+        )
+        material = Material(E=request.material.E, nu=request.material.nu, G=request.material.G)
+        loadcases = [LoadCase(name=lc.name, target_height=lc.target_height) for lc in request.loadcases]
+        
+        inp_content = generate_inp(geom, material, loadcases, request.design_code, 18)
+        inp_path = job_dir / f"{job_name}.inp"
+        inp_path.write_text(inp_content)
+        
+        ccx_path = shutil.which("ccx")
+        result = subprocess.run([ccx_path, "-i", job_name], cwd=job_dir, capture_output=True, text=True, timeout=120)
+        
+        files = {}
+        for ext in [".dat", ".frd", ".sta"]:
+            f = job_dir / f"{job_name}{ext}"
+            if f.exists():
+                files[ext] = f.read_text(errors='ignore')[:5000]
+        
+        return {
+            "returncode": result.returncode,
+            "stdout": result.stdout[:2000],
+            "files": files
+        }
+    finally:
+        shutil.rmtree(job_dir)
+
+
 # ============================================================================
 # Main
 # ============================================================================

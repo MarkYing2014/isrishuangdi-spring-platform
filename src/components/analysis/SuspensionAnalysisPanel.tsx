@@ -152,11 +152,23 @@ interface FeaResult {
   elapsed_ms: number;
   results?: {
     success: boolean;
+    converged: boolean;
     steps: Array<{
+      step_number: number;
       step_name: string;
-      reaction_force: Record<string, { fy: number; magnitude: number }>;
+      reaction_force_z: number;  // Axial reaction force in N
+      max_displacement_z: number;
       max_stress: number;
+      max_stress_node: number;
     }>;
+    node_stresses?: Array<{
+      nodeId: number;
+      vonMises: number;
+      x: number;
+      y: number;
+      z: number;
+    }>;
+    max_stress: number;
   };
   error_message?: string;
 }
@@ -257,58 +269,89 @@ function FeaTab({ isZh, geometry, material, calcResult, analysis }: FeaTabProps)
               </p>
             </div>
             
-            {/* Comparison Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2">{isZh ? "指标" : "Metric"}</th>
-                    <th className="text-right py-2">{isZh ? "解析" : "Analytic"}</th>
-                    <th className="text-right py-2">FEA</th>
-                    <th className="text-right py-2">Δ%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b">
-                    <td className="py-2">τ_ride (MPa)</td>
-                    <td className="text-right font-mono">{calcResult.stress.tauRide_MPa.toFixed(0)}</td>
-                    <td className="text-right font-mono">
-                      {feaResult.results.steps.find(s => s.step_name === "RIDE")?.max_stress.toFixed(0) ?? "-"}
-                    </td>
-                    <td className="text-right font-mono text-muted-foreground">
-                      {feaResult.results.steps[0]?.max_stress 
-                        ? ((feaResult.results.steps[0].max_stress - calcResult.stress.tauRide_MPa) / calcResult.stress.tauRide_MPa * 100).toFixed(1) + "%"
-                        : "-"
-                      }
-                    </td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2">τ_bump (MPa)</td>
-                    <td className="text-right font-mono">{calcResult.stress.tauBump_MPa.toFixed(0)}</td>
-                    <td className="text-right font-mono">
-                      {feaResult.results.steps.find(s => s.step_name === "BUMP")?.max_stress.toFixed(0) ?? "-"}
-                    </td>
-                    <td className="text-right font-mono text-muted-foreground">
-                      {feaResult.results.steps[1]?.max_stress 
-                        ? ((feaResult.results.steps[1].max_stress - calcResult.stress.tauBump_MPa) / calcResult.stress.tauBump_MPa * 100).toFixed(1) + "%"
-                        : "-"
-                      }
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2">SF_bump</td>
-                    <td className="text-right font-mono">{calcResult.stress.yieldSafetyFactor_bump.toFixed(2)}</td>
-                    <td className="text-right font-mono">-</td>
-                    <td className="text-right font-mono text-muted-foreground">-</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            {/* Comparison Table - Reaction Force based */}
+            {(() => {
+              // Spring geometry for stress calculation
+              const d = geometry.wireDiameter;  // mm
+              const D = geometry.diameterProfile?.DmStart ?? 100;  // mm
+              const c = D / d;  // Spring index
+              const K = (4 * c - 1) / (4 * c - 4) + 0.615 / c;  // Wahl correction factor
+              
+              // Get FEA reaction force (convert to same load case if available)
+              const feaRf = feaResult.results?.steps[0]?.reaction_force_z ?? 0;
+              
+              // Calculate shear stress from FEA force: τ = 8 * F * K * D / (π * d³)
+              const feaTau = feaRf > 0 ? (8 * feaRf * K * D) / (Math.PI * Math.pow(d, 3)) : 0;
+              
+              // Analytical values
+              const analyticTau = calcResult.stress.tauRide_MPa;
+              const analyticForce = calcResult.forces.ride_N;
+              
+              // Delta percentage
+              const deltaForce = analyticForce > 0 ? ((feaRf - analyticForce) / analyticForce * 100) : 0;
+              const deltaTau = analyticTau > 0 ? ((feaTau - analyticTau) / analyticTau * 100) : 0;
+              
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2">{isZh ? "指标" : "Metric"}</th>
+                        <th className="text-right py-2">{isZh ? "解析" : "Analytic"}</th>
+                        <th className="text-right py-2">FEA</th>
+                        <th className="text-right py-2">Δ%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b">
+                        <td className="py-2">F_ride (N)</td>
+                        <td className="text-right font-mono">{analyticForce.toFixed(1)}</td>
+                        <td className="text-right font-mono text-emerald-600 dark:text-emerald-400">
+                          {feaRf > 0 ? feaRf.toFixed(1) : "-"}
+                        </td>
+                        <td className="text-right font-mono text-muted-foreground">
+                          {feaRf > 0 ? `${deltaForce > 0 ? "+" : ""}${deltaForce.toFixed(1)}%` : "-"}
+                        </td>
+                      </tr>
+                      <tr className="border-b">
+                        <td className="py-2">τ_ride (MPa)</td>
+                        <td className="text-right font-mono">{analyticTau.toFixed(0)}</td>
+                        <td className="text-right font-mono text-emerald-600 dark:text-emerald-400">
+                          {feaTau > 0 ? feaTau.toFixed(0) : "-"}
+                        </td>
+                        <td className="text-right font-mono text-muted-foreground">
+                          {feaTau > 0 ? `${deltaTau > 0 ? "+" : ""}${deltaTau.toFixed(1)}%` : "-"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-2">{isZh ? "偏差状态" : "Deviation Status"}</td>
+                        <td className="text-right font-mono">-</td>
+                        <td className="text-right font-mono" colSpan={2}>
+                          {Math.abs(deltaForce) < 10 ? (
+                            <span className="text-emerald-600 dark:text-emerald-400">
+                              ✓ {isZh ? "在 ±10% 内" : "Within ±10%"}
+                            </span>
+                          ) : Math.abs(deltaForce) < 20 ? (
+                            <span className="text-yellow-600 dark:text-yellow-400">
+                              ⚠ {isZh ? "偏差较大" : "Moderate deviation"}
+                            </span>
+                          ) : (
+                            <span className="text-red-600 dark:text-red-400">
+                              ✗ {isZh ? "偏差过大" : "Large deviation"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
             
             <p className="text-xs text-muted-foreground">
               {isZh 
-                ? "FEA 使用 Beam (B31) 单元模型，结果与解析公式应在 ±10% 内"
-                : "FEA uses Beam (B31) element model, results should be within ±10% of analytic"
+                ? "FEA 使用 B32 二次梁单元模型，应力由 τ = 8FKD/(πd³) 从反力计算"
+                : "FEA uses B32 quadratic beam model, stress calculated from τ = 8FKD/(πd³)"
               }
             </p>
           </>
