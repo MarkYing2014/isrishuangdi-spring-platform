@@ -331,12 +331,16 @@ export function isTorsionDesign(design: SpringDesign): design is TorsionSpringDe
 export type PitchMode = "uniform" | "twoStage" | "threeStage";
 export type DiameterMode = "constant" | "barrel" | "conical";
 
+export type SuspensionEndType = "open" | "closed" | "closed_ground";
+
 export interface PitchProfile {
   mode: PitchMode;
   pitchCenter?: number;
   pitchEnd?: number;
   endClosedTurns?: number;
   transitionTurns?: number;
+  /** End type affects dead coil behavior and end-cap visualization */
+  endType?: SuspensionEndType;
 }
 
 export interface DiameterProfile {

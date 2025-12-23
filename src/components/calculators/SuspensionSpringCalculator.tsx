@@ -631,6 +631,7 @@ export function SuspensionSpringCalculator() {
                     pitchEnd: pitchEnd || undefined,
                     endClosedTurns,
                     transitionTurns,
+                    endType,
                   }}
                   diameterProfile={{
                     mode: diameterMode,

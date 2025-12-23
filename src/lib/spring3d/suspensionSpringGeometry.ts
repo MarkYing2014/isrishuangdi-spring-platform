@@ -61,11 +61,16 @@ function pitchAtTheta(theta: number, Nt: number, prof: PitchProfile, L_avg: numb
     const thetaTotal = 2 * Math.PI * Nt;
     const uniformPitch = L_avg / Nt; // Approximate uniform pitch
 
+    // Check if ends are closed (dead coils)
+    const hasClosedEnds = prof.endType === "closed" || prof.endType === "closed_ground";
+
     if (prof.mode === "uniform") {
+        // If open ends, no closed-coil behavior
+        if (!hasClosedEnds) {
+            return uniformPitch;
+        }
+
         // Standard uniform pitch with closed ends
-        // If not specified, assume 1 closed turn each end for "uniform" if explicitly asked? 
-        // Usually "uniform" implies constant pitch body + closed ends.
-        // Let's use the profile's endClosedTurns if provided, default 1.
         const closedTurns = prof.endClosedTurns ?? 1.0;
         const closedTheta = 2 * Math.PI * closedTurns;
 
@@ -79,25 +84,25 @@ function pitchAtTheta(theta: number, Nt: number, prof: PitchProfile, L_avg: numb
         return uniformPitch;
     }
 
-    // Two-Stage / Progressive
-    const thetaClosed = 2 * Math.PI * (prof.endClosedTurns ?? 1.0);
+    // Two-Stage / Progressive - only apply dead coils if closed ends
+    const endClosedTurns = hasClosedEnds ? (prof.endClosedTurns ?? 1.0) : 0;
+    const thetaClosed = 2 * Math.PI * endClosedTurns;
     const thetaTrans = 2 * Math.PI * (prof.transitionTurns ?? 0.75);
 
     const pCenter = prof.pitchCenter ?? uniformPitch;
     const pEnd = prof.pitchEnd ?? (pCenter * 0.1);
 
-    // 1. Start Closed Zone (0 -> thetaClosed)
-    // Pitch is very small (pEnd) or zero? Real springs assume small pitch at ends.
-    if (theta < thetaClosed) return pEnd;
+    // 1. Start Closed Zone (0 -> thetaClosed), only if closed ends
+    if (hasClosedEnds && theta < thetaClosed) return pEnd;
 
     // 2. Start Transition (thetaClosed -> thetaClosed + thetaTrans)
-    if (theta < thetaClosed + thetaTrans) {
+    if (hasClosedEnds && theta < thetaClosed + thetaTrans) {
         const u = smoothstep(thetaClosed, thetaClosed + thetaTrans, theta);
         return pEnd + (pCenter - pEnd) * u;
     }
 
     // 3. End Transition (Symmetric)
-    if (theta > thetaTotal - (thetaClosed + thetaTrans)) {
+    if (hasClosedEnds && theta > thetaTotal - (thetaClosed + thetaTrans)) {
         const startTransBack = thetaTotal - (thetaClosed + thetaTrans);
         if (theta < thetaTotal - thetaClosed) {
             // In transition zone
