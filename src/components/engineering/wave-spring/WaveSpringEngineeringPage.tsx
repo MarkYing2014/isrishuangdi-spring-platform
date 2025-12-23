@@ -23,7 +23,7 @@ import {
 
 import { useSpringDesignStore, type WaveSpringGeometry, type MaterialInfo } from "@/lib/stores/springDesignStore";
 import { calculateWaveSpring, type WaveSpringInput, type WaveSpringResult } from "@/lib/waveSpring/math";
-import { computeWaveSpringEngineeringSummary, computeWaveSpringCurve, type WaveSpringEngineeringSummary } from "@/lib/engineering/waveSpring/analysis";
+import { analyzeWaveSpringQuick, type WaveSpringQuickResult } from "@/lib/engineering/waveSpring/WaveSpringQuickAnalysis";
 
 // Placeholder for future visualization
 // const WaveSpringVisualizer = lazy(() => import("@/components/three/WaveSpringVisualizer"));
@@ -37,17 +37,17 @@ function useWaveSpringContext() {
   return { geometry, material, analysisResult };
 }
 
-function SummaryGrid({ summary, isZh }: { summary: WaveSpringEngineeringSummary; isZh: boolean }) {
+function SummaryGrid({ summary, isZh }: { summary: WaveSpringQuickResult; isZh: boolean }) {
   const cards = [
     { 
       label: isZh ? "设计状态" : "Design Status", 
       value: summary.designStatus,
       status: summary.designStatus 
     },
-    { label: isZh ? "工作刚度 k (N/mm)" : "k @ Work (N/mm)", value: summary.kWork.toFixed(2) },
-    { label: isZh ? "任务载荷 F (N)" : "F @ Work (N)", value: summary.fWork.toFixed(1) },
-    { label: isZh ? "等效应力指标" : "Stress Index", value: `${(summary.stressIndex * 100).toFixed(1)}%` },
-    { label: isZh ? "并紧余量" : "Solid Clearance", value: `${summary.solidClearance.toFixed(2)} mm` },
+    { label: isZh ? "工作刚度 k (N/mm)" : "k @ Work (N/mm)", value: summary.stiffness.toFixed(2) },
+    { label: isZh ? "并紧余量" : "Solid Clearance", value: `${summary.flattenMargin.toFixed(2)} mm` },
+    { label: isZh ? "等效应力指标" : "Stress Index", value: `${(summary.stressRatio * 100).toFixed(1)}%` },
+    { label: isZh ? "最大应力" : "Max Stress", value: `${summary.maxStress.toFixed(0)} MPa` },
     { label: isZh ? "安全系数" : "Safety Factor", value: summary.safetyFactor.toFixed(2) },
   ];
 
@@ -61,7 +61,7 @@ function SummaryGrid({ summary, isZh }: { summary: WaveSpringEngineeringSummary;
           <CardContent>
             <div className={`text-xl font-bold ${
               card.status === "FAIL" ? "text-red-600" : 
-              card.status === "MARGINAL" ? "text-amber-600" : ""
+              card.status === "WARNING" ? "text-amber-600" : ""
             }`}>
               {card.value}
             </div>
@@ -89,11 +89,26 @@ export function WaveSpringEngineeringPage() {
 
   const summary = useMemo(() => {
     if (!geometry || !result) return null;
-    return computeWaveSpringEngineeringSummary(
-      { geometry, material: material ? { E_MPa: material.elasticModulus, id: material.id, name: material.name } : undefined },
-      result,
-      material ?? undefined
-    );
+    
+    // Prepare Phase 0 Input
+    const input = {
+        outerDiameter: geometry.od,
+        innerDiameter: geometry.id,
+        thickness: geometry.thickness_t,
+        width: geometry.radialWall_b,
+        freeHeight: geometry.freeHeight_Hf,
+        workingDeflection: geometry.freeHeight_Hf - geometry.workingHeight_Hw,
+        totalLoad: result.loadAtWorkingHeight_N,
+        wavesPerTurn: geometry.wavesPerTurn_Nw,
+        turns: geometry.turns_Nt,
+        material: {
+            elasticModulus: material?.elasticModulus ?? 203000,
+            yieldStrength: (material?.tensileStrength || 1400) * 0.8 // Estimate yield if not present
+        }
+    };
+    
+    return analyzeWaveSpringQuick(input);
+
   }, [geometry, result, material]);
 
   if (!geometry || !summary || !result) {
@@ -151,20 +166,22 @@ export function WaveSpringEngineeringPage() {
 
       <Alert variant={summary.designStatus === "FAIL" ? "destructive" : "default"} className={`border-l-4 ${
         summary.designStatus === "PASS" ? "border-l-green-500" : 
-        summary.designStatus === "MARGINAL" ? "border-l-amber-500" : ""
+        summary.designStatus === "WARNING" ? "border-l-amber-500" : ""
       }`}>
         <div className="flex items-start gap-4">
           {summary.designStatus === "PASS" ? <CheckCircle className="h-5 w-5 text-green-500" /> : 
-           summary.designStatus === "MARGINAL" ? <AlertTriangle className="h-5 w-5 text-amber-500" /> : <XCircle className="h-5 w-5" />}
+           summary.designStatus === "WARNING" ? <AlertTriangle className="h-5 w-5 text-amber-500" /> : <XCircle className="h-5 w-5" />}
           <div>
             <AlertTitle className="font-bold flex items-center gap-2">
               {isZh ? "验证结论" : "Verdict"}: 
-              <span className={summary.designStatus === "FAIL" ? "" : summary.designStatus === "MARGINAL" ? "text-amber-600" : "text-green-600"}>
-                {isZh ? summary.verdictZh : summary.verdict}
+              <span className={summary.designStatus === "FAIL" ? "" : summary.designStatus === "WARNING" ? "text-amber-600" : "text-green-600"}>
+                {summary.designStatus === "PASS" ? (isZh ? "设计安全" : "Design Safe") : 
+                 summary.designStatus === "WARNING" ? (isZh ? "警告：应力较高" : "Warning: High Stress") : 
+                 (isZh ? "失效：设计不安全" : "Fail: Unsafe Design")}
               </span>
             </AlertTitle>
             <AlertDescription className="text-xs opacity-85 mt-1">
-              {summary.stressIndex > 0.8 && (
+              {summary.stressRatio > 0.8 && (
                 <span className="flex items-center gap-1">
                   <Info className="h-3 w-3" />
                   {isZh 
@@ -190,7 +207,7 @@ export function WaveSpringEngineeringPage() {
 
         <div className="mt-6">
           <TabsContent value="load">
-            <LoadDeflectionTab geometry={geometry} material={material} isZh={isZh} />
+            <LoadDeflectionTab geometry={geometry} summary={summary} isZh={isZh} />
           </TabsContent>
           <TabsContent value="stress">
             <StressAnalysisTab summary={summary} material={material} isZh={isZh} />
@@ -214,14 +231,16 @@ export function WaveSpringEngineeringPage() {
 // Tab Components
 // ============================================================================
 
-function LoadDeflectionTab({ geometry, material, isZh }: { geometry: WaveSpringGeometry; material: MaterialInfo | null; isZh: boolean }) {
+function LoadDeflectionTab({ geometry, summary, isZh }: { geometry: WaveSpringGeometry; summary: WaveSpringQuickResult; isZh: boolean }) {
   const curveData = useMemo(() => {
-    const input: WaveSpringInput = {
-      geometry,
-      material: material ? { E_MPa: material.elasticModulus } : undefined
-    };
-    return computeWaveSpringCurve(input);
-  }, [geometry, material]);
+    // Phase 0: Use curve from summary directly
+    return summary.stiffnessCurve.map(p => ({
+        travel: p.x,
+        height: geometry.freeHeight_Hf - p.x,
+        load: p.load,
+        stress: p.stress
+    }));
+  }, [summary, geometry]);
 
   const workingTravel = geometry.freeHeight_Hf - geometry.workingHeight_Hw;
 
@@ -289,8 +308,8 @@ function LoadDeflectionTab({ geometry, material, isZh }: { geometry: WaveSpringG
   );
 }
 
-function StressAnalysisTab({ summary, material, isZh }: { summary: WaveSpringEngineeringSummary; material: MaterialInfo | null; isZh: boolean }) {
-  const stressStatus = summary.stressIndex < 0.8 ? "OK" : summary.stressIndex < 0.9 ? "WARNING" : "CRITICAL";
+function StressAnalysisTab({ summary, material, isZh }: { summary: WaveSpringQuickResult; material: MaterialInfo | null; isZh: boolean }) {
+  const stressStatus = summary.stressRatio < 0.6 ? "OK" : summary.stressRatio < 0.8 ? "WARNING" : "CRITICAL";
   
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -304,7 +323,7 @@ function StressAnalysisTab({ summary, material, isZh }: { summary: WaveSpringEng
                stressStatus === "CRITICAL" ? "text-red-500" : 
                stressStatus === "WARNING" ? "text-amber-500" : "text-slate-900 dark:text-slate-100"
             }`}>
-              {(summary.stressIndex * 100).toFixed(1)}
+              {(summary.stressRatio * 100).toFixed(1)}
               <span className="text-lg font-normal ml-1">%</span>
             </div>
             <Badge variant={stressStatus === "CRITICAL" ? "destructive" : "secondary"}>
@@ -324,12 +343,12 @@ function StressAnalysisTab({ summary, material, isZh }: { summary: WaveSpringEng
                   : "Wave springs do not experience uniform torsional stress. Evaluated using a crest-level equivalent bending model."}
                 <br /><br />
                 {stressStatus === "OK" && (isZh ? "结构利用率处于安全区间。" : "Structural utilization is within safe limits.")}
-                {stressStatus === "WARNING" && (isZh ? "接近建议限值（90%），建议进行 FEA 仿真。" : "Approaching recommended limit (90%); FEA simulation recommended.")}
+                {stressStatus === "WARNING" && (isZh ? "接近建议限值（80%），建议进行 FEA 仿真。" : "Approaching recommended limit (80%); FEA simulation recommended.")}
                 {stressStatus === "CRITICAL" && (isZh ? "超出推荐工作区间，极可能导致永久变形。" : "Exceeds safe range; high risk of permanent set.")}
               </p>
             </div>
 
-            {summary.stressIndex > 0.7 && (
+            {summary.stressRatio > 0.7 && (
               <Alert className="bg-amber-500/10 border-amber-500/20 py-2">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -387,8 +406,8 @@ function StressAnalysisTab({ summary, material, isZh }: { summary: WaveSpringEng
   );
 }
 
-function FatigueTab({ summary, isZh }: { summary: WaveSpringEngineeringSummary; isZh: boolean }) {
-  const lifeLevel = summary.stressIndex < 0.4 ? "HIGH" : summary.stressIndex < 0.6 ? "MED" : "LOW";
+function FatigueTab({ summary, isZh }: { summary: WaveSpringQuickResult; isZh: boolean }) {
+  const lifeLevel = summary.stressRatio < 0.4 ? "HIGH" : summary.stressRatio < 0.6 ? "MED" : "LOW";
   
   return (
     <Card>
@@ -407,7 +426,7 @@ function FatigueTab({ summary, isZh }: { summary: WaveSpringEngineeringSummary; 
           <div className="flex-1 max-w-md w-full">
             <div className="flex justify-between text-[10px] mb-1 font-medium">
               <span>{isZh ? "疲劳风险" : "Fatigue Risk"}</span>
-              <span>{(summary.stressIndex * 100).toFixed(0)}% Util.</span>
+              <span>{(summary.stressRatio * 100).toFixed(0)}% Util.</span>
             </div>
             <div className="h-3 bg-muted rounded-full overflow-hidden flex">
               <div className="h-full bg-green-500" style={{ width: "40%" }} />
@@ -435,11 +454,11 @@ function FatigueTab({ summary, isZh }: { summary: WaveSpringEngineeringSummary; 
             <h4 className="font-bold opacity-70">Goodman Mapping</h4>
             <div className="flex justify-between">
               <span>Mean Stress (σm)</span>
-              <span className="font-mono">{(summary.stressMax * 0.5).toFixed(0)} MPa</span>
+              <span className="font-mono">{(summary.maxStress * 0.5).toFixed(0)} MPa</span>
             </div>
             <div className="flex justify-between">
               <span>Stress Amp (σa)</span>
-              <span className="font-mono">{(summary.stressMax * 0.5).toFixed(0)} MPa</span>
+              <span className="font-mono">{(summary.maxStress * 0.5).toFixed(0)} MPa</span>
             </div>
           </div>
           <div className="space-y-1">
