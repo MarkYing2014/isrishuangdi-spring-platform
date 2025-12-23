@@ -436,7 +436,7 @@ function FatigueTab({ summary, isZh }: { summary: WaveSpringQuickResult; isZh: b
             <div className="relative mt-1">
                <div 
                  className="absolute h-4 w-1 bg-primary -top-4 shadow-sm transition-all" 
-                 style={{ left: `${Math.min(summary.stressIndex * 100, 100)}%` }} 
+                 style={{ left: `${Math.min(summary.stressRatio * 100, 100)}%` }} 
                />
             </div>
           </div>
