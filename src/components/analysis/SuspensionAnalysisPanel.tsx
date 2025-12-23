@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, AlertTriangle, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -134,6 +134,187 @@ function KxCurveChart({ data, isZh }: { data: { x: number; k: number; hasContact
         {isZh ? "黄色区域：圈-圈接触开始，刚度非线性增加" : "Yellow zone: Coil contact begins, stiffness increases nonlinearly"}
       </p>
     </div>
+  );
+}
+
+// FEA Tab Component
+interface FeaTabProps {
+  isZh: boolean;
+  geometry: SuspensionGeometry;
+  material: MaterialInfo;
+  calcResult: ReturnType<typeof calculateSuspensionSpring>;
+  analysis: SuspensionAnalysisResult;
+}
+
+interface FeaResult {
+  job_id: string;
+  status: "success" | "failed" | "error";
+  elapsed_ms: number;
+  results?: {
+    success: boolean;
+    steps: Array<{
+      step_name: string;
+      reaction_force: Record<string, { fy: number; magnitude: number }>;
+      max_stress: number;
+    }>;
+  };
+  error_message?: string;
+}
+
+function FeaTab({ isZh, geometry, material, calcResult, analysis }: FeaTabProps) {
+  const [feaStatus, setFeaStatus] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [feaResult, setFeaResult] = useState<FeaResult | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const runFea = useCallback(async () => {
+    setFeaStatus("running");
+    setErrorMsg(null);
+    
+    try {
+      const response = await fetch("/api/fea/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          design_code: `SUSP-${Date.now().toString(36).toUpperCase()}`,
+          geometry: {
+            wire_diameter: geometry.wireDiameter,
+            mean_diameter: geometry.diameterProfile?.DmStart ?? 100,
+            active_coils: geometry.activeCoils,
+            total_coils: geometry.totalCoils,
+            free_length: geometry.freeLength,
+            end_type: geometry.pitchProfile?.endType ?? "closed_ground",
+            dm_start: geometry.diameterProfile?.DmStart,
+            dm_mid: geometry.diameterProfile?.DmMid,
+            dm_end: geometry.diameterProfile?.DmEnd,
+          },
+          material: {
+            E: 206000,
+            nu: 0.3,
+            G: material.shearModulus,
+            name: "STEEL"
+          },
+          loadcases: [
+            { name: "RIDE", target_height: calcResult.rideHeight_mm },
+            { name: "BUMP", target_height: calcResult.bumpHeight_mm },
+          ],
+          mesh_level: "medium"
+        }),
+      });
+      
+      const result: FeaResult = await response.json();
+      setFeaResult(result);
+      setFeaStatus(result.status === "success" ? "done" : "error");
+      if (result.error_message) setErrorMsg(result.error_message);
+      
+    } catch (err) {
+      setFeaStatus("error");
+      setErrorMsg(String(err));
+    }
+  }, [geometry, material, calcResult]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>{isZh ? "FEA 验证 (CalculiX)" : "FEA Validation (CalculiX)"}</span>
+          <Button 
+            onClick={runFea} 
+            disabled={feaStatus === "running"}
+            size="sm"
+          >
+            {feaStatus === "running" ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                {isZh ? "运行中..." : "Running..."}
+              </>
+            ) : (
+              isZh ? "运行 FEA" : "Run FEA"
+            )}
+          </Button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {feaStatus === "idle" && (
+          <p className="text-muted-foreground text-sm">
+            {isZh 
+              ? "点击 \"运行 FEA\" 使用 CalculiX 进行静力分析验证"
+              : "Click \"Run FEA\" to validate with CalculiX static analysis"
+            }
+          </p>
+        )}
+        
+        {feaStatus === "error" && (
+          <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm text-red-700 dark:text-red-300">
+            {errorMsg || (isZh ? "FEA 分析失败" : "FEA analysis failed")}
+          </div>
+        )}
+        
+        {feaStatus === "done" && feaResult?.results && (
+          <>
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-sm">
+              <p className="font-medium text-emerald-700 dark:text-emerald-300">
+                ✓ {isZh ? "FEA 完成" : "FEA Complete"} ({feaResult.elapsed_ms}ms)
+              </p>
+            </div>
+            
+            {/* Comparison Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2">{isZh ? "指标" : "Metric"}</th>
+                    <th className="text-right py-2">{isZh ? "解析" : "Analytic"}</th>
+                    <th className="text-right py-2">FEA</th>
+                    <th className="text-right py-2">Δ%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b">
+                    <td className="py-2">τ_ride (MPa)</td>
+                    <td className="text-right font-mono">{calcResult.stress.tauRide_MPa.toFixed(0)}</td>
+                    <td className="text-right font-mono">
+                      {feaResult.results.steps.find(s => s.step_name === "RIDE")?.max_stress.toFixed(0) ?? "-"}
+                    </td>
+                    <td className="text-right font-mono text-muted-foreground">
+                      {feaResult.results.steps[0]?.max_stress 
+                        ? ((feaResult.results.steps[0].max_stress - calcResult.stress.tauRide_MPa) / calcResult.stress.tauRide_MPa * 100).toFixed(1) + "%"
+                        : "-"
+                      }
+                    </td>
+                  </tr>
+                  <tr className="border-b">
+                    <td className="py-2">τ_bump (MPa)</td>
+                    <td className="text-right font-mono">{calcResult.stress.tauBump_MPa.toFixed(0)}</td>
+                    <td className="text-right font-mono">
+                      {feaResult.results.steps.find(s => s.step_name === "BUMP")?.max_stress.toFixed(0) ?? "-"}
+                    </td>
+                    <td className="text-right font-mono text-muted-foreground">
+                      {feaResult.results.steps[1]?.max_stress 
+                        ? ((feaResult.results.steps[1].max_stress - calcResult.stress.tauBump_MPa) / calcResult.stress.tauBump_MPa * 100).toFixed(1) + "%"
+                        : "-"
+                      }
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2">SF_bump</td>
+                    <td className="text-right font-mono">{calcResult.stress.yieldSafetyFactor_bump.toFixed(2)}</td>
+                    <td className="text-right font-mono">-</td>
+                    <td className="text-right font-mono text-muted-foreground">-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            
+            <p className="text-xs text-muted-foreground">
+              {isZh 
+                ? "FEA 使用 Beam (B31) 单元模型，结果与解析公式应在 ±10% 内"
+                : "FEA uses Beam (B31) element model, results should be within ±10% of analytic"
+              }
+            </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -295,6 +476,7 @@ export function SuspensionAnalysisPanel({
               <TabsTrigger value="kx">{isZh ? "k(x) 曲线" : "k(x) Curve"}</TabsTrigger>
               <TabsTrigger value="stress">{isZh ? "应力分析" : "Stress"}</TabsTrigger>
               <TabsTrigger value="fatigue">{isZh ? "疲劳评估" : "Fatigue"}</TabsTrigger>
+              <TabsTrigger value="fea">{isZh ? "FEA 验证" : "FEA Validation"}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="kx">
@@ -396,6 +578,16 @@ export function SuspensionAnalysisPanel({
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="fea">
+              <FeaTab
+                isZh={isZh}
+                geometry={geometry}
+                material={material}
+                calcResult={calcResult}
+                analysis={analysis}
+              />
             </TabsContent>
           </Tabs>
         </div>
