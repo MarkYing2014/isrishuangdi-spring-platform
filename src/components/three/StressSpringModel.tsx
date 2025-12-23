@@ -26,6 +26,7 @@ interface StressSpringModelProps {
   maxStress?: number;        // MPa - for color scale max (optional)
   showStress?: boolean;      // Toggle stress visualization
   scale?: number;            // Scene scale factor (default: 50/max(D*1.5, L0))
+  showCoilBind?: boolean;    // Toggle coil bind visualization (red highlight)
 }
 
 // Color interpolation: blue (low) → green → yellow → red (high)
@@ -130,6 +131,7 @@ export function StressSpringModel({
   maxStress,
   showStress = true,
   scale: scaleProp,
+  showCoilBind = true,
 }: StressSpringModelProps) {
   // Scale factor: use prop if provided, otherwise calculate from geometry
   const freeLength = pitch * activeCoils + wireDiameter * (totalCoils ?? activeCoils);
@@ -182,7 +184,20 @@ export function StressSpringModel({
         const stressIndex = Math.min(ringIndex, springData.stresses.length - 1);
         const stress = springData.stresses[stressIndex] || stressMin;
         
-        const color = stressToColor(stress, stressMin, stressMax);
+        let color: THREE.Color;
+        
+        // Detect coil bind: If current pitch <= wireDiameter, color red
+        const totalCoilsVal = activeCoils + (totalCoils ? (totalCoils - activeCoils) : 2);
+        const freeLength = pitch * activeCoils + wireDiameter * (totalCoils ?? activeCoils + 2);
+        const currentHeight = pitch * activeCoils; // simplified
+        const isBindSegment = showCoilBind && (pitch <= wireDiameter * 1.05);
+
+        if (isBindSegment) {
+          color = new THREE.Color(1, 0, 0); // Pure Red for bind
+        } else {
+          color = stressToColor(stress, stressMin, stressMax);
+        }
+
         colors[i * 3] = color.r;
         colors[i * 3 + 1] = color.g;
         colors[i * 3 + 2] = color.b;

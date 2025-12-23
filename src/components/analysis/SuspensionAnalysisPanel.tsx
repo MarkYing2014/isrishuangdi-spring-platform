@@ -144,7 +144,172 @@ interface FeaTabProps {
   material: MaterialInfo;
   calcResult: ReturnType<typeof calculateSuspensionSpring>;
   analysis: SuspensionAnalysisResult;
-  onFeaComplete?: (force: number | null) => void;  // Callback when FEA completes with reaction force
+  onFeaComplete?: (force: number | null) => void;
+}
+
+// Option A: NVH Analysis Tab
+function NvhTab({ isZh, calcResult, loadcase }: { isZh: boolean, calcResult: ReturnType<typeof calculateSuspensionSpring>, loadcase: any }) {
+  const dyn = calcResult.dynamics;
+  
+  if (!dyn) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">
+            {isZh ? "NVH & 动态分析" : "NVH & Dynamic Analysis"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground italic">
+            {isZh ? "请输入车辆簧下质量(Corner Mass)以进行频率分析" : "Please provide corner mass to enable frequency analysis"}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const rideFreq = dyn.naturalFreq_Hz;
+  const targetFreq = loadcase.targetFreq_Hz;
+  const diff = targetFreq ? Math.abs(rideFreq - targetFreq) : 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">
+          {isZh ? "NVH & 动态分析" : "NVH & Dynamic Analysis"}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-1">
+            <span className="text-xs text-muted-foreground">{isZh ? "车轮刚度 (Wheel Rate)" : "Wheel Rate"}</span>
+            <p className="text-2xl font-mono font-bold text-primary">
+              {dyn.wheelRate_N_per_mm.toFixed(1)} <span className="text-xs font-normal">N/mm</span>
+            </p>
+          </div>
+          <div className="space-y-1">
+            <span className="text-xs text-muted-foreground">{isZh ? "固有频率 (Natural Frequency)" : "Natural Frequency"}</span>
+            <p className="text-2xl font-mono font-bold text-primary">
+              {rideFreq.toFixed(2)} <span className="text-xs font-normal">Hz</span>
+            </p>
+          </div>
+        </div>
+
+        {targetFreq && (
+          <div className={`p-3 rounded-lg flex items-center gap-3 ${diff < 0.2 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+            {diff < 0.2 ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+            <div className="text-xs">
+              <p className="font-semibold">{isZh ? "目标频率对比" : "Target Frequency Comparison"}</p>
+              <p className="opacity-90">
+                {isZh 
+                  ? `当前比目标 (${targetFreq}Hz) ${rideFreq > targetFreq ? "偏高" : "偏低"} ${diff.toFixed(2)}Hz` 
+                  : `Currently ${diff.toFixed(2)}Hz ${rideFreq > targetFreq ? "higher" : "lower"} than target (${targetFreq}Hz)`}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold">{isZh ? "NVH 风险提示" : "NVH Risk Profile"}</h4>
+          <div className="grid grid-cols-3 gap-2 text-[10px] uppercase font-bold text-center">
+            <div className={`p-2 rounded ${rideFreq < 1.0 ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground opacity-50'}`}>
+              Soft/Boat
+            </div>
+            <div className={`p-2 rounded ${rideFreq >= 1.0 && rideFreq <= 2.2 ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' : 'bg-muted text-muted-foreground opacity-50'}`}>
+              Standard
+            </div>
+            <div className={`p-2 rounded ${rideFreq > 2.2 ? 'bg-red-100 text-red-700' : 'bg-muted text-muted-foreground opacity-50'}`}>
+              Stiff/Racing
+            </div>
+          </div>
+          <p className="text-[10px] text-muted-foreground italic mt-2">
+            * {isZh ? "基于单轮质量模型的估算值。1.0-2.2Hz 属于乘用车常规区间。" : "Estimated via quarter-car model. 1.0-2.2Hz is standard for passenger cars."}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Option A: Engineering Conclusion & Expert Designer Suggestions
+function ConclusionTab({ isZh, geometry, material, calcResult, analysis }: { isZh: boolean, geometry: SuspensionGeometry, material: MaterialInfo, calcResult: ReturnType<typeof calculateSuspensionSpring>, analysis: SuspensionAnalysisResult }) {
+  const sfBump = calcResult.stress.yieldSafetyFactor_bump;
+  const coilBindMargin = calcResult.bumpHeight_mm - calcResult.derived.solidHeight_Hs_mm;
+  const fatigueSF = analysis.fatigue?.fatigueSF ?? 0;
+  
+  const rules = [];
+  
+  if (sfBump < 1.1) {
+    rules.push({
+      status: "fail",
+      title: isZh ? "屈服强度不足" : "Insufficent Yield Strength",
+      desc: isZh ? `Bump 工况安全系数仅 ${sfBump.toFixed(2)}，远低于 1.1。` : `Safety factor at Bump is only ${sfBump.toFixed(2)}, well below 1.1.`,
+      advice: isZh ? "建议：增加线径 d 或更换高等级材料（如 55CrSi）。" : "Advice: Increase wire diameter d or upgrade to higher grade material (e.g., 55CrSi)."
+    });
+  } else if (sfBump < 1.3) {
+    rules.push({
+      status: "warning",
+      title: isZh ? "强度余量较低" : "Low Strength Margin",
+      desc: isZh ? `安全系数 ${sfBump.toFixed(2)} 勉强及格。` : `Safety factor ${sfBump.toFixed(2)} is marginal.`,
+      advice: isZh ? "建议：优化卷数 Na 以降低应力水平。" : "Advice: Optimize active coils Na to lower stress levels."
+    });
+  }
+
+  if (coilBindMargin < 3) {
+    rules.push({
+      status: "fail",
+      title: isZh ? "并紧余量过小" : "Low Coil Bind Margin",
+      desc: isZh ? `最大压缩时余量仅 ${coilBindMargin.toFixed(1)}mm (标准 ≥3mm)。` : `Margin at max bump is only ${coilBindMargin.toFixed(1)}mm (Standard ≥3mm).`,
+      advice: isZh ? "建议：增加自由长 Hf 或减少总圈数 Nt。" : "Advice: Increase free length Hf or reduce total coils Nt."
+    });
+  }
+
+  const fatiguePass = fatigueSF > 1.2;
+  if (!fatiguePass && fatigueSF > 0) {
+    rules.push({
+      status: "warning",
+      title: isZh ? "疲劳寿命中等" : "Moderate Fatigue Life",
+      desc: isZh ? "Goodman 判定点接近包络线边缘。" : "Goodman point is near the envelope boundary.",
+      advice: isZh ? "建议：确保护油喷丸工艺(Shot Peened)或降低预载。" : "Advice: Ensure shot peening or reduce preload."
+    });
+  }
+
+  if (rules.length === 0) {
+    rules.push({
+      status: "pass",
+      title: isZh ? "设计完美" : "Design Optimized",
+      desc: isZh ? "所有工程指标均在安全区间内。" : "All engineering metrics are within safety limits.",
+      advice: isZh ? "建议：可以尝试减轻重量以优化成本。" : "Advice: Consider weight reduction for cost optimization."
+    });
+  }
+
+  const overallStatus = rules.some(r => r.status === "fail") ? "fail" : rules.some(r => r.status === "warning") ? "warning" : "pass";
+
+  return (
+    <Card className={`border-2 ${overallStatus === "fail" ? "border-red-200" : overallStatus === "warning" ? "border-amber-200" : "border-emerald-200"}`}>
+      <CardHeader>
+        <CardTitle className="text-sm flex items-center justify-between">
+          <span>{isZh ? "工程结论 & 改进建议" : "Engineering Conclusion & Advice"}</span>
+          <Badge className={overallStatus === "fail" ? "bg-red-500" : overallStatus === "warning" ? "bg-amber-500" : "bg-emerald-500"}>
+            {overallStatus === "fail" ? (isZh ? "不合格" : "FAIL") : overallStatus === "warning" ? (isZh ? "临界" : "MARGINAL") : (isZh ? "合格" : "PASS")}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {rules.map((rule, i) => (
+          <div key={i} className={`p-3 rounded-lg border-l-4 ${rule.status === "fail" ? "bg-red-50 border-red-500" : rule.status === "warning" ? "bg-amber-50 border-amber-500" : "bg-emerald-50 border-emerald-500"}`}>
+            <h5 className="font-bold text-sm mb-1">{rule.title}</h5>
+            <p className="text-xs opacity-80 mb-2">{rule.desc}</p>
+            <p className="text-xs font-semibold text-primary">{rule.advice}</p>
+          </div>
+        ))}
+        
+        <div className="pt-4 border-t text-[10px] text-muted-foreground italic">
+          {isZh ? "* 以上建议由 AI 设计专家系统基于标准底盘工程经验生成，仅供参考。" : "* Advice generated by AI Expert System based on chassis engineering best practices."}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 interface FeaResult {
@@ -725,15 +890,16 @@ export function SuspensionAnalysisPanel({
       {/* Main Content Tabs */}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Tabs defaultValue="kx" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="kx">{isZh ? "k(x) 曲线" : "k(x) Curve"}</TabsTrigger>
-              <TabsTrigger value="stress">{isZh ? "应力分析" : "Stress"}</TabsTrigger>
-              <TabsTrigger value="fatigue">{isZh ? "疲劳评估" : "Fatigue"}</TabsTrigger>
-              <TabsTrigger value="fea">{isZh ? "FEA 验证" : "FEA Validation"}</TabsTrigger>
+          <Tabs defaultValue="curves" className="w-full">
+            <TabsList className="grid grid-cols-5 w-full">
+              <TabsTrigger value="curves">k(x)</TabsTrigger>
+              <TabsTrigger value="fatigue">{isZh ? "疲劳" : "Fatigue"}</TabsTrigger>
+              <TabsTrigger value="nvh">NVH</TabsTrigger>
+              <TabsTrigger value="fea">FEA</TabsTrigger>
+              <TabsTrigger value="conclusion">{isZh ? "结论" : "Conclusion"}</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="kx">
+            <TabsContent value="curves">
               <Card>
                 <CardHeader>
                   <CardTitle>{isZh ? "非线性刚度曲线 k(x)" : "Nonlinear Stiffness k(x)"}</CardTitle>
@@ -832,6 +998,20 @@ export function SuspensionAnalysisPanel({
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="nvh">
+              <NvhTab isZh={isZh} calcResult={calcResult} loadcase={input.loadcase} />
+            </TabsContent>
+
+            <TabsContent value="conclusion">
+              <ConclusionTab 
+                isZh={isZh} 
+                geometry={geometry} 
+                material={material} 
+                calcResult={calcResult} 
+                analysis={analysis} 
+              />
             </TabsContent>
 
             <TabsContent value="fea">
