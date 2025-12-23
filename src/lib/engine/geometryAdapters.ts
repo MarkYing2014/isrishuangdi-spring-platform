@@ -119,5 +119,8 @@ export function convertStoreGeometryToEngine(
         materialId,
         // pitch is complex, engine usually calculates it from L0/Na if undefined
       };
+    case "dieSpring":
+      // dieSpring has its own dedicated analysis - not supported in generic engine
+      throw new Error("Die spring geometry adapter not implemented - use dedicated die spring analysis");
   }
 }

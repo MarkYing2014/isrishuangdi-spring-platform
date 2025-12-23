@@ -135,13 +135,17 @@ function CadExportContent() {
   
   // 从 store 或 URL 获取数据
   const code = storeMeta?.designCode ?? searchParams.get("code") ?? undefined;
-  const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compression") as SpringGeometry['type'] | "spiralTorsion";
+  // Note: dieSpring has its own dedicated engineering page and is not supported in CAD export
+const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compression") as SpringGeometry['type'] | "spiralTorsion";
   
   // 几何参数 - 优先从 store 读取
   // 螺旋扭转弹簧没有 wireDiameter，使用 stripThickness 作为替代
+  // Note: dieSpring 有专用工程分析页面，不在此处处理
   const wireDiameter = storeGeometry?.type === "spiralTorsion" 
     ? storeGeometry.stripThickness 
-    : (storeGeometry?.wireDiameter ?? numberOrUndefined(searchParams.get("d")) ?? 3.2);
+    : ("wireDiameter" in (storeGeometry ?? {}) 
+      ? (storeGeometry as { wireDiameter?: number })?.wireDiameter 
+      : undefined) ?? numberOrUndefined(searchParams.get("d")) ?? 3.2;
   
   // 螺旋扭转弹簧没有 meanDiameter 概念，getMeanDiameter 返回 null
   // 对于 wire spring 使用 meanDiameter，对于 spiral 使用 fallback 值（仅用于显示）
@@ -150,7 +154,12 @@ function CadExportContent() {
   
   // 标记是否为螺旋扭转弹簧
   const isSpiralTorsion = storeGeometry?.type === "spiralTorsion" || springType === "spiralTorsion";
-  const activeCoils = storeGeometry?.activeCoils ?? numberOrUndefined(searchParams.get("Na")) ?? 8;
+  // Note: dieSpring 有专用工程分析页面，CAD 导出暂不支持
+  const isDieSpring = storeGeometry?.type === "dieSpring";
+  // 使用 in 操作符安全访问 activeCoils
+  const activeCoils = ("activeCoils" in (storeGeometry ?? {})
+    ? (storeGeometry as { activeCoils?: number })?.activeCoils
+    : undefined) ?? numberOrUndefined(searchParams.get("Na")) ?? 8;
   const totalCoils = (storeGeometry?.type === "compression" ? storeGeometry.totalCoils : undefined) 
     ?? numberOrUndefined(searchParams.get("Nt")) ?? activeCoils + 2;
   const freeLength = (storeGeometry?.type === "compression" || storeGeometry?.type === "conical" 

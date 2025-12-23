@@ -112,6 +112,25 @@ export interface ConicalGeometry {
   materialId?: SpringMaterialId;
 }
 
+/** 模具弹簧几何参数 (矩形线材) */
+export interface DieSpringGeometry {
+  type: "dieSpring";
+  designCode?: string;
+  dutyColor?: "blue" | "red" | "gold" | "green";
+  outerDiameter: number;
+  innerDiameter?: number;
+  freeLength: number;
+  workingLength: number;
+  totalCoils: number;
+  wireWidth: number; // b - 径向宽度
+  wireThickness: number; // t - 厚度
+  holeDiameter?: number;
+  rodDiameter?: number;
+  meanDiameter?: number;
+  solidHeight?: number;
+  materialId?: SpringMaterialId;
+}
+
 /** 螺旋扭转弹簧几何参数 (带材卷绕式) */
 export interface SpiralTorsionGeometry {
   type: "spiralTorsion";
@@ -151,6 +170,7 @@ export type SpringGeometry =
   | ExtensionGeometry
   | TorsionGeometry
   | ConicalGeometry
+  | DieSpringGeometry
   | SpiralTorsionGeometry
   | SuspensionGeometry;
 
@@ -307,6 +327,11 @@ export function isTorsionDesign(design: SpringGeometry | null): design is Torsio
 /** 检查是否为锥形弹簧设计 */
 export function isConicalDesign(design: SpringGeometry | null): design is ConicalGeometry {
   return design?.type === "conical";
+}
+
+/** 检查是否为模具弹簧设计 */
+export function isDieSpringDesign(design: SpringGeometry | null): design is DieSpringGeometry {
+  return design?.type === "dieSpring";
 }
 
 // ============================================================================
@@ -712,6 +737,7 @@ export function generateDesignCode(geometry: SpringGeometry): string {
     extension: "ES",
     torsion: "TS",
     conical: "CN",
+    dieSpring: "DS",
     spiralTorsion: "STS",
     suspensionSpring: "SUS",
   };
@@ -719,21 +745,41 @@ export function generateDesignCode(geometry: SpringGeometry): string {
 
   const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
 
-  // 螺旋扭转弹簧使用带材尺寸，其他使用线径
-  if (geometry.type === "spiralTorsion") {
-    const b = geometry.stripWidth.toFixed(1);
-    const t = geometry.stripThickness.toFixed(2);
-    return `${prefix}-${b}x${t}-${timestamp}`;
-  }
+  let d = "0.0";
+  let dim = "0";
 
-  const d = geometry.wireDiameter.toFixed(1);
-  let dim = "";
-  if (geometry.type === "compression" || geometry.type === "torsion") {
-    dim = geometry.meanDiameter.toFixed(0);
-  } else if (geometry.type === "extension") {
-    dim = geometry.outerDiameter.toFixed(0);
-  } else if (geometry.type === "conical") {
-    dim = geometry.largeOuterDiameter.toFixed(0);
+  switch (geometry.type) {
+    case "spiralTorsion": {
+      const b = geometry.stripWidth.toFixed(1);
+      const t = geometry.stripThickness.toFixed(2);
+      return `${prefix}-${b}x${t}-${timestamp}`;
+    }
+    case "compression":
+      d = geometry.wireDiameter.toFixed(1);
+      dim = geometry.meanDiameter.toFixed(0);
+      break;
+    case "extension":
+      d = geometry.wireDiameter.toFixed(1);
+      dim = geometry.outerDiameter.toFixed(0);
+      break;
+    case "torsion":
+      d = geometry.wireDiameter.toFixed(1);
+      dim = geometry.meanDiameter.toFixed(0);
+      break;
+    case "conical":
+      d = geometry.wireDiameter.toFixed(1);
+      dim = geometry.largeOuterDiameter.toFixed(0);
+      break;
+    case "dieSpring":
+      d = geometry.wireThickness.toFixed(1);
+      dim = geometry.outerDiameter.toFixed(0);
+      break;
+    case "suspensionSpring":
+      d = geometry.wireDiameter.toFixed(1);
+      dim = geometry.diameterProfile?.DmStart?.toFixed(0) ?? geometry.wireDiameter.toFixed(0);
+      break;
+    default:
+      break;
   }
 
   return `${prefix}-${d}x${dim}-${timestamp}`;
@@ -751,6 +797,8 @@ export function getMeanDiameter(geometry: SpringGeometry): number | null {
     return geometry.outerDiameter - geometry.wireDiameter;
   } else if (geometry.type === "conical") {
     return (geometry.largeOuterDiameter + geometry.smallOuterDiameter) / 2 - geometry.wireDiameter;
+  } else if (geometry.type === "dieSpring") {
+    return geometry.meanDiameter ?? geometry.outerDiameter - geometry.wireThickness;
   } else if (geometry.type === "spiralTorsion") {
     // ⚠️ 螺旋扭转弹簧不使用 meanDiameter 概念
     // 核心参数是 activeLength (L)，不是 Dm

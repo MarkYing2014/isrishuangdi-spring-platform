@@ -12,7 +12,8 @@
 
 "use client";
 
-import { useMemo, useState, lazy, Suspense } from "react";
+import { useMemo, useState, useCallback, lazy, Suspense } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,12 @@ import { Cog, AlertTriangle, CheckCircle, XCircle, Thermometer, Loader2 } from "
 
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { buildPipelineUrl } from "@/lib/pipeline/springPipelines";
+import {
+  useSpringDesignStore,
+  type DieSpringGeometry as StoreDieSpringGeometry,
+  type AnalysisResult as StoreAnalysisResult,
+} from "@/lib/stores/springDesignStore";
+import { mapDieMaterialToStoreMaterial } from "@/lib/engineering/dieSpring/materialAdapter";
 
 const DieSpringVisualizer = lazy(() => import("@/components/three/DieSpringVisualizer"));
 
@@ -48,6 +55,15 @@ import {
 import { buildDieSpringDesignRuleReport } from "@/lib/designRules/dieSpringRules";
 import { buildDieSpringRiskRadar } from "@/lib/riskRadar/builders";
 
+type DutyColor = "blue" | "red" | "gold" | "green";
+
+const DUTY_TO_COLOR: Record<DieSpringDuty, DutyColor> = {
+  LD: "blue",
+  MD: "red",
+  HD: "gold",
+  XHD: "green",
+};
+
 interface DieSpringCalculatorProps {
   isZh?: boolean;
 }
@@ -65,6 +81,9 @@ function ResultRow({ label, value, unit }: { label: string; value: string; unit?
 }
 
 export function DieSpringCalculator({ isZh = false }: DieSpringCalculatorProps) {
+  const router = useRouter();
+  const setDesign = useSpringDesignStore((state) => state.setDesign);
+
   // Geometry state
   const [od_mm, setOd] = useState(25);
   const [freeLength_mm, setFreeLength] = useState(50);
@@ -132,15 +151,94 @@ export function DieSpringCalculator({ isZh = false }: DieSpringCalculatorProps) 
     rodDia: rodDiameter_mm !== undefined ? String(rodDiameter_mm) : undefined,
   }), [od_mm, freeLength_mm, workingLength_mm, coils, wire_b_mm, wire_t_mm, endStyle, material, temperature_C, holeDiameter_mm, rodDiameter_mm]);
 
-  const analysisUrl = useMemo(() => 
-    buildPipelineUrl("/tools/analysis?type=dieSpring", designParams), 
-    [designParams]
-  );
-
   const cadExportUrl = useMemo(() => 
     buildPipelineUrl("/tools/cad-export?type=dieSpring", designParams), 
     [designParams]
   );
+
+  const dutyColor = DUTY_TO_COLOR[duty];
+
+  const handleSendToEngineering = useCallback(() => {
+    if (!result.ok) return;
+
+    const materialInfo = mapDieMaterialToStoreMaterial(material);
+    const designCode = `DS-${Math.round(od_mm)}-${Math.round(freeLength_mm)}-${Date.now()
+      .toString(36)
+      .toUpperCase()}`;
+    const innerDiameter = Math.max(0, od_mm - 2 * wire_b_mm);
+
+    const dieGeometry: StoreDieSpringGeometry = {
+      type: "dieSpring",
+      designCode,
+      dutyColor,
+      outerDiameter: od_mm,
+      innerDiameter,
+      freeLength: freeLength_mm,
+      workingLength: workingLength_mm,
+      totalCoils: coils,
+      wireWidth: wire_b_mm,
+      wireThickness: wire_t_mm,
+      holeDiameter: holeDiameter_mm,
+      rodDiameter: rodDiameter_mm,
+      meanDiameter: result.meanDiameter_mm,
+      solidHeight: result.solidHeight_mm,
+      materialId: materialInfo.id,
+    };
+
+    const analysisResult: StoreAnalysisResult = {
+      springRate: result.springRate_Nmm,
+      springRateUnit: "N/mm",
+      workingLoad: result.loadAtWorking_N,
+      maxLoad: result.deratedLoad_N ?? result.loadAtWorking_N,
+      shearStress: result.stress_MPa,
+      maxStress: result.stress_MPa,
+      springIndex: result.springIndex,
+      workingDeflection: result.travel_mm,
+      maxDeflection: result.travel_mm,
+      solidHeight: result.solidHeight_mm,
+    };
+
+    setDesign({
+      springType: "dieSpring",
+      geometry: dieGeometry,
+      material: materialInfo,
+      analysisResult,
+      meta: {
+        designCode,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+
+    const engineeringUrl = buildPipelineUrl("/tools/engineering/die-spring", {
+      type: "die",
+      designCode,
+      od: String(od_mm),
+      ID: innerDiameter ? String(innerDiameter) : undefined,
+      L0: String(freeLength_mm),
+      Lw: String(workingLength_mm),
+      Nt: String(coils),
+      b: String(wire_b_mm),
+      t: String(wire_t_mm),
+      dutyColor,
+      material,
+    });
+
+    router.push(engineeringUrl);
+  }, [
+    result,
+    material,
+    od_mm,
+    freeLength_mm,
+    workingLength_mm,
+    coils,
+    wire_b_mm,
+    wire_t_mm,
+    holeDiameter_mm,
+    rodDiameter_mm,
+    dutyColor,
+    setDesign,
+    router,
+  ]);
 
   // Compute deflection risk for visualization
   const deflectionRisk = useMemo(() => computeDieSpringRisk({
@@ -419,14 +517,13 @@ export function DieSpringCalculator({ isZh = false }: DieSpringCalculatorProps) 
 
               {/* Action Buttons - 工程分析和CAD出图 */}
               <div className="space-y-3 pt-4 border-t">
-                <Button 
-                  asChild 
-                  variant="outline" 
-                  className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
+                <Button
+                  onClick={handleSendToEngineering}
+                  disabled={!result.ok}
+                  variant="outline"
+                  className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10 disabled:opacity-60"
                 >
-                  <a href={analysisUrl}>
-                    {isZh ? "发送到工程分析 / Engineering Analysis" : "Send to Engineering Analysis / 发送到工程分析"}
-                  </a>
+                  {isZh ? "发送到工程分析 / Engineering Analysis" : "Send to Engineering Analysis / 发送到工程分析"}
                 </Button>
                 <Button 
                   asChild 

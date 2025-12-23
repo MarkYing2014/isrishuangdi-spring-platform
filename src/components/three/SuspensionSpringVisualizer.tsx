@@ -63,6 +63,7 @@ export interface SuspensionSpringVisualizerProps {
   feaForce?: number;          // FEA reaction force (N) for stress calculation
   showStressContour?: boolean; // Toggle stress contour display
   isZh?: boolean;             // Language for legend
+  displayMode?: "geometry" | "engineering";
 }
 
 export function SuspensionSpringVisualizer({
@@ -81,6 +82,7 @@ export function SuspensionSpringVisualizer({
   feaForce,
   showStressContour = false,
   isZh = false,
+  displayMode = "geometry",
 }: SuspensionSpringVisualizerProps) {
   const controlsRef = useRef<any>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");

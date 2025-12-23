@@ -144,16 +144,19 @@ function AnalysisReady({
   designMaterial,
   designAnalysis,
 }: AnalysisReadyProps) {
-  // ⚠️ 注意：spiralTorsion 已在上层被拦截，此函数只处理 wire spring
-  // 不要在这里添加 spiralTorsion 的兼容代码
+  // ⚠️ 注意：spiralTorsion 和 dieSpring 已在上层被拦截，此函数只处理 wire spring
+  // 不要在这里添加 spiralTorsion 或 dieSpring 的兼容代码
   if (designGeometry.type === "spiralTorsion") {
     throw new Error("spiralTorsion should be handled by SpiralTorsionAnalysisPanel");
+  }
+  if (designGeometry.type === "dieSpring") {
+    throw new Error("dieSpring should be handled by DieSpringEngineeringPage");
   }
   
   const springType = designGeometry.type;
   const materialId = designMaterial.id;
   
-  // Wire spring 专用字段 - 不包含 spiralTorsion
+  // Wire spring 专用字段 - 不包含 spiralTorsion 或 dieSpring
   const wireDiameter = designGeometry.wireDiameter;
   const activeCoils = designGeometry.activeCoils;
   const shearModulus = designGeometry.shearModulus ?? designMaterial.shearModulus;

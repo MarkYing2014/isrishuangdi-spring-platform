@@ -512,6 +512,11 @@ export function buildFreeCADRequest(
     };
   }
 
+  // dieSpring 有专用工程分析页面，FreeCAD 导出暂不支持
+  if (geometry.type === "dieSpring") {
+    return null;
+  }
+
   const design: FreeCADExportRequest["design"] = {
     springType: geometry.type,
     wireDiameter: geometry.wireDiameter,
@@ -624,5 +629,8 @@ export function generateFreeCADScript(geometry: SpringGeometry): string {
         stripThickness: geometry.stripThickness,
         handedness: "ccw",
       });
+    case "dieSpring":
+      // dieSpring FreeCAD export not yet implemented
+      return "# Die spring FreeCAD export not yet implemented";
   }
 }

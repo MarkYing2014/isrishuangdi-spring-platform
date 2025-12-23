@@ -62,6 +62,11 @@ export function Calculator3DPreview({
       );
     }
 
+    // dieSpring has its own dedicated visualizer in DieSpringCalculator
+    if (geometry.type === "dieSpring") {
+      return null;
+    }
+
     const shearModulus = geometry.shearModulus ?? material?.shearModulus ?? 79300;
 
     const springRate = analysis?.springRate ?? 10;
