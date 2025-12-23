@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, AlertTriangle, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -174,10 +174,54 @@ interface FeaResult {
   error_message?: string;
 }
 
+// Generate a stable cache key based on design parameters
+function generateFeaCacheKey(geometry: SuspensionGeometry, material: MaterialInfo, calcResult: ReturnType<typeof calculateSuspensionSpring>): string {
+  const keyData = {
+    wd: geometry.wireDiameter.toFixed(2),
+    dm: (geometry.diameterProfile?.DmStart ?? 100).toFixed(1),
+    na: geometry.activeCoils.toFixed(1),
+    nt: geometry.totalCoils.toFixed(1),
+    l0: geometry.freeLength.toFixed(1),
+    G: material.shearModulus,
+    rh: calcResult.rideHeight_mm.toFixed(1),
+    bh: calcResult.bumpHeight_mm.toFixed(1),
+  };
+  return `fea-cache-${JSON.stringify(keyData)}`;
+}
+
 function FeaTab({ isZh, geometry, material, calcResult, analysis, onFeaComplete }: FeaTabProps) {
   const [feaStatus, setFeaStatus] = useState<"idle" | "running" | "done" | "error">("idle");
   const [feaResult, setFeaResult] = useState<FeaResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Cache key based on design parameters
+  const cacheKey = useMemo(() => 
+    generateFeaCacheKey(geometry, material, calcResult),
+  [geometry, material, calcResult]);
+
+  // Load cached result on mount or when cache key changes
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsedResult: FeaResult = JSON.parse(cached);
+        setFeaResult(parsedResult);
+        setFeaStatus(parsedResult.status === "success" ? "done" : "error");
+        // Also notify parent of cached force
+        if (parsedResult.status === "success" && parsedResult.results?.steps[0]?.reaction_force_z) {
+          onFeaComplete?.(parsedResult.results.steps[0].reaction_force_z);
+        }
+      } else {
+        // No cache for new design - reset state
+        setFeaResult(null);
+        setFeaStatus("idle");
+        onFeaComplete?.(null);
+      }
+    } catch (e) {
+      // Ignore localStorage errors
+      console.warn("Failed to load FEA cache:", e);
+    }
+  }, [cacheKey, onFeaComplete]);
 
   const runFea = useCallback(async () => {
     setFeaStatus("running");
@@ -219,6 +263,13 @@ function FeaTab({ isZh, geometry, material, calcResult, analysis, onFeaComplete 
       setFeaStatus(result.status === "success" ? "done" : "error");
       if (result.error_message) setErrorMsg(result.error_message);
       
+      // Save to cache
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(result));
+      } catch (e) {
+        console.warn("Failed to save FEA cache:", e);
+      }
+      
       // Notify parent of FEA completion with reaction force
       if (result.status === "success" && result.results?.steps[0]?.reaction_force_z) {
         onFeaComplete?.(result.results.steps[0].reaction_force_z);
@@ -231,7 +282,7 @@ function FeaTab({ isZh, geometry, material, calcResult, analysis, onFeaComplete 
       setErrorMsg(String(err));
       onFeaComplete?.(null);
     }
-  }, [geometry, material, calcResult, onFeaComplete]);
+  }, [geometry, material, calcResult, cacheKey, onFeaComplete]);
 
   return (
     <Card>
