@@ -164,6 +164,20 @@ export interface SuspensionGeometry {
   shearModulus?: number;
 }
 
+/** 波形弹簧几何参数 (Crest-to-crest) */
+export interface WaveSpringGeometry {
+  type: "wave";
+  id: number; // 内径
+  od: number; // 外径
+  thickness_t: number;
+  radialWall_b: number;
+  turns_Nt: number;
+  wavesPerTurn_Nw: number;
+  freeHeight_Hf: number;
+  workingHeight_Hw: number;
+  materialId?: SpringMaterialId;
+}
+
 /** 所有几何参数联合类型 - 这是 Store 的核心类型 */
 export type SpringGeometry =
   | CompressionGeometry
@@ -172,7 +186,8 @@ export type SpringGeometry =
   | ConicalGeometry
   | DieSpringGeometry
   | SpiralTorsionGeometry
-  | SuspensionGeometry;
+  | SuspensionGeometry
+  | WaveSpringGeometry;
 
 // ============================================================================
 // 材料信息
@@ -332,6 +347,11 @@ export function isConicalDesign(design: SpringGeometry | null): design is Conica
 /** 检查是否为模具弹簧设计 */
 export function isDieSpringDesign(design: SpringGeometry | null): design is DieSpringGeometry {
   return design?.type === "dieSpring";
+}
+
+/** 检查是否为波形弹簧设计 */
+export function isWaveSpringDesign(design: SpringGeometry | null): design is WaveSpringGeometry {
+  return design?.type === "wave";
 }
 
 // ============================================================================
@@ -740,6 +760,7 @@ export function generateDesignCode(geometry: SpringGeometry): string {
     dieSpring: "DS",
     spiralTorsion: "STS",
     suspensionSpring: "SUS",
+    wave: "WS",
   };
   const prefix = prefixMap[geometry.type];
 
@@ -778,6 +799,10 @@ export function generateDesignCode(geometry: SpringGeometry): string {
       d = geometry.wireDiameter.toFixed(1);
       dim = geometry.diameterProfile?.DmStart?.toFixed(0) ?? geometry.wireDiameter.toFixed(0);
       break;
+    case "wave":
+      d = geometry.thickness_t.toFixed(2);
+      dim = geometry.od.toFixed(0);
+      break;
     default:
       break;
   }
@@ -797,6 +822,8 @@ export function getMeanDiameter(geometry: SpringGeometry): number | null {
     return geometry.outerDiameter - geometry.wireDiameter;
   } else if (geometry.type === "conical") {
     return (geometry.largeOuterDiameter + geometry.smallOuterDiameter) / 2 - geometry.wireDiameter;
+  } else if (geometry.type === "wave") {
+    return (geometry.od + geometry.id) / 2;
   } else if (geometry.type === "dieSpring") {
     return geometry.meanDiameter ?? geometry.outerDiameter - geometry.wireThickness;
   } else if (geometry.type === "spiralTorsion") {

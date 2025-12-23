@@ -14,6 +14,7 @@
 
 import { useMemo, useState, useCallback, lazy, Suspense } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/components/language-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,7 +81,10 @@ function ResultRow({ label, value, unit }: { label: string; value: string; unit?
   );
 }
 
-export function DieSpringCalculator({ isZh = false }: DieSpringCalculatorProps) {
+export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps) {
+  const { language } = useLanguage();
+  const isZh = propIsZh ?? (language === "zh");
+
   const router = useRouter();
   const setDesign = useSpringDesignStore((state) => state.setDesign);
 
@@ -261,7 +265,7 @@ export function DieSpringCalculator({ isZh = false }: DieSpringCalculatorProps) 
       {/* Design Rules Panel */}
       <DesignRulePanel
         report={designRuleReport}
-        title={isZh ? "设计规则 / Design Rules" : "Design Rules"}
+        title={isZh ? "设计规范校核" : "Design Rule Check"}
       />
 
       <Card>
@@ -523,7 +527,7 @@ export function DieSpringCalculator({ isZh = false }: DieSpringCalculatorProps) 
                   variant="outline"
                   className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10 disabled:opacity-60"
                 >
-                  {isZh ? "发送到工程分析 / Engineering Analysis" : "Send to Engineering Analysis / 发送到工程分析"}
+                  {isZh ? "发送到工程分析" : "Send to Engineering Analysis"}
                 </Button>
                 <Button 
                   asChild 
@@ -532,7 +536,7 @@ export function DieSpringCalculator({ isZh = false }: DieSpringCalculatorProps) 
                   disabled={!result.ok}
                 >
                   <a href={cadExportUrl}>
-                    {isZh ? "导出 CAD / Export CAD" : "Export CAD / 导出 CAD"}
+                    {isZh ? "导出 CAD 模型" : "Export CAD Model"}
                   </a>
                 </Button>
               </div>
@@ -647,7 +651,7 @@ export function DieSpringCalculator({ isZh = false }: DieSpringCalculatorProps) 
                     value={fmt(result.springIndex)}
                   />
                   <ResultRow
-                    label="b/t"
+                    label={isZh ? "b/t 比" : "b/t Ratio"}
                     value={fmt(wire_b_mm / wire_t_mm)}
                   />
                 </div>

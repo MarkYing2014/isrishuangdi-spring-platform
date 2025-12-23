@@ -12,6 +12,8 @@
 "use client";
 
 import { useMemo, useState, lazy, Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { useLanguage } from "@/components/language-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +42,7 @@ import {
 } from "@/lib/waveSpring/math";
 import { buildWaveSpringDesignRuleReport } from "@/lib/designRules/waveSpringRules";
 import { buildWaveRiskRadar } from "@/lib/riskRadar/builders";
+import { useSpringDesignStore } from "@/lib/stores/springDesignStore";
 
 const WaveSpringVisualizer = lazy(() => import("@/components/three/WaveSpringVisualizer"));
 
@@ -59,7 +62,11 @@ function ResultRow({ label, value, unit }: { label: string; value: string; unit?
   );
 }
 
-export function WaveSpringCalculator({ isZh = false }: WaveSpringCalculatorProps) {
+export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorProps) {
+  const router = useRouter();
+  const setDesign = useSpringDesignStore((state) => state.setDesign);
+  const { language } = useLanguage();
+  const isZh = propIsZh ?? (language === "zh");
   // Geometry state
   const [id, setId] = useState(20);
   const [od, setOd] = useState(30);
@@ -132,6 +139,32 @@ export function WaveSpringCalculator({ isZh = false }: WaveSpringCalculatorProps
     buildPipelineUrl("/tools/cad-export?type=wave", designParams), 
     [designParams]
   );
+
+  const handleSendToEngineering = () => {
+    setDesign({
+      springType: "wave",
+      geometry: {
+        type: "wave",
+        ...input.geometry
+      },
+      material: {
+        id: materialId as any,
+        name: input.material?.name || "17-7PH",
+        elasticModulus: E_MPa,
+        shearModulus: E_MPa / (2 * (1 + 0.3)), // estimate
+        density: 7800,
+      },
+      analysisResult: {
+        springRate: result.springRate_Nmm,
+        springRateUnit: "N/mm",
+        workingLoad: result.loadAtWorkingHeight_N,
+        maxStress: result.stressMax_MPa,
+        springIndex: result.meanDiameter_mm / thickness_t,
+        workingDeflection: result.travel_mm,
+      }
+    });
+    router.push("/tools/engineering/wave-spring");
+  };
 
   // Format number helper
   const fmt = (n: number, decimals = 2) => {
@@ -325,13 +358,11 @@ export function WaveSpringCalculator({ isZh = false }: WaveSpringCalculatorProps
               {/* Action Buttons - 工程分析和CAD出图 */}
               <div className="space-y-3 pt-4 border-t">
                 <Button 
-                  asChild 
+                  onClick={handleSendToEngineering}
                   variant="outline" 
-                  className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
+                   className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
                 >
-                  <a href={analysisUrl}>
-                    {isZh ? "发送到工程分析 / Engineering Analysis" : "Send to Engineering Analysis / 发送到工程分析"}
-                  </a>
+                  {isZh ? "发送到工程分析 / Engineering Analysis" : "Send to Engineering Analysis / 发送到工程分析"}
                 </Button>
                 <Button 
                   asChild 

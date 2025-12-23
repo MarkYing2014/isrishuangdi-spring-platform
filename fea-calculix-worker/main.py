@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from inp_generator import (
-    SuspensionSpringGeometry,
+    SpringGeometry,
     Material,
     LoadCase,
     generate_inp
@@ -35,7 +35,10 @@ from result_parser import parse_all_results, results_to_json
 
 class GeometryInput(BaseModel):
     """Spring geometry from frontend"""
-    wire_diameter: float = Field(..., description="Wire diameter in mm")
+    section_type: str = Field(default="CIRC", description="CIRC or RECT")
+    wire_diameter: float = Field(default=0.0, description="Wire diameter in mm (for CIRC)")
+    wire_width: float = Field(default=0.0, description="Wire width in mm (radial 't' for RECT)")
+    wire_thickness: float = Field(default=0.0, description="Wire thickness in mm (axial 'b' for RECT)")
     mean_diameter: float = Field(..., description="Mean coil diameter in mm")
     active_coils: float = Field(..., description="Number of active coils")
     total_coils: float = Field(..., description="Total coils including dead coils")
@@ -139,8 +142,11 @@ async def run_fea_job(request: FeaJobRequest):
     
     try:
         # Convert input to internal types
-        geom = SuspensionSpringGeometry(
+        geom = SpringGeometry(
+            section_type=request.geometry.section_type,
             wire_diameter=request.geometry.wire_diameter,
+            wire_width=request.geometry.wire_width,
+            wire_thickness=request.geometry.wire_thickness,
             mean_diameter=request.geometry.mean_diameter,
             active_coils=request.geometry.active_coils,
             total_coils=request.geometry.total_coils,
@@ -247,8 +253,11 @@ async def run_fea_job(request: FeaJobRequest):
 @app.post("/debug/inp")
 async def debug_generate_inp(request: FeaJobRequest):
     """Generate and return .inp file content without running FEA"""
-    geom = SuspensionSpringGeometry(
+    geom = SpringGeometry(
+        section_type=request.geometry.section_type,
         wire_diameter=request.geometry.wire_diameter,
+        wire_width=request.geometry.wire_width,
+        wire_thickness=request.geometry.wire_thickness,
         mean_diameter=request.geometry.mean_diameter,
         active_coils=request.geometry.active_coils,
         total_coils=request.geometry.total_coils,
@@ -360,8 +369,11 @@ async def debug_raw_files(request: FeaJobRequest):
     job_name = "spring"
     
     try:
-        geom = SuspensionSpringGeometry(
+        geom = SpringGeometry(
+            section_type=request.geometry.section_type or "CIRC",
             wire_diameter=request.geometry.wire_diameter,
+            wire_width=request.geometry.wire_width,
+            wire_thickness=request.geometry.wire_thickness,
             mean_diameter=request.geometry.mean_diameter,
             active_coils=request.geometry.active_coils,
             total_coils=request.geometry.total_coils,

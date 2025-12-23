@@ -58,7 +58,7 @@ export function computeDieSpringEngineeringSummary(
     return DEFAULT_SUMMARY;
   }
 
-  const { analysisResult, geometry, catalogEntry, operatingTemperature_C, dieMaterialType } = input;
+  const { analysisResult, geometry, material, catalogEntry, operatingTemperature_C, dieMaterialType } = input;
 
   // Deflection percent
   const travel = geometry.freeLength - geometry.workingLength;
@@ -66,7 +66,9 @@ export function computeDieSpringEngineeringSummary(
     geometry.freeLength > 0 ? travel / geometry.freeLength : null;
 
   // Stress ratio (shear stress / yield strength approximation)
-  const stressRatio = analysisResult.shearStress ?? analysisResult.maxStress ?? null;
+  const yieldStrength = material.tensileStrength ? material.tensileStrength * 0.7 : 1400;
+  const stress_MPa = analysisResult.shearStress ?? analysisResult.maxStress ?? 0;
+  const stressRatio = stress_MPa / yieldStrength;
 
   // Cycle life level based on deflection vs duty max
   const dutyCode = geometry.dutyColor
@@ -106,9 +108,9 @@ export function computeDieSpringEngineeringSummary(
 
   // Design status
   let designStatus: "PASS" | "MARGINAL" | "FAIL" = "PASS";
-  if (cycleLifeLevel === "LOW" || guideRisk === "HIGH") {
+  if (cycleLifeLevel === "LOW" || guideRisk === "HIGH" || stressRatio > 1.0) {
     designStatus = "FAIL";
-  } else if (cycleLifeLevel === "MEDIUM" || guideRisk === "MEDIUM") {
+  } else if (cycleLifeLevel === "MEDIUM" || guideRisk === "MEDIUM" || stressRatio > 0.85) {
     designStatus = "MARGINAL";
   }
 
