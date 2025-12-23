@@ -32,7 +32,8 @@ import { EXTENSION_HOOK_LABELS, type ExtensionHookType, type SpringType } from "
 import Link from "next/link";
 import { Brain } from "lucide-react";
 import { SpiralTorsionAnalysisPanel } from "@/components/analysis/SpiralTorsionAnalysisPanel";
-import { isSpiralTorsionDesign } from "@/lib/stores/springDesignStore";
+import { SuspensionAnalysisPanel } from "@/components/analysis/SuspensionAnalysisPanel";
+import { isSpiralTorsionDesign, isSuspensionDesign } from "@/lib/stores/springDesignStore";
 
 // Dynamic imports for 3D visualizers
 const CompressionSpringVisualizer = dynamic(
@@ -117,7 +118,19 @@ function AnalysisContent() {
     );
   }
 
-  // Wire spring (compression/extension/torsion/conical) 使用原有分析面板
+  // Suspension Spring uses dedicated analysis panel
+  if (isSuspensionDesign(designGeometry)) {
+    return (
+      <SuspensionAnalysisPanel
+        isZh={isZh}
+        geometry={designGeometry}
+        material={designMaterial}
+        analysisResult={designAnalysis}
+      />
+    );
+  }
+
+  // Wire spring (compression/extension/torsion/conical) uses original analysis panel
   return (
     <AnalysisReady
       isZh={isZh}

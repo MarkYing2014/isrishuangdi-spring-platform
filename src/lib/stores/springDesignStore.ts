@@ -764,3 +764,8 @@ export function getMeanDiameter(geometry: SpringGeometry): number | null {
 export function isSpiralTorsionDesign(design: SpringGeometry | null): design is SpiralTorsionGeometry {
   return design?.type === "spiralTorsion";
 }
+
+/** 检查是否为减震器弹簧设计 */
+export function isSuspensionDesign(design: SpringGeometry | null): design is SuspensionGeometry {
+  return design?.type === "suspensionSpring";
+}
