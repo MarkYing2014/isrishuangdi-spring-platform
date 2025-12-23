@@ -30,10 +30,42 @@ export function computeWaveSpringEngineeringSummary(
     const { geometry } = input;
     const yieldStrength = material?.tensileStrength ? material.tensileStrength * 0.8 : 1170; // fallback to 17-7PH approx
 
-    // Use an equivalent crest stress model for Wave Springs
-    // Dividing by a distribution factor (conservative estimate of wave peak sharing)
-    const rawStressRatio = result.stressMax_MPa / yieldStrength;
-    const stressIndex = rawStressRatio / 3.0; // Scaled to reflect multi-wave load distribution
+    // 1. Engineering Parameters from Geometry
+    const b = geometry.radialWall_b; // Radial wall width
+    const t = geometry.thickness_t; // Strip thickness
+    const nW = geometry.wavesPerTurn_Nw;
+    const nT = geometry.turns_Nt;
+    const Dm = (geometry.od + geometry.id) / 2;
+
+    // 2. Load Sharing Factor (N_eff)
+    // eta = 0.75 (User provided default: 0.6~0.85)
+    const eta = 0.75;
+    const N_eff = nW * nT * eta;
+
+    // 3. Effective Bending Length (L_eff)
+    // kappa_L = 0.30 (User provided default: 0.25~0.35)
+    const kappa_L = 0.30;
+    const L_eff = (Math.PI * Dm / nW) * kappa_L;
+
+    // 4. Maximum Bending Moment (M_max)
+    // Distribute total load F_work to each effective wave
+    const F_work = result.loadAtWorkingHeight_N;
+    const F_i = F_work / N_eff;
+
+    // kappa_M = 1.3 (User provided default: 1.1~1.5)
+    // Empirical correction for contact/constraint
+    const kappa_M = 1.3;
+    const M_max = F_i * L_eff * kappa_M;
+
+    // 5. Equivalent Crest Bending Stress (sigma_b_eq)
+    // Section Modulus Z = b * t^2 / 6
+    const Z = (b * Math.pow(t, 2)) / 6;
+
+    // sigma_b_eq = M_max / Z
+    const sigma_b_eq = M_max / Z;
+
+    // Utilization / Stress Index
+    const stressIndex = sigma_b_eq / yieldStrength;
 
     const solidHeight = geometry.turns_Nt * geometry.thickness_t;
     const solidClearance = geometry.workingHeight_Hw - solidHeight;
@@ -44,12 +76,12 @@ export function computeWaveSpringEngineeringSummary(
 
     if (stressIndex > 0.9) {
         designStatus = "FAIL";
-        verdict = "Stress Index exceeds safe limits (>90%) - permanent deformation likely.";
-        verdictZh = "等效应力指标超过安全限值 (>90%) - 可能发生永久变形。";
+        verdict = `High equivalent crest stress (${(stressIndex * 100).toFixed(0)}%). Risk of permanent set.`;
+        verdictZh = `等效波峰利用率过高 (${(stressIndex * 100).toFixed(0)}%)。存在永久变形风险。`;
     } else if (stressIndex > 0.8) {
         designStatus = "MARGINAL";
-        verdict = "Stress Index is high (>80%) - use with caution.";
-        verdictZh = "等效应力指标较高 (>80%) - 请谨慎使用。";
+        verdict = `Stress Utilization > 80% (${(stressIndex * 100).toFixed(0)}%). Fatigue life may be limited.`;
+        verdictZh = `应力利用率 > 80% (${(stressIndex * 100).toFixed(0)}%)。疲劳寿命可能受限。`;
     }
 
     if (solidClearance < 0.5 && designStatus !== "FAIL") {
@@ -70,11 +102,11 @@ export function computeWaveSpringEngineeringSummary(
         verdictZh,
         kWork: result.springRate_Nmm,
         fWork: result.loadAtWorkingHeight_N,
-        stressMax: result.stressMax_MPa / 3.0, // Scaled for equivalent crest stress
+        stressMax: sigma_b_eq,
         stressIndex,
         solidHeight,
         solidClearance,
-        safetyFactor: yieldStrength / (result.stressMax_MPa / 3.0),
+        safetyFactor: yieldStrength / sigma_b_eq,
     };
 }
 

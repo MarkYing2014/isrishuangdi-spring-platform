@@ -26,6 +26,10 @@ from inp_generator import (
     LoadCase,
     generate_inp
 )
+from wave_shell_generator import (
+    WaveSpringGeometry, 
+    generate_wave_shell_inp
+)
 from result_parser import parse_all_results, results_to_json
 
 
@@ -49,6 +53,11 @@ class GeometryInput(BaseModel):
     dm_start: Optional[float] = None
     dm_mid: Optional[float] = None
     dm_end: Optional[float] = None
+    
+    # Wave Spring specific
+    waves_per_turn: Optional[float] = None
+    inner_diameter: Optional[float] = None
+    outer_diameter: Optional[float] = None
 
 
 class MaterialInput(BaseModel):
@@ -174,14 +183,45 @@ async def run_fea_job(request: FeaJobRequest):
             request.mesh_level, 36
         )
         
-        # Generate .inp file
-        inp_content = generate_inp(
-            geom=geom,
-            material=material,
-            loadcases=loadcases,
-            design_code=request.design_code,
-            segments_per_coil=segments_per_coil
-        )
+        # Prepare .inp content variable
+        inp_content = ""
+
+        # Branching: Wave Spring Shell vs Standard Beam
+        if request.geometry.section_type == "WAVE_SHELL":
+            # Map parameters for Wave Spring
+            wave_id = request.geometry.inner_diameter or (request.geometry.mean_diameter - request.geometry.wire_width)
+            wave_od = request.geometry.outer_diameter or (request.geometry.mean_diameter + request.geometry.wire_width)
+            
+            wave_geom = WaveSpringGeometry(
+                id=wave_id,
+                od=wave_od,
+                t=request.geometry.wire_thickness,
+                b=request.geometry.wire_width,
+                n_w=request.geometry.waves_per_turn or 3.5,
+                n_t=request.geometry.active_coils,
+                h0=request.geometry.free_length
+            )
+            
+            # Calculate compression delta from first loadcase
+            target_h = request.loadcases[0].target_height if request.loadcases else (request.geometry.free_length * 0.5)
+            delta_max = wave_geom.h0 - target_h
+            if delta_max < 0: delta_max = 0.1
+            
+            inp_content = generate_wave_shell_inp(
+                geometry=wave_geom,
+                material=material,
+                delta_max=delta_max,
+                design_code=request.design_code
+            )
+        else:
+            # Standard Helical/Rectangular Beam Generation
+            inp_content = generate_inp(
+                geom=geom,
+                material=material,
+                loadcases=loadcases,
+                design_code=request.design_code,
+                segments_per_coil=segments_per_coil
+            )
         
         inp_path = job_dir / f"{job_name}.inp"
         inp_path.write_text(inp_content)
