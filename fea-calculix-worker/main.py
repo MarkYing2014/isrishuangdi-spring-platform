@@ -30,6 +30,7 @@ from wave_shell_generator import (
     WaveSpringGeometry, 
     generate_wave_shell_inp
 )
+from wave_beam_generator import generate_wave_beam_inp
 from result_parser import parse_all_results, results_to_json
 
 
@@ -208,6 +209,32 @@ async def run_fea_job(request: FeaJobRequest):
             if delta_max < 0: delta_max = 0.1
             
             inp_content = generate_wave_shell_inp(
+                geometry=wave_geom,
+                material=material,
+                delta_max=delta_max,
+                design_code=request.design_code
+            )
+        elif request.geometry.section_type == "WAVE_BEAM":
+            # Wave Spring Beam Logic (B32)
+            wave_id = request.geometry.inner_diameter or (request.geometry.mean_diameter - request.geometry.wire_width)
+            wave_od = request.geometry.outer_diameter or (request.geometry.mean_diameter + request.geometry.wire_width)
+            
+            wave_geom = WaveSpringGeometry(
+                id=wave_id,
+                od=wave_od,
+                t=request.geometry.wire_thickness,
+                b=request.geometry.wire_width,
+                n_w=request.geometry.waves_per_turn or 3.5,
+                n_t=request.geometry.active_coils,
+                h0=request.geometry.free_length
+            )
+            
+            # Calculate compression delta
+            target_h = request.loadcases[0].target_height if request.loadcases else (request.geometry.free_length * 0.5)
+            delta_max = wave_geom.h0 - target_h
+            if delta_max < 0: delta_max = 0.1
+            
+            inp_content = generate_wave_beam_inp(
                 geometry=wave_geom,
                 material=material,
                 delta_max=delta_max,
