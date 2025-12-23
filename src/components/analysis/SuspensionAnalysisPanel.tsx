@@ -144,6 +144,7 @@ interface FeaTabProps {
   material: MaterialInfo;
   calcResult: ReturnType<typeof calculateSuspensionSpring>;
   analysis: SuspensionAnalysisResult;
+  onFeaComplete?: (force: number | null) => void;  // Callback when FEA completes with reaction force
 }
 
 interface FeaResult {
@@ -173,7 +174,7 @@ interface FeaResult {
   error_message?: string;
 }
 
-function FeaTab({ isZh, geometry, material, calcResult, analysis }: FeaTabProps) {
+function FeaTab({ isZh, geometry, material, calcResult, analysis, onFeaComplete }: FeaTabProps) {
   const [feaStatus, setFeaStatus] = useState<"idle" | "running" | "done" | "error">("idle");
   const [feaResult, setFeaResult] = useState<FeaResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -218,11 +219,19 @@ function FeaTab({ isZh, geometry, material, calcResult, analysis }: FeaTabProps)
       setFeaStatus(result.status === "success" ? "done" : "error");
       if (result.error_message) setErrorMsg(result.error_message);
       
+      // Notify parent of FEA completion with reaction force
+      if (result.status === "success" && result.results?.steps[0]?.reaction_force_z) {
+        onFeaComplete?.(result.results.steps[0].reaction_force_z);
+      } else {
+        onFeaComplete?.(null);
+      }
+      
     } catch (err) {
       setFeaStatus("error");
       setErrorMsg(String(err));
+      onFeaComplete?.(null);
     }
-  }, [geometry, material, calcResult]);
+  }, [geometry, material, calcResult, onFeaComplete]);
 
   return (
     <Card>
@@ -390,6 +399,10 @@ export function SuspensionAnalysisPanel({
       solidMargin_mm: 3,
     },
   }), [geometry, material]);
+
+  // FEA stress visualization state
+  const [feaForce, setFeaForce] = useState<number | null>(null);
+  const [showStressContour, setShowStressContour] = useState(true);
 
   const calcResult = useMemo(() => calculateSuspensionSpring(input), [input]);
 
@@ -630,6 +643,7 @@ export function SuspensionAnalysisPanel({
                 material={material}
                 calcResult={calcResult}
                 analysis={analysis}
+                onFeaComplete={(force) => setFeaForce(force)}
               />
             </TabsContent>
           </Tabs>
@@ -656,6 +670,9 @@ export function SuspensionAnalysisPanel({
                   springRate={calcResult.springRate_N_per_mm}
                   pitchProfile={geometry.pitchProfile}
                   diameterProfile={geometry.diameterProfile}
+                  feaForce={feaForce ?? undefined}
+                  showStressContour={showStressContour && feaForce !== null}
+                  isZh={isZh}
                 />
               </div>
               <p className="text-xs text-muted-foreground text-center mt-2">

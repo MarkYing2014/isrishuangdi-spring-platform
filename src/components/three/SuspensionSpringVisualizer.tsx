@@ -6,6 +6,7 @@ import { OrbitControls } from "@react-three/drei";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
 import { SuspensionSpringMesh } from "./SuspensionSpringMesh";
+import { StressSpringModel, StressColorLegend } from "./StressSpringModel";
 import { previewTheme } from "@/lib/three/previewTheme";
 
 const VIEW_PRESETS = {
@@ -58,6 +59,10 @@ export interface SuspensionSpringVisualizerProps {
   springRate: number;
   pitchProfile?: PitchProfile;
   diameterProfile?: DiameterProfile;
+  // FEA stress visualization
+  feaForce?: number;          // FEA reaction force (N) for stress calculation
+  showStressContour?: boolean; // Toggle stress contour display
+  isZh?: boolean;             // Language for legend
 }
 
 export function SuspensionSpringVisualizer({
@@ -73,6 +78,9 @@ export function SuspensionSpringVisualizer({
   springRate,
   pitchProfile,
   diameterProfile,
+  feaForce,
+  showStressContour = false,
+  isZh = false,
 }: SuspensionSpringVisualizerProps) {
   const controlsRef = useRef<any>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
@@ -121,18 +129,30 @@ export function SuspensionSpringVisualizer({
           intensity={previewTheme.lights.point.intensity}
         />
 
-        <SuspensionSpringMesh
-          wireDiameter={wireDiameter}
-          activeCoils={activeCoils}
-          totalCoils={totalCoils}
-          freeLength={freeLength}
-          currentDeflection={currentDeflection}
-          stressRatio={stressRatio}
-          solidHeight={solidHeight}
-          scale={scale}
-          pitchProfile={pitchProfile}
-          diameterProfile={diameterProfile}
-        />
+        {showStressContour && feaForce && feaForce > 0 ? (
+          <StressSpringModel
+            wireDiameter={wireDiameter}
+            meanDiameter={meanDiameter}
+            activeCoils={activeCoils}
+            pitch={(freeLength - wireDiameter * totalCoils) / activeCoils}
+            totalCoils={totalCoils}
+            axialForce={feaForce}
+            showStress={true}
+          />
+        ) : (
+          <SuspensionSpringMesh
+            wireDiameter={wireDiameter}
+            activeCoils={activeCoils}
+            totalCoils={totalCoils}
+            freeLength={freeLength}
+            currentDeflection={currentDeflection}
+            stressRatio={stressRatio}
+            solidHeight={solidHeight}
+            scale={scale}
+            pitchProfile={pitchProfile}
+            diameterProfile={diameterProfile}
+          />
+        )}
 
         <OrbitControls
           ref={controlsRef}
@@ -232,6 +252,25 @@ export function SuspensionSpringVisualizer({
           </div>
         </div>
       </div>
+
+      {/* Stress Color Legend when contour is active */}
+      {showStressContour && feaForce && feaForce > 0 && (() => {
+        // Calculate stress range for legend
+        const c = meanDiameter / wireDiameter;
+        const K = (4 * c - 1) / (4 * c - 4) + 0.615 / c;
+        const tauMax = (8 * feaForce * K * meanDiameter) / (Math.PI * Math.pow(wireDiameter, 3));
+        const tauMin = tauMax * 0.2; // Dead coil minimum
+        
+        return (
+          <div className="absolute bottom-14 left-2 right-2 rounded bg-white/95 px-2 py-2 shadow">
+            <StressColorLegend
+              minStress={tauMin}
+              maxStress={tauMax}
+              isZh={isZh}
+            />
+          </div>
+        );
+      })()}
     </div>
   );
 }
