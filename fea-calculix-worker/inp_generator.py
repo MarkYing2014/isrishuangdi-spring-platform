@@ -22,10 +22,11 @@ class Node:
 
 @dataclass
 class Element:
-    """Beam element connecting two nodes"""
+    """Beam element connecting three nodes (for B32 quadratic)"""
     id: int
-    n1: int
-    n2: int
+    n1: int  # Start node
+    n2: int  # End node  
+    n3: int  # Middle node (for B32)
 
 
 @dataclass
@@ -67,7 +68,7 @@ class LoadCase:
 def generate_centerline(geom: SuspensionSpringGeometry, segments_per_coil: int = 36) -> List[Tuple[float, float, float]]:
     """
     Generate centerline points for helical spring.
-    Returns list of (x, y, z) tuples.
+    Returns list of (x, y, z) tuples with monotonically increasing Z.
     """
     total_angle = geom.total_coils * 2 * math.pi
     num_points = int(geom.total_coils * segments_per_coil)
@@ -76,11 +77,19 @@ def generate_centerline(geom: SuspensionSpringGeometry, segments_per_coil: int =
     dead_coils_per_end = (geom.total_coils - geom.active_coils) / 2
     dead_angle = dead_coils_per_end * 2 * math.pi
     
-    # Calculate pitch
-    active_length = geom.free_length - geom.wire_diameter * geom.total_coils
-    base_pitch = active_length / geom.active_coils if geom.active_coils > 0 else 0
+    # Calculate pitch for active and dead coils
+    # Total height = dead_height_bottom + active_height + dead_height_top
+    dead_pitch = geom.wire_diameter  # Tight coils
+    active_pitch = (geom.free_length - geom.wire_diameter * dead_coils_per_end * 2 - geom.wire_diameter * geom.active_coils) / geom.active_coils if geom.active_coils > 0 else 0
+    
+    # Ensure positive pitch
+    if active_pitch < geom.wire_diameter:
+        active_pitch = geom.wire_diameter
     
     points = []
+    z = 0.0  # Start at z=0
+    prev_theta = 0.0
+    
     for i in range(num_points + 1):
         theta = (i / num_points) * total_angle
         t = i / num_points  # Normalized position 0-1
@@ -93,19 +102,21 @@ def generate_centerline(geom: SuspensionSpringGeometry, segments_per_coil: int =
         
         radius = dm / 2
         
-        # Pitch calculation with dead coils
+        # Determine pitch based on position
         if theta < dead_angle:
-            # Bottom dead coils - minimal pitch
-            pitch = geom.wire_diameter
+            pitch = dead_pitch
         elif theta > total_angle - dead_angle:
-            # Top dead coils - minimal pitch
-            pitch = geom.wire_diameter
+            pitch = dead_pitch
         else:
-            # Active coils - normal pitch
-            pitch = base_pitch
+            pitch = active_pitch
         
-        # Z position (cumulative height)
-        z = (theta / (2 * math.pi)) * (pitch + geom.wire_diameter)
+        # Cumulative Z: add height increment since last point
+        if i > 0:
+            delta_theta = theta - prev_theta
+            delta_z = (delta_theta / (2 * math.pi)) * (pitch + geom.wire_diameter)
+            z += delta_z
+        
+        prev_theta = theta
         
         # X, Y from helix
         x = radius * math.cos(theta)
@@ -117,15 +128,34 @@ def generate_centerline(geom: SuspensionSpringGeometry, segments_per_coil: int =
 
 
 def create_nodes_elements(centerline: List[Tuple[float, float, float]]) -> Tuple[List[Node], List[Element]]:
-    """Convert centerline points to FEA nodes and beam elements"""
+    """
+    Convert centerline points to FEA nodes and B32 beam elements.
+    B32 quadratic beam elements require 3 nodes: start, end, and midpoint.
+    """
     nodes = []
     elements = []
     
+    # First, add all centerline points as corner nodes
     for i, (x, y, z) in enumerate(centerline):
         nodes.append(Node(id=i+1, x=x, y=y, z=z))
     
+    num_corner_nodes = len(centerline)
+    
+    # Then add midpoint nodes for each element and create elements
     for i in range(len(centerline) - 1):
-        elements.append(Element(id=i+1, n1=i+1, n2=i+2))
+        # Corner node IDs (1-indexed)
+        n1_id = i + 1
+        n2_id = i + 2
+        
+        # Create midpoint node
+        mid_id = num_corner_nodes + i + 1
+        x_mid = (centerline[i][0] + centerline[i+1][0]) / 2
+        y_mid = (centerline[i][1] + centerline[i+1][1]) / 2
+        z_mid = (centerline[i][2] + centerline[i+1][2]) / 2
+        nodes.append(Node(id=mid_id, x=x_mid, y=y_mid, z=z_mid))
+        
+        # Create element with node order: start, end, mid (CalculiX B32 format)
+        elements.append(Element(id=i+1, n1=n1_id, n2=n2_id, n3=mid_id))
     
     return nodes, elements
 
@@ -143,9 +173,9 @@ Suspension Spring FEA (Beam Model) - {{ design_code }}
 ** NODES
 ** -----------------------------------------------
 *NODE, NSET=ALL
-{% for node in nodes %}
+{%- for node in nodes %}
 {{ node.id }}, {{ "%.6f"|format(node.x) }}, {{ "%.6f"|format(node.y) }}, {{ "%.6f"|format(node.z) }}
-{% endfor %}
+{%- endfor %}
 
 ** Node sets for boundary conditions
 *NSET, NSET=BOTTOM
@@ -157,17 +187,17 @@ Suspension Spring FEA (Beam Model) - {{ design_code }}
 ** -----------------------------------------------
 ** ELEMENTS
 ** -----------------------------------------------
-*ELEMENT, TYPE=B31, ELSET=SPRING
-{% for elem in elements %}
-{{ elem.id }}, {{ elem.n1 }}, {{ elem.n2 }}
-{% endfor %}
+*ELEMENT, TYPE=B32, ELSET=SPRING
+{%- for elem in elements %}
+{{ elem.id }}, {{ elem.n1 }}, {{ elem.n2 }}, {{ elem.n3 }}
+{%- endfor %}
 
 ** -----------------------------------------------
 ** BEAM SECTION (Circular wire)
 ** -----------------------------------------------
 *BEAM SECTION, ELSET=SPRING, MATERIAL={{ material.name }}, SECTION=CIRC
 {{ "%.4f"|format(wire_radius) }}
-0.0, 0.0, 1.0
+1.0, 0.0, 0.0
 
 ** -----------------------------------------------
 ** MATERIAL
@@ -191,10 +221,10 @@ BOTTOM, 1, 6, 0.0
 *STATIC
 0.1, 1.0, 0.001, 1.0
 
-** Apply displacement to top node (Y direction = axial)
+** Apply displacement to top node (Z direction = axial for helical spring)
 ** Displacement = target_height - free_length
 *BOUNDARY
-TOP, 2, 2, {{ "%.6f"|format(lc.target_height - free_length) }}
+TOP, 3, 3, {{ "%.6f"|format(lc.target_height - free_length) }}
 
 ** Output requests
 *NODE FILE
@@ -207,8 +237,7 @@ S
 RF
 
 *END STEP
-
-{% endfor %}
+{%- endfor %}
 """
 
 

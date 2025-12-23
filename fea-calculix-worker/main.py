@@ -194,16 +194,14 @@ async def run_fea_job(request: FeaJobRequest):
         )
         
         if result.returncode != 0:
-            # Check if it's a non-fatal warning
-            if "warning" in result.stderr.lower() and result.returncode == 0:
-                pass  # Continue with warnings
-            else:
-                return FeaJobResponse(
-                    job_id=job_id,
-                    status="failed",
-                    elapsed_ms=int((datetime.now() - start_time).total_seconds() * 1000),
-                    error_message=f"CalculiX failed: {result.stderr[:500]}"
-                )
+            # CalculiX might output errors to stdout or stderr
+            error_output = result.stderr or result.stdout
+            return FeaJobResponse(
+                job_id=job_id,
+                status="failed",
+                elapsed_ms=int((datetime.now() - start_time).total_seconds() * 1000),
+                error_message=f"CalculiX failed (exit code {result.returncode}): {error_output[:500]}"
+            )
         
         # Parse results
         fea_results = parse_all_results(job_dir, job_name)
@@ -286,6 +284,73 @@ async def debug_generate_inp(request: FeaJobRequest):
     )
     
     return {"inp_content": inp_content}
+
+
+@app.get("/debug/ccx-test")
+async def debug_ccx_test():
+    """Test ccx with a minimal hardcoded B32 beam model"""
+    minimal_inp = """*HEADING
+Minimal B32 Beam Test
+*NODE, NSET=ALL
+1, 0.0, 0.0, 0.0
+2, 10.0, 0.0, 0.0
+3, 20.0, 0.0, 0.0
+4, 5.0, 0.0, 0.0
+5, 15.0, 0.0, 0.0
+*NSET, NSET=BOTTOM
+1
+*NSET, NSET=TOP
+3
+*ELEMENT, TYPE=B32, ELSET=BEAM
+1, 1, 2, 4
+2, 2, 3, 5
+*BEAM SECTION, ELSET=BEAM, MATERIAL=STEEL, SECTION=CIRC
+1.0
+0.0, 1.0, 0.0
+*MATERIAL, NAME=STEEL
+*ELASTIC
+200000.0, 0.3
+*BOUNDARY
+BOTTOM, 1, 6, 0.0
+*STEP
+*STATIC
+*BOUNDARY
+TOP, 1, 1, -1.0
+*NODE FILE
+U
+*END STEP
+"""
+    job_dir = Path(tempfile.mkdtemp(prefix="ccx_test_"))
+    job_name = "test"
+    
+    try:
+        inp_path = job_dir / f"{job_name}.inp"
+        inp_path.write_text(minimal_inp)
+        
+        ccx_path = shutil.which("ccx")
+        result = subprocess.run(
+            [ccx_path, "-i", job_name],
+            cwd=job_dir,
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        
+        # Read any output files
+        output_files = {}
+        for ext in [".dat", ".sta", ".frd"]:
+            f = job_dir / f"{job_name}{ext}"
+            if f.exists():
+                output_files[ext] = f.read_text()[:1000]
+        
+        return {
+            "returncode": result.returncode,
+            "stdout": result.stdout[:2000],
+            "stderr": result.stderr[:2000],
+            "output_files": output_files
+        }
+    finally:
+        shutil.rmtree(job_dir)
 
 
 # ============================================================================
