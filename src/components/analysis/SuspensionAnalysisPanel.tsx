@@ -771,6 +771,16 @@ export function SuspensionAnalysisPanel({
     setFeaForce(force);
   }, []);
 
+  // 3D Preview Display Mode
+  const [displayMode, setDisplayMode] = useState<"geometry" | "engineering">("geometry");
+  
+  // Update display mode automatically when FEA results arrive, but keep manual control
+  useEffect(() => {
+    if (feaForce !== null) {
+      setDisplayMode("engineering");
+    }
+  }, [feaForce]);
+
   const calcResult = useMemo(() => calculateSuspensionSpring(input), [input]);
 
   // Run analysis
@@ -1034,11 +1044,25 @@ export function SuspensionAnalysisPanel({
         {/* 3D Preview Sidebar */}
         <div>
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle>{isZh ? "3D 预览" : "3D Preview"}</CardTitle>
+              <div className="flex bg-muted p-1 rounded-md text-[10px]">
+                <button 
+                  onClick={() => setDisplayMode("geometry")}
+                  className={`px-2 py-1 rounded-sm transition-all ${displayMode === "geometry" ? "bg-background shadow-sm font-bold" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {isZh ? "几何" : "Geom"}
+                </button>
+                <button 
+                  onClick={() => setDisplayMode("engineering")}
+                  className={`px-2 py-1 rounded-sm transition-all ${displayMode === "engineering" ? "bg-background shadow-sm font-bold" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {isZh ? "工程" : "Eng"}
+                </button>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="h-[350px] rounded-lg overflow-hidden border">
+              <div className="h-[350px] rounded-lg overflow-hidden border bg-slate-50 dark:bg-slate-900/50">
                 <SuspensionSpringVisualizer
                   wireDiameter={geometry.wireDiameter}
                   meanDiameter={geometry.diameterProfile?.DmStart ?? 100}
@@ -1053,8 +1077,9 @@ export function SuspensionAnalysisPanel({
                   pitchProfile={geometry.pitchProfile}
                   diameterProfile={geometry.diameterProfile}
                   feaForce={feaForce ?? undefined}
-                  showStressContour={showStressContour && feaForce !== null}
+                  showStressContour={(displayMode === "engineering") && (feaForce !== null || !!calcResult)}
                   isZh={isZh}
+                  displayMode={displayMode}
                 />
               </div>
               <p className="text-xs text-muted-foreground text-center mt-2">
