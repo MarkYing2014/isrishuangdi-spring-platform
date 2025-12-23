@@ -199,7 +199,7 @@ export function WaveSpringEngineeringPage() {
             <PackagingTab geometry={geometry} isZh={isZh} />
           </TabsContent>
           <TabsContent value="fea">
-            <FeaPlaceholderTab isZh={isZh} />
+            <WaveSpringFeaTab geometry={geometry} material={material} isZh={isZh} />
           </TabsContent>
         </div>
       </Tabs>
@@ -516,24 +516,218 @@ function PackagingTab({ geometry, isZh }: { geometry: WaveSpringGeometry; isZh: 
   );
 }
 
-function FeaPlaceholderTab({ isZh }: { isZh: boolean }) {
+function WaveSpringFeaTab({ geometry, material, isZh }: { geometry: WaveSpringGeometry; material: MaterialInfo | null; isZh: boolean }) {
+  const [loading, setLoading] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<any>(null);
+  const [method, setMethod] = useState<"WAVE_BEAM" | "WAVE_SHELL">("WAVE_BEAM");
+
+  // FEA runner function
+  const runSimulation = async () => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      // 1. Prepare Payload
+      // We calculate a target height based on working deflection.
+      // Or maybe full solid compression? 
+      // User likely wants to see the curve up to a certain point.
+      // Let's sim to solid (or 90% solid) to be safe?
+      // Or use working height given in geometry.
+      // Let's use Working Height first for speed.
+      
+      const payload = {
+        design_code: "WAVE-SIM-001",
+        geometry: {
+          section_type: method,
+          wire_width: geometry.radialWall_b,
+          wire_thickness: geometry.thickness_t,
+          mean_diameter: Number(((geometry.od + geometry.id) / 2).toFixed(3)),
+          active_coils: geometry.turns_Nt,
+          total_coils: geometry.turns_Nt, // Simple assumption for now
+          free_length: geometry.freeHeight_Hf,
+          waves_per_turn: geometry.wavesPerTurn_Nw,
+          inner_diameter: geometry.id,
+          outer_diameter: geometry.od,
+          end_type: "closed" // Not really used for wave
+        },
+        material: {
+          E: material?.elasticModulus ?? 203000,
+          nu: 0.28,
+          G: material?.shearModulus ?? 78000,
+          name: material?.name ?? "MAT_17-7PH"
+        },
+        loadcases: [
+          {
+            name: "COMPRESSION_WORK",
+            target_height: geometry.workingHeight_Hw
+          }
+        ],
+        mesh_level: "medium"
+      };
+
+      // 2. Call API
+      const response = await fetch("/api/fea/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`FEA Service Error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.status === "failed" || data.status === "error") {
+        throw new Error(data.error_message || "Simulation failed.");
+      }
+
+      setJobId(data.job_id);
+      setResult(data.results);
+
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <Card className="border-dashed py-20">
-      <CardContent className="flex flex-col items-center justify-center text-center space-y-4">
-        <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center">
-           <Loader2 className="h-8 w-8 text-primary animate-pulse" />
-        </div>
-        <div className="space-y-2">
-          <h3 className="font-bold">{isZh ? "FEA 仿真接口开发中" : "FEA Module Development"}</h3>
-          <p className="text-sm text-muted-foreground max-w-sm">
-            {isZh 
-              ? "我们正在接入 CalculiX 进行非线性接触仿真，以精确预测波形弹簧在全行程下的刚度变化及应力分布。" 
-              : "We are integrating CalculiX for non-linear contact simulations to precisely predict stiffness and stress across the full stroke."}
-          </p>
-        </div>
-        <Button disabled variant="outline">{isZh ? "查看路线图" : "View Roadmap"}</Button>
-      </CardContent>
-    </Card>
+    <div className="grid gap-6 md:grid-cols-3">
+      {/* Control Panel */}
+      <Card className="md:col-span-1 border-l-4 border-l-primary">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">{isZh ? "仿真控制" : "Simulation Control"}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <span className="text-xs font-semibold">{isZh ? "求解器方法" : "Solver Method"}</span>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <button 
+                onClick={() => setMethod("WAVE_BEAM")}
+                className={`p-2 rounded border text-center transition-colors ${
+                  method === "WAVE_BEAM" ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"
+                }`}
+              >
+                Beam (B32)
+                <span className="block text-[9px] opacity-70 font-normal">{isZh ? "快速趋势" : "Fast Trend"}</span>
+              </button>
+              <button 
+                onClick={() => setMethod("WAVE_SHELL")}
+                className={`p-2 rounded border text-center transition-colors ${
+                  method === "WAVE_SHELL" ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"
+                }`}
+              >
+                Shell (S4)
+                <span className="block text-[9px] opacity-70 font-normal">{isZh ? "高精度接触" : "Accurate Contact"}</span>
+              </button>
+            </div>
+            {method === "WAVE_BEAM" && (
+               <p className="text-[10px] text-muted-foreground mt-1">
+                 {isZh ? "使用 B32 梁单元模拟波形中心线。计算极快，仅供刚度趋势参考。" : "Uses B32 beam elements on centerline. Very fast, for stiffness trend only."}
+               </p>
+            )}
+            {method === "WAVE_SHELL" && (
+               <p className="text-[10px] text-muted-foreground mt-1">
+                 {isZh ? "使用 S4 壳单元+非线性接触。计算较慢，但能精确捕捉接触硬化。" : "Uses S4 shells with NLGEOM contact. Slower but captures contact hardening."}
+               </p>
+            )}
+          </div>
+
+          <Button 
+            className="w-full" 
+            disabled={loading} 
+            onClick={runSimulation}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {isZh ? "计算中..." : "Solving..."}
+              </>
+            ) : (
+               isZh ? "运行 CalculiX" : "Run CalculiX"
+            )}
+          </Button>
+          
+          {error && (
+            <Alert variant="destructive" className="text-xs">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {result && (
+            <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded text-xs text-green-700">
+               <div className="font-bold flex items-center gap-2">
+                 <CheckCircle className="h-3 w-3" />
+                 {isZh ? "求解成功" : "Solved Successfully"}
+               </div>
+               <div className="mt-1 opacity-80">Job ID: {jobId}</div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Results Panel */}
+      <Card className="md:col-span-2">
+        <CardHeader>
+           <CardTitle className="text-sm font-medium">{isZh ? "仿真结果" : "Simulation Results"}</CardTitle>
+        </CardHeader>
+        <CardContent>
+           {!result ? (
+             <div className="h-[300px] flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
+                <Info className="h-8 w-8 opacity-20 mb-2" />
+                <p className="text-xs">{isZh ? "请运行仿真以查看结果" : "Run simulation to view results"}</p>
+             </div>
+           ) : (
+             <div className="space-y-6 animate-in fade-in">
+                {/* Result Summary Metrics */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-3 bg-slate-50 border rounded-lg">
+                    <div className="text-[10px] text-muted-foreground uppercase">{isZh ? "最大反力" : "Max Reaction"}</div>
+                    <div className="text-lg font-mono font-bold text-primary">
+                      {Math.abs(result.reaction_force?.z || 0).toFixed(1)} N
+                    </div>
+                  </div>
+                  <div className="p-3 bg-slate-50 border rounded-lg">
+                    <div className="text-[10px] text-muted-foreground uppercase">{isZh ? "最大位移" : "Max Deflection"}</div>
+                    <div className="text-lg font-mono font-bold">
+                      {Math.abs(result.displacement?.z || 0).toFixed(2)} mm
+                    </div>
+                  </div>
+                  <div className="p-3 bg-slate-50 border rounded-lg">
+                    <div className="text-[10px] text-muted-foreground uppercase">{isZh ? "最大应力" : "Max Stress"}</div>
+                    <div className="text-lg font-mono font-bold text-amber-600">
+                      {(result.stress?.max_von_mises || 0).toFixed(0)} MPa
+                    </div>
+                  </div>
+                  <div className="p-3 bg-slate-50 border rounded-lg">
+                    <div className="text-[10px] text-muted-foreground uppercase">{isZh ? "刚度 (Secant)" : "Rate (Secant)"}</div>
+                    <div className="text-lg font-mono font-bold">
+                      {(Math.abs(result.reaction_force?.z || 0) / Math.max(0.001, Math.abs(result.displacement?.z || 0))).toFixed(1)}
+                    </div>
+                  </div>
+                </div>
+
+                <Alert className="bg-muted/50 border-0">
+                   <Info className="h-4 w-4" />
+                   <AlertTitle className="text-xs font-bold">{isZh ? "结果分析" : "Result Analysis"}</AlertTitle>
+                   <AlertDescription className="text-xs opacity-90 leading-relaxed mt-1">
+                      {isZh 
+                        ? "仿真结果仅供参考。波形弹簧对边界摩擦非常敏感，实际力值可能因摩擦滞后而略有不同。" 
+                        : "Results are for reference. Wave springs are sensitive to friction; actual loads may vary due to hysteresis."}
+                   </AlertDescription>
+                </Alert>
+             </div>
+           )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
