@@ -333,14 +333,32 @@ export type DiameterMode = "constant" | "barrel" | "conical";
 
 export type SuspensionEndType = "open" | "closed" | "closed_ground";
 
+/**
+ * Detailed end specification for suspension springs
+ * 端部详细规格（汽车减震弹簧用）
+ */
+export interface SuspensionEndSpec {
+  type: SuspensionEndType;
+  /** Dead coil turns per end (typically 0.75~1.5) */
+  closedTurnsPerEnd: number;
+  /** Ground flat influence turns per end (typically 0.25~0.75), only for closed_ground */
+  groundTurnsPerEnd?: number;
+  /** Seat drop height adjustment (mm, optional) */
+  seatDrop?: number;
+  /** Extra end angle (turns, for tangential/pigtail ends - future) */
+  endAngleExtra?: number;
+}
+
 export interface PitchProfile {
   mode: PitchMode;
   pitchCenter?: number;
   pitchEnd?: number;
   endClosedTurns?: number;
   transitionTurns?: number;
-  /** End type affects dead coil behavior and end-cap visualization */
+  /** Simple end type (backward compatible) */
   endType?: SuspensionEndType;
+  /** Detailed end spec (advanced - overrides endType if present) */
+  endSpec?: SuspensionEndSpec;
 }
 
 export interface DiameterProfile {
