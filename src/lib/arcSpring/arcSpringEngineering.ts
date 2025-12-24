@@ -1,5 +1,6 @@
 import { ArcSpringInput, ArcSpringResult, ArcSpringPoint } from "./types";
 import { springRate_k, frictionTorque, xFromDeltaDeg, torqueFromDeltaDeg } from "./math";
+import { calculateArcSpringStress } from "./ArcSpringStress";
 import { ARC_SPRING_MATERIALS } from "./materials";
 
 const PI = Math.PI;
@@ -52,18 +53,10 @@ export function computeEngineeringAnalysis(input: ArcSpringInput, baseResult: Ar
     const k_theta_Nm_deg = k_theta_Nmm_deg / 1000;
 
     // 3. Allowable Stress
-    // Simple estimation for now. Real app should use Material DB or Goodman.
-    // Default alpha = 0.5 * Sy.
-    // We need Sy. `ArcSpringInput` doesn't strictly carry Sy unless in materials.
-    // Let's approximate from allowableTau if passed, or use generic 900-1200 MPa.
-    // For now, SF calculation will use a placeholder or derived from standard.
-    // Let's assume Sy = 1600 MPa (generic Spring Steel) -> Tau_allow = 800 MPa.
-    // Or better, use `allowableTau` from UI state if we could pass it. 
-    // For this pure function, we might just return Tau and let UI calc SF.
-    // But let's try to find material.
-    const mat = ARC_SPRING_MATERIALS.find(m => m.key === input.materialKey);
-    // We don't have Sy in material def yet. Assume 800 MPa allow.
-    const tauAllow = 800;
+    // Assume defaults valid for this layer
+    const Sy = 1600;
+    const allowFactor = 0.65;
+    const sigmaAllow = Sy * allowFactor;
 
     // 4. Point Calculator
     const calcPoint = (targetAlpha: number | undefined, label: string): EngineeringPoint | null => {
@@ -84,10 +77,20 @@ export function computeEngineeringAnalysis(input: ArcSpringInput, baseResult: Ar
         // Force Calculation (Moment Arm)
         const F_total_N = T_total_Nmm / r;
 
-        // Stress Calculation (Wahl)
-        // tau = Kw * (8FD / pi d^3)
-        const kw = baseResult.wahlFactor;
-        const tau = kw * (8 * F_total_N * D) / (PI * Math.pow(d, 3));
+        // Stress Calculation (New Engineering Model)
+        // Uses: calculateArcSpringStress
+        const stressResult = calculateArcSpringStress(
+            { d: input.d }, // Geometry (Round Wire)
+            { Sy, allowFactor },   // Material
+            {   // Loadcase
+                thetaFree: input.alpha0,
+                thetaWork: targetAlpha,
+                kTheta: k_theta_Nm_deg, // System Stiffness in Nm/deg
+                kThetaUnit: "Nm",
+                parallelCount: input.countParallel ?? 4,
+                beta: 1.15 // Default Beta
+            }
+        );
 
         return {
             label,
@@ -96,8 +99,8 @@ export function computeEngineeringAnalysis(input: ArcSpringInput, baseResult: Ar
             x: r * (deltaDeg * PI / 180),
             T_Nm: T_total_Nmm / 1000,
             F_N: F_total_N,
-            tau_MPa: tau,
-            SF: tau > 0 ? tauAllow / tau : 999,
+            tau_MPa: stressResult.sigmaMax_MPa, // Mapped to sigmaMax_MPa
+            SF: stressResult.sigmaMax_MPa > 0 ? (stressResult.sigmaAllow_MPa / stressResult.sigmaMax_MPa) : 999,
             isValid: true
         };
     };

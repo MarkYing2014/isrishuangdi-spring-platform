@@ -1,10 +1,15 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { useSearchParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Info, AlertTriangle, Calculator, FileOutput, CheckCircle2 } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -16,15 +21,23 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+
 import type { ArcSpringInput } from "@/lib/arcSpring/types";
 import { computeArcSpringCurve } from "@/lib/arcSpring/math";
-import { computeEngineeringAnalysis } from "@/lib/arcSpring/arcSpringEngineering";
-import { AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { calculateArcSpringStress, toFactoryTorqueNm } from "@/lib/arcSpring/ArcSpringStress";
 
 export function ArcSpringEngineeringPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   
-  // Parse inputs from URL
+  // -- State for interactive elements that aren't in searchParams --
+  const [assemblyFactor, setAssemblyFactor] = React.useState(4);
+  const [stressBeta, setStressBeta] = React.useState(1.15);
+  const [allowFactor, setAllowFactor] = React.useState(0.65);
+  // Default Sy for Generic Spring Steel if not provided
+  const [Sy, setSy] = React.useState(1600); 
+
+  // -- Parse inputs from URL --
   const input = useMemo<ArcSpringInput>(() => {
     const getNum = (key: string, def: number) => {
       const v = searchParams.get(key);
@@ -32,194 +45,338 @@ export function ArcSpringEngineeringPage() {
     };
     
     return {
-      d: getNum("d", 3),
-      D: getNum("D", 25),
-      n: getNum("n", 6), // Na
-      Nt: getNum("Nt", getNum("n", 6) + 2),
+      d: getNum("d", 3.7),
+      D: getNum("D", 12.2),
+      n: getNum("n", 50.3),
       r: getNum("r", 60),
-      alpha0: getNum("alpha0", 45),
-      alphaWork: getNum("alphaWork", 45 - 20),
-      alphaLimit: getNum("alphaLimit", 45 - 30),
-      alphaC: getNum("alphaC", 10), // Solid Angle
-      preloadTorque: getNum("preloadTorque", 0),
-      alphaPreload: getNum("alphaPreload", getNum("alpha0", 45)), // Default to free if not set
-      
+      alpha0: getNum("alpha0", 127),
+      alphaWork: getNum("alphaWork", 103),
+      alphaLimit: getNum("alphaLimit", 103), // Same as work if not specified
+      alphaC: getNum("alphaC", 10),
+      countParallel: assemblyFactor, 
       materialKey: (searchParams.get("mat") as any) ?? "EN10270_2",
-      hand: (searchParams.get("hand") as any) ?? "right",
-      // Factory Report implies 4 springs (or 2 pairs) for Stiffness target 5.25.
-      // 1.29 * 4 = 5.16 ~ 5.25.
-      countParallel: getNum("nParallel", 4), 
       samples: 100
     };
-  }, [searchParams]);
+  }, [searchParams, assemblyFactor]);
 
-  // Compute Results
+  // -- Base Calculations (Stiffness) --
   const baseResult = useMemo(() => computeArcSpringCurve(input), [input]);
-  const engResult = useMemo(() => computeEngineeringAnalysis(input, baseResult), [input, baseResult]);
 
-  // Chart Data
+  // -- Stress Calculation (New Engineering Model) --
+  const stressResult = useMemo(() => {
+    // k_theta from math.ts is in Nmm/deg? 
+    // computeArcSpringCurve returns R_deg in Nmm/deg.
+    // Let's verify units from math.ts source.
+    // R_deg = k * r^2 * (pi/180) * nParallel
+    // This implies Total System stiffness if input.countParallel is used.
+    
+    // However, input.countParallel is passed to computeArcSpringCurve.
+    // So R_deg IS total system stiffness.
+    
+    // We need to pass system stiffness to calculateArcSpringStress.
+    // R_deg is Nmm/deg.
+    // calculateArcSpringStress expects kTheta. Unit defaults "Nm" unless specified.
+    // Let's pass Nmm and specify unit.
+    
+    return calculateArcSpringStress(
+      { 
+        d: input.d, 
+        D: input.D // Pass Mean Diameter
+      },
+      { 
+        Sy: Sy,
+        allowFactor: allowFactor
+      },
+      {
+        thetaFree: input.alpha0,
+        thetaWork: input.alphaWork ?? input.alpha0,
+        kTheta: baseResult.R_deg, // Nmm/deg
+        kThetaUnit: "Nmm",
+        parallelCount: input.countParallel,
+        beta: stressBeta,
+        rWork: input.r // Pass Working Radius
+      }
+    );
+  }, [input, baseResult, Sy, allowFactor, stressBeta]);
+
+  // -- Chart Data --
   const chartData = useMemo(() => {
-    return engResult.engineeringCurve.map(p => ({
-      alpha: p.alpha.toFixed(1),
-      delta: p.deltaDeg.toFixed(1),
-      Torque: p.T_Nm.toFixed(1),
-      Force: p.F_N.toFixed(0),
-      Stress: p.tau_MPa.toFixed(0),
-      label: p.label
-    }));
-  }, [engResult]);
+    // Generate linear curve from 0 to Delta_Work + 10 deg
+    const maxDelta = (stressResult.dThetaDeg || 10) * 1.2;
+    const points = [];
+    const steps = 20;
+    for (let i = 0; i<=steps; i++) {
+      const d = (maxDelta * i) / steps;
+      // T_total = k * d
+      const T_Nmm = stressResult.kTheta_Nmm_per_deg * d;
+      const T_single_Nmm = T_Nmm / (input.countParallel || 1);
+      
+      // Re-calc stress for curve
+      const sig = calculateArcSpringStress(
+         { d: input.d }, 
+         { Sy, allowFactor }, 
+         { 
+             thetaFree: input.alpha0, 
+             thetaWork: input.alpha0 - d, // Current angle
+             kTheta: baseResult.R_deg,
+             kThetaUnit: "Nmm",
+             parallelCount: input.countParallel,
+             beta: stressBeta,
+             rWork: input.r
+         }
+      ).sigmaMax_MPa;
 
-  // KPI Status
-  const status = engResult.ptWork && engResult.ptWork.SF >= 1.1 ? "PASS" : "FAIL";
-  
+      points.push({
+        delta: d.toFixed(1),
+        Torque: (T_Nmm / 1000).toFixed(1),
+        Stress: sig.toFixed(0)
+      });
+    }
+    return points;
+  }, [stressResult, input, baseResult, Sy, allowFactor, stressBeta]);
+
+  // -- Styling Helpers --
+  const getStatusColor = (ratio: number) => {
+    if (ratio > 100) return "bg-red-600";
+    if (ratio > 85) return "bg-orange-500";
+    return "bg-green-600";
+  };
+
   return (
     <div className="container mx-auto py-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Arc Spring Analysis</h1>
-          <p className="text-muted-foreground">Factory Standard θ–T–σ Model</p>
+          <h1 className="text-2xl font-bold">Arc Spring Engineering Analysis</h1>
+          <p className="text-muted-foreground">Engineering Grade Δθ–M–σ Model</p>
         </div>
-        <Badge className={status === "PASS" ? "bg-green-600 text-lg px-4 py-1" : "bg-red-600 text-lg px-4 py-1"}>
-          {status}
-        </Badge>
+        <div className="flex gap-2">
+            <Badge variant="outline">v2.0 Engineering</Badge>
+            <Badge className={getStatusColor(stressResult.stressRatio_pct)}>
+                Stress Ratio: {stressResult.stressRatio_pct.toFixed(1)}%
+            </Badge>
+        </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-6 gap-4">
-        <KpiCard label="k_theta (Work)" value={engResult.k_theta_Nm_deg.toFixed(2)} unit="Nm/deg" />
-        <KpiCard label="T_work" value={engResult.ptWork?.T_Nm.toFixed(1) ?? "-"} unit="Nm" />
-        <KpiCard label="Stress Ratio" value={engResult.ptWork ? (800 / engResult.ptWork.SF * 100 / 800 * 100).toFixed(0) : "-"} unit="%" /> 
-        {/* Stress Ratio = Tau / Allow. PtWork.SF = Allow / Tau. So Tau/Allow = 1/SF. */}
-        
-        <KpiCard 
-          label="Angle Margin" 
-          value={engResult.angleMargin.toFixed(1)} 
-          unit="deg" 
-          sub="(Free - Work)"
-        />
-        <KpiCard label="Solid Margin" value={engResult.solidMargin.toFixed(1)} unit="mm" />
-        <KpiCard label="Max Stress" value={engResult.ptLimit?.tau_MPa.toFixed(0) ?? "-"} unit="MPa" />
-      </div>
+      {/* Warnings */}
+      {stressResult.warnings.length > 0 && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Computation Warnings</AlertTitle>
+            <AlertDescription>
+                {stressResult.warnings.map(w => <div key={w}>{w}</div>)}
+            </AlertDescription>
+          </Alert>
+      )}
 
-      <Tabs defaultValue="loadAngle" className="w-full">
-        <TabsList>
-          <TabsTrigger value="loadAngle">Load – Angle (θ–T)</TabsTrigger>
-          <TabsTrigger value="stress">Stress Analysis (τ–θ)</TabsTrigger>
-          <TabsTrigger value="packaging">Packaging</TabsTrigger>
-          {/* <TabsTrigger value="fatigue">Fatigue (Phase 2)</TabsTrigger> */}
-        </TabsList>
-
-        <TabsContent value="loadAngle">
-          <Card>
-            <CardHeader>
-              <CardTitle>Torque Characteristic</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="delta" label={{ value: 'Delta Angle (deg)', position: 'insideBottom', offset: -5 }} />
-                    <YAxis label={{ value: 'Torque (Nm)', angle: -90, position: 'insideLeft' }} />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="Torque" stroke="#2563eb" strokeWidth={3} dot={false} />
-                    {/* Markers */}
-                    {engResult.ptWork && <ReferenceLine x={engResult.ptWork.deltaDeg.toFixed(1)} stroke="green" label="Work" />}
-                    {engResult.ptLimit && <ReferenceLine x={engResult.ptLimit.deltaDeg.toFixed(1)} stroke="red" label="Limit" />}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
-                <div className="p-3 bg-slate-50 rounded">
-                  <div className="font-semibold">Stiffness Model</div>
-                  <div>k_axial = {engResult.k_axial_N_mm.toFixed(2)} N/mm</div>
-                  <div>R_work = {input.r} mm</div>
-                  <div>k_theta = k * R² = {engResult.k_theta_Nm_deg.toFixed(3)} Nm/deg</div>
-                </div>
-                <div className="p-3 bg-slate-50 rounded">
-                  <div className="font-semibold">Unit Conversion</div>
-                  <div>Δθ uses relative angle (deg)</div>
-                  <div>x = R * Δθ_rad</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="stress">
-          <Card>
-            <CardHeader>
-              <CardTitle>Stress Check (Shear Stress)</CardTitle>
-            </CardHeader>
-            <CardContent>
-               <div className="h-[300px] mb-6">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="delta" label={{ value: 'Delta Angle (deg)', position: 'insideBottom', offset: -5 }} />
-                    <YAxis label={{ value: 'Stress (MPa)', angle: -90, position: 'insideLeft' }} />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="Stress" stroke="#dc2626" strokeWidth={3} dot={false} />
-                    <ReferenceLine y={800} stroke="orange" strokeDasharray="3 3" label="Allowable (Est)" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+      <div className="grid grid-cols-12 gap-6">
+          {/* LEFT COLUMN: INPUTS */}
+          <div className="col-span-4 space-y-4">
               
-              <div className="grid grid-cols-3 gap-4">
-                 <StressCard title="Work Stress" val={engResult.ptWork?.tau_MPa} limit={800} />
-                 <StressCard title="Limit Stress" val={engResult.ptLimit?.tau_MPa} limit={800} />
-                 <StressCard title="Solid Stress" val={engResult.ptSolid?.tau_MPa} limit={800} />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              {/* Card A: Geometry */}
+              <Card>
+                  <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-bold uppercase text-muted-foreground">A. Geometry</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                      <div className="flex justify-between items-center">
+                          <Label>Wire Diameter (d)</Label>
+                          <span className="font-mono bg-slate-100 px-2 py-1 rounded">{input.d} mm</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                          <Label>Mean Diameter (D)</Label>
+                          <span className="font-mono bg-slate-100 px-2 py-1 rounded">{input.D} mm</span>
+                      </div>
+                       <div className="flex justify-between items-center">
+                          <Label>Working Radius (r)</Label>
+                          <span className="font-mono bg-slate-100 px-2 py-1 rounded">{input.r} mm</span>
+                      </div>
+                      <div className="pt-2 text-xs text-muted-foreground border-t flex justify-between">
+                          <span>Z_ref ≈ {stressResult.Z_ref_mm3.toFixed(2)}</span>
+                          <span className="font-bold text-slate-700">Z_eff ≈ {stressResult.Z_eff_mm3.toFixed(1)}</span>
+                      </div>
+                  </CardContent>
+              </Card>
 
-        <TabsContent value="packaging">
-           <Card>
-            <CardHeader><CardTitle>Packaging Dimensions</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="flex justify-between border-b py-2"><span>Outer Diameter (De)</span> <span>{baseResult.De.toFixed(1)} mm</span></div>
-                <div className="flex justify-between border-b py-2"><span>Inner Diameter (Di)</span> <span>{baseResult.Di.toFixed(1)} mm</span></div>
-                <div className="flex justify-between border-b py-2"><span>Wire Diameter (d)</span> <span>{input.d.toFixed(2)} mm</span></div>
-                <div className="flex justify-between border-b py-2"><span>Working Radius (R)</span> <span>{input.r.toFixed(1)} mm</span></div>
-              </div>
-              <div className="space-y-2">
-                 <div className="flex justify-between border-b py-2"><span>Free Angle (θ_free)</span> <span>{input.alpha0}°</span></div>
-                 <div className="flex justify-between border-b py-2"><span>Work Angle (θ_work)</span> <span>{input.alphaWork ?? "-"}°</span></div>
-                 <div className="flex justify-between border-b py-2"><span>Solid Angle (θ_solid)</span> <span>{input.alphaC}°</span></div>
-              </div>
-            </CardContent>
-           </Card>
-        </TabsContent>
-      </Tabs>
+              {/* Card B: Loadcase */}
+              <Card className="border-l-4 border-l-blue-500">
+                  <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-bold uppercase text-muted-foreground">B. Loadcase</CardTitle>
+                  </CardHeader>
+                   <CardContent className="space-y-3 text-sm">
+                      <div className="flex justify-between items-center">
+                          <Label>Free Angle (θ_free)</Label>
+                          <span className="font-mono bg-slate-100 px-2 py-1 rounded">{input.alpha0}°</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                          <Label>Work Angle (θ_work)</Label>
+                          <span className="font-mono bg-slate-100 px-2 py-1 rounded">{input.alphaWork}°</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-blue-50 p-2 rounded">
+                          <Label className="text-blue-700 font-bold">Used Travel (Δθ)</Label>
+                          <span className="font-mono font-bold text-blue-700">{stressResult.dThetaDeg.toFixed(1)}°</span>
+                      </div>
+                  </CardContent>
+              </Card>
+
+              {/* Card C: System */}
+              <Card>
+                  <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-bold uppercase text-muted-foreground">C. System</CardTitle>
+                  </CardHeader>
+                   <CardContent className="space-y-3 text-sm">
+                      <div className="flex justify-between items-center">
+                          <Label>Assembly Factor (N)</Label>
+                          <Select value={assemblyFactor.toString()} onValueChange={(v) => setAssemblyFactor(parseInt(v))}>
+                              <SelectTrigger className="w-[120px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="1">1 (Single)</SelectItem>
+                                  <SelectItem value="2">2 (Pair)</SelectItem>
+                                  <SelectItem value="4">4 (DMF Set)</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
+                      <div className="flex justify-between items-center">
+                          <Label>Stress Beta (β)</Label>
+                          <Select value={stressBeta.toString()} onValueChange={(v) => setStressBeta(parseFloat(v))}>
+                              <SelectTrigger className="w-[120px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="1.0">1.0 (None)</SelectItem>
+                                  <SelectItem value="1.15">1.15 (Mild)</SelectItem>
+                                  <SelectItem value="1.25">1.25 (Curved)</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
+                      <div className="pt-2 text-xs text-muted-foreground border-t">
+                          System k_theta = {(stressResult.kTheta_Nmm_per_deg/1000).toFixed(2)} Nm/deg
+                      </div>
+                  </CardContent>
+              </Card>
+
+              {/* Card D: Material */}
+              <Card>
+                  <CardHeader className="pb-2">
+                       <CardTitle className="text-sm font-bold uppercase text-muted-foreground">D. Material</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                      <div className="flex justify-between items-center">
+                          <Label>Yield Strength S_y</Label>
+                          <div className="flex items-center gap-1">
+                             <input type="number" 
+                                className="w-16 h-8 text-right border rounded px-1 text-xs"
+                                value={Sy} onChange={e => setSy(parseFloat(e.target.value))} 
+                             />
+                             <span className="text-xs text-muted-foreground">MPa</span>
+                          </div>
+                      </div>
+                       <div className="flex justify-between items-center">
+                          <Label>Allow Factor</Label>
+                           <Select value={allowFactor.toString()} onValueChange={(v) => setAllowFactor(parseFloat(v))}>
+                              <SelectTrigger className="w-[120px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="0.6">0.60 (Consv)</SelectItem>
+                                  <SelectItem value="0.65">0.65 (Std)</SelectItem>
+                                  <SelectItem value="0.7">0.70 (Aggr)</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
+                      <div className="text-right text-xs text-green-600 font-medium">
+                          σ_allow = {(Sy * allowFactor).toFixed(0)} MPa
+                      </div>
+                  </CardContent>
+              </Card>
+
+          </div>
+
+          {/* RIGHT COLUMN: RESULTS & TOOLS */}
+          <div className="col-span-8 space-y-6">
+              
+              {/* Card E: Results */}
+              <Card>
+                  <CardHeader>
+                      <CardTitle>Results Summary</CardTitle>
+                      <CardDescription>Incremental Bending Stress Analysis</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                      <div className="grid grid-cols-4 gap-4 mb-6">
+                          <div className="p-4 bg-slate-50 rounded border">
+                              <div className="text-xs text-muted-foreground uppercase">Torsional Stiffness</div>
+                              <div className="text-2xl font-bold mt-1">{(stressResult.kTheta_Nmm_per_deg / 1000).toFixed(2)}</div>
+                              <div className="text-xs text-muted-foreground">Nm/deg</div>
+                              <div className="text-[10px] text-slate-400 mt-1">{stressResult.kTheta_Nmm_per_deg.toFixed(0)} Nmm/deg</div>
+                          </div>
+                           <div className="p-4 bg-slate-50 rounded border">
+                              <div className="text-xs text-muted-foreground uppercase">Work Torque</div>
+                              <div className="text-2xl font-bold mt-1">{(stressResult.T_total_Nmm / 1000).toFixed(1)}</div>
+                              <div className="text-xs text-muted-foreground">Nm @ {stressResult.dThetaDeg.toFixed(1)}°</div>
+                              <div className="text-[10px] text-slate-400 mt-1">{(stressResult.T_single_Nmm / 1000).toFixed(1)} Nm/strip</div>
+                          </div>
+                           <div className="p-4 bg-slate-50 rounded border">
+                              <div className="text-xs text-muted-foreground uppercase">Max Stress</div>
+                              <div className="text-2xl font-bold mt-1 text-slate-900">{stressResult.sigmaMax_MPa.toFixed(0)}</div>
+                              <div className="text-xs text-muted-foreground">MPa</div>
+                              <div className="text-[10px] text-slate-400 mt-1">Allow: {stressResult.sigmaAllow_MPa.toFixed(0)} MPa</div>
+                          </div>
+                           <div className={`p-4 rounded border text-white ${getStatusColor(stressResult.stressRatio_pct)}`}>
+                              <div className="text-xs opacity-80 uppercase">Stress Ratio</div>
+                              <div className="text-3xl font-bold mt-1">{stressResult.stressRatio_pct.toFixed(1)}%</div>
+                              <div className="text-xs opacity-80">
+                                  {stressResult.stressRatio_pct <= 100 ? "SAFE" : "FAIL"}
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Charts */}
+                      <Tabs defaultValue="load" className="w-full">
+                          <TabsList>
+                              <TabsTrigger value="load">Torque – Angle</TabsTrigger>
+                              <TabsTrigger value="stress">Stress – Angle</TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="load" className="h-[300px] border rounded mt-2 p-4">
+                              <ResponsiveContainer width="100%" height="100%">
+                                  <LineChart data={chartData}>
+                                      <CartesianGrid strokeDasharray="3 3"/>
+                                      <XAxis dataKey="delta" label={{ value: "Delta Angle (deg)", position: 'insideBottom', offset: -5 }}/>
+                                      <YAxis label={{ value: "Torque (Nm)", angle: -90, position: 'insideLeft' }}/>
+                                      <Tooltip />
+                                      <Line type="monotone" dataKey="Torque" stroke="#2563eb" strokeWidth={3} dot={false} />
+                                      <ReferenceLine x={stressResult.dThetaDeg} stroke="green" strokeDasharray="3 3" label="Work" />
+                                  </LineChart>
+                              </ResponsiveContainer>
+                          </TabsContent>
+                           <TabsContent value="stress" className="h-[300px] border rounded mt-2 p-4">
+                              <ResponsiveContainer width="100%" height="100%">
+                                  <LineChart data={chartData}>
+                                      <CartesianGrid strokeDasharray="3 3"/>
+                                      <XAxis dataKey="delta" label={{ value: "Delta Angle (deg)", position: 'insideBottom', offset: -5 }}/>
+                                      <YAxis label={{ value: "Stress (MPa)", angle: -90, position: 'insideLeft' }}/>
+                                      <Tooltip />
+                                      <Line type="monotone" dataKey="Stress" stroke="#dc2626" strokeWidth={3} dot={false} />
+                                      <ReferenceLine y={stressResult.sigmaAllow_MPa} stroke="orange" strokeDasharray="3 3" label="Allow" />
+                                      <ReferenceLine x={stressResult.dThetaDeg} stroke="green" strokeDasharray="3 3" label="Work" />
+                                  </LineChart>
+                              </ResponsiveContainer>
+                          </TabsContent>
+                      </Tabs>
+                  </CardContent>
+              </Card>
+
+              {/* Card F: Tools */}
+              <Card>
+                  <CardHeader className="pb-2">
+                       <CardTitle className="text-sm font-bold uppercase text-muted-foreground">F. Engineering Tools</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex gap-4">
+                      <Button variant="outline" className="gap-2">
+                          <FileOutput className="h-4 w-4"/> Export Report (PDF)
+                      </Button>
+                      <Button variant="outline" className="gap-2" disabled>
+                          <Calculator className="h-4 w-4"/> FEA Verification (Coming Soon)
+                      </Button>
+                  </CardContent>
+              </Card>
+          </div>
+      </div>
     </div>
   );
-}
-
-function KpiCard({ label, value, unit, sub }: { label: string, value: string, unit: string, sub?: string }) {
-  return (
-    <Card>
-      <CardContent className="p-4 text-center">
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="text-xl font-bold my-1">{value}</div>
-        <div className="text-xs text-muted-foreground">{unit} {sub && <span className="block text-[10px]">{sub}</span>}</div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function StressCard({ title, val, limit }: { title: string, val?: number, limit: number }) {
-  if (val === undefined) return null;
-  const ratio = val / limit;
-  const color = ratio > 1.0 ? "text-red-600" : ratio > 0.8 ? "text-orange-500" : "text-green-600";
-  return (
-    <div className="p-4 border rounded bg-slate-50">
-      <div className="text-sm font-medium text-slate-700">{title}</div>
-      <div className={`text-2xl font-bold ${color}`}>{val.toFixed(0)} MPa</div>
-      <div className="text-xs text-muted-foreground">Limit: {limit} MPa (SF: {(limit/val).toFixed(2)})</div>
-    </div>
-  )
 }
