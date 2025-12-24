@@ -129,7 +129,7 @@ function SliderNumberInput({
           min={min}
           step={step}
           disabled={disabled}
-          className="h-9 w-28 arc-no-spinner"
+          className="h-9 w-28 arc-no-spinner flex-shrink-0"
         />
       </div>
       <Slider
@@ -213,7 +213,7 @@ export function ArcSpringCalculator() {
         n: g.coils ?? def.n,
         r: g.workingRadius ?? def.r,
         alpha0: g.unloadedAngle ?? def.alpha0,
-        alphaWork: g.workingAngle ?? def.alphaWork,
+        alphaWork: g.workingAngle ?? g.unloadedAngle ?? def.alpha0,
         alphaC: g.solidAngle ?? def.alphaC,
         hysteresisMode: input.hysteresisMode,
         systemMode: input.systemMode,
@@ -496,7 +496,7 @@ export function ArcSpringCalculator() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div
                   ref={setFieldRef("r")}
                   className={highlightField === "r" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}

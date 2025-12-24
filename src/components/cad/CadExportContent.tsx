@@ -342,8 +342,8 @@ function CadExportContent() {
       return null;
     }
 
-    // 波形弹簧也不使用通用引擎适配器
-    if (storeGeometry?.type === "wave") {
+    // 波形弹簧和弧形弹簧也不使用通用引擎适配器
+    if (storeGeometry?.type === "wave" || storeGeometry?.type === "arc") {
       return null; 
     }
     
