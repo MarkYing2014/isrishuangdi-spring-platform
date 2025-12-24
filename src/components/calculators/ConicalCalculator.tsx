@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { type SubmitHandler, useForm, Controller } from "react-hook-form";
+import { useRouter } from "next/navigation";
 
 import {
   calculateLoadAndStress,
@@ -57,6 +58,7 @@ interface FormValues {
 type CalculationResult = ReturnType<typeof calculateLoadAndStress> | null;
 
 export function ConicalCalculator() {
+  const router = useRouter();
   const [nonlinearResult, setNonlinearResult] = useState<ConicalNonlinearResult | null>(null);
   const [stageTransitions, setStageTransitions] = useState<ReturnType<typeof extractConicalStageTransitions> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -753,19 +755,29 @@ export function ConicalCalculator() {
             </Button>
             */}
             <Button 
-              asChild 
               variant="outline" 
               className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
+              onClick={() => {
+                const values = form.getValues();
+                const calc = result; // Use current linear result if available
+                saveDesignToStore(values, calc);
+                router.push(analysisUrl);
+              }}
             >
-              <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
+              Send to Engineering Analysis / 发送到工程分析
             </Button>
             <Button 
-              asChild 
               variant="outline" 
               className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10" 
               disabled={!result && !nonlinearResult}
+              onClick={() => {
+                const values = form.getValues();
+                const calc = result;
+                saveDesignToStore(values, calc);
+                router.push(cadExportUrl);
+              }}
             >
-              <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
+              Export CAD / 导出 CAD
             </Button>
           </div>
 
