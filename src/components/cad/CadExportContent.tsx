@@ -64,6 +64,19 @@ const SpiralTorsionSpringVisualizer = dynamic(
   }
 );
 
+// Dynamic import for Arc Spring 3D preview
+const ArcSpringVisualizer = dynamic(
+  () => import("@/components/three/ArcSpringMesh").then(mod => mod.ArcSpringVisualizer),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="h-[400px] bg-white rounded-lg flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    )
+  }
+);
+
 // Dynamic import for Wave Spring 3D preview
 const WaveSpringVisualizer = dynamic(
   () => import("@/components/three/WaveSpringVisualizer").then(mod => mod.WaveSpringVisualizer),
@@ -149,7 +162,8 @@ function CadExportContent() {
   // 从 store 或 URL 获取数据
   const code = storeMeta?.designCode ?? searchParams.get("code") ?? undefined;
   // Note: dieSpring has its own dedicated engineering page and is not supported in CAD export
-const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compression") as SpringGeometry['type'] | "spiralTorsion" | "wave";
+  const rawType = searchParams.get("type") ?? storeGeometry?.type ?? "compression";
+  const springType = (rawType === "arcSpring" ? "arc" : rawType) as SpringGeometry['type'] | "spiralTorsion" | "wave" | "arc";
   
   // 几何参数 - 优先从 store 读取
   // 螺旋扭转弹簧没有 wireDiameter，使用 stripThickness 作为替代
@@ -213,6 +227,10 @@ const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compress
     ?? numberOrUndefined(searchParams.get("Nt"));
   const conicalEndType = (storeGeometry?.type === "conical" ? storeGeometry.endType : undefined)
     ?? (searchParams.get("endType") as "natural" | "closed" | "closed_ground" | null) ?? "closed_ground";
+
+  // Arc Spring Parameters
+  const arcRadius = (storeGeometry?.type === "arc" ? (storeGeometry as any).workingRadius : undefined) ?? numberOrUndefined(searchParams.get("r")) ?? 50;
+  const arcAlpha0 = (storeGeometry?.type === "arc" ? (storeGeometry as any).unloadedAngle : undefined) ?? numberOrUndefined(searchParams.get("alpha0")) ?? 45;
 
   // 构建几何参数 - 根据实际弹簧类型构建
   const geometry = useMemo(() => {
@@ -578,6 +596,18 @@ const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compress
           { label: "Spring Rate k / 刚度", value: springRate ? `${springRate.toFixed(2)} N/mm` : "—" },
         ];
       }
+      case "arc": {
+        return [
+          { label: "Spring Type / 类型", value: "Arc / 弧形弹簧" },
+          { label: "Material / 材料", value: materialName },
+          { label: "Wire Diameter d / 线径", value: `${wireDiameter.toFixed(2)} mm` },
+          { label: "Mean Diameter D / 中径", value: `${meanDiameter.toFixed(2)} mm` },
+          { label: "Active Coils n / 有效圈数", value: String(activeCoils) },
+          { label: "Working Radius r / 工作半径", value: `${arcRadius.toFixed(2)} mm` },
+          { label: "Unloaded Angle α₀ / 自由角度", value: `${arcAlpha0.toFixed(2)}°` },
+          { label: "Spring Rate R / 旋转刚度", value: springRate ? `${springRate.toFixed(2)} N·mm/deg` : "—" },
+        ];
+      }
       case "extension":
         return [
           ...baseItems,
@@ -770,6 +800,25 @@ const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compress
                     />
                   </p>
                 </>
+              ) : springType === "arc" ? (
+                <>
+                  <div className="h-[400px] rounded-lg overflow-hidden bg-white border">
+                    <ArcSpringVisualizer
+                      d={wireDiameter}
+                      D={meanDiameter}
+                      n={activeCoils}
+                      r={arcRadius}
+                      alpha0Deg={arcAlpha0}
+                      autoRotate={true}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    <LanguageText 
+                      en="Arc Spring • Internal 3D Renderer"
+                      zh="弧形弹簧 • 内置 3D 渲染器"
+                    />
+                  </p>
+                </>
               ) : storeGeometry?.type === "wave" ? (
                 <>
                   <div className="h-[400px] rounded-lg overflow-hidden bg-white border">
@@ -822,13 +871,13 @@ const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compress
             </TabsContent>
             
             <TabsContent value="cad">
-              {springType === "wave" ? (
+              {springType === "wave" || springType === "arc" ? (
                 <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 rounded-lg p-6 border text-center">
                   <AlertCircle className="w-10 h-10 text-slate-300 mb-4" />
                   <p className="text-muted-foreground">
                     <LanguageText 
-                      en="FreeCAD preview is not available for Wave Springs yet."
-                      zh="波形弹簧暂不支持 FreeCAD 预览。"
+                      en={`FreeCAD preview is not available for ${springType === "wave" ? "Wave" : "Arc"} Springs yet.`}
+                      zh={`${springType === "wave" ? "波形" : "弧形"}弹簧暂不支持 FreeCAD 预览。`}
                     />
                   </p>
                 </div>
@@ -877,13 +926,13 @@ const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compress
             </TabsContent>
             
             <TabsContent value="2d">
-              {springType === "wave" ? (
+              {springType === "wave" || springType === "arc" ? (
                 <div className="flex flex-col items-center justify-center h-[500px] bg-slate-50 rounded-lg p-6 border text-center">
                   <FileText className="w-10 h-10 text-slate-300 mb-4" />
                   <p className="text-muted-foreground">
                     <LanguageText 
-                      en="Engineering drawing generation is not available for Wave Springs yet."
-                      zh="波形弹簧暂不支持工程图生成。"
+                      en={`Engineering drawing generation is not available for ${springType === "wave" ? "Wave" : "Arc"} Springs yet.`}
+                      zh={`${springType === "wave" ? "波形" : "弧形"}弹簧暂不支持工程图生成。`}
                     />
                   </p>
                 </div>

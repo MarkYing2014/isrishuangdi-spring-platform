@@ -26,6 +26,7 @@ import {
   downloadArcSpringPDF,
   printArcSpringReport,
 } from "@/lib/arcSpring";
+import { LanguageText } from "@/components/language-context";
 import { useSpringDesignStore, type ArcGeometry } from "@/lib/stores/springDesignStore";
 import { useRouter } from "next/navigation";
 import { buildArcSpringDesignRuleReport } from "@/lib/designRules";
@@ -971,7 +972,7 @@ export function ArcSpringCalculator() {
                   }}
                 >
                   <Activity className="w-4 h-4 mr-1" />
-                  Engineering Analysis
+                  <LanguageText en="Engineering Analysis" zh="工程分析" />
                 </Button>
                 <Button
                   size="sm"
@@ -980,7 +981,7 @@ export function ArcSpringCalculator() {
                   disabled={!calculated || (result.warnings.length > 0 && !isFinite(result.k))}
                 >
                   <Printer className="w-4 h-4 mr-1" />
-                  Print Report
+                  <LanguageText en="Print Report" zh="打印报告" />
                 </Button>
                 <Button
                   size="sm"
@@ -989,7 +990,7 @@ export function ArcSpringCalculator() {
                   disabled={!calculated || (result.warnings.length > 0 && !isFinite(result.k))}
                 >
                   <FileText className="w-4 h-4 mr-1" />
-                  Export PDF
+                  <LanguageText en="Export PDF" zh="导出 PDF" />
                 </Button>
                 <Button
                   size="sm"
@@ -1000,7 +1001,7 @@ export function ArcSpringCalculator() {
                 >
                   <a href={`/tools/cad-export?type=arcSpring&d=${input.d}&D=${input.D}&Na=${input.n}&alpha0=${input.alpha0}&r=${input.r}&mat=${input.materialKey}`}>
                     <Download className="w-4 h-4 mr-1" />
-                    Export CAD
+                    <LanguageText en="Export CAD" zh="导出 CAD" />
                   </a>
                 </Button>
               </div>
