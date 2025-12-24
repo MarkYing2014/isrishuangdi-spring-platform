@@ -597,6 +597,7 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
               <div className="space-y-3">
                 <h3 className="text-sm font-medium">
                   {isZh ? "3D 预览" : "3D Preview"}
+                </h3>
                 <div className="mt-3">
                   <Calculator3DPreview
                     expectedType="dieSpring"
