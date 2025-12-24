@@ -20,6 +20,8 @@ import {
   Legend,
   ResponsiveContainer,
   ReferenceLine,
+  ComposedChart,
+  Scatter,
 } from "recharts";
 
 import { computeArcSpring, ARC_SPRING_FACTORY_POLICY, ArcSpringResults } from "@/lib/arcSpring/ArcSpringStress";
@@ -239,13 +241,21 @@ export function ArcSpringEngineeringPage() {
                                       ({engResult.direction})
                                   </span>
                               </div>
-                              <div className="text-[10px] text-slate-400 mt-1">{engResult.TworkPerStrip_Nm.toFixed(1)} Nm/strip</div>
+                              <div className="text-[10px] text-slate-400 mt-1">
+                                  {engResult.TworkPerStrip_Nm.toFixed(1)} Nm/strip
+                              </div>
+                              <div className="text-[10px] text-muted-foreground mt-2 italic border-t pt-1">
+                                  Total Damper Torque ({assemblyFactor} strips in parallel)
+                              </div>
                           </div>
                            <div className="p-4 bg-slate-50 rounded border">
                               <div className="text-xs text-muted-foreground uppercase">Max Shear Stress</div>
                               <div className="text-2xl font-bold mt-1 text-slate-900">{engResult.tauWork_MPa.toFixed(0)}</div>
                               <div className="text-xs text-muted-foreground">MPa (Wahl)</div>
                               <div className="text-[10px] text-slate-400 mt-1">Allow: {engResult.tauAllow_MPa.toFixed(0)} MPa</div>
+                              <div className="text-[10px] text-muted-foreground mt-2 italic border-t pt-1">
+                                  Stress shown is per strip (critical wire), evaluated with Wahl factor.
+                              </div>
                           </div>
                            <div className={`p-4 rounded border text-white ${getStatusColor(engResult.stressRatio_pct)}`}>
                               <div className="text-xs opacity-80 uppercase">Stress Ratio</div>
@@ -288,6 +298,81 @@ export function ArcSpringEngineeringPage() {
                               </ResponsiveContainer>
                           </TabsContent>
                       </Tabs>
+                  </CardContent>
+              </Card>
+
+              {/* Card G: Fatigue Analysis */}
+              <Card>
+                  <CardHeader>
+                      <CardTitle>G. Fatigue Analysis (V2)</CardTitle>
+                      <CardDescription>
+                          Goodman & Soderberg Criteria (Cycle: 0 - {engResult.tauWork_MPa.toFixed(0)} MPa)
+                      </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                      <div className="grid grid-cols-3 gap-4 mb-6">
+                           <div className={`p-4 rounded border text-slate-800 bg-slate-50`}>
+                              <div className="text-xs opacity-80 uppercase">Cycle Type</div>
+                              <div className="text-lg font-bold mt-1">{engResult.fatigue.cycleType}</div>
+                              <div className="text-xs opacity-80">R = 0 (Pulsating)</div>
+                          </div>
+                           <div className={`p-4 rounded border ${engResult.fatigue.safetyFactorGoodman < 1.1 ? 'bg-red-100' : 'bg-green-50'}`}>
+                              <div className="text-xs opacity-80 uppercase">Goodman SF</div>
+                              <div className="text-3xl font-bold mt-1 text-slate-900">{engResult.fatigue.safetyFactorGoodman.toFixed(2)}</div>
+                              <div className="text-xs opacity-80 text-slate-600">Target &gt; 1.1</div>
+                          </div>
+                          <div className={`p-4 rounded border ${engResult.fatigue.safetyFactorSoderberg < 1.1 ? 'bg-red-100' : 'bg-green-50'}`}>
+                              <div className="text-xs opacity-80 uppercase">Soderberg SF</div>
+                              <div className="text-3xl font-bold mt-1 text-slate-900">{engResult.fatigue.safetyFactorSoderberg.toFixed(2)}</div>
+                              <div className="text-xs opacity-80 text-slate-600">Conservative</div>
+                          </div>
+                      </div>
+
+                      <div className="h-[350px] border rounded p-4">
+                          <ResponsiveContainer width="100%" height="100%">
+                              <ComposedChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis 
+                                    type="number" 
+                                    dataKey="x" 
+                                    name="Mean Stress" 
+                                    unit=" MPa" 
+                                    domain={[0, 'auto']} 
+                                    label={{ value: "Mean Stress (MPa)", position: 'insideBottom', offset: -10 }}
+                                  />
+                                  <YAxis 
+                                    type="number" 
+                                    dataKey="y" 
+                                    name="Alt Stress" 
+                                    unit=" MPa" 
+                                    domain={[0, 'auto']} 
+                                    label={{ value: "Alternating Stress (MPa)", angle: -90, position: 'insideLeft' }}
+                                  />
+                                  <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                                  <Legend verticalAlign="top"/>
+                                  
+                                  {/* Goodman Line (Se to Sut) */}
+                                  <Line 
+                                    data={[{x:0, y:engResult.fatigue.Se}, {x:engResult.fatigue.Sut, y:0}]} 
+                                    type="linear" dataKey="y" stroke="#2563eb" strokeWidth={2} name="Goodman Limit" dot={false} 
+                                  />
+                                  
+                                  {/* Soderberg Line (Se to Sy) */}
+                                  <Line 
+                                    data={[{x:0, y:engResult.fatigue.Se}, {x:Sy, y:0}]} 
+                                    type="linear" dataKey="y" stroke="#9333ea" strokeDasharray="5 5" name="Soderberg Limit" dot={false} 
+                                  />
+
+                                  {/* Operating Point */}
+                                  <Scatter 
+                                    name="Operating Point" 
+                                    data={[{x: engResult.fatigue.tauMean, y: engResult.fatigue.tauAlt}]} 
+                                    fill={engResult.fatigue.safetyFactorGoodman >= 1.1 ? "green" : "red"} 
+                                    shape="circle"
+                                  />
+                              </ComposedChart>
+                          </ResponsiveContainer>
+                      </div>
                   </CardContent>
               </Card>
 

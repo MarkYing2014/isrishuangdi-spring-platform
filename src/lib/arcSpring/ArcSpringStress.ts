@@ -133,6 +133,19 @@ export interface ArcSpringResults {
 
     // warnings (for UI Design Rules panel)
     warnings: Array<{ code: string; message: string }>;
+
+    // Fatigue Analysis (V2)
+    fatigue: FatigueResult;
+}
+
+export interface FatigueResult {
+    Sut: number;
+    Se: number;
+    tauMean: number;
+    tauAlt: number;
+    safetyFactorGoodman: number;
+    safetyFactorSoderberg: number;
+    cycleType: "Pulsating (0-Max)" | "Reversing" | "Custom";
 }
 
 /**
@@ -302,6 +315,37 @@ export function computeArcSpring(
         stressAngle.push({ thetaDeg: theta, tauMPa: tau, ratioPct });
     }
 
+    // 6) Fatigue Analysis (V2)
+    // Assumptions:
+    // - Cycle: Pulsating from Neutral (0 stress) to Work Point (tauWork).
+    // - Material: Sut approx 1.2 * Sy (if not provided), Se approx 0.5 * Sut.
+    const Sut = mat.Sut ?? (mat.Sy * 1.2);
+    const Se = Sut * 0.5;
+
+    // Cycle 0 -> tauWork
+    const tauMin = 0;
+    const tauMax = tauWork;
+    const tauMean = (tauMax + tauMin) / 2;
+    const tauAlt = (tauMax - tauMin) / 2;
+
+    // Goodman: Ta/Se + Tm/Sut = 1/nf
+    const goodmanTerm = (tauAlt / Se) + (tauMean / Sut);
+    const sfGoodman = goodmanTerm > 0 ? (1 / goodmanTerm) : 999;
+
+    // Soderberg: Ta/Se + Tm/Sy = 1/nf
+    const soderbergTerm = (tauAlt / Se) + (tauMean / mat.Sy);
+    const sfSoderberg = soderbergTerm > 0 ? (1 / soderbergTerm) : 999;
+
+    const fatigue: FatigueResult = {
+        Sut,
+        Se,
+        tauMean,
+        tauAlt,
+        safetyFactorGoodman: sfGoodman,
+        safetyFactorSoderberg: sfSoderberg,
+        cycleType: "Pulsating (0-Max)"
+    };
+
     // Reporting mode
     // Some screens want to show "total damper" numbers only, but always keep per-strip in payload.
     const res: ArcSpringResults = {
@@ -332,6 +376,7 @@ export function computeArcSpring(
         limit,
         curves: { torqueAngle, stressAngle },
         warnings,
+        fatigue,
     };
 
     // If you want a strict factory-style warning when ratio is crazy:
