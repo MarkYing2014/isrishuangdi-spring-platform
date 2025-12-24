@@ -32,6 +32,17 @@ const SpiralTorsionSpringVisualizer = dynamic(
     ),
   }
 );
+const DieSpringVisualizer = dynamic(
+  () => import("@/components/three/DieSpringVisualizer").then((mod) => mod.DieSpringVisualizer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full w-full flex items-center justify-center bg-slate-50 rounded-lg">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-500" />
+      </div>
+    ),
+  }
+);
 
 export function Calculator3DPreview({
   expectedType,
@@ -68,7 +79,20 @@ export function Calculator3DPreview({
 
     // dieSpring has its own dedicated visualizer in DieSpringCalculator
     if (geometry.type === "dieSpring") {
-      return null;
+       return (
+        <DieSpringVisualizer
+          outerDiameter={geometry.outerDiameter}
+          wireThickness={geometry.wireThickness}
+          wireWidth={geometry.wireWidth}
+          coils={geometry.totalCoils}
+          freeLength={geometry.freeLength}
+          endStyle={geometry.endStyle ?? "closed_ground"}
+          duty={geometry.duty ?? "MD"}
+          risk={geometry.risk ?? "low"}
+          autoRotate={false} 
+          backgroundColor="#f8fafc" // slate-50
+        />
+      );
     }
     
     // waveSpring has its own visualizer or is not supported here yet

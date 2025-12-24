@@ -40,7 +40,7 @@ import {
 } from "@/lib/stores/springDesignStore";
 import { mapDieMaterialToStoreMaterial } from "@/lib/engineering/dieSpring/materialAdapter";
 
-const DieSpringVisualizer = lazy(() => import("@/components/three/DieSpringVisualizer"));
+import { Calculator3DPreview } from "@/components/calculators/Calculator3DPreview";
 
 import {
   calculateDieSpring,
@@ -597,28 +597,21 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
               <div className="space-y-3">
                 <h3 className="text-sm font-medium">
                   {isZh ? "3D 预览" : "3D Preview"}
-                </h3>
-                <div className="h-[280px] rounded-md border bg-white overflow-hidden">
-                  <Suspense
-                    fallback={
-                      <div className="h-full w-full flex items-center justify-center">
-                        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-                      </div>
-                    }
-                  >
-                    <DieSpringVisualizer
-                      outerDiameter={od_mm}
-                      wireThickness={wire_t_mm}
-                      wireWidth={wire_b_mm}
-                      coils={coils}
-                      freeLength={freeLength_mm}
-                      endStyle={endStyle}
-                      duty={duty}
-                      risk={deflectionRisk.risk}
-                      autoRotate={true}
-                      backgroundColor="#ffffff"
-                    />
-                  </Suspense>
+                <div className="mt-3">
+                  <Calculator3DPreview
+                    expectedType="dieSpring"
+                    geometryOverride={{
+                      type: "dieSpring",
+                      outerDiameter: od_mm,
+                      wireThickness: wire_t_mm,
+                      wireWidth: wire_b_mm,
+                      totalCoils: coils,
+                      freeLength: freeLength_mm,
+                      endStyle: endStyle,
+                      duty: duty,
+                      risk: deflectionRisk.risk,
+                    }}
+                  />
                 </div>
               </div>
 
