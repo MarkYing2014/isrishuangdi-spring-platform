@@ -3,6 +3,7 @@
 import { useMemo, useEffect, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/components/language-context";
 import { UnifiedForceTester } from "@/components/force-tester";
@@ -29,7 +30,7 @@ import {
 } from "@/lib/stores/springDesignStore";
 import { convertStoreGeometryToEngine } from "@/lib/engine/geometryAdapters";
 import { EXTENSION_HOOK_LABELS, type ExtensionHookType, type SpringType } from "@/lib/springTypes";
-import Link from "next/link";
+
 import { Brain } from "lucide-react";
 import { SpiralTorsionAnalysisPanel } from "@/components/analysis/SpiralTorsionAnalysisPanel";
 import { SuspensionAnalysisPanel } from "@/components/analysis/SuspensionAnalysisPanel";
@@ -176,6 +177,23 @@ function AnalysisReady({
   }
   if (designGeometry.type === "wave") {
     throw new Error("waveSpring should be handled by WaveSpringEngineeringPage");
+  }
+  if (designGeometry.type === "arc") {
+    return (
+      <div className="container mx-auto py-12 text-center">
+        <h1 className="text-2xl font-bold mb-4">{isZh ? "弧形弹簧分析" : "Arc Spring Analysis"}</h1>
+        <p className="text-muted-foreground mb-6">
+          {isZh 
+            ? "弧形弹簧的通用工程分析暂未开通。" 
+            : "Standard engineering analysis is not yet available for Arc Springs."}
+        </p>
+        <Button asChild variant="outline">
+          <Link href="/tools/calculator?type=arcSpring">
+            {isZh ? "返回计算器" : "Back to Calculator"}
+          </Link>
+        </Button>
+      </div>
+    );
   }
   
   const springType = designGeometry.type;

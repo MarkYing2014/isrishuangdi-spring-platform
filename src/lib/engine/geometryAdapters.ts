@@ -125,5 +125,7 @@ export function convertStoreGeometryToEngine(
       // If a basic compression model is needed, define `startDm` locally or pass it.
       // For now, throwing an error as a placeholder.
       throw new Error("Wave spring should not use the general engine adapter");
+    case "arc":
+      throw new Error("Arc spring should not use the general engine adapter");
   }
 }
