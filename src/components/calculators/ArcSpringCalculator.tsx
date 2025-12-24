@@ -390,7 +390,7 @@ export function ArcSpringCalculator() {
                   unit="mm"
                   min={5}
                   max={120}
-                  step={1}
+                  step={0.1}
                 />
               </div>
               <div
@@ -430,7 +430,7 @@ export function ArcSpringCalculator() {
                     unit="mm"
                     min={10}
                     max={200}
-                    step={1}
+                    step={0.1}
                   />
                 </div>
                 <div
@@ -444,7 +444,7 @@ export function ArcSpringCalculator() {
                     unit="deg"
                     min={10}
                     max={180}
-                    step={1}
+                    step={0.1}
                   />
                 </div>
                 <div
@@ -458,7 +458,7 @@ export function ArcSpringCalculator() {
                     unit="deg"
                     min={0}
                     max={input.alpha0}
-                    step={1}
+                    step={0.1}
                   />
                 </div>
                 <div
@@ -472,7 +472,7 @@ export function ArcSpringCalculator() {
                     unit="deg"
                     min={0}
                     max={Math.max(0, (input.alpha0 ?? 0) - 1)}
-                    step={1}
+                    step={0.1}
                   />
                 </div>
                 <div
