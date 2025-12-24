@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, Suspense } from "react";
+import { useMemo, useEffect, Suspense, useState } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,8 @@ import { Brain } from "lucide-react";
 import { SpiralTorsionAnalysisPanel } from "@/components/analysis/SpiralTorsionAnalysisPanel";
 import { DiskSpringAnalysisPanel } from "@/components/analysis/DiskSpringAnalysisPanel";
 import { isSpiralTorsionDesign, isDiskSpringDesign } from "@/lib/stores/springDesignStore";
+import { SavedDesignManager } from "@/components/analysis/SavedDesignManager";
+import { QuoteCTA } from "@/components/common/QuoteCTA";
 
 // Dynamic imports for 3D visualizers
 const CompressionSpringVisualizer = dynamic(
@@ -157,6 +159,23 @@ function AnalysisReady({
   designMaterial,
   designAnalysis,
 }: AnalysisReadyProps) {
+  const [showQuoteCTA, setShowQuoteCTA] = useState(false);
+  const designCode = (designGeometry as any).designCode;
+
+  const handleExportPDF = () => {
+    try {
+      const results = SpringAnalysisEngine.analyze(engineGeometry, workingConditions);
+      const reportData = createReportData(engineGeometry, workingConditions, results, {
+        language: isZh ? "zh" : "en",
+      });
+      printReport(reportData);
+      
+      // Commercial Loop: Show Quote CTA after export
+      setTimeout(() => setShowQuoteCTA(true), 1500);
+    } catch (error) {
+      console.error("Export error:", error);
+    }
+  };
   // ⚠️ 注意：spiralTorsion 和 dieSpring 已在上层被拦截，此函数只处理 wire spring
   // 不要在这里添加 spiralTorsion 或 dieSpring 的兼容代码
   if (designGeometry.type === "spiralTorsion") {
@@ -462,17 +481,7 @@ function AnalysisReady({
     );
   }
 
-  const handleExportPDF = () => {
-    try {
-      const results = SpringAnalysisEngine.analyze(engineGeometry, workingConditions);
-      const reportData = createReportData(engineGeometry, workingConditions, results, {
-        language: isZh ? "zh" : "en",
-      });
-      printReport(reportData);
-    } catch (error) {
-      console.error("Export error:", error);
-    }
-  };
+  // Removed old handleExportPDF from here as it's moved up to access state
 
   const handleDownloadHTML = () => {
     try {
@@ -523,7 +532,7 @@ function AnalysisReady({
 
   return (
     <main className="container mx	auto py-8 px-4">
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold mb-2">
             {isZh ? "弹簧工程分析" : "Spring Engineering Analysis"}
@@ -534,12 +543,15 @@ function AnalysisReady({
               : "Complete stress, fatigue, safety factor, and buckling analysis"}
           </p>
         </div>
-        <Link href="/tools/advanced-analysis">
-          <Button variant="outline" className="gap-2">
-            <Brain className="h-4 w-4" />
-            {isZh ? "高级分析" : "Advanced Analysis"}
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <SavedDesignManager />
+          <Link href="/tools/advanced-analysis">
+            <Button variant="outline" className="gap-2 rounded-full">
+              <Brain className="h-4 w-4" />
+              {isZh ? "高级分析" : "Advanced Analysis"}
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[350px,1fr]">
@@ -753,6 +765,11 @@ function AnalysisReady({
           />
         </div>
       )}
+      <QuoteCTA 
+        isVisible={showQuoteCTA} 
+        onDismiss={() => setShowQuoteCTA(false)} 
+        designCode={designCode}
+      />
     </main>
   );
 }

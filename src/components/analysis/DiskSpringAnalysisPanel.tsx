@@ -22,6 +22,7 @@ import dynamic from "next/dynamic";
 import { calculateDiskSpring, type DiskSpringResult, type DiskCurvePoint } from "@/lib/springMath/diskSpring";
 import type { DiskGeometry, MaterialInfo, AnalysisResult } from "@/lib/stores/springDesignStore";
 import { VariablePitchCurvesChart, type VariablePitchCurveMode } from "@/components/charts/VariablePitchCurvesChart";
+import { SavedDesignManager } from "@/components/analysis/SavedDesignManager";
 
 const DiskSpringVisualizer = dynamic(
   () => import("@/components/three/DiskSpringVisualizer").then((mod) => mod.DiskSpringVisualizer),
@@ -91,7 +92,8 @@ export function DiskSpringAnalysisPanel({
           </div>
         </div>
         <div className="flex items-center gap-2">
-           <Button variant="outline" size="sm" className="gap-2">
+           <SavedDesignManager />
+           <Button variant="outline" size="sm" className="gap-2 rounded-full">
              <Download className="h-4 w-4" />
              {isZh ? "导出报告" : "Export Report"}
            </Button>

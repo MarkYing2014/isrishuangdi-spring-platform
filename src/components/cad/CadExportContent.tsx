@@ -37,6 +37,7 @@ import type { SpringMaterialId } from "@/lib/materials/springMaterials";
 import { generateSpringDrawingSpec } from "@/lib/drawing";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileCode, Box } from "lucide-react";
+import { QuoteCTA } from "@/components/common/QuoteCTA";
 
 // Dynamic import for 3D preview (client-side only)
 const CadPreview3D = dynamic(
@@ -466,6 +467,7 @@ function CadExportContent() {
   const [error, setError] = useState<string | null>(null);
   const [freecadStatus, setFreecadStatus] = useState<{ available: boolean; version?: string } | null>(null);
   const [isExportingFreeCAD, setIsExportingFreeCAD] = useState(false);
+  const [showQuoteCTA, setShowQuoteCTA] = useState(false);
   
   // 检查 FreeCAD 状态
   useEffect(() => {
@@ -547,6 +549,9 @@ function CadExportContent() {
           downloadUrl: f.downloadUrl,
           fileSize: f.fileSize,
         })));
+        
+        // Commercial Loop: Show Quote CTA after export
+        setTimeout(() => setShowQuoteCTA(true), 2000);
       } else if (result.status === "unavailable") {
         setError(result.message || "FreeCAD is not available");
       } else {
@@ -595,6 +600,8 @@ function CadExportContent() {
       
       if (result.files) {
         setExportedFiles(result.files);
+        // Commercial Loop: Show Quote CTA after export
+        setTimeout(() => setShowQuoteCTA(true), 1500);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -805,6 +812,7 @@ function CadExportContent() {
   }
 
   return (
+    <>
     <section className="space-y-6">
       <div className="space-y-3">
         <p className="text-sm uppercase tracking-[0.3em] text-primary/70">
@@ -1357,5 +1365,11 @@ function CadExportContent() {
         </Button>
       </div>
     </section>
+    <QuoteCTA 
+      isVisible={showQuoteCTA} 
+      onDismiss={() => setShowQuoteCTA(false)} 
+      designCode={code}
+    />
+    </>
   );
 }

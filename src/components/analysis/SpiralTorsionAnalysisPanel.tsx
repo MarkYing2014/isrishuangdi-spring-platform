@@ -48,6 +48,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { SpiralFeaPanel } from "@/components/analysis/SpiralFeaPanel";
 import { SpiralAdvancedAnalysisPanel } from "@/components/analysis/SpiralAdvancedAnalysisPanel";
+import { SavedDesignManager } from "@/components/analysis/SavedDesignManager";
 
 const SpiralTorsionSpringVisualizer = dynamic(
   () => import("@/components/three/SpiralTorsionSpringMesh").then((mod) => mod.SpiralTorsionSpringVisualizer),
@@ -316,17 +317,21 @@ export function SpiralTorsionAnalysisPanel({
     <main className="container mx-auto py-8 px-4">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex gap-2 mb-4">
+        <div className="flex flex-wrap items-center gap-2 mb-4">
           <Link href="/tools/calculator">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" className="rounded-full">
               <ArrowLeft className="w-4 h-4 mr-2" />
               {isZh ? "返回" : "Back"}
             </Button>
           </Link>
+
+          <SavedDesignManager />
+
           <Button
             variant="secondary"
             size="sm"
             disabled={isExportingPdf || !canExportReport}
+            className="rounded-full"
             onClick={() => {
               void (async () => {
                 setIsExportingPdf(true);
@@ -407,7 +412,7 @@ export function SpiralTorsionAnalysisPanel({
             variant="secondary"
             size="sm"
             disabled={isExportingDraft || !canExportReport}
-            className="transition-colors hover:bg-purple-200 hover:text-purple-950 dark:hover:bg-purple-900/40 dark:hover:text-purple-100"
+            className="rounded-full transition-colors hover:bg-purple-200 hover:text-purple-950 dark:hover:bg-purple-900/40 dark:hover:text-purple-100"
             title={isZh ? "导出草稿：下载 JSON + 打开/下载 HTML 预览" : "Draft export: download JSON + open/download HTML preview"}
             onClick={() => {
               setIsExportingDraft(true);

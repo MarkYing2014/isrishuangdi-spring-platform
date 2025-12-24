@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { HomeRiskRadar } from "@/components/home/HomeRiskRadar";
 import { HoverGlassCard } from "@/components/home/HoverGlassCard";
 import { HeroSpline } from "@/components/home/hero-spline";
+import { ManufacturingAlignment } from "@/components/home/ManufacturingAlignment";
 
 const features = [
   {
@@ -114,14 +115,14 @@ export default function Home() {
             </div>
             <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
               <LanguageText
-                en="Engineering-First Spring Design & Manufacturing Platform"
-                zh="以工程为核心的弹簧设计与制造平台"
+                en="Engineering-Grade Spring Analysis & Manufacturing Platform"
+                zh="面向制造的工程级弹簧分析与设计平台"
               />
             </h1>
             <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
               <LanguageText
-                en="From Geometry → Risk → Production → Quality. Replace tribal knowledge with engineering certainty."
-                zh="从几何到风险，从设计到生产。用工程确定性替代‘老师傅经验’。"
+                en="Factory-Calibrated. Design-Ready. Not just a calculator, but a complete decision system from Geometry → Risk → Production."
+                zh="与工厂报告对齐，为真实设计而生。从几何验证到生产评审的全链路决策系统。"
               />
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
@@ -254,6 +255,8 @@ export default function Home() {
           <HomeRiskRadar />
         </div>
       </section>
+
+      <ManufacturingAlignment />
 
       <section className="rounded-3xl border bg-background p-6 sm:p-10">
         <div className="text-center mb-8">

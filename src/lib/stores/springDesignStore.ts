@@ -284,6 +284,21 @@ export interface AnalysisResult {
 }
 
 // ============================================================================
+// 持久化保存的设计 (Saved Cases)
+// ============================================================================
+
+export interface SavedDesign {
+  id: string;
+  designCode: string;
+  springType: SpringType;
+  geometry: SpringGeometry;
+  material: MaterialInfo;
+  analysisResult: AnalysisResult;
+  timestamp: string; // ISO string
+  notes?: string;
+}
+
+// ============================================================================
 // 设计元数据
 // ============================================================================
 
@@ -336,6 +351,9 @@ interface SpringDesignState {
   /** 是否有有效设计 */
   hasValidDesign: boolean;
 
+  /** 已保存的设计列表 (历史记录) */
+  savedDesigns: SavedDesign[];
+
   // ========== 操作方法 ==========
   setSpringType: (type: SpringType) => void;
   setGeometry: (geometry: SpringGeometry) => void;
@@ -360,6 +378,13 @@ interface SpringDesignState {
     meta?: Partial<DesignMeta>;
     eds?: SpringEds | null;
   }) => void;
+
+  /** 保存当前设计到历史记录 */
+  saveDesign: (notes?: string) => void;
+  /** 删除历史记录中的某个设计 */
+  deleteDesign: (id: string) => void;
+  /** 清空历史记录 */
+  clearSavedDesigns: () => void;
 
   /** 清除所有数据 */
   clear: () => void;
@@ -423,6 +448,7 @@ export const useSpringDesignStore = create<SpringDesignState>()(
         eds: null,
         resolved: null,
         hasValidDesign: false,
+        savedDesigns: [],
 
         // 设置弹簧类型
         setSpringType: (type) => set({
@@ -739,6 +765,35 @@ export const useSpringDesignStore = create<SpringDesignState>()(
           resolved: null,
           hasValidDesign: false,
         }),
+
+        // 保存当前设计
+        saveDesign: (notes) => {
+          const { geometry, springType, material, analysisResult } = get();
+          if (!geometry || !springType || !material || !analysisResult) return;
+
+          const newSaved: SavedDesign = {
+            id: Math.random().toString(36).substring(2, 9),
+            designCode: generateDesignCode(geometry),
+            springType,
+            geometry,
+            material,
+            analysisResult,
+            timestamp: new Date().toISOString(),
+            notes,
+          };
+
+          set((state) => ({
+            savedDesigns: [newSaved, ...state.savedDesigns.slice(0, 19)], // 保留最近 20 个
+          }));
+        },
+
+        // 删除历史记录
+        deleteDesign: (id) => set((state) => ({
+          savedDesigns: state.savedDesigns.filter((d) => d.id !== id),
+        })),
+
+        // 清空历史记录
+        clearSavedDesigns: () => set({ savedDesigns: [] }),
       };
     },
     {
@@ -758,6 +813,7 @@ export const useSpringDesignStore = create<SpringDesignState>()(
         meta: state.meta,
         eds: state.eds,
         hasValidDesign: state.hasValidDesign,
+        savedDesigns: state.savedDesigns,
       }),
 
       onRehydrateStorage: () => (state, error) => {
