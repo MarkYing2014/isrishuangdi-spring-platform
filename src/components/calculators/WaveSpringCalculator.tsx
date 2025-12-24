@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useMemo, useState, lazy, Suspense } from "react";
+import { useMemo, useState, lazy, Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/language-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -84,6 +84,32 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
 
   // Mode state (for future use)
   const [mode, setMode] = useState<WaveSpringMode>("loadAtWorkingHeight");
+
+  // Global store for hydration
+  const storedGeometry = useSpringDesignStore(state => state.geometry);
+
+  useEffect(() => {
+    if (storedGeometry && storedGeometry.type === "wave") {
+      const g = storedGeometry as any; // Cast to WaveGeometry if explicit type available, using 'any' for now to match file imports
+      // Update local state
+      setId(g.id);
+      setOd(g.od);
+      setThickness(g.thickness_t);
+      setRadialWall(g.radialWall_b);
+      setTurns(g.turns_Nt);
+      setWavesPerTurn(g.wavesPerTurn_Nw);
+      setFreeHeight(g.freeHeight_Hf);
+      setWorkingHeight(g.workingHeight_Hw);
+      
+      if (g.materialId) {
+        setMaterialId(g.materialId); 
+        // Note: E is separate in this component state, but might be derived from materialId change.
+        // We might need to look up material properties or store E in geometry.
+        // Assuming user will re-select if needed or E propagates from material logic if connected.
+        // For now just setting ID which drives material object in input useMemo.
+      }
+    }
+  }, [storedGeometry]);
 
   // Build input object
   const input = useMemo<WaveSpringInput>(() => ({

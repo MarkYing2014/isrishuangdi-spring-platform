@@ -24,6 +24,7 @@ import { SpringDesign } from "@/lib/springTypes";
 import { resolveCompressionNominal } from "@/lib/eds/compressionResolver";
 import { toEdsFromLegacyForm } from "@/lib/eds/legacyAdapters";
 import { buildCompressionDesignRuleReport } from "@/lib/designRules";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -142,6 +143,39 @@ export function CompressionCalculator() {
       bottomGround: lastCompressionGeometry?.bottomGround ?? true,
     },
   });
+
+  // Update form when store hydrates or changes
+  useEffect(() => {
+    if (lastCompressionGeometry) {
+      const g = lastCompressionGeometry;
+      const a = lastCompressionAnalysis;
+      
+      // Update form values
+      form.reset({
+        wireDiameter: g.wireDiameter,
+        meanDiameter: g.meanDiameter,
+        activeCoils: g.activeCoils,
+        totalCoils: g.totalCoils,
+        shearModulus: g.shearModulus ?? initialMaterial.shearModulus,
+        freeLength: g.freeLength ?? 50,
+        deflection: a?.workingDeflection ?? 10,
+        preloadDeflection: (a?.maxDeflection !== undefined && a?.workingDeflection !== undefined) 
+          ? Math.max(a.maxDeflection - a.workingDeflection, 0)
+          : 0,
+        stressRatio: 0.3,
+        topGround: g.topGround ?? true,
+        bottomGround: g.bottomGround ?? true,
+      });
+
+      // Update local material state if recorded in geometry
+      if (g.materialId) {
+        const mat = getSpringMaterial(g.materialId);
+        if (mat) {
+          setSelectedMaterial(mat);
+        }
+      }
+    }
+  }, [lastCompressionGeometry, lastCompressionAnalysis, form, initialMaterial]);
 
   // Handle material change
   const handleMaterialChange = (material: SpringMaterial) => {

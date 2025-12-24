@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { type SubmitHandler, useForm, Controller } from "react-hook-form";
 
 import {
@@ -148,6 +148,33 @@ export function ConicalCalculator() {
     });
     return `/tools/simulator?${params.toString()}`;
   }, [result, form]);
+
+  // Update form when store hydrates or changes (fixes refresh issue)
+  useEffect(() => {
+    if (lastConicalGeometry) {
+      const g = lastConicalGeometry;
+      const a = lastConicalAnalysis;
+      
+      form.reset({
+        wireDiameter: g.wireDiameter,
+        largeDiameter: g.largeOuterDiameter,
+        smallDiameter: g.smallOuterDiameter,
+        activeCoils: g.activeCoils,
+        totalCoils: g.totalCoils ?? g.activeCoils + 2,
+        freeLength: g.freeLength,
+        shearModulus: g.shearModulus ?? selectedMaterial.shearModulus ?? 79300,
+        deflection: a?.workingDeflection ?? 15,
+        endType: g.endType ?? "closed_ground",
+      });
+
+      if (g.materialId) {
+        const mat = getSpringMaterial(g.materialId);
+        if (mat) {
+          setSelectedMaterial(mat);
+        }
+      }
+    }
+  }, [lastConicalGeometry, lastConicalAnalysis, form, selectedMaterial.shearModulus]);
 
   // Watch form values for URL generation
   const watchedValues = form.watch();

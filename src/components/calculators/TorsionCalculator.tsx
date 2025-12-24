@@ -11,7 +11,7 @@
  * - Stress correction factor: Ki = (4C² - C - 1) / (4C(C - 1)) (inner fiber)
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { NumericInput } from "@/components/ui/numeric-input";
 
@@ -288,6 +288,33 @@ export function TorsionCalculator() {
       handOfCoil: lastTorsion?.windingDirection ?? "right",
     },
   });
+
+  // Update form when store hydrates or changes (fixes refresh issue)
+  useEffect(() => {
+    if (lastTorsion) {
+      const g = lastTorsion;
+      const a = lastTorsionAnalysis;
+      
+      form.reset({
+        wireDiameter: g.wireDiameter,
+        outerDiameter: g.outerDiameter ?? (g.meanDiameter + g.wireDiameter),
+        totalCoils: g.activeCoils, // Torsion total ~= active
+        activeCoils: g.activeCoils,
+        armLength1: g.legLength1,
+        armLength2: g.legLength2,
+        loadRadius: 20, // Not stored in geometry, rely on default
+        bodyLength: g.bodyLength ?? 10,
+        installAngle: 0, // Simplified logic used in submit
+        workingAngle: g.workingAngle ?? 45,
+        pitch: 1.5,
+        handOfCoil: g.windingDirection ?? "right",
+      });
+
+      if (g.materialId) {
+        setMaterialId(g.materialId);
+      }
+    }
+  }, [lastTorsion, lastTorsionAnalysis, form]);
 
   const watchedValues = form.watch();
 
