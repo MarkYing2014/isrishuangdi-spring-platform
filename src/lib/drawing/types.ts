@@ -393,7 +393,7 @@ export interface ConicalSpringDimensionRules {
 export interface FreeCADExportRequest {
   /** 设计参数 */
   design: {
-    springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion" | "suspensionSpring";
+    springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion" | "suspensionSpring" | "variablePitchCompression" | "disk";
     wireDiameter?: number;
     meanDiameter?: number;
     outerDiameter?: number;

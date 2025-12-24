@@ -522,11 +522,31 @@ export function buildFreeCADRequest(
   if (geometry.type === "arc") {
     return null;
   }
+  if (geometry.type === "disk") {
+    return null; // Not yet supported
+  }
+  if (geometry.type === "variablePitchCompression") {
+    // Variable pitch is a wire spring, so we can pass basic params
+    // Future: pass segments for full simulation
+    const vDesign: FreeCADExportRequest["design"] = {
+      springType: "variablePitchCompression",
+      wireDiameter: geometry.wireDiameter,
+      activeCoils: geometry.activeCoils,
+      meanDiameter: geometry.meanDiameter,
+      totalCoils: geometry.totalCoils,
+      freeLength: geometry.freeLength,
+    };
+    return {
+      design: vDesign,
+      outputFormats,
+      generateDrawing: true,
+    };
+  }
 
   const design: FreeCADExportRequest["design"] = {
-    springType: geometry.type,
-    wireDiameter: geometry.wireDiameter,
-    activeCoils: geometry.activeCoils,
+    springType: geometry.type as any,
+    wireDiameter: (geometry as any).wireDiameter,
+    activeCoils: (geometry as any).activeCoils,
   };
 
   switch (geometry.type) {

@@ -149,6 +149,30 @@ export const SPRING_PIPELINES: Record<SpringType, SpringPipelineConfig> = {
     icon: "Circle",
     implemented: true,
   },
+  variablePitchCompression: {
+    type: "variablePitchCompression",
+    label: { en: "Variable Pitch Compression", zh: "变节距压缩弹簧" },
+    calculatorPath: "/tools/calculator?tab=variablePitchCompression",
+    analysisPath: "/tools/analysis?type=variablePitchCompression",
+    simulatorPath: "/tools/simulator?type=variablePitchCompression",
+    reportPath: "/tools/report?type=variablePitchCompression",
+    cadExportPath: "/tools/cad-export?type=variablePitchCompression",
+    rfqPath: "/rfq?springType=variablePitchCompression",
+    icon: "ArrowDownWideNarrow",
+    implemented: true,
+  },
+  disk: {
+    type: "disk",
+    label: { en: "Disk / Belleville Spring", zh: "碟形弹簧" },
+    calculatorPath: "/tools/calculator?tab=disk",
+    analysisPath: "/tools/analysis?type=disk",
+    simulatorPath: "/tools/simulator?type=disk",
+    reportPath: "/tools/report?type=disk",
+    cadExportPath: "/tools/cad-export?type=disk",
+    rfqPath: "/rfq?springType=disk",
+    icon: "Disc",
+    implemented: true,
+  },
 };
 
 /**

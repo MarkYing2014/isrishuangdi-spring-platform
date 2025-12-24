@@ -25,7 +25,7 @@ import { useSpringDesignStore } from "@/lib/stores/springDesignStore";
 import { Calculator3DPreview } from "@/components/calculators/Calculator3DPreview";
 import { buildPipelineUrl } from "@/lib/pipeline/springPipelines";
 
-const Separator = () => <div className="h-px bg-slate-200 w-full my-1" />;
+const Separator = ({ className }: { className?: string }) => <div className={`h-px bg-slate-200 w-full ${className || "my-1"}`} />;
 
 export function DiskSpringCalculator() {
   // --- Form State ---

@@ -127,5 +127,11 @@ export function convertStoreGeometryToEngine(
       throw new Error("Wave spring should not use the general engine adapter");
     case "arc":
       throw new Error("Arc spring should not use the general engine adapter");
+    case "variablePitchCompression":
+      return toCompressionGeometry(geometry as any, materialId);
+    case "disk":
+      throw new Error("Disk spring should not use the general engine adapter");
+    default:
+      throw new Error(`Unknown spring type: ${(geometry as any).type}`);
   }
 }

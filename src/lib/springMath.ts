@@ -1,5 +1,5 @@
-import { 
-  SpringDesign, 
+import {
+  SpringDesign,
   CompressionSpringDesign,
   ConicalSpringDesign,
   ExtensionSpringDesign,
@@ -10,9 +10,9 @@ import {
   isTorsionDesign,
   LegacySpringDesign,
 } from "@/lib/springTypes";
-import { 
-  getSpringMaterial, 
-  type SpringMaterialId 
+import {
+  getSpringMaterial,
+  type SpringMaterialId
 } from "@/lib/materials/springMaterials";
 
 const PI = Math.PI;
@@ -55,7 +55,10 @@ export function getMeanDiameter(design: SpringDesign | LegacySpringDesign): numb
  * Get active coils from any spring design type
  */
 export function getActiveCoils(design: SpringDesign | LegacySpringDesign): number {
-  return design.activeCoils;
+  if ("activeCoils" in design && typeof design.activeCoils === "number") {
+    return design.activeCoils;
+  }
+  return 0;
 }
 
 /**
@@ -70,7 +73,7 @@ function validateGeometry(design: SpringDesign | LegacySpringDesign) {
   if (meanDiameter <= 0) {
     throw new Error("meanDiameter must be greater than zero");
   }
-  if (design.activeCoils <= 0) {
+  if (getActiveCoils(design) <= 0) {
     throw new Error("activeCoils must be greater than zero");
   }
 }
@@ -617,10 +620,10 @@ export function calculateConicalSpringNonlinear(
 
   // Calculate solid height: H_solid = Na * d
   const solidHeight = n0 * d;
-  
+
   // Total deflection capacity: X_total = L0 - H_solid
   const totalDeflectionCapacity = L0 - solidHeight;
-  
+
   if (totalDeflectionCapacity <= 0) {
     throw new Error(
       `Free length is too short compared to solid height. ` +
@@ -635,7 +638,7 @@ export function calculateConicalSpringNonlinear(
 
   // Check if maxDeflection exceeds total capacity
   const exceededSolidHeight = maxX > totalDeflectionCapacity;
-  
+
   // Clamp maxX to not exceed total deflection capacity
   const effectiveMaxX = Math.min(maxX, totalDeflectionCapacity);
 
@@ -659,15 +662,15 @@ export function calculateConicalSpringNonlinear(
     // Calculate instantaneous stiffness for current active coils
     // Using conical spring formula: k = G * d^4 / (2 * n * (D1 + D2) * (D1^2 + D2^2))
     // For progressive collapse, we interpolate the diameters based on which coils remain
-    
+
     // As coils collapse, the remaining coils have smaller average diameter
     // Linear interpolation of mean diameters for remaining coils
     const collapseRatio = collapsed / n0;
     const D1_eff = D1 - (D1 - D2) * collapseRatio; // Effective large diameter shrinks
     const D2_eff = D2; // Small end stays the same
-    
+
     // Conical spring stiffness formula
-    const k = (G * Math.pow(d, 4)) / 
+    const k = (G * Math.pow(d, 4)) /
       (2 * n_eff * (D1_eff + D2_eff) * (Math.pow(D1_eff, 2) + Math.pow(D2_eff, 2)));
 
     // Calculate load using piecewise linear approximation
@@ -800,12 +803,12 @@ export interface StressCorrectionResult {
  * @returns Corrected stress result
  */
 export function applyStressCorrections(params: StressCorrectionParams): StressCorrectionResult {
-  const { 
-    tauNominal, 
-    wahlFactor, 
-    surfaceFactor = 1.0, 
-    sizeFactor = 1.0, 
-    tempFactor = 1.0 
+  const {
+    tauNominal,
+    wahlFactor,
+    surfaceFactor = 1.0,
+    sizeFactor = 1.0,
+    tempFactor = 1.0
   } = params;
 
   const kTotal = wahlFactor * surfaceFactor * sizeFactor * tempFactor;
@@ -946,7 +949,7 @@ export function estimateFatigueLife(params: {
   // Using two points: (N1, tau1) and (N2, tau2)
   // m = (log(N1) - log(N2)) / (log(tau2) - log(tau1))
   // A = log(N1) + m × log(tau1)
-  
+
   const logN1 = Math.log10(N1);
   const logN2 = Math.log10(N2);
   const logTau1 = Math.log10(tau1);

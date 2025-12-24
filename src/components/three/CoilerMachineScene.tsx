@@ -8,7 +8,7 @@ import { SpringModel } from "@/components/three/SpringModel";
 import { CoilerArms } from "@/components/three/CoilerArms";
 import { WireFeed } from "@/components/three/WireFeed";
 import { SpringDesign, CompressionSpringDesign, isCompressionDesign } from "@/lib/springTypes";
-import { getMeanDiameter } from "@/lib/springMath";
+import { getMeanDiameter, getActiveCoils } from "@/lib/springMath";
 
 import { previewTheme } from "@/lib/three/previewTheme";
 
@@ -47,7 +47,7 @@ export function CoilerMachineScene({ springDesign, pitch }: CoilerMachineScenePr
             <SpringModel
               wireDiameter={springDesign.wireDiameter}
               meanDiameter={getMeanDiameter(springDesign)}
-              activeCoils={springDesign.activeCoils}
+              activeCoils={getActiveCoils(springDesign)}
               pitch={pitch}
             />
           </group>
