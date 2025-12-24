@@ -8,18 +8,59 @@
 
 "use client";
 
-import { useMemo, useRef, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo, Suspense } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Edges } from "@react-three/drei";
+import { OrbitControls, Edges, Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { useFeaStore } from "@/lib/stores/feaStore";
 import { applyFeaColors } from "@/lib/fea/feaTypes";
 import { previewTheme } from "@/lib/three/previewTheme";
+import { Button } from "@/components/ui/button";
+import { RotateCcw } from "lucide-react";
 import {
   createSpiralTorsionSpringGeometry,
   validateSpiralTorsionGeometry,
   type SpiralTorsionGeometryParams,
 } from "@/lib/spring3d/spiralTorsionGeometry";
+
+// View presets
+const VIEW_PRESETS = {
+  perspective: { position: [0, 60, 80], target: [0, 0, 0] },
+  front: { position: [0, 0, 100], target: [0, 0, 0] },    // Z axis
+  top: { position: [0, 100, 0], target: [0, 0, 0] },      // Y axis
+  side: { position: [100, 0, 0], target: [0, 0, 0] },     // X axis
+} as const;
+
+type ViewType = keyof typeof VIEW_PRESETS;
+
+/**
+ * Camera controller component
+ */
+function CameraController({ 
+  viewType, 
+  controlsRef 
+}: { 
+  viewType: ViewType; 
+  controlsRef: React.RefObject<any>;
+}) {
+  const { camera } = useThree();
+  
+  useEffect(() => {
+    const preset = VIEW_PRESETS[viewType];
+    camera.position.set(...(preset.position as [number, number, number]));
+    camera.lookAt(...(preset.target as [number, number, number]));
+    camera.updateProjectionMatrix();
+    
+    setTimeout(() => {
+      if (controlsRef.current) {
+        controlsRef.current.target.set(...(preset.target as [number, number, number]));
+        controlsRef.current.update();
+      }
+    }, 10);
+  }, [viewType, camera, controlsRef]);
+  
+  return null;
+}
 
 // ============================================================================
 // Types
@@ -142,61 +183,7 @@ export function SpiralTorsionSpringMesh({
   );
 }
 
-// ============================================================================
-// FitToObject - 自动对焦相机到模型
-// ============================================================================
 
-interface FitToObjectProps {
-  groupRef: React.RefObject<THREE.Group | null>;
-  autoRotate?: boolean;
-}
-
-function FitToObject({ groupRef, autoRotate = false }: FitToObjectProps) {
-  const { camera } = useThree();
-  const controlsRef = useRef<any>(null);
-
-  useEffect(() => {
-    const obj = groupRef.current;
-    if (!obj) return;
-
-    // 计算包围盒
-    const box = new THREE.Box3().setFromObject(obj);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-
-    // 计算相机距离
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const dist = maxDim * 2.0;
-
-    // 设置相机位置（斜上方视角）
-    camera.position.set(
-      center.x + dist * 0.8,
-      center.y - dist * 0.6,
-      center.z + dist * 0.8
-    );
-    camera.near = maxDim / 100;
-    camera.far = maxDim * 100;
-    camera.updateProjectionMatrix();
-
-    // 更新控制器目标点
-    if (controlsRef.current) {
-      controlsRef.current.target.copy(center);
-      controlsRef.current.update();
-    }
-  }, [camera, groupRef]);
-
-  return (
-    <OrbitControls
-      ref={controlsRef}
-      makeDefault
-      enablePan={true}
-      enableZoom={true}
-      enableRotate={true}
-      autoRotate={autoRotate}
-      autoRotateSpeed={1}
-    />
-  );
-}
 
 // ============================================================================
 // Visualizer Component (with controls)
@@ -219,51 +206,10 @@ export interface SpiralTorsionSpringVisualizerProps {
   autoRotate?: boolean;
   /** 缩放因子（用于适配视口） */
   scaleFactor?: number;
-}
-
-function SpiralTorsionScene({
-  innerDiameter,
-  outerDiameter,
-  turns,
-  stripWidth,
-  stripThickness,
-  handedness,
-  autoRotate,
-  scaleFactor,
-}: Required<SpiralTorsionSpringVisualizerProps>) {
-  const groupRef = useRef<THREE.Group>(null);
-
-  return (
-    <>
-      <color attach="background" args={[previewTheme.background]} />
-      
-      <ambientLight intensity={previewTheme.lights.ambient} />
-      <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} castShadow />
-      <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
-      <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
-      
-      {/* 螺旋扭转弹簧网格 */}
-      <group ref={groupRef} rotation={[Math.PI / 2, 0, 0]}>
-        <SpiralTorsionSpringMesh
-          innerDiameter={innerDiameter}
-          outerDiameter={outerDiameter}
-          turns={turns}
-          stripWidth={stripWidth}
-          stripThickness={stripThickness}
-          handedness={handedness}
-          scale={scaleFactor}
-          color="#6b9bd1"
-          metalness={previewTheme.material.spring.metalness}
-          roughness={previewTheme.material.spring.roughness}
-        />
-      </group>
-
-      <gridHelper args={[100, 20, previewTheme.grid.major, previewTheme.grid.minor]} position={[0, -20, 0]} />
-      
-      {/* 自动对焦相机 */}
-      <FitToObject groupRef={groupRef} autoRotate={autoRotate} />
-    </>
-  );
+  
+  // New props for status overlay
+  springRate?: number;
+  torque?: number;
 }
 
 export function SpiralTorsionSpringVisualizer({
@@ -274,24 +220,153 @@ export function SpiralTorsionSpringVisualizer({
   stripThickness = 0.5,
   handedness = "cw",
   autoRotate = false,
-  scaleFactor = 1, // 不再需要手动缩放，FitToObject 会自动调整
+  scaleFactor = 1,
+  springRate,
+  torque,
 }: SpiralTorsionSpringVisualizerProps) {
+  const controlsRef = useRef<any>(null);
+  const [currentView, setCurrentView] = useState<ViewType>("perspective");
+
+  const handleViewChange = useCallback((view: ViewType) => {
+    setCurrentView(view);
+  }, []);
+
   return (
-    <Canvas
-      camera={{ fov: 45, near: 0.1, far: 5000 }}
-      style={{ width: "100%", height: "100%" }}
-    >
-      <SpiralTorsionScene
-        innerDiameter={innerDiameter}
-        outerDiameter={outerDiameter}
-        turns={turns}
-        stripWidth={stripWidth}
-        stripThickness={stripThickness}
-        handedness={handedness}
-        autoRotate={autoRotate}
-        scaleFactor={scaleFactor}
-      />
-    </Canvas>
+    <div className="relative w-full h-full min-h-[300px]" style={{ background: previewTheme.background }}>
+      <Canvas
+        camera={{ fov: 45, near: 0.1, far: 5000, position: [0, 60, 80] }}
+        gl={{ antialias: true, alpha: true }}
+      >
+        <CameraController viewType={currentView} controlsRef={controlsRef} />
+        
+        <Suspense fallback={null}>
+          <color attach="background" args={[previewTheme.background]} />
+          
+          <ambientLight intensity={previewTheme.lights.ambient} />
+          <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} castShadow />
+          <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
+          <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
+          
+          <Environment preset="studio" />
+
+          {/* 螺旋扭转弹簧网格 - Rotate to lie flat on grid usually, but preset puts it on side.
+              In Standard preview (Compression), Y is Up. 
+              Spiral Torsion is planar. Usually lies on XZ plane?
+              Mesh generator creates it in XY plane generally. 
+              Let's rotate it -90 X to lie flat on XZ grid if we use standard Y-up grid.
+          */}
+          <group rotation={[-Math.PI / 2, 0, 0]}>
+            <SpiralTorsionSpringMesh
+              innerDiameter={innerDiameter}
+              outerDiameter={outerDiameter}
+              turns={turns}
+              stripWidth={stripWidth}
+              stripThickness={stripThickness}
+              handedness={handedness}
+              scale={scaleFactor}
+              color="#6b9bd1"
+              metalness={previewTheme.material.spring.metalness}
+              roughness={previewTheme.material.spring.roughness}
+            />
+          </group>
+
+          <gridHelper 
+            args={[200, 20, previewTheme.grid.major, previewTheme.grid.minor]} 
+            position={[0, -stripWidth/2, 0]} 
+          />
+          
+          <OrbitControls 
+            ref={controlsRef}
+            autoRotate={autoRotate}
+            autoRotateSpeed={1}
+            enablePan={true}
+            enableZoom={true}
+            enableRotate={true}
+            minDistance={10}
+            maxDistance={500}
+          />
+        </Suspense>
+      </Canvas>
+
+      {/* View selector - bottom left */}
+      <div className="absolute bottom-2 left-2 flex gap-1">
+        <Button
+          variant={currentView === "perspective" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("perspective")}
+          title="透视图 / Perspective"
+        >
+          <RotateCcw className="h-3 w-3 mr-1" />
+          3D
+        </Button>
+        <Button
+          variant={currentView === "front" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("front")}
+          title="前视图 / Front View"
+        >
+          前
+        </Button>
+        <Button
+          variant={currentView === "top" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("top")}
+          title="俯视图 / Top View"
+        >
+          顶
+        </Button>
+        <Button
+          variant={currentView === "side" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("side")}
+          title="侧视图 / Side View"
+        >
+          侧
+        </Button>
+      </div>
+
+      {/* Legend overlay - top left */}
+      <div className="absolute top-2 left-2 rounded bg-white/90 px-2 py-1.5 text-xs shadow z-10">
+        <div className="flex items-center gap-2">
+           <span className="font-semibold text-slate-700">Spiral Torsion</span>
+        </div>
+        <div className="mt-1 text-slate-600">
+           {handedness === "cw" ? "CW (Right)" : "CCW (Left)"}
+        </div>
+      </div>
+
+      {/* Status overlay - top right */}
+      <div className="absolute top-2 right-2 rounded bg-white/90 px-2 py-1.5 text-xs shadow space-y-0.5 z-10">
+        <div className="flex justify-between gap-4">
+          <span className="text-slate-500">OD:</span>
+          <span className="font-medium">{outerDiameter ?? "-"} mm</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-slate-500">ID:</span>
+          <span className="font-medium">{innerDiameter ?? "-"} mm</span>
+        </div>
+         <div className="flex justify-between gap-4">
+          <span className="text-slate-500">b×t:</span>
+          <span className="font-medium">{stripWidth}×{stripThickness}</span>
+        </div>
+        <div className="border-t border-slate-200 pt-1 mt-1">
+          <div className="flex justify-between gap-4">
+            <span className="text-slate-500">Nt:</span>
+            <span className="font-medium">{turns}</span>
+          </div>
+          {springRate !== undefined && (
+             <div className="flex justify-between gap-4">
+                <span className="text-slate-500">Rate:</span>
+                <span className="font-medium">{springRate.toFixed(2)} Nmm/°</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -7,12 +7,24 @@
 
 "use client";
 
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useMemo, useRef, useState, useCallback, useEffect, Suspense } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Grid } from "@react-three/drei";
+import { OrbitControls, Grid, Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { previewTheme } from "@/lib/three/previewTheme";
+import { Button } from "@/components/ui/button";
+import { RotateCcw } from "lucide-react";
 import { WaveSpringMesh } from "./WaveSpringMesh";
+
+// View presets
+const VIEW_PRESETS = {
+  perspective: { position: [50, 40, 50], target: [0, 0, 0] },
+  front: { position: [0, 0, 100], target: [0, 0, 0] },    // Z axis
+  top: { position: [0, 100, 0], target: [0, 0, 0] },      // Y axis
+  side: { position: [100, 0, 0], target: [0, 0, 0] },     // X axis
+} as const;
+
+type ViewType = keyof typeof VIEW_PRESETS;
 
 // ============================================================================
 // Types
@@ -37,6 +49,11 @@ export interface WaveSpringVisualizerProps {
   color?: string;
   /** Container className */
   className?: string;
+  
+  // New props for analysis overlay
+  springRate?: number;
+  solidHeight?: number;
+  loadAtWorkingHeight?: number;
 }
 
 // ============================================================================
@@ -44,26 +61,27 @@ export interface WaveSpringVisualizerProps {
 // ============================================================================
 
 function CameraController({ 
-  meanDiameter,
+  viewType, 
   controlsRef 
 }: { 
-  meanDiameter: number;
+  viewType: ViewType; 
   controlsRef: React.RefObject<any>;
 }) {
   const { camera } = useThree();
   
   useEffect(() => {
-    // Position camera based on spring size
-    const distance = meanDiameter * 2.5;
-    camera.position.set(distance * 0.8, distance * 0.5, distance * 0.8);
-    camera.lookAt(0, 0, 0);
+    const preset = VIEW_PRESETS[viewType];
+    camera.position.set(...(preset.position as [number, number, number]));
+    camera.lookAt(...(preset.target as [number, number, number]));
     camera.updateProjectionMatrix();
     
-    if (controlsRef.current) {
-      controlsRef.current.target.set(0, 0, 0);
-      controlsRef.current.update();
-    }
-  }, [meanDiameter, camera, controlsRef]);
+    setTimeout(() => {
+      if (controlsRef.current) {
+        controlsRef.current.target.set(...(preset.target as [number, number, number]));
+        controlsRef.current.update();
+      }
+    }, 10);
+  }, [viewType, camera, controlsRef]);
   
   return null;
 }
@@ -131,69 +149,162 @@ export function WaveSpringVisualizer({
   phase = 0,
   color = "#6b9bd1",
   className = "",
+  springRate,
+  solidHeight,
+  loadAtWorkingHeight,
 }: WaveSpringVisualizerProps) {
   const controlsRef = useRef<any>(null);
+  const [currentView, setCurrentView] = useState<ViewType>("perspective");
+
+  const handleViewChange = useCallback((view: ViewType) => {
+    setCurrentView(view);
+  }, []);
 
   // Calculate scale for visualization
   const scale = useMemo(() => {
-    const maxDim = Math.max(meanDiameter * 1.5, amplitude * 4);
-    return 30 / maxDim; // Normalize to ~30 units
+    const maxDim = Math.max(meanDiameter, amplitude * 2);
+    return maxDim > 0 ? 30 / maxDim : 1; 
   }, [meanDiameter, amplitude]);
 
-  const gridSize = meanDiameter * 1.5;
+  const gridSize = Math.max(meanDiameter * 2, 50);
 
   return (
-    <div className={`w-full h-full min-h-[300px] ${className}`}>
+    <div className={`relative w-full h-full min-h-[300px] ${className}`}>
       <Canvas
         camera={{
           fov: 45,
           near: 0.1,
           far: 1000,
-          position: [50, 30, 50],
+          position: [50, 40, 50],
         }}
         gl={{ antialias: true, alpha: false }}
         style={{ background: previewTheme.background }}
       >
-        {/* Background color */}
-        <color attach="background" args={[previewTheme.background]} />
+        <CameraController viewType={currentView} controlsRef={controlsRef} />
+        
+        <Suspense fallback={null}>
+          {/* Background color */}
+          <color attach="background" args={[previewTheme.background]} />
 
-        {/* Camera controller */}
-        <CameraController 
-          meanDiameter={meanDiameter} 
-          controlsRef={controlsRef} 
-        />
+          {/* Lighting */}
+          <SceneLighting />
+          
+           <Environment preset="studio" />
 
-        {/* Lighting */}
-        <SceneLighting />
+          {/* Grid */}
+          <SceneGrid size={gridSize} />
 
-        {/* Grid */}
-        <SceneGrid size={gridSize} />
+          {/* Wave Spring Mesh */}
+          <WaveSpringMesh
+            meanDiameter={meanDiameter}
+            thickness={thickness}
+            width={width}
+            amplitude={amplitude}
+            waves={waves}
+            turns={turns}
+            phase={phase}
+            color={color}
+            scale={scale}
+            showEdges={true}
+          />
 
-        {/* Wave Spring Mesh */}
-        <WaveSpringMesh
-          meanDiameter={meanDiameter}
-          thickness={thickness}
-          width={width}
-          amplitude={amplitude}
-          waves={waves}
-          turns={turns}
-          phase={phase}
-          color={color}
-          scale={scale}
-          showEdges={true}
-        />
-
-        {/* Orbit Controls */}
-        <OrbitControls
-          ref={controlsRef}
-          enablePan={true}
-          enableZoom={true}
-          enableRotate={true}
-          minDistance={10}
-          maxDistance={200}
-          target={[0, 0, 0]}
-        />
+          {/* Orbit Controls */}
+          <OrbitControls
+            ref={controlsRef}
+            enablePan={true}
+            enableZoom={true}
+            enableRotate={true}
+            minDistance={10}
+            maxDistance={200}
+            target={[0, 0, 0]}
+          />
+        </Suspense>
       </Canvas>
+
+      {/* View selector - bottom left */}
+      <div className="absolute bottom-2 left-2 flex gap-1">
+        <Button
+          variant={currentView === "perspective" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("perspective")}
+          title="透视图 / Perspective"
+        >
+          <RotateCcw className="h-3 w-3 mr-1" />
+          3D
+        </Button>
+        <Button
+          variant={currentView === "front" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("front")}
+          title="前视图 / Front View"
+        >
+          前
+        </Button>
+        <Button
+          variant={currentView === "top" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("top")}
+          title="俯视图 / Top View"
+        >
+          顶
+        </Button>
+        <Button
+          variant={currentView === "side" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("side")}
+          title="侧视图 / Side View"
+        >
+          侧
+        </Button>
+      </div>
+
+      {/* Legend overlay - top left */}
+      <div className="absolute top-2 left-2 rounded bg-white/90 px-2 py-1.5 text-xs shadow z-10">
+        <div className="flex items-center gap-2">
+           <span className="font-semibold text-slate-700">Wave Spring</span>
+        </div>
+        <div className="mt-1 text-slate-600">
+           {turns > 1 ? `Multi-Turn (${turns})` : "Single Turn"}
+        </div>
+      </div>
+
+       {/* Status overlay - top right */}
+      <div className="absolute top-2 right-2 rounded bg-white/90 px-2 py-1.5 text-xs shadow space-y-0.5 z-10">
+        <div className="flex justify-between gap-4">
+          <span className="text-slate-500">Dm:</span>
+          <span className="font-medium">{meanDiameter.toFixed(1)} mm</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-slate-500">Amp:</span>
+          <span className="font-medium">{amplitude.toFixed(2)} mm</span>
+        </div>
+         <div className="flex justify-between gap-4">
+          <span className="text-slate-500">b×t:</span>
+          <span className="font-medium">{width}×{thickness}</span>
+        </div>
+        <div className="border-t border-slate-200 pt-1 mt-1">
+          <div className="flex justify-between gap-4">
+            <span className="text-slate-500">Nw:</span>
+            <span className="font-medium">{waves}</span>
+          </div>
+          {loadAtWorkingHeight !== undefined && (
+            <div className="flex justify-between gap-4">
+                <span className="text-slate-500">Load:</span>
+                <span className="font-medium">{loadAtWorkingHeight.toFixed(0)} N</span>
+            </div>
+          )}
+          {springRate !== undefined && (
+             <div className="flex justify-between gap-4">
+                <span className="text-slate-500">Rate:</span>
+                <span className="font-medium">{springRate.toFixed(1)} N/mm</span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

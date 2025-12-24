@@ -63,6 +63,18 @@ export function Calculator3DPreview({
     if (!geometry) return null;
     if (geometry.type !== expectedType) return null;
 
+const WaveSpringVisualizer = dynamic(
+  () => import("@/components/three/WaveSpringVisualizer").then((mod) => mod.WaveSpringVisualizer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full w-full flex items-center justify-center bg-slate-50 rounded-lg">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-500" />
+      </div>
+    ),
+  }
+);
+    
     if (geometry.type === "spiralTorsion") {
       return (
         <SpiralTorsionSpringVisualizer
@@ -73,6 +85,23 @@ export function Calculator3DPreview({
           stripThickness={geometry.stripThickness}
           handedness={geometry.windingDirection ?? "cw"}
           autoRotate={false}
+          springRate={analysis?.springRate}
+        />
+      );
+    }
+
+    if (geometry.type === "wave") {
+      return (
+        <WaveSpringVisualizer
+          meanDiameter={geometry.od - geometry.radialWall_b} // Approximation of Dm
+          thickness={geometry.thickness_t}
+          width={geometry.radialWall_b}
+          amplitude={(geometry.freeHeight_Hf - (geometry.turns_Nt * geometry.thickness_t)) / (2 * geometry.turns_Nt * geometry.wavesPerTurn_Nw)} // Approx amplitude
+          waves={geometry.wavesPerTurn_Nw}
+          turns={geometry.turns_Nt}
+          color="#6b9bd1"
+          springRate={analysis?.springRate}
+          loadAtWorkingHeight={analysis?.workingLoad}
         />
       );
     }
@@ -95,11 +124,6 @@ export function Calculator3DPreview({
           solidHeight={analysis?.solidHeight}
         />
       );
-    }
-    
-    // waveSpring has its own visualizer or is not supported here yet
-    if (geometry.type === "wave") {
-      return null;
     }
 
     const shearModulus = geometry.shearModulus ?? material?.shearModulus ?? 79300;

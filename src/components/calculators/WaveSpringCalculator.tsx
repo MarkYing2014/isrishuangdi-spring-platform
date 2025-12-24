@@ -45,7 +45,7 @@ import { buildWaveSpringDesignRuleReport } from "@/lib/designRules/waveSpringRul
 import { buildWaveRiskRadar } from "@/lib/riskRadar/builders";
 import { useSpringDesignStore } from "@/lib/stores/springDesignStore";
 
-const WaveSpringVisualizer = lazy(() => import("@/components/three/WaveSpringVisualizer"));
+import { Calculator3DPreview } from "./Calculator3DPreview";
 
 interface WaveSpringCalculatorProps {
   isZh?: boolean;
@@ -460,23 +460,21 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[300px] rounded-md border bg-slate-50">
-                    <Suspense fallback={
-                      <div className="flex h-full items-center justify-center text-muted-foreground">
-                        {isZh ? "加载中..." : "Loading..."}
-                      </div>
-                    }>
-                      <WaveSpringVisualizer
-                        meanDiameter={result.meanDiameter_mm}
-                        thickness={thickness_t}
-                        width={radialWall_b}
-                        amplitude={result.waveAmplitude_mm}
-                        waves={wavesPerTurn_Nw}
-                        turns={turns_Nt}
-                        phase={0}
-                        color="#6b9bd1"
-                      />
-                    </Suspense>
+                  <div className="mt-3">
+                    <Calculator3DPreview 
+                      expectedType="wave" 
+                      geometryOverride={{
+                        type: "wave",
+                        id,
+                        od,
+                        thickness_t,
+                        radialWall_b,
+                        turns_Nt,
+                        wavesPerTurn_Nw,
+                        freeHeight_Hf,
+                        workingHeight_Hw,
+                      }}
+                    />
                   </div>
                 </CardContent>
               </Card>
