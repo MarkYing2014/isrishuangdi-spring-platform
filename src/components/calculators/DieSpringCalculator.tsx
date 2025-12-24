@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/language-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -293,63 +294,93 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                 <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/20 p-4">
                   <div className="space-y-1">
                     <Label>{isZh ? "外径 OD (mm)" : "Outer Diameter OD (mm)"}</Label>
-                    <Input
-                      type="number"
+                    <NumericInput
                       value={od_mm}
-                      onChange={(e) => setOd(parseFloat(e.target.value) || 0)}
+                      onChange={setOd}
                       step={0.5}
                       min={0}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "自由长度 L0 (mm)" : "Free Length L0 (mm)"}</Label>
-                    <Input
-                      type="number"
+                    <NumericInput
                       value={freeLength_mm}
-                      onChange={(e) => setFreeLength(parseFloat(e.target.value) || 0)}
+                      onChange={setFreeLength}
                       step={1}
                       min={0}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "工作长度 Lw (mm)" : "Working Length Lw (mm)"}</Label>
-                    <Input
-                      type="number"
+                    <NumericInput
                       value={workingLength_mm}
-                      onChange={(e) => setWorkingLength(parseFloat(e.target.value) || 0)}
+                      onChange={setWorkingLength}
                       step={1}
                       min={0}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "总圈数" : "Total Coils"}</Label>
-                    <Input
-                      type="number"
+                    <NumericInput
                       value={coils}
-                      onChange={(e) => setCoils(parseFloat(e.target.value) || 0)}
+                      onChange={setCoils}
                       step={0.5}
                       min={0}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label>{isZh ? "线材宽度 b (mm)" : "Wire Width b (mm)"}</Label>
-                    <Input
-                      type="number"
-                      value={wire_b_mm}
-                      onChange={(e) => setWireB(parseFloat(e.target.value) || 0)}
-                      step={0.1}
-                      min={0}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>{isZh ? "线材厚度 t (mm)" : "Wire Thickness t (mm)"}</Label>
-                    <Input
-                      type="number"
-                      value={wire_t_mm}
-                      onChange={(e) => setWireT(parseFloat(e.target.value) || 0)}
-                      step={0.1}
-                      min={0}
-                    />
+                  {/* Smart Wire Section */}
+                  <div className="col-span-2 space-y-2 border p-2 rounded bg-slate-50 dark:bg-slate-900/50">
+                    <Label className="text-xs font-semibold text-muted-foreground">{isZh ? "线材截面 (b × t)" : "Wire Section (b × t)"}</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                            <Label className="text-[10px]">{isZh ? "宽度 b (mm)" : "Width b (mm)"}</Label>
+                            <NumericInput
+                                value={wire_b_mm}
+                                onChange={setWireB}
+                                step={0.1}
+                                min={0}
+                                placeholder="e.g. 4.0"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-[10px]">{isZh ? "厚度 t (mm)" : "Thickness t (mm)"}</Label>
+                            <NumericInput
+                                value={wire_t_mm}
+                                onChange={setWireT}
+                                step={0.1}
+                                min={0}
+                                placeholder="e.g. 2.0"
+                            />
+                        </div>
+                    </div>
+                    {/* Paste Helper */}
+                    <div className="flex gap-2">
+                        <Input 
+                            placeholder={isZh ? "粘贴规格如 '3.23*4.05'" : "Paste text like '3.23*4.05'"}
+                            className="h-7 text-xs"
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                // Simple parser for "A x B" or "A*B" or "AxB"
+                                const parts = val.replace(/[δ\s]/g, "").split(/[x×*]/i);
+                                if (parts.length === 2) {
+                                    const b = parseFloat(parts[0]);
+                                    const t = parseFloat(parts[1]);
+                                    if (!isNaN(b) && !isNaN(t)) {
+                                        // Heuristic: usually b > t for die springs, but users might paste t x b
+                                        // Let's assume standard "b x t" (Radial x Axial)? 
+                                        // Or just take order.
+                                        // User example: 3.23*4.05.
+                                        setWireB(Math.max(b, t)); // User usually implies wider side is Width? 
+                                        // Actually Die Springs are "Rectangular Wire". Width (Radial) and Thickness (Axial).
+                                        // Let's just set b=0, t=1.
+                                        setWireB(parts[0] ? parseFloat(parts[0]) : wire_b_mm);
+                                        setWireT(parts[1] ? parseFloat(parts[1]) : wire_t_mm);
+                                        e.target.value = ""; // Clear after paste
+                                    }
+                                }
+                            }}
+                        />
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "端部形式" : "End Type"}</Label>
@@ -427,10 +458,9 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                     </div>
                     <div className="space-y-1">
                       <Label>{isZh ? "当前高度 H (mm)" : "Current Height H (mm)"}</Label>
-                      <Input
-                        type="number"
+                      <NumericInput
                         value={currentHeight_mm}
-                        onChange={(e) => setCurrentHeight(parseFloat(e.target.value) || workingLength_mm)}
+                        onChange={setCurrentHeight}
                         step={1}
                         min={result.solidHeight_mm || 0}
                         max={freeLength_mm}
@@ -488,32 +518,27 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                 <div className="grid grid-cols-3 gap-3 rounded-md border bg-muted/20 p-4">
                   <div className="space-y-1">
                     <Label>{isZh ? "温度 (°C)" : "Temperature (°C)"}</Label>
-                    <Input
-                      type="number"
-                      value={temperature_C ?? ""}
-                      onChange={(e) => setTemperature(e.target.value ? parseFloat(e.target.value) : undefined)}
-                      placeholder="20"
-                      step={10}
+                    <NumericInput
+                      value={temperature_C ?? 0}
+                      onChange={(v) => setTemperature(v)}
+                      allowEmpty
+                      decimalScale={0}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "导向孔径 (mm)" : "Hole Dia (mm)"}</Label>
-                    <Input
-                      type="number"
-                      value={holeDiameter_mm ?? ""}
-                      onChange={(e) => setHoleDiameter(e.target.value ? parseFloat(e.target.value) : undefined)}
-                      placeholder="—"
-                      step={0.5}
+                    <NumericInput
+                      value={holeDiameter_mm ?? 0}
+                      onChange={(v) => setHoleDiameter(v)}
+                      allowEmpty
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "导向杆径 (mm)" : "Rod Dia (mm)"}</Label>
-                    <Input
-                      type="number"
-                      value={rodDiameter_mm ?? ""}
-                      onChange={(e) => setRodDiameter(e.target.value ? parseFloat(e.target.value) : undefined)}
-                      placeholder="—"
-                      step={0.5}
+                    <NumericInput
+                      value={rodDiameter_mm ?? 0}
+                      onChange={(v) => setRodDiameter(v)}
+                      allowEmpty
                     />
                   </div>
                 </div>
