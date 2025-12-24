@@ -11,9 +11,10 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer, Download } from "lucide-react";
+import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer, Download, BookOpen, HelpCircle } from "lucide-react";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { ArcSpringAdvancedPanel } from "@/components/calculators/ArcSpringAdvancedPanel";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   ArcSpringInput,
   ArcSpringResult,
@@ -1304,6 +1305,99 @@ export function ArcSpringCalculator() {
           allowableTau={allowableTau}
         />
       )}
+
+      {/* Engineering Specifications (SEC) & FAQ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 pb-20">
+        {/* SEC Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <BookOpen className="w-4 h-4" />
+              <LanguageText en="Engineering Specifications (SEC)" zh="技术规范与工程标准 (SEC)" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <div className="space-y-2">
+              <h4 className="font-semibold text-foreground">
+                <LanguageText en="Standard Compatibility" zh="标准兼容性" />
+              </h4>
+              <p>
+                <LanguageText 
+                  en="Calculations align with EN 13906-1 physical principles for helical compression springs, mapped to an arc axis. All material data follow EN 10270 standards."
+                  zh="计算逻辑遵循 EN 13906-1 螺旋压缩弹簧物理准则，并映射至圆弧轴线。材料数据严格采用 EN 10270 标准。"
+                />
+              </p>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-semibold text-foreground">
+                <LanguageText en="Stiffness Relation" zh="刚度关系原理" />
+              </h4>
+              <p>
+                <LanguageText 
+                  en="The rotational stiffness R (N·mm/deg) is derived from axial stiffness k (N/mm) and working radius r: R = k · r² · (π/180)."
+                  zh="旋转刚度 R (N·mm/deg) 由轴向刚度 k (N/mm) 与工作半径 r 导出：R = k · r² · (π/180)。"
+                />
+              </p>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-semibold text-foreground">
+                <LanguageText en="Manufacturing Limits" zh="制造与精度限制" />
+              </h4>
+              <ul className="list-disc list-inside space-y-1">
+                <li><LanguageText en="Spring Index (D/d): 4 - 20 recommended." zh="弹簧指数 (D/d): 推荐范围 4 - 20。" /></li>
+                <li><LanguageText en="Min Free Pitch: 1.1 * d." zh="最小自由节距: 1.1 * d。" /></li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* FAQ Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <HelpCircle className="w-4 h-4" />
+              <LanguageText en="Frequently Asked Questions (FAQ)" zh="常见问题解答 (FAQ)" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="item-1">
+                <AccordionTrigger>
+                  <LanguageText en="What is the difference between Single and Dual systems?" zh="单级与双级系统有什么区别？" />
+                </AccordionTrigger>
+                <AccordionContent>
+                  <LanguageText 
+                    en="Single systems use a single spring for the entire shift. Dual systems use two springs (parallel or staged) to provide non-linear torque-angle characteristics, often used in Dual Mass Flywheels (DMF)."
+                    zh="单级系统在整个行程中使用单一弹簧。双级系统使用两根弹簧（并联或级联）来提供非线性的扭矩-角度特性，通常用于双质量飞轮 (DMF)。"
+                  />
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-2">
+                <AccordionTrigger>
+                  <LanguageText en="How should I choose the Working Radius (r)?" zh="我该如何选择工作半径 (r)？" />
+                </AccordionTrigger>
+                <AccordionContent>
+                  <LanguageText 
+                    en="The working radius is the distance from the center of the arc tool to the spring centerline. It directly determines the torque leverage. Increasing r increases torque but also increases centrifugal stress."
+                    zh="工作半径是从圆弧中心到弹簧中心线的距离。它直接决定了扭矩力臂。增大 r 会增加扭矩，但也会增加离心应力。"
+                  />
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="item-3">
+                <AccordionTrigger>
+                  <LanguageText en="What does 'Hysteresis Mode' affect?" zh="“迟滞模式”有什么影响？" />
+                </AccordionTrigger>
+                <AccordionContent>
+                  <LanguageText 
+                    en="Hysteresis accounts for internal and external friction. 'Proportional' mode varies friction with load, which is more realistic for DMF applications involving centrifugal forces."
+                    zh="迟滞用于衡量内外摩擦。 “比例”模式使摩擦力随载荷变化，这对于涉及离心力的 DMF 应用更为真实。"
+                  />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
