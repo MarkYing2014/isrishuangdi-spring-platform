@@ -60,10 +60,10 @@ export function buildArcSpringDesignRuleReport(
 
   const deadStart =
     context?.deadCoilsStart ??
-    ((context?.showDeadCoils ?? false) ? Math.max(0, Math.round(context?.deadCoilsPerEnd ?? 0)) : 0);
+    ((context?.showDeadCoils ?? false) ? Math.max(0, context?.deadCoilsPerEnd ?? 0) : 0);
   const deadEnd =
     context?.deadCoilsEnd ??
-    ((context?.showDeadCoils ?? false) ? Math.max(0, Math.round(context?.deadCoilsPerEnd ?? 0)) : 0);
+    ((context?.showDeadCoils ?? false) ? Math.max(0, context?.deadCoilsPerEnd ?? 0) : 0);
 
   const deg2rad = (deg: number) => (deg * Math.PI) / 180;
 

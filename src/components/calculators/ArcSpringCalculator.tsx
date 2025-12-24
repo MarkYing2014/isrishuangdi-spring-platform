@@ -174,7 +174,10 @@ export function ArcSpringCalculator() {
   const [highlightField, setHighlightField] = useState<ArcIssueField | null>(null);
   const [highlightSeq, setHighlightSeq] = useState(0);
   const [showDeadCoils, setShowDeadCoils] = useState(false);
+  const [symmetricDeadCoils, setSymmetricDeadCoils] = useState(true);
   const [deadCoilsPerEnd, setDeadCoilsPerEnd] = useState(1);
+  const [deadCoilsLeft, setDeadCoilsLeft] = useState(1);
+  const [deadCoilsRight, setDeadCoilsRight] = useState(1); // Usually different per user feedback
   const [deadTightnessK, setDeadTightnessK] = useState(2);
   const [deadTightnessSigma, setDeadTightnessSigma] = useState(0.08);
   const [allowableTau, setAllowableTau] = useState(800);
@@ -186,9 +189,11 @@ export function ArcSpringCalculator() {
     () =>
       buildArcSpringDesignRuleReport(input, {
         showDeadCoils,
-        deadCoilsPerEnd,
+        deadCoilsPerEnd: symmetricDeadCoils ? deadCoilsPerEnd : undefined,
+        deadCoilsStart: symmetricDeadCoils ? undefined : deadCoilsLeft,
+        deadCoilsEnd: symmetricDeadCoils ? undefined : deadCoilsRight,
       }),
-    [input, showDeadCoils, deadCoilsPerEnd]
+    [input, showDeadCoils, symmetricDeadCoils, deadCoilsPerEnd, deadCoilsLeft, deadCoilsRight]
   );
 
   const hasRuleError = designRuleReport.summary.status === "FAIL";
@@ -697,26 +702,71 @@ export function ArcSpringCalculator() {
               <CardTitle className="text-base">3D Preview / 三维预览</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between gap-3 pb-3">
-                <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={showDeadCoils}
-                    onChange={(e) => setShowDeadCoils(e.target.checked)}
-                  />
-                  Dead Coils / 两端接触圈
-                </label>
-                <div className="flex items-center gap-2">
-                  <div className="text-xs text-muted-foreground">per end</div>
-                  <NumericInput
-                    value={deadCoilsPerEnd}
-                    onChange={(v) => setDeadCoilsPerEnd(Math.max(0, Math.round(v ?? 0)))}
-                    min={0}
-                    step={1}
-                    disabled={!showDeadCoils}
-                    className="h-8 w-20 arc-no-spinner"
-                  />
+              <div className="flex flex-col gap-2 pb-3">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={showDeadCoils}
+                      onChange={(e) => setShowDeadCoils(e.target.checked)}
+                    />
+                    Dead Coils / 两端接触圈
+                  </label>
+                  
+                  {showDeadCoils && (
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                       <input
+                         type="checkbox"
+                         checked={symmetricDeadCoils}
+                         onChange={(e) => setSymmetricDeadCoils(e.target.checked)}
+                       />
+                       Symmetric / 对称
+                    </label>
+                  )}
                 </div>
+
+                {showDeadCoils && (
+                  symmetricDeadCoils ? (
+                    <div className="flex items-center justify-between gap-2 pl-4">
+                      <div className="text-xs text-muted-foreground">Per End / 单端圈数</div>
+                      <NumericInput
+                        value={deadCoilsPerEnd}
+                        onChange={(v) => {
+                          const val = Math.max(0, v ?? 0);
+                          setDeadCoilsPerEnd(val);
+                          setDeadCoilsLeft(val);
+                          setDeadCoilsRight(val);
+                        }}
+                        min={0}
+                        step={0.1}
+                        className="h-8 w-24 arc-no-spinner"
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 pl-4">
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Left / 左端</div>
+                        <NumericInput
+                          value={deadCoilsLeft}
+                          onChange={(v) => setDeadCoilsLeft(Math.max(0, v ?? 0))}
+                          min={0}
+                          step={0.1}
+                          className="h-8 w-full arc-no-spinner"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Right / 右端</div>
+                        <NumericInput
+                          value={deadCoilsRight}
+                          onChange={(v) => setDeadCoilsRight(Math.max(0, v ?? 0))}
+                          min={0}
+                          step={0.1}
+                          className="h-8 w-full arc-no-spinner"
+                        />
+                      </div>
+                    </div>
+                  )
+                )}
               </div>
               <div className="flex items-center justify-end gap-2 pb-3">
                 <div className="text-xs text-muted-foreground">k</div>
@@ -768,7 +818,9 @@ export function ArcSpringCalculator() {
                   r={input.r}
                   alpha0Deg={input.alpha0}
                   useDeadCoils={showDeadCoils}
-                  deadCoilsPerEnd={deadCoilsPerEnd}
+                  deadCoilsPerEnd={symmetricDeadCoils ? deadCoilsPerEnd : undefined}
+                  deadCoilsStart={symmetricDeadCoils ? undefined : deadCoilsLeft}
+                  deadCoilsEnd={symmetricDeadCoils ? undefined : deadCoilsRight}
                   deadTightnessK={deadTightnessK}
                   deadTightnessSigma={deadTightnessSigma}
                   colorMode={showStressColors ? "approx_stress" : "solid"}
@@ -781,7 +833,12 @@ export function ArcSpringCalculator() {
               </div>
               <div className="mt-2 text-xs text-muted-foreground">
                 d={input.d.toFixed(2)}mm, D={input.D.toFixed(1)}mm, n={input.n.toFixed(2)}, r={input.r.toFixed(1)}mm, α₀={input.alpha0.toFixed(1)}°
-                {showDeadCoils ? `, dead=${deadCoilsPerEnd}×2, k=${deadTightnessK.toFixed(2)}, σ=${deadTightnessSigma.toFixed(2)}` : ""}
+                {showDeadCoils ? (
+                  symmetricDeadCoils
+                    ? `, dead=${deadCoilsPerEnd.toFixed(2)}×2`
+                    : `, dead L=${deadCoilsLeft.toFixed(2)} R=${deadCoilsRight.toFixed(2)}`
+                ) : ""}
+                {showDeadCoils ? `, k=${deadTightnessK.toFixed(2)}, σ=${deadTightnessSigma.toFixed(2)}` : ""}
               </div>
             </CardContent>
           </Card>

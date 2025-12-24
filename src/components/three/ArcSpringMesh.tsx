@@ -220,6 +220,8 @@ export interface ArcSpringVisualizerProps {
   alpha0Deg?: number;
   useDeadCoils?: boolean;
   deadCoilsPerEnd?: number;
+  deadCoilsStart?: number;
+  deadCoilsEnd?: number;
   deadTightnessK?: number;
   deadTightnessSigma?: number;
   colorMode?: ArcSpringColorMode;
@@ -238,6 +240,8 @@ type ArcSpringSceneProps = {
   alpha0Deg: number;
   useDeadCoils: boolean;
   deadCoilsPerEnd: number;
+  deadCoilsStart?: number;
+  deadCoilsEnd?: number;
   deadTightnessK: number;
   deadTightnessSigma: number;
   colorMode: ArcSpringColorMode;
@@ -256,6 +260,8 @@ function ArcSpringScene({
   alpha0Deg,
   useDeadCoils,
   deadCoilsPerEnd,
+  deadCoilsStart,
+  deadCoilsEnd,
   deadTightnessK,
   deadTightnessSigma,
   colorMode,
@@ -282,8 +288,8 @@ function ArcSpringScene({
           n={n}
           r={r}
           alpha0Deg={alpha0Deg}
-          deadCoilsStart={useDeadCoils ? deadCoilsPerEnd : 0}
-          deadCoilsEnd={useDeadCoils ? deadCoilsPerEnd : 0}
+          deadCoilsStart={useDeadCoils ? (deadCoilsStart ?? deadCoilsPerEnd) : 0}
+          deadCoilsEnd={useDeadCoils ? (deadCoilsEnd ?? deadCoilsPerEnd) : 0}
           deadTightnessK={useDeadCoils ? deadTightnessK : 0}
           deadTightnessSigma={useDeadCoils ? deadTightnessSigma : 0}
           colorMode={colorMode}
@@ -307,6 +313,8 @@ export function ArcSpringVisualizer({
   alpha0Deg = 120,
   useDeadCoils = false,
   deadCoilsPerEnd = 1,
+  deadCoilsStart,
+  deadCoilsEnd,
   deadTightnessK = 0,
   deadTightnessSigma = 0,
   colorMode = "solid",
@@ -324,8 +332,10 @@ export function ArcSpringVisualizer({
         n={n}
         r={r}
         alpha0Deg={alpha0Deg}
+        deadCoilsPerEnd={Math.max(0, deadCoilsPerEnd)}
         useDeadCoils={useDeadCoils}
-        deadCoilsPerEnd={Math.max(0, Math.round(deadCoilsPerEnd))}
+        deadCoilsStart={deadCoilsStart}
+        deadCoilsEnd={deadCoilsEnd}
         deadTightnessK={Math.max(0, deadTightnessK)}
         deadTightnessSigma={Math.max(0, deadTightnessSigma)}
         colorMode={colorMode}
