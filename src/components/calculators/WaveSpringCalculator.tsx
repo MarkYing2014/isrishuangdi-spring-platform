@@ -190,7 +190,33 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
         workingDeflection: result.travel_mm,
       }
     });
-    router.push("/tools/engineering/wave-spring");
+    router.push(analysisUrl);
+  };
+
+  const handleExportCad = () => {
+    setDesign({
+      springType: "wave",
+      geometry: {
+        type: "wave",
+        ...input.geometry
+      },
+      material: {
+        id: materialId as any,
+        name: input.material?.name || "17-7PH",
+        elasticModulus: E_MPa,
+        shearModulus: E_MPa / (2 * (1 + 0.3)), // estimate
+        density: 7800,
+      },
+      analysisResult: {
+        springRate: result.springRate_Nmm,
+        springRateUnit: "N/mm",
+        workingLoad: result.loadAtWorkingHeight_N,
+        maxStress: result.stressMax_MPa,
+        springIndex: result.meanDiameter_mm / thickness_t,
+        workingDeflection: result.travel_mm,
+      }
+    });
+    router.push(cadExportUrl);
   };
 
   // Format number helper
@@ -386,14 +412,12 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
                   {isZh ? "发送到工程分析 / Engineering Analysis" : "Send to Engineering Analysis / 发送到工程分析"}
                 </Button>
                 <Button 
-                  asChild 
+                  onClick={handleExportCad}
                   variant="outline" 
                   className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10"
                   disabled={!result.isValid}
                 >
-                  <a href={cadExportUrl}>
-                    {isZh ? "导出 CAD / Export CAD" : "Export CAD / 导出 CAD"}
-                  </a>
+                  {isZh ? "导出 CAD / Export CAD" : "Export CAD / 导出 CAD"}
                 </Button>
               </div>
             </div>
