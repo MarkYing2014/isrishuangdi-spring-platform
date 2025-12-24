@@ -16,6 +16,7 @@ import type { DesignRuleReport } from "@/lib/designRules";
 import {
   buildCompressionRiskRadar,
   buildConicalRiskRadar,
+  buildDiskRiskRadar,
   buildExtensionRiskRadar,
   buildSpiralRiskRadar,
   buildTorsionRiskRadar,
@@ -49,6 +50,8 @@ function springTypeLabel(geometryType: string | null | undefined): { en: string;
       return { en: "Conical Spring", zh: "圆锥弹簧" };
     case "spiralTorsion":
       return { en: "Spiral Torsion Spring", zh: "螺旋扭簧" };
+    case "disk":
+      return { en: "Disk / Belleville Spring", zh: "碟形弹簧" };
     default:
       return { en: "Unknown Spring", zh: "未知弹簧" };
   }
@@ -184,6 +187,13 @@ export function HomeRiskRadar() {
     if (geometry.type === "spiralTorsion") {
       return buildSpiralRiskRadar({
         geometry,
+        analysisResult,
+      });
+    }
+
+    if (geometry.type === "disk") {
+      return buildDiskRiskRadar({
+        design: geometry,
         analysisResult,
       });
     }

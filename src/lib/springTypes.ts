@@ -27,24 +27,31 @@ export const SPRING_TYPE_LABELS: Record<SpringType, { en: string; zh: string }> 
 // ============================================================================
 
 /**
- * Base interface for all spring designs
- * 所有弹簧设计的基础接口
+ * Common base for all spring designs
+ * 所有弹簧设计的基础通用接口
  */
-export interface SpringDesignBase {
+export interface CommonDesignBase {
   /** Optional design code or SKU */
   id?: string;
   /** Optional design code or SKU */
   code?: string;
   /** Spring type */
   type: SpringType;
-  /** Wire diameter d in millimeters */
-  wireDiameter: number;
   /** Material ID */
   materialId?: SpringMaterialId;
-  /** Shear modulus G in MPa */
-  shearModulus: number;
   /** Additional notes */
   notes?: string;
+}
+
+/**
+ * Base interface for ALL wire-based spring designs
+ * 线材类弹簧的基础接口
+ */
+export interface SpringDesignBase extends CommonDesignBase {
+  /** Wire diameter d in millimeters */
+  wireDiameter: number;
+  /** Shear modulus G in MPa */
+  shearModulus: number;
 }
 
 // ============================================================================
@@ -417,7 +424,7 @@ export interface VariablePitchCompressionDesign extends SpringDesignBase {
 
 export type DiskSpringGroup = "G1" | "G2" | "G3";
 
-export interface DiskSpringDesign extends SpringDesignBase {
+export interface DiskSpringDesign extends CommonDesignBase {
   type: "disk";
   /** Outer diameter De in millimeters */
   outerDiameter: number;

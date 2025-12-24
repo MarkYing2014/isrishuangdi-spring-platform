@@ -66,8 +66,10 @@ export function getActiveCoils(design: SpringDesign | LegacySpringDesign): numbe
  * Serves as a lightweight guard before running engineering approximations.
  */
 function validateGeometry(design: SpringDesign | LegacySpringDesign) {
-  if (design.wireDiameter <= 0) {
-    throw new Error("wireDiameter must be greater than zero");
+  if ("wireDiameter" in design && typeof design.wireDiameter === "number") {
+    if (design.wireDiameter <= 0) {
+      throw new Error("wireDiameter must be greater than zero");
+    }
   }
   const meanDiameter = getMeanDiameter(design);
   if (meanDiameter <= 0) {
@@ -87,7 +89,9 @@ function validateGeometry(design: SpringDesign | LegacySpringDesign) {
 export function calculateSpringIndex(design: SpringDesign | LegacySpringDesign): number {
   validateGeometry(design);
   const meanDiameter = getMeanDiameter(design);
-  return meanDiameter / design.wireDiameter;
+  const d = (design as any).wireDiameter;
+  if (typeof d !== "number" || d <= 0) return 0;
+  return meanDiameter / d;
 }
 
 /**
@@ -151,8 +155,13 @@ export function calculateLoadAndStress(
   const meanDiameter = getMeanDiameter(design);
 
   const load = k * deflection; // N, assuming linear elastic range.
+  const d = (design as any).wireDiameter;
+  if (typeof d !== "number" || d <= 0) {
+    return { k, load, shearStress: 0, springIndex, wahlFactor };
+  }
+
   const shearStress =
-    wahlFactor * ((8 * load * meanDiameter) / (PI * design.wireDiameter ** 3));
+    wahlFactor * ((8 * load * meanDiameter) / (PI * d ** 3));
 
   return { k, load, shearStress, springIndex, wahlFactor };
 }

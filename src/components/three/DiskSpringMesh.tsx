@@ -70,38 +70,40 @@ export const DiskSpringMesh: React.FC<DiskSpringMeshProps> = ({
 
   const disks = useMemo(() => {
     const list = [];
-    const stackGap = 0.1; // Small visual gap for parallel disks
     
-    let currentZ = 0;
-    
+    // Total height of a single nested parallel group (nP disks)
+    const groupHeight = (nP - 1) * thickness + (h + thickness);
+
     for (let sIdx = 0; sIdx < nS; sIdx++) {
-      const isFlipped = sIdx % 2 !== 0; // Series stacking alternates direction
+      const isFlipped = sIdx % 2 !== 0;
       
+      // Calculate groupBaseY based on stacking type (Opposed Series)
+      // Even sIdx (Up): groupBaseY = sIdx * groupHeight
+      // Odd sIdx (Down): groupBaseY = (sIdx + 1) * groupHeight
+      const groupBaseY = isFlipped ? (sIdx + 1) * groupHeight : sIdx * groupHeight;
+
       for (let pIdx = 0; pIdx < nP; pIdx++) {
+        const pOffset = pIdx * thickness;
+        const yPos = groupBaseY + pOffset;
+
         list.push({
           id: `s${sIdx}-p${pIdx}`,
-          position: [0, 0, currentZ],
+          position: [0, yPos, 0],
           rotation: isFlipped ? [Math.PI, 0, 0] : [0, 0, 0],
-          // When flipped, we need to adjust the Z to keep the contact point
-          offsetZ: isFlipped ? h + thickness : 0 
         });
-        currentZ += stackGap + thickness;
       }
-      // After each series group, we move Z to the next contact point
-      // If not p-stacking, next contact point is h + thickness away
-      // For V1, we just increment Z simply.
     }
     
     return list;
   }, [nP, nS, h, thickness]);
 
   return (
-    <group rotation={[-Math.PI / 2, 0, 0]}> {/* Align Z with Up for Three.js */}
+    <group> 
       {disks.map((d) => (
         <mesh 
           key={d.id} 
           geometry={diskGeometry} 
-          position={[0, 0, d.position[2] + (d.rotation[0] === Math.PI ? h + thickness : 0)]}
+          position={d.position as any}
           rotation={d.rotation as any}
         >
           <meshStandardMaterial color={color} side={THREE.DoubleSide} />

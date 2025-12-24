@@ -45,7 +45,7 @@ export function CoilerMachineScene({ springDesign, pitch }: CoilerMachineScenePr
             <WireFeed />
             <CoilerArms position={[0, 0, 0]} />
             <SpringModel
-              wireDiameter={springDesign.wireDiameter}
+              wireDiameter={(springDesign as any).wireDiameter ?? 1.0}
               meanDiameter={getMeanDiameter(springDesign)}
               activeCoils={getActiveCoils(springDesign)}
               pitch={pitch}

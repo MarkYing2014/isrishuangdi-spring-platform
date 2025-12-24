@@ -103,6 +103,11 @@ function classifyDimension(args: {
     if (id.startsWith("DIE_I")) return "manufacturing";
   }
 
+  if (args.springType === "disk") {
+    if (id.startsWith("DISK_SF")) return "engineering";
+    if (id.startsWith("DISK_GEOM") || id.startsWith("DISK_MAN")) return "manufacturing";
+  }
+
   if (id.includes("READ_ONLY")) return "quality";
 
   return "engineering";
@@ -123,9 +128,9 @@ function toRiskFinding(args: {
     recommendation:
       finding.suggestionEn || finding.suggestionZh
         ? {
-            en: finding.suggestionEn ?? "",
-            zh: finding.suggestionZh ?? "",
-          }
+          en: finding.suggestionEn ?? "",
+          zh: finding.suggestionZh ?? "",
+        }
         : undefined,
   };
 }
@@ -240,6 +245,15 @@ function dimensionMetricsFromReport(args: {
         "full_solid_deflection",
         "sum_pitch_length"
       );
+    }
+  }
+
+  if (args.springType === "disk") {
+    if (args.dimension === "engineering") {
+      return pick("sf_static");
+    }
+    if (args.dimension === "manufacturing") {
+      return pick("thickness_od_ratio", "h0_t_ratio");
     }
   }
 

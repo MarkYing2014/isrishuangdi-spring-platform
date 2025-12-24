@@ -1,6 +1,7 @@
 import type { ArcSpringInput } from "@/lib/arcSpring";
 import type { CompressionSpringEds } from "@/lib/eds/engineeringDefinition";
 import type { ResolveCompressionNominalResult } from "@/lib/eds/compressionResolver";
+import type { DiskSpringDesign } from "@/lib/springTypes";
 import type {
   AnalysisResult,
   ConicalGeometry,
@@ -21,6 +22,7 @@ import { buildTorsionDesignRuleReport } from "@/lib/designRules/torsionRules";
 import { buildVariablePitchCompressionDesignRuleReport } from "@/lib/designRules/variablePitchRules";
 import { buildWaveSpringDesignRuleReport } from "@/lib/designRules/waveSpringRules";
 import { buildDieSpringDesignRuleReport } from "@/lib/designRules/dieSpringRules";
+import { buildDiskSpringDesignRuleReport } from "@/lib/designRules/diskSpringRules";
 import type { WaveSpringInput, WaveSpringResult } from "@/lib/waveSpring/math";
 import type { DieSpringInput, DieSpringResult } from "@/lib/dieSpring/types";
 
@@ -109,4 +111,12 @@ export function buildDieSpringRiskRadar(params: {
 }): EngineeringRiskRadar {
   const report = buildDieSpringDesignRuleReport(params.input ?? null, params.result ?? null);
   return radarFromDesignRuleReport({ springType: "dieSpring", report });
+}
+
+export function buildDiskRiskRadar(params: {
+  design: DiskSpringDesign | null;
+  analysisResult?: AnalysisResult | null;
+}): EngineeringRiskRadar {
+  const report = buildDiskSpringDesignRuleReport(params);
+  return radarFromDesignRuleReport({ springType: "disk", report });
 }
