@@ -39,14 +39,20 @@ export function sampleArcSpringCenterline(
 
   const centerArc = options?.centerArc ?? true;
 
-  const deadCoilsStart = Math.max(0, Math.round(options?.deadCoilsStart ?? 0));
-  const deadCoilsEnd = Math.max(0, Math.round(options?.deadCoilsEnd ?? 0));
+  const deadCoilsStart = Math.max(0, options?.deadCoilsStart ?? 0);
+  const deadCoilsEnd = Math.max(0, options?.deadCoilsEnd ?? 0);
   const deadDensityFactor = Math.max(1, options?.deadDensityFactor ?? 4);
   const totalTurns = n + deadCoilsStart + deadCoilsEnd;
 
   const tightnessK = Math.max(0, options?.tightnessK ?? 0);
   const tightnessSigma = Math.max(1e-4, options?.tightnessSigma ?? 0);
   const useLambda = totalTurns > 0 && (deadCoilsStart + deadCoilsEnd) > 0 && tightnessK > 0 && tightnessSigma > 0;
+
+  // For asymmetrical dead coils, we weight the density contribution.
+  const totalDead = deadCoilsStart + deadCoilsEnd;
+  const avgDead = totalDead / 2;
+  const wStart = (useLambda && totalDead > 0) ? (deadCoilsStart / avgDead) : 1;
+  const wEnd = (useLambda && totalDead > 0) ? (deadCoilsEnd / avgDead) : 1;
 
   const baseSamples = Math.round(Math.max(1, totalTurns) * 220);
   const samples = options?.samples ?? clamp(baseSamples, 400, 4500);
@@ -66,19 +72,22 @@ export function sampleArcSpringCenterline(
   const fracEnd = lenEnd / lenSum;
 
   const expNegInvSigma = useLambda ? Math.exp(-1 / tightnessSigma) : 0;
+  // Denominator reflects the combined weighted area under the two density bumps
   const denomLambda = useLambda
-    ? 1 + tightnessK * 2 * tightnessSigma * (1 - expNegInvSigma)
+    ? 1 + tightnessK * tightnessSigma * (wStart * (1 - expNegInvSigma) + wEnd * (1 - expNegInvSigma))
     : 1;
 
   const lambdaAt = (s: number) => {
     if (!useLambda) return s;
     const e1 = Math.exp(-s / tightnessSigma);
     const e2 = Math.exp((s - 1) / tightnessSigma);
+
+    // Weight the start density (e1) and end density (e2) by their respective settings
     const I =
       s +
       tightnessK *
       tightnessSigma *
-      (1 - e1 + (e2 - expNegInvSigma));
+      (wStart * (1 - e1) + wEnd * (e2 - expNegInvSigma));
     return I / denomLambda;
   };
 
