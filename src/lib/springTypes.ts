@@ -5,7 +5,7 @@ import type { SpringMaterialId } from "@/lib/materials/springMaterials";
 // 弹簧类型定义
 // ============================================================================
 
-export type SpringType = "compression" | "extension" | "torsion" | "conical" | "spiralTorsion" | "wave" | "dieSpring" | "suspensionSpring" | "arc";
+export type SpringType = "compression" | "extension" | "torsion" | "conical" | "spiralTorsion" | "wave" | "dieSpring" | "suspensionSpring" | "arc" | "variablePitchCompression";
 
 export const SPRING_TYPE_LABELS: Record<SpringType, { en: string; zh: string }> = {
   compression: { en: "Compression Spring", zh: "压缩弹簧" },
@@ -17,6 +17,7 @@ export const SPRING_TYPE_LABELS: Record<SpringType, { en: string; zh: string }> 
   dieSpring: { en: "Die Spring", zh: "模具弹簧" },
   suspensionSpring: { en: "Suspension Spring", zh: "减震器弹簧" },
   arc: { en: "Arc Spring", zh: "弧形弹簧" },
+  variablePitchCompression: { en: "Variable Pitch Compression", zh: "变节距压缩弹簧" },
 };
 
 // ============================================================================
@@ -206,7 +207,8 @@ export type SpringDesign =
   | CompressionSpringDesign
   | ConicalSpringDesign
   | ExtensionSpringDesign
-  | TorsionSpringDesign;
+  | TorsionSpringDesign
+  | VariablePitchCompressionDesign;
 
 // ============================================================================
 // LEGACY INTERFACE (for backward compatibility)
@@ -324,6 +326,10 @@ export function isTorsionDesign(design: SpringDesign): design is TorsionSpringDe
   return design.type === "torsion";
 }
 
+export function isVariablePitchDesign(design: SpringDesign): design is VariablePitchCompressionDesign {
+  return design.type === "variablePitchCompression";
+}
+
 // ============================================================================
 // SUSPENSION SPRING GEOMETRY
 // 减震器弹簧/悬架弹簧高级几何
@@ -373,3 +379,28 @@ export interface SuspensionGeometry {
   pitchProfile: PitchProfile;
   diameterProfile: DiameterProfile;
 }
+
+// ============================================================================
+// VARIABLE PITCH COMPRESSION SPRING DESIGN
+// 变节距压缩弹簧设计
+// ============================================================================
+
+export interface VariablePitchSegment {
+  coils: number;
+  pitch: number;
+}
+
+export interface VariablePitchCompressionDesign extends SpringDesignBase {
+  type: "variablePitchCompression";
+  /** Mean diameter Dm in millimeters */
+  meanDiameter: number;
+  /** Active coils Na0 at free state */
+  activeCoils: number;
+  /** Total coils Nt */
+  totalCoils: number;
+  /** Free length L0 in millimeters */
+  freeLength?: number;
+  /** Coil segments with varying pitch */
+  segments: VariablePitchSegment[];
+}
+

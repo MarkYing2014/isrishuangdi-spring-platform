@@ -165,6 +165,20 @@ export interface SuspensionGeometry {
   shearModulus?: number;
 }
 
+/** 变节距压缩弹簧几何参数 */
+export interface VariablePitchCompressionGeometry {
+  type: "variablePitchCompression";
+  wireDiameter: number;
+  meanDiameter: number;
+  activeCoils: number;
+  totalCoils: number;
+  freeLength?: number;
+  segments: { coils: number; pitch: number }[];
+  shearModulus?: number;
+  materialId?: SpringMaterialId;
+}
+
+
 /** 弧形弹簧几何参数 */
 export interface ArcGeometry {
   type: "arc";
@@ -203,7 +217,8 @@ export type SpringGeometry =
   | SpiralTorsionGeometry
   | SuspensionGeometry
   | WaveSpringGeometry
-  | ArcGeometry;
+  | ArcGeometry
+  | VariablePitchCompressionGeometry;
 
 // ============================================================================
 // 材料信息
@@ -778,6 +793,7 @@ export function generateDesignCode(geometry: SpringGeometry): string {
     suspensionSpring: "SUS",
     wave: "WS",
     arc: "ARC",
+    variablePitchCompression: "VPC",
   };
   const prefix = prefixMap[geometry.type];
 
@@ -820,6 +836,10 @@ export function generateDesignCode(geometry: SpringGeometry): string {
       d = geometry.thickness_t.toFixed(2);
       dim = geometry.od.toFixed(0);
       break;
+    case "variablePitchCompression":
+      d = geometry.wireDiameter.toFixed(1);
+      dim = geometry.meanDiameter.toFixed(0);
+      break;
     default:
       break;
   }
@@ -833,7 +853,7 @@ export function generateDesignCode(geometry: SpringGeometry): string {
  * @returns meanDiameter (mm) 或 null（对于不适用的弹簧类型）
  */
 export function getMeanDiameter(geometry: SpringGeometry): number | null {
-  if (geometry.type === "compression" || geometry.type === "torsion" || geometry.type === "arc") {
+  if (geometry.type === "compression" || geometry.type === "torsion" || geometry.type === "arc" || geometry.type === "variablePitchCompression") {
     return geometry.meanDiameter;
   } else if (geometry.type === "extension") {
     return geometry.outerDiameter - geometry.wireDiameter;
@@ -861,3 +881,9 @@ export function isSpiralTorsionDesign(design: SpringGeometry | null): design is 
 export function isSuspensionDesign(design: SpringGeometry | null): design is SuspensionGeometry {
   return design?.type === "suspensionSpring";
 }
+
+/** 检查是否为变节距压缩弹簧设计 */
+export function isVariablePitchDesign(design: SpringGeometry | null): design is VariablePitchCompressionGeometry {
+  return design?.type === "variablePitchCompression";
+}
+

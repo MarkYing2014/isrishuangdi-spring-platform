@@ -1,16 +1,57 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, Suspense } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Edges, Environment } from "@react-three/drei";
 import * as THREE from "three";
+import { RotateCcw } from "lucide-react";
 
 import { previewTheme } from "@/lib/three/previewTheme";
+import { Button } from "@/components/ui/button";
 
 import type { VariablePitchSegment } from "@/lib/springMath";
 import {
   createVariablePitchCompressionSpringGeometry,
 } from "@/lib/spring3d/variablePitchCompressionGeometry";
+
+// View presets
+const VIEW_PRESETS = {
+  perspective: { position: [100, 60, 100], target: [0, 0, 0] },
+  front: { position: [0, 0, 150], target: [0, 0, 0] },    // Z axis (spring is vertical)
+  top: { position: [0, 150, 0], target: [0, 0, 0] },      // Y axis
+  side: { position: [150, 0, 0], target: [0, 0, 0] },     // X axis
+} as const;
+
+type ViewType = keyof typeof VIEW_PRESETS;
+
+/**
+ * Camera controller component
+ */
+function CameraController({ 
+  viewType, 
+  controlsRef 
+}: { 
+  viewType: ViewType; 
+  controlsRef: React.RefObject<any>;
+}) {
+  const { camera } = useThree();
+  
+  useEffect(() => {
+    const preset = VIEW_PRESETS[viewType];
+    camera.position.set(...(preset.position as [number, number, number]));
+    camera.lookAt(...(preset.target as [number, number, number]));
+    camera.updateProjectionMatrix();
+    
+    setTimeout(() => {
+      if (controlsRef.current) {
+        controlsRef.current.target.set(...(preset.target as [number, number, number]));
+        controlsRef.current.update();
+      }
+    }, 10);
+  }, [viewType, camera, controlsRef]);
+  
+  return null;
+}
 
 export type VariablePitchCompressionSpringVisualizerProps = {
   wireDiameter: number;
@@ -25,6 +66,7 @@ export type VariablePitchCompressionSpringVisualizerProps = {
   showStressColors?: boolean;
   stressUtilization?: number;
   stressBeta?: number;
+  springRate?: number; // For status overlay
 };
 
 function lerp(a: number, b: number, t: number) {
@@ -42,7 +84,6 @@ function colorRampGyr(t: number): [number, number, number] {
 }
 
 function mapUtilizationToRampT(utilization: number): number {
-  // Make the ramp more conservative so moderate utilization stays greener.
   const u = Number.isFinite(utilization) ? Math.max(0, utilization) : 0;
   const scaled = Math.max(0, Math.min(1, u / 1.25));
   return Math.max(0, Math.min(1, Math.pow(scaled, 1.2)));
@@ -85,68 +126,40 @@ function applyStressColors(geometry: THREE.BufferGeometry, utilization: number, 
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 }
 
-function FitToObject({ groupRef }: { groupRef: React.RefObject<THREE.Group | null> }) {
-  const { camera } = useThree();
-  const controlsRef = useRef<any>(null);
-
-  useEffect(() => {
-    const obj = groupRef.current;
-    if (!obj) return;
-
-    const box = new THREE.Box3().setFromObject(obj);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const dist = maxDim * 2.2;
-
-    // Put camera in a diagonal side-top view so pitch differences are visible.
-    camera.position.set(center.x + dist * 1.0, center.y + dist * 0.6, center.z + dist * 0.9);
-    camera.near = Math.max(0.1, maxDim / 200);
-    camera.far = Math.max(1000, maxDim * 50);
-    camera.updateProjectionMatrix();
-
-    if (controlsRef.current) {
-      controlsRef.current.target.copy(center);
-      controlsRef.current.update();
-    }
-  }, [camera, groupRef]);
-
-  return (
-    <OrbitControls
-      ref={controlsRef}
-      makeDefault
-      enablePan={true}
-      enableZoom={true}
-      enableRotate={true}
-    />
-  );
-}
-
-function SpringMesh(props: VariablePitchCompressionSpringVisualizerProps) {
-  const groupRef = useRef<THREE.Group>(null);
-
+function SpringMesh({
+  wireDiameter,
+  meanDiameter,
+  shearModulus,
+  activeCoils0,
+  totalCoils,
+  freeLength,
+  segments,
+  deflection,
+  showStressColors,
+  stressUtilization,
+  stressBeta,
+}: VariablePitchCompressionSpringVisualizerProps) {
   const utilization = useMemo(() => {
-    const u = props.stressUtilization;
+    const u = stressUtilization;
     return Number.isFinite(u) ? Math.max(0, Math.min(2, u as number)) : 0;
-  }, [props.stressUtilization]);
+  }, [stressUtilization]);
 
-  const stressBeta = useMemo(() => {
-    const b = props.stressBeta;
+  const betaUsed = useMemo(() => {
+    const b = stressBeta;
     return Number.isFinite(b) ? Math.max(0, Math.min(0.9, b as number)) : 0.25;
-  }, [props.stressBeta]);
+  }, [stressBeta]);
 
   const { geometry, zMin, zMax } = useMemo(() => {
     const res = createVariablePitchCompressionSpringGeometry(
       {
-        wireDiameter: props.wireDiameter,
-        meanDiameter: props.meanDiameter,
-        shearModulus: props.shearModulus,
-        activeCoils0: props.activeCoils0,
-        totalCoils: props.totalCoils,
-        freeLength: props.freeLength,
-        segments: props.segments,
-        deflection: props.deflection,
+        wireDiameter,
+        meanDiameter,
+        shearModulus,
+        activeCoils0,
+        totalCoils,
+        freeLength,
+        segments,
+        deflection,
       },
       {
         pointsPerTurn: 24,
@@ -156,22 +169,22 @@ function SpringMesh(props: VariablePitchCompressionSpringVisualizerProps) {
         contactGapRatio: 0.01,
       }
     );
-    if (props.showStressColors) {
-      applyStressColors(res.geometry, utilization, stressBeta);
+    if (showStressColors) {
+      applyStressColors(res.geometry, utilization, betaUsed);
     }
     return res;
   }, [
-    props.wireDiameter,
-    props.meanDiameter,
-    props.shearModulus,
-    props.activeCoils0,
-    props.totalCoils,
-    props.freeLength,
-    props.segments,
-    props.deflection,
-    props.showStressColors,
+    wireDiameter,
+    meanDiameter,
+    shearModulus,
+    activeCoils0,
+    totalCoils,
+    freeLength,
+    segments,
+    deflection,
+    showStressColors,
     utilization,
-    stressBeta,
+    betaUsed,
   ]);
 
   useEffect(() => {
@@ -180,7 +193,7 @@ function SpringMesh(props: VariablePitchCompressionSpringVisualizerProps) {
     };
   }, [geometry]);
 
-  const d = Math.max(0.01, props.wireDiameter);
+  const d = Math.max(0.01, wireDiameter);
   const zBottom = zMin + d * 0.5;
   const zTop = zMax - d * 0.5;
 
@@ -197,7 +210,7 @@ function SpringMesh(props: VariablePitchCompressionSpringVisualizerProps) {
   }, [zBottom, zTop]);
 
   const material = useMemo(() => {
-    if (props.showStressColors) {
+    if (showStressColors) {
       return new THREE.MeshBasicMaterial({
         color: "#ffffff",
         side: THREE.DoubleSide,
@@ -212,7 +225,7 @@ function SpringMesh(props: VariablePitchCompressionSpringVisualizerProps) {
       side: THREE.DoubleSide,
       clippingPlanes,
     });
-  }, [clippingPlanes, props.showStressColors]);
+  }, [clippingPlanes, showStressColors]);
 
   useEffect(() => {
     return () => {
@@ -221,7 +234,7 @@ function SpringMesh(props: VariablePitchCompressionSpringVisualizerProps) {
   }, [material]);
 
   const capMaterial = useMemo(() => {
-    if (props.showStressColors) {
+    if (showStressColors) {
       const [r, g, bl] = colorRampGyr(mapUtilizationToRampT(utilization));
       return new THREE.MeshBasicMaterial({
         color: new THREE.Color(r, g, bl),
@@ -241,14 +254,14 @@ function SpringMesh(props: VariablePitchCompressionSpringVisualizerProps) {
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1,
     });
-  }, [props.showStressColors, utilization]);
+  }, [showStressColors, utilization]);
 
   const capGeom = useMemo(() => {
-    const R = props.meanDiameter / 2;
-    const rInner = Math.max(0.01, R - props.wireDiameter / 2);
-    const rOuter = Math.max(rInner + 0.01, R + props.wireDiameter / 2);
+    const R = meanDiameter / 2;
+    const rInner = Math.max(0.01, R - wireDiameter / 2);
+    const rOuter = Math.max(rInner + 0.01, R + wireDiameter / 2);
     return new THREE.RingGeometry(rInner, rOuter, 96, 1);
-  }, [props.meanDiameter, props.wireDiameter]);
+  }, [meanDiameter, wireDiameter]);
 
   useEffect(() => {
     return () => {
@@ -262,57 +275,181 @@ function SpringMesh(props: VariablePitchCompressionSpringVisualizerProps) {
   const topCapZ = zTop - capEps;
 
   return (
-    <>
-      <group ref={groupRef} rotation={[0, 0, 0]}>
-        <mesh geometry={geometry} material={material} castShadow receiveShadow />
-        <mesh
-          geometry={capGeom}
-          material={capMaterial}
-          position={[0, 0, bottomCapZ]}
-          rotation={[0, 0, 0]}
-          receiveShadow
-        />
-        <mesh
-          geometry={capGeom}
-          material={capMaterial}
-          position={[0, 0, topCapZ]}
-          rotation={[Math.PI, 0, 0]}
-          receiveShadow
-        />
-      </group>
-      <FitToObject groupRef={groupRef} />
-    </>
+    <group rotation={[0, 0, 0]}>
+      <mesh geometry={geometry} material={material} castShadow receiveShadow />
+      <mesh
+        geometry={capGeom}
+        material={capMaterial}
+        position={[0, 0, bottomCapZ]}
+        rotation={[0, 0, 0]}
+        receiveShadow
+      />
+      <mesh
+        geometry={capGeom}
+        material={capMaterial}
+        position={[0, 0, topCapZ]}
+        rotation={[Math.PI, 0, 0]}
+        receiveShadow
+      />
+      <Edges threshold={35} color="#1a365d" />
+    </group>
   );
 }
 
 export function VariablePitchCompressionSpringVisualizer(
   props: VariablePitchCompressionSpringVisualizerProps
 ) {
+  const { showStressColors } = props;
   const [mounted, setMounted] = useState(false);
+  const controlsRef = useRef<any>(null);
+  const [currentView, setCurrentView] = useState<ViewType>("perspective");
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  const handleViewChange = useCallback((view: ViewType) => {
+    setCurrentView(view);
+  }, []);
+
   if (!mounted) return null;
 
   return (
-    <Canvas
-      camera={{ fov: 45, near: 0.1, far: 5000 }}
-      style={{ width: "100%", height: "100%" }}
-      gl={{ localClippingEnabled: true, antialias: true }}
-    >
-      <color attach="background" args={[previewTheme.background]} />
+    <div className="relative w-full h-full min-h-[300px]" style={{ background: previewTheme.background }}>
+      <Canvas
+        camera={{ fov: 45, near: 0.1, far: 5000, position: [100, 60, 100] }}
+        style={{ width: "100%", height: "100%" }}
+        gl={{ localClippingEnabled: true, antialias: true }}
+      >
+        <CameraController viewType={currentView} controlsRef={controlsRef} />
+        <Suspense fallback={null}>
+          <color attach="background" args={[previewTheme.background]} />
 
-      <ambientLight intensity={previewTheme.lights.ambient} />
-      <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} castShadow />
-      <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
-      <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
+          <ambientLight intensity={previewTheme.lights.ambient} />
+          <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} castShadow />
+          <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
+          <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
+          <Environment preset="studio" />
 
-      <SpringMesh {...props} />
+          {/* Rotate the spring to be vertical if generator uses XY plane, or stay if it uses Z up.
+              Variable pitch generator usually produces Z-up geometry.
+          */}
+          <SpringMesh {...props} />
 
-      <gridHelper args={[80, 16, previewTheme.grid.major, previewTheme.grid.minor]} position={[0, 0, 0]} rotation={[0, 0, 0]} />
-    </Canvas>
+          <gridHelper 
+            args={[200, 20, previewTheme.grid.major, previewTheme.grid.minor]} 
+            position={[0, 0, 0]} 
+            rotation={[Math.PI / 2, 0, 0]} // Grid on XY plane
+          />
+
+          <OrbitControls
+            ref={controlsRef}
+            makeDefault
+            enablePan={true}
+            enableZoom={true}
+            enableRotate={true}
+            autoRotate={props.autoRotate}
+            autoRotateSpeed={0.8}
+            minDistance={10}
+            maxDistance={1000}
+          />
+        </Suspense>
+      </Canvas>
+
+      {/* View selector - bottom left */}
+      <div className="absolute bottom-2 left-2 flex gap-1 z-10">
+        <Button
+          variant={currentView === "perspective" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("perspective")}
+          title="透视图 / Perspective"
+        >
+          <RotateCcw className="h-3 w-3 mr-1" />
+          3D
+        </Button>
+        <Button
+          variant={currentView === "front" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("front")}
+          title="正视图 / Front View"
+        >
+          前
+        </Button>
+        <Button
+          variant={currentView === "top" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("top")}
+          title="俯视图 / Top View"
+        >
+          顶
+        </Button>
+        <Button
+          variant={currentView === "side" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("side")}
+          title="侧视图 / Side View"
+        >
+          侧
+        </Button>
+      </div>
+
+      {/* Legend overlay - top left */}
+      <div className="absolute top-2 left-2 rounded bg-white/90 px-2 py-1.5 text-xs shadow z-10">
+        <div className="flex items-center gap-2">
+           <span className="font-semibold text-slate-700">Variable Pitch</span>
+        </div>
+        <div className="mt-1 text-slate-600">
+           Compression
+        </div>
+        
+        {showStressColors && (
+          <div className="mt-3 space-y-2 border-t pt-2">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-full rounded-full bg-gradient-to-r from-[#1a7a33] via-[#ffcc00] to-[#e60000]" />
+            </div>
+            <div className="flex justify-between text-[10px] text-slate-500">
+              <span>0%</span>
+              <span>100%</span>
+            </div>
+            <div className="text-[10px] text-center text-slate-400 font-mono">
+              Stress FEA Preview
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Status overlay - top right */}
+      <div className="absolute top-2 right-2 rounded bg-white/90 px-2 py-1.5 text-xs shadow space-y-0.5 z-10 min-w-[120px]">
+        <div className="flex justify-between gap-4">
+          <span className="text-slate-500">Dm:</span>
+          <span className="font-medium">{props.meanDiameter} mm</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-slate-500">d:</span>
+          <span className="font-medium">{props.wireDiameter} mm</span>
+        </div>
+        <div className="border-t border-slate-200 pt-1 mt-1">
+          <div className="flex justify-between gap-4">
+            <span className="text-slate-500">Nt:</span>
+            <span className="font-medium">{props.totalCoils}</span>
+          </div>
+          <div className="flex justify-between gap-4">
+            <span className="text-slate-500">L0:</span>
+            <span className="font-medium">{props.freeLength ?? "-"} mm</span>
+          </div>
+          {props.springRate !== undefined && (
+            <div className="flex justify-between gap-4">
+                <span className="text-slate-500">Rate:</span>
+                <span className="font-medium">{props.springRate.toFixed(2)} N/mm</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

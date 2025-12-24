@@ -90,6 +90,19 @@ const WaveSpringVisualizer = dynamic(
   }
 );
 
+// Dynamic import for Variable Pitch 3D preview
+const VariablePitchCompressionSpringVisualizer = dynamic(
+  () => import("@/components/three/VariablePitchCompressionSpringVisualizer").then(mod => mod.VariablePitchCompressionSpringVisualizer),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="h-[400px] bg-white rounded-lg flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    )
+  }
+);
+
 // Dynamic import for 2D drawing canvas
 const EngineeringDrawingCanvas = dynamic(
   () => import("@/components/drawing/EngineeringDrawingCanvas").then(mod => mod.EngineeringDrawingCanvas),
@@ -163,7 +176,7 @@ function CadExportContent() {
   const code = storeMeta?.designCode ?? searchParams.get("code") ?? undefined;
   // Note: dieSpring has its own dedicated engineering page and is not supported in CAD export
   const rawType = searchParams.get("type") ?? storeGeometry?.type ?? "compression";
-  const springType = (rawType === "arcSpring" ? "arc" : rawType) as SpringGeometry['type'] | "spiralTorsion" | "wave" | "arc";
+  const springType = (rawType === "arcSpring" ? "arc" : rawType) as SpringGeometry['type'] | "spiralTorsion" | "wave" | "arc" | "variablePitchCompression";
   
   // 几何参数 - 优先从 store 读取
   // 螺旋扭转弹簧没有 wireDiameter，使用 stripThickness 作为替代
@@ -181,6 +194,8 @@ function CadExportContent() {
   
   // 标记是否为螺旋扭转弹簧
   const isSpiralTorsion = storeGeometry?.type === "spiralTorsion" || springType === "spiralTorsion";
+  // 标记是否为变节距压缩弹簧
+  const isVariablePitch = storeGeometry?.type === "variablePitchCompression" || springType === "variablePitchCompression";
   // Note: dieSpring 有专用工程分析页面，CAD 导出暂不支持
   const isDieSpring = storeGeometry?.type === "dieSpring";
   // 使用 in 操作符安全访问 activeCoils
@@ -342,8 +357,8 @@ function CadExportContent() {
       return null;
     }
 
-    // 波形弹簧和弧形弹簧也不使用通用引擎适配器
-    if (storeGeometry?.type === "wave" || storeGeometry?.type === "arc") {
+    // 波形弹簧、弧形弹簧和变节距弹簧也不使用通用引擎适配器
+    if (storeGeometry?.type === "wave" || storeGeometry?.type === "arc" || storeGeometry?.type === "variablePitchCompression") {
       return null; 
     }
     
@@ -461,6 +476,15 @@ function CadExportContent() {
             stripThickness: storeGeometry.stripThickness,
             handedness: "ccw",
           }
+        : isVariablePitch && storeGeometry?.type === "variablePitchCompression"
+        ? {
+            wireDiameter,
+            meanDiameter,
+            activeCoils,
+            totalCoils,
+            freeLength,
+            segments: storeGeometry.segments,
+          }
         : {
             wireDiameter,
             meanDiameter,
@@ -481,7 +505,7 @@ function CadExportContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          springType: isSpiralTorsion ? "spiral_torsion" : springType,
+          springType: isSpiralTorsion ? "spiral_torsion" : isVariablePitch ? "variable_pitch_compression" : springType,
           geometry: geometryParams,
           export: {
             formats: ["STEP"],
@@ -577,7 +601,7 @@ function CadExportContent() {
     const baseItems = [
       { label: "Spring Type / 类型", value: springTypeLabels[springType] ?? springType },
       { label: "Design Code / 设计编号", value: code ?? "—" },
-      { label: "Wire Diameter d / 线径", value: springType === "wave" ? "—" : `${wireDiameter.toFixed(2)} mm` },
+      { label: "Wire Diameter d / 线径", value: (springType === "wave" || springType === "variablePitchCompression") ? "—" : `${wireDiameter.toFixed(2)} mm` },
     ];
     
     // 根据弹簧类型添加特定参数
@@ -610,6 +634,18 @@ function CadExportContent() {
           { label: "Working Radius r / 工作半径", value: `${arcRadius.toFixed(2)} mm` },
           { label: "Unloaded Angle α₀ / 自由角度", value: `${arcAlpha0.toFixed(2)}°` },
           { label: "Spring Rate R / 旋转刚度", value: springRate ? `${springRate.toFixed(2)} N·mm/deg` : "—" },
+        ];
+      }
+      case "variablePitchCompression": {
+        return [
+          { label: "Spring Type / 类型", value: "Variable Pitch / 变节距弹簧" },
+          { label: "Material / 材料", value: materialName },
+          { label: "Wire Diameter d / 线径", value: `${wireDiameter.toFixed(2)} mm` },
+          { label: "Mean Diameter Dm / 中径", value: `${meanDiameter.toFixed(2)} mm` },
+          { label: "Active Coils Na / 有效圈数", value: activeCoils.toFixed(1) },
+          { label: "Total Coils Nt / 总圈数", value: totalCoils.toFixed(1) },
+          { label: "Free Length L₀ / 自由长度", value: `${freeLength.toFixed(1)} mm` },
+          { label: "Spring Rate k / 刚度", value: springRate ? `${springRate.toFixed(2)} N/mm` : "—" },
         ];
       }
       case "extension":
@@ -823,6 +859,27 @@ function CadExportContent() {
                     />
                   </p>
                 </>
+              ) : springType === "variablePitchCompression" && storeGeometry?.type === "variablePitchCompression" ? (
+                <>
+                  <div className="h-[400px] rounded-lg overflow-hidden bg-white border">
+                    <VariablePitchCompressionSpringVisualizer
+                      wireDiameter={wireDiameter}
+                      meanDiameter={meanDiameter}
+                      shearModulus={storeGeometry.shearModulus ?? 79300}
+                      activeCoils0={storeGeometry.activeCoils}
+                      totalCoils={storeGeometry.totalCoils}
+                      freeLength={storeGeometry.freeLength}
+                      segments={storeGeometry.segments}
+                      deflection={0}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    <LanguageText 
+                      en="Variable Pitch Compression • Internal 3D Renderer"
+                      zh="变节距压缩弹簧 • 内置 3D 渲染器"
+                    />
+                  </p>
+                </>
               ) : storeGeometry?.type === "wave" ? (
                 <>
                   <div className="h-[400px] rounded-lg overflow-hidden bg-white border">
@@ -875,13 +932,13 @@ function CadExportContent() {
             </TabsContent>
             
             <TabsContent value="cad">
-              {springType === "wave" || springType === "arc" ? (
+              {springType === "wave" || springType === "arc" || springType === "variablePitchCompression" ? (
                 <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 rounded-lg p-6 border text-center">
                   <AlertCircle className="w-10 h-10 text-slate-300 mb-4" />
                   <p className="text-muted-foreground">
                     <LanguageText 
-                      en={`FreeCAD preview is not available for ${springType === "wave" ? "Wave" : "Arc"} Springs yet.`}
-                      zh={`${springType === "wave" ? "波形" : "弧形"}弹簧暂不支持 FreeCAD 预览。`}
+                      en={`FreeCAD preview is not available for ${springType === "wave" ? "Wave" : springType === "arc" ? "Arc" : "Variable Pitch"} Springs yet.`}
+                      zh={`${springType === "wave" ? "波形" : springType === "arc" ? "弧形" : "变节距"}弹簧暂不支持 FreeCAD 预览。`}
                     />
                   </p>
                 </div>
@@ -930,13 +987,13 @@ function CadExportContent() {
             </TabsContent>
             
             <TabsContent value="2d">
-              {springType === "wave" || springType === "arc" ? (
+              {springType === "wave" || springType === "arc" || springType === "variablePitchCompression" ? (
                 <div className="flex flex-col items-center justify-center h-[500px] bg-slate-50 rounded-lg p-6 border text-center">
                   <FileText className="w-10 h-10 text-slate-300 mb-4" />
                   <p className="text-muted-foreground">
                     <LanguageText 
-                      en={`Engineering drawing generation is not available for ${springType === "wave" ? "Wave" : "Arc"} Springs yet.`}
-                      zh={`${springType === "wave" ? "波形" : "弧形"}弹簧暂不支持工程图生成。`}
+                      en={`Engineering drawing generation is not available for ${springType === "wave" ? "Wave" : springType === "arc" ? "Arc" : "Variable Pitch"} Springs yet.`}
+                      zh={`${springType === "wave" ? "波形" : springType === "arc" ? "弧形" : "变节距"}弹簧暂不支持工程图生成。`}
                     />
                   </p>
                 </div>

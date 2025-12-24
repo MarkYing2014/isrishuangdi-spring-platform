@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FileText, Printer, Download } from "lucide-react";
 
 import {
@@ -17,6 +17,7 @@ import {
 } from "@/lib/materials/springMaterials";
 
 import { useVariablePitchCompressionStore } from "@/lib/stores/variablePitchCompressionStore";
+import { useSpringDesignStore } from "@/lib/stores/springDesignStore";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,7 +44,7 @@ import {
   type VariablePitchCurveMode,
 } from "@/components/charts/VariablePitchCurvesChart";
 
-import { VariablePitchCompressionSpringVisualizer } from "@/components/three/VariablePitchCompressionSpringVisualizer";
+import { Calculator3DPreview } from "@/components/calculators/Calculator3DPreview";
 import { VariablePitchAdvancedPanel } from "@/components/calculators/VariablePitchAdvancedPanel";
 
 import { mapToVariablePitchCompressionReportPayload } from "@/lib/reports/variablePitchCompressionReport";
@@ -103,13 +104,16 @@ export function VariablePitchCompressionCalculator() {
     return (materialId ? getSpringMaterial(materialId) : undefined) ?? getDefaultSpringMaterial();
   }, [materialId]);
 
+
+
+
   const handleMaterialChange = (material: SpringMaterial) => {
     setMaterialId(material.id);
     setShearModulus(material.shearModulus);
   };
 
   const coilsSum = useMemo(() => {
-    return segments.reduce((acc, s) => acc + (isFinite(s.coils) ? s.coils : 0), 0);
+    return segments.reduce((acc, s) => acc + (s.coils ?? 0), 0);
   }, [segments]);
 
   const freeLengthEstimate = useMemo(() => {
@@ -118,8 +122,8 @@ export function VariablePitchCompressionCalculator() {
 
     const dead = Math.max(0, totalCoils - activeCoils0);
     const segmentsLen = segments.reduce((acc, s) => {
-      const n = isFinite(s.coils) ? s.coils : 0;
-      const p = isFinite(s.pitch) ? s.pitch : 0;
+      const n = s.coils ?? 0;
+      const p = s.pitch ?? 0;
       return acc + n * p;
     }, 0);
 
@@ -229,6 +233,54 @@ export function VariablePitchCompressionCalculator() {
       deflection: deflectionUsed,
     });
   }, [variablePitchBase, deflectionUsed]);
+
+  // Sync with global SpringDesignStore for CAD export and 3D orchestration
+  const setDesign = useSpringDesignStore((s) => s.setDesign);
+
+  useEffect(() => {
+    setDesign({
+      springType: "variablePitchCompression",
+      geometry: {
+        type: "variablePitchCompression",
+        wireDiameter,
+        meanDiameter,
+        activeCoils: activeCoils0,
+        totalCoils,
+        freeLength,
+        segments: l0Dominant.segmentsUsed,
+        materialId,
+        shearModulus,
+      },
+      material: {
+        id: selectedMaterial.id,
+        name: selectedMaterial.nameEn,
+        shearModulus: selectedMaterial.shearModulus,
+        elasticModulus: selectedMaterial.elasticModulus ?? 206000,
+        density: selectedMaterial.density ?? 7.85e-6,
+      },
+      analysisResult: {
+        springRate: result.springRate,
+        springRateUnit: "N/mm",
+        workingLoad: result.load,
+        shearStress: result.shearStress,
+        workingDeflection: deflectionUsed,
+        solidHeight: totalCoils * wireDiameter,
+      }
+    });
+  }, [
+    setDesign,
+    wireDiameter,
+    meanDiameter,
+    activeCoils0,
+    totalCoils,
+    freeLength,
+    l0Dominant.segmentsUsed,
+    materialId,
+    shearModulus,
+    selectedMaterial,
+    result,
+    deflectionUsed
+  ]);
 
   const chartData = useMemo(() => {
     const maxDeflection =
@@ -706,22 +758,15 @@ export function VariablePitchCompressionCalculator() {
                     </div>
                   </div>
                   <div className="h-[420px] w-full overflow-hidden rounded-md border bg-background">
-                    <VariablePitchCompressionSpringVisualizer
-                      wireDiameter={wireDiameter}
-                      meanDiameter={meanDiameter}
-                      shearModulus={shearModulus}
-                      activeCoils0={activeCoils0}
-                      totalCoils={totalCoils}
-                      freeLength={freeLength}
-                      segments={l0Dominant.segmentsUsed}
-                      deflection={deflectionUsed}
+                    <Calculator3DPreview
+                      expectedType="variablePitchCompression"
                       showStressColors={showStressColors}
-                      stressBeta={stressBeta}
                       stressUtilization={
                         selectedMaterial.allowShearStatic > 0
                           ? result.shearStress / selectedMaterial.allowShearStatic
                           : 0
                       }
+                      stressBeta={stressBeta}
                     />
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">

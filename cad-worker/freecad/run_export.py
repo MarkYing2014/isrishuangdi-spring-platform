@@ -771,7 +771,118 @@ def generate_extension_body_centerline(params):
     return points, 0.0, extended_length
 
 
+def generate_variable_pitch_centerline(params):
+    """
+    生成变节距压缩弹簧中心线
+    """
+    wire_diameter = params.get("wireDiameter", 3.2)
+    mean_diameter = params.get("meanDiameter", 24.0)
+    total_coils = params.get("totalCoils", 10)
+    active_coils = params.get("activeCoils", 8)
+    segments = params.get("segments", [])
+    
+    R = mean_diameter / 2.0
+    d = wire_diameter
+    
+    # 采样参数
+    num_samples = 800
+    total_angle = 2.0 * math.pi * total_coils
+    
+    dead_coils = total_coils - active_coils
+    dead_coils_per_end = dead_coils / 2.0
+    
+    points = []
+    min_z = float('inf')
+    max_z = float('-inf')
+    
+    for i in range(num_samples + 1):
+        t = i / num_samples
+        theta = t * total_angle
+        n = theta / (2.0 * math.pi)
+        
+        z = 0
+        if n <= dead_coils_per_end:
+            z = n * d
+        elif n >= total_coils - dead_coils_per_end:
+            active_height = 0
+            for seg in segments:
+                active_height += seg.get('coils', 0) * seg.get('pitch', 0)
+            
+            n_top = n - (total_coils - dead_coils_per_end)
+            z = dead_coils_per_end * d + active_height + n_top * d
+        else:
+            n_active = n - dead_coils_per_end
+            z = dead_coils_per_end * d
+            
+            curr_n = 0
+            for seg in segments:
+                s_coils = seg.get('coils', 0)
+                s_pitch = seg.get('pitch', 0)
+                if curr_n + s_coils >= n_active:
+                    z += (n_active - curr_n) * s_pitch
+                    break
+                else:
+                    z += s_coils * s_pitch
+                    curr_n += s_coils
+        
+        x = R * math.cos(theta)
+        y = R * math.sin(theta)
+        
+        p = App.Vector(x, y, z)
+        points.append(p)
+        min_z = min(min_z, z)
+        max_z = max(max_z, z)
+        
+    return points, min_z, max_z
+
+
+def make_variable_pitch_compression_spring(params):
+    """
+    生成变节距压缩弹簧
+    """
+    d = params.get("wireDiameter", 3.2)
+    Dm = params.get("meanDiameter", 24.0)
+    total_coils = params.get("totalCoils", 10)
+    ground_ends = params.get("groundEnds", True)
+    
+    points, min_z, max_z = generate_variable_pitch_centerline(params)
+    path = make_bspline_from_points(points)
+    spring_solid = sweep_wire_along_path(path, d)
+    
+    if ground_ends and spring_solid:
+        EPS = max(0.05 * d, 0.05)
+        if not spring_solid.isValid():
+            spring_solid = spring_solid.removeSplitter()
+        
+        grind_depth = 0.3 * d
+        
+        box_size = Dm * 3
+        box_height = d * 5
+        
+        bottom_box = Part.makeBox(
+            box_size, box_size, box_height,
+            App.Vector(-box_size/2, -box_size/2, grind_depth + EPS - box_height)
+        )
+        
+        top_box = Part.makeBox(
+            box_size, box_size, box_height,
+            App.Vector(-box_size/2, -box_size/2, max_z - grind_depth - EPS)
+        )
+        
+        try:
+            cut_result = spring_solid.cut(bottom_box)
+            cut_result = cut_result.cut(top_box)
+            if cut_result.ShapeType == "Compound" and cut_result.Solids:
+                cut_result = max(cut_result.Solids, key=lambda s: s.Volume)
+            spring_solid = cut_result
+        except Exception as e:
+            print(f"[VariablePitch] Ground end cutting failed: {e}")
+            
+    return spring_solid
+
+
 def make_extension_spring(params):
+
     """
     生成拉伸弹簧 (带钩子) - OpenAI 优化方案
     
@@ -2392,6 +2503,8 @@ def main():
         spring = make_spiral_torsion_spring(geometry)
     elif spring_type == "conical":
         spring = make_conical_spring(geometry)
+    elif spring_type == "variable_pitch_compression":
+        spring = make_variable_pitch_compression_spring(geometry)
     else:
         print(f"Unknown spring type: {spring_type}")
         sys.exit(1)

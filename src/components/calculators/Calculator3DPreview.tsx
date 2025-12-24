@@ -43,15 +43,32 @@ const DieSpringVisualizer = dynamic(
     ),
   }
 );
+const VariablePitchCompressionSpringVisualizer = dynamic(
+  () => import("@/components/three/VariablePitchCompressionSpringVisualizer").then((mod) => mod.VariablePitchCompressionSpringVisualizer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full w-full flex items-center justify-center bg-slate-50 rounded-lg">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-500" />
+      </div>
+    ),
+  }
+);
 
 export function Calculator3DPreview({
   expectedType,
   heightClassName = "h-[420px]",
   geometryOverride,
+  showStressColors,
+  stressUtilization,
+  stressBeta,
 }: {
   expectedType: SpringType;
   heightClassName?: string;
-  geometryOverride?: any; // Allow passing partial/full geometry from form state
+  geometryOverride?: any;
+  showStressColors?: boolean;
+  stressUtilization?: number;
+  stressBeta?: number;
 }) {
   const storedGeometry = useSpringDesignStore((s) => s.geometry);
   const geometry = geometryOverride ?? storedGeometry;
@@ -122,6 +139,25 @@ const WaveSpringVisualizer = dynamic(
           backgroundColor="#f8fafc" // slate-50
           springRate={analysis?.springRate}
           solidHeight={analysis?.solidHeight}
+        />
+      );
+    }
+
+    if (geometry.type === "variablePitchCompression") {
+      return (
+        <VariablePitchCompressionSpringVisualizer
+          wireDiameter={geometry.wireDiameter}
+          meanDiameter={geometry.meanDiameter}
+          shearModulus={geometry.shearModulus ?? material?.shearModulus ?? 79300}
+          activeCoils0={geometry.activeCoils}
+          totalCoils={geometry.totalCoils}
+          freeLength={geometry.freeLength}
+          segments={geometry.segments}
+          deflection={analysis?.workingDeflection ?? 0}
+          showStressColors={showStressColors}
+          stressUtilization={stressUtilization}
+          stressBeta={stressBeta}
+          springRate={analysis?.springRate}
         />
       );
     }
@@ -209,7 +245,7 @@ const WaveSpringVisualizer = dynamic(
     }
 
     return null;
-  }, [analysis?.initialTension, analysis?.maxDeflection, analysis?.springRate, analysis?.workingDeflection, expectedType, geometry, heightClassName, material?.shearModulus]);
+  }, [analysis?.initialTension, analysis?.maxDeflection, analysis?.springRate, analysis?.workingDeflection, expectedType, geometry, heightClassName, material?.shearModulus, showStressColors, stressUtilization, stressBeta]);
 
   if (!geometry || geometry.type !== expectedType) {
     return (
