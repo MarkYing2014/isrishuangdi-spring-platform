@@ -589,7 +589,7 @@ export function SpiralTorsionCalculator() {
       : null;
 
   const results = useMemo((): SpiralTorsionResults | null => {
-    if (!submitted) return null;
+    // if (!submitted) return null; // Reactive calculation
 
     const material = getSpiralSpringMaterial(materialId);
     if (!material) return null;
@@ -611,7 +611,7 @@ export function SpiralTorsionCalculator() {
       watchedValues.allowableStressRule ?? "0.45_UTS",  // 设计准则
       material
     );
-  }, [submitted, watchedValues, materialId]);
+  }, [watchedValues, materialId]);
 
   const designRuleReport = useMemo(() => {
     const geometry: SpiralTorsionGeometry = {
@@ -679,7 +679,7 @@ export function SpiralTorsionCalculator() {
 
       // 构建材料信息
       const materialInfo: MaterialInfo = {
-        id: "music_wire_a228",
+        id: material.id as any,
         name: material.name,
         shearModulus: material.elasticModulus_MPa / 2.6,
         elasticModulus: results.elasticModulus,
@@ -717,10 +717,6 @@ export function SpiralTorsionCalculator() {
 
   const handleMaterialChange = (material: SpiralSpringMaterial) => {
     setMaterialId(material.id);
-    if (submitted) {
-      setSubmitted(false);
-      setTimeout(() => setSubmitted(true), 0);
-    }
   };
 
   return (
@@ -1214,7 +1210,7 @@ export function SpiralTorsionCalculator() {
           <CardTitle>Results / 计算结果</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {submitted && results ? (
+          {results ? (
             <div className="space-y-4">
               {/* Errors */}
               {results.errors.length > 0 && (
