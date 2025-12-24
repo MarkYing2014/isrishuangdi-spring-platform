@@ -1,142 +1,358 @@
 // src/lib/arcSpring/ArcSpringStress.ts
-// Arc Spring stress model (engineering-grade, incremental)
-// - Uses Δθ = θ_free - θ_work
-// - Uses single-strip torque: T_single = (kθ * Δθ) / parallelCount
-// - Uses Effective Section Modulus Z_eff = Z_ref * (2r / D) to account for Lever Arm ratio
-// - Returns σ in MPa, stressRatio in %
+// Engineering-grade Arc Spring (Damper Arc Helical Spring) analysis
+// Target: match factory report (θ_free, θ_work → T_work, kθ, τ_work) 1:1
+// Units: N, mm, MPa, deg
 
-export type ArcSpringUnits = "Nmm" | "Nm";
 export type AngleUnit = "deg" | "rad";
 
-export interface ArcSpringGeometry {
-    /** strip width b (mm) */
-    b?: number;
-    /** strip thickness t (mm) */
-    t?: number;
-    /** wire diameter d (mm) - Fallback for Round Wire */
-    d?: number;
-    /** Mean Coil Diameter D (mm) - Required for Z_eff */
-    D?: number;
+export interface ArcSpringMaterial {
+    id: string;
+    name: string;
+    /** Shear modulus G (MPa = N/mm^2) */
+    G: number;
+    /** Yield strength Sy (MPa) */
+    Sy: number;
+    /** Optional ultimate strength Sut (MPa) */
+    Sut?: number;
 }
 
-export interface ArcSpringMaterial {
-    /** yield strength Sy (MPa) */
-    Sy: number;
-    /** allowable factor on Sy */
-    allowFactor?: number;
+export interface ArcSpringGeometry {
+    /** wire diameter d (mm) */
+    d: number;
+
+    /** mean coil diameter Dm (mm). If not provided, you can derive from OD - d */
+    Dm: number;
+
+    /** active coils Na */
+    Na: number;
+
+    /**
+     * working radius r (mm)
+     * This is the damper radius converting tangential force -> torque: T = F * r
+     */
+    r: number;
+
+    /**
+     * number of identical arc springs in parallel (e.g. 4 strips / 4 springs)
+     * Factory often reports the total damper performance; each strip shares torque.
+     */
+    nParallel?: number;
 }
 
 export interface ArcSpringLoadcase {
-    /** Free angle θ_free (deg) */
-    thetaFree: number;
-    /** Work/limit angle θ_work (deg) */
-    thetaWork: number;
-    /** torsional stiffness per DEG */
-    kTheta: number;
-    kThetaUnit?: ArcSpringUnits; // default "Nm"
-    parallelCount?: number;
-    beta?: number;
-    /** Working Radius r (mm) - Required for Z_eff */
-    rWork?: number;
+    /** free angle θ_free (deg) */
+    thetaFreeDeg: number;
+    /** work angle θ_work (deg) */
+    thetaWorkDeg: number;
+
+    /**
+     * Optional: limit angle θ_limit (deg) for max checks
+     * If omitted, we only analyze at work.
+     */
+    thetaLimitDeg?: number;
 }
 
-export interface ArcSpringStressResult {
+export interface ArcSpringPolicy {
+    /**
+     * Allowable shear stress rule.
+     * Industry-friendly default for shot-peened spring steels:
+     * tau_allow = 0.65 * Sy  (matches your "Allow: 1040 MPa" when Sy=1600)
+     */
+    tauAllowFactorOfSy?: number; // default 0.65
+
+    /**
+     * Minimum recommended spring index for helical springs.
+     * Arc springs often run low C (3~6) but still we can warn.
+     */
+    springIndexRecommended?: { min: number; max: number }; // default {min:4, max:20}
+
+    /**
+     * If you want to match factory “total stiffness” display:
+     * total = perStrip * nParallel
+     * perStrip = total / nParallel
+     */
+    reportAsTotalDamper?: boolean; // default true
+}
+
+export interface ArcSpringResults {
+    // basic geometry factors
+    C: number;
+    Kw: number;
+
+    // stiffness
+    /** Tangential spring rate (N/mm) per strip */
+    kTangentialPerStrip: number;
+    /** Torsional stiffness (N·mm/deg) total damper (after parallel) */
+    kThetaTotal_NmmPerDeg: number;
+    /** Torsional stiffness (Nm/deg) total damper */
+    kThetaTotal_NmPerDeg: number;
+    /** Torsional stiffness per strip (Nm/deg) */
+    kThetaPerStrip_NmPerDeg: number;
+
+    // work point
     dThetaDeg: number;
+    direction: "Compress" | "Extend";
     dThetaRad: number;
-    kTheta_Nmm_per_deg: number;
-    T_total_Nmm: number;
-    T_single_Nmm: number;
 
-    Z_ref_mm3: number; // Base section Z
-    Z_eff_mm3: number; // Effective Z (accounting for r/D)
+    /** Work torque total damper (Nm) */
+    TworkTotal_Nm: number;
+    /** Work torque per strip (Nm) */
+    TworkPerStrip_Nm: number;
 
-    sigmaMax_MPa: number;
-    sigmaAllow_MPa: number;
+    /** Equivalent tangential deflection at radius r (mm) */
+    dxWork_mm: number;
+    /** Force per strip (N) */
+    FworkPerStrip_N: number;
+
+    /** Shear stress at work (MPa) */
+    tauWork_MPa: number;
+    /** Allowable shear (MPa) */
+    tauAllow_MPa: number;
+    /** Stress ratio (tau/tauAllow * 100) */
     stressRatio_pct: number;
-    warnings: string[];
+    /** Safety factor = tauAllow / tau */
+    safetyFactor: number;
+
+    // optional limit point
+    limit?: {
+        dThetaDeg: number;
+        Ttotal_Nm: number;
+        TperStrip_Nm: number;
+        dx_mm: number;
+        FperStrip_N: number;
+        tau_MPa: number;
+        stressRatio_pct: number;
+        safetyFactor: number;
+    };
+
+    // chart-ready curves
+    curves: {
+        torqueAngle: Array<{ thetaDeg: number; torqueTotalNm: number; torquePerStripNm: number }>;
+        stressAngle: Array<{ thetaDeg: number; tauMPa: number; ratioPct: number }>;
+    };
+
+    // warnings (for UI Design Rules panel)
+    warnings: Array<{ code: string; message: string }>;
 }
 
-const DEG2RAD = Math.PI / 180;
-
-function assertFinitePositive(name: string, v: number) {
-    if (!Number.isFinite(v) || v <= 0) throw new Error(`${name} must be a finite positive number`);
-}
-function assertFinite(name: string, v: number) {
-    if (!Number.isFinite(v)) throw new Error(`${name} must be finite`);
-}
-function clamp(v: number, lo: number, hi: number) {
-    return Math.max(lo, Math.min(hi, v));
-}
-function toNmm(value: number, unit: ArcSpringUnits): number {
-    return unit === "Nm" ? value * 1000 : value;
+/**
+ * Wahl factor (Kw) for helical compression spring shear stress correction.
+ * Kw = (4C-1)/(4C-4) + 0.615/C
+ */
+export function wahlFactor(C: number): number {
+    if (C <= 1.1) return Infinity;
+    return (4 * C - 1) / (4 * C - 4) + 0.615 / C;
 }
 
-export function calculateArcSpringStress(
+/**
+ * Helical spring rate (compression/tangential) for one strip:
+ * k = G d^4 / (8 D^3 Na)
+ * Units: G (MPa=N/mm^2), d(mm), D(mm) => k in N/mm
+ */
+export function helicalRate_N_per_mm(G: number, d: number, Dm: number, Na: number): number {
+    if (Na <= 0) throw new Error("Na must be > 0");
+    return (G * Math.pow(d, 4)) / (8 * Math.pow(Dm, 3) * Na);
+}
+
+/**
+ * Core shear stress model for helical spring:
+ * tau = Kw * 8 F Dm / (pi d^3)
+ * Units: F(N), Dm(mm), d(mm) => tau in MPa (N/mm^2)
+ */
+export function helicalShearStress_MPa(F: number, Dm: number, d: number, Kw: number): number {
+    return (Kw * 8 * F * Dm) / (Math.PI * Math.pow(d, 3));
+}
+
+/**
+ * Convert angle difference to tangential deflection:
+ * dx = r * dTheta(rad)
+ * Units: r(mm), rad => dx(mm)
+ */
+export function tangentialDeflection_mm(r: number, dThetaRad: number): number {
+    return r * dThetaRad;
+}
+
+export function deg2rad(deg: number): number {
+    return (deg * Math.PI) / 180;
+}
+
+export function computeArcSpring(
     geom: ArcSpringGeometry,
+    load: ArcSpringLoadcase,
     mat: ArcSpringMaterial,
-    lc: ArcSpringLoadcase
-): ArcSpringStressResult {
-    const warnings: string[] = [];
+    policy: ArcSpringPolicy = {}
+): ArcSpringResults {
+    const {
+        tauAllowFactorOfSy = 0.65,
+        springIndexRecommended = { min: 4, max: 20 },
+        reportAsTotalDamper = true,
+    } = policy;
 
-    // 1. Base Section Modulus (Z_ref)
-    let Z_ref_mm3 = 0;
-    if (geom.b !== undefined && geom.t !== undefined) {
-        assertFinitePositive("b", geom.b);
-        assertFinitePositive("t", geom.t);
-        Z_ref_mm3 = (geom.b * geom.t * geom.t) / 6;
-    } else if (geom.d !== undefined) {
-        assertFinitePositive("d", geom.d);
-        Z_ref_mm3 = (Math.PI * Math.pow(geom.d, 3)) / 32;
-    } else {
-        throw new Error("Geometry missing dimensions");
+    const n = Math.max(1, Math.floor(geom.nParallel ?? 1));
+    const d = geom.d;
+    const Dm = geom.Dm;
+    const Na = geom.Na;
+    const r = geom.r;
+
+    const warnings: ArcSpringResults["warnings"] = [];
+
+    const C = Dm / d;
+    const Kw = wahlFactor(C);
+
+    if (C < springIndexRecommended.min || C > springIndexRecommended.max) {
+        warnings.push({
+            code: "SPRING_INDEX",
+            message: `Spring Index C=${C.toFixed(2)} outside recommended range (${springIndexRecommended.min}~${springIndexRecommended.max}). Arc springs may run low C but check manufacturability/fatigue.`,
+        });
+    }
+    if (!Number.isFinite(Kw) || Kw > 5) {
+        warnings.push({
+            code: "WAHL_FACTOR",
+            message: `Wahl factor seems too high (Kw=${Kw.toFixed(3)}). Check Dm/d inputs.`,
+        });
     }
 
-    // 2. Effective Section Modulus (Z_eff)
-    // Accounts for Lever Arm change from Arc Radius (r) to Coil Radius (D/2).
-    // Factor = (2 * r) / D.
-    const D_mean = geom.D ?? 12.2;
-    const r_work = lc.rWork ?? 60;
-    const leverageFactor = (2 * r_work) / D_mean;
-    const Z_eff_mm3 = Z_ref_mm3 * leverageFactor;
+    // 1) Per-strip tangential rate (same as compression spring)
+    const kPerStrip = helicalRate_N_per_mm(mat.G, d, Dm, Na);
 
-    // 3. Loadcase
-    assertFinitePositive("Sy", mat.Sy);
-    const allowFactor = mat.allowFactor ?? 0.65;
-    const parallelCount = Math.max(1, Math.floor(lc.parallelCount ?? 4));
-    const beta = clamp(lc.beta ?? 1.15, 1.0, 1.5);
-    const kThetaUnit = lc.kThetaUnit ?? "Nm";
+    // 2) Torsional stiffness:
+    // per-strip: kθ_strip (N·mm/rad) = k(N/mm) * r^2 (mm^2)
+    // because T = F*r, F = k*dx, dx = r*θ => T = (k*r^2)*θ
+    const kThetaPerStrip_NmmPerRad = kPerStrip * r * r;
+    const kThetaPerStrip_NmmPerDeg = kThetaPerStrip_NmmPerRad / (180 / Math.PI);
+    const kThetaPerStrip_NmPerDeg = kThetaPerStrip_NmmPerDeg / 1000;
 
-    const dThetaDeg = lc.thetaFree - lc.thetaWork;
-    if (dThetaDeg < 0) warnings.push("Δθ is negative. Check angle convention.");
-    const dThetaDegAbs = Math.abs(dThetaDeg);
+    const kThetaTotal_NmPerDeg = kThetaPerStrip_NmPerDeg * n;
+    const kThetaTotal_NmmPerDeg = kThetaTotal_NmPerDeg * 1000;
 
-    const kTheta_Nmm_per_deg = toNmm(lc.kTheta, kThetaUnit);
-    const T_total_Nmm = kTheta_Nmm_per_deg * dThetaDegAbs;
-    const T_single_Nmm = T_total_Nmm / parallelCount;
+    // 3) Work point
+    const dThetaDeg = load.thetaFreeDeg - load.thetaWorkDeg;
+    // Engineering convention: Magnitude governs stress/torque size. Sign governs direction.
+    const dThetaDegMag = Math.abs(dThetaDeg);
+    const direction = dThetaDeg >= 0 ? "Compress" : "Extend";
 
-    // 4. Stress Calculation
-    // σ = β * T_single / Z_eff
-    const sigmaMax_MPa = beta * (T_single_Nmm / Z_eff_mm3);
-    const sigmaAllow_MPa = allowFactor * mat.Sy;
-    const stressRatio_pct = (sigmaMax_MPa / sigmaAllow_MPa) * 100;
+    const dThetaRad = deg2rad(dThetaDegMag);
 
-    if (stressRatio_pct > 500) warnings.push("Stress > 500%. Check units.");
+    const dxWork = tangentialDeflection_mm(r, dThetaRad); // mm (magnitude)
+    const FworkPerStrip = kPerStrip * dxWork; // N (magnitude)
 
-    return {
-        dThetaDeg: dThetaDegAbs,
-        dThetaRad: dThetaDegAbs * DEG2RAD,
-        kTheta_Nmm_per_deg,
-        T_total_Nmm,
-        T_single_Nmm,
-        Z_ref_mm3,
-        Z_eff_mm3,
-        sigmaMax_MPa,
-        sigmaAllow_MPa,
-        stressRatio_pct,
+    const TworkPerStrip_Nmm = FworkPerStrip * r; // N*mm
+    const TworkPerStrip_Nm = TworkPerStrip_Nmm / 1000;
+
+    const TworkTotal_Nm = TworkPerStrip_Nm * n;
+
+    // 4) Shear stress (per strip) - Magnitude
+    const tauWork = helicalShearStress_MPa(FworkPerStrip, Dm, d, Kw);
+
+    // 5) Allowables & SF
+    const tauAllow = tauAllowFactorOfSy * mat.Sy;
+    const ratio = (tauWork / tauAllow) * 100;
+    const SF = tauAllow / tauWork;
+
+    // Optional limit point
+    let limit: ArcSpringResults["limit"] | undefined = undefined;
+    if (typeof load.thetaLimitDeg === "number") {
+        const dThetaL_Deg = load.thetaFreeDeg - load.thetaLimitDeg;
+        const dThetaL_Mag = Math.abs(dThetaL_Deg);
+        const dThetaL_Rad = deg2rad(dThetaL_Mag);
+        const dxL = tangentialDeflection_mm(r, dThetaL_Rad);
+        const FL = kPerStrip * dxL;
+        const TstripL_Nm = (FL * r) / 1000;
+        const TtotalL_Nm = TstripL_Nm * n;
+        const tauL = helicalShearStress_MPa(FL, Dm, d, Kw);
+        const ratioL = (tauL / tauAllow) * 100;
+        const SFL = tauAllow / tauL;
+
+        limit = {
+            dThetaDeg: dThetaL_Mag,
+            Ttotal_Nm: TtotalL_Nm,
+            TperStrip_Nm: TstripL_Nm,
+            dx_mm: dxL,
+            FperStrip_N: FL,
+            tau_MPa: tauL,
+            stressRatio_pct: ratioL,
+            safetyFactor: SFL,
+        };
+    }
+
+    // Curves (chart)
+    // We build from thetaWork -> thetaFree (or to thetaLimit if exists)
+    const thetaStart = (typeof load.thetaLimitDeg === "number") ? load.thetaLimitDeg : load.thetaWorkDeg;
+    const thetaEnd = load.thetaFreeDeg;
+    const steps = 40;
+
+    const torqueAngle: ArcSpringResults["curves"]["torqueAngle"] = [];
+    const stressAngle: ArcSpringResults["curves"]["stressAngle"] = [];
+
+    for (let i = 0; i <= steps; i++) {
+        const theta = thetaStart + ((thetaEnd - thetaStart) * i) / steps;
+        const dTheta_i_Deg = load.thetaFreeDeg - theta;
+        const dTheta_i_Mag = Math.abs(dTheta_i_Deg); // Use magnitude for calculations
+        const dTheta_i_Rad = deg2rad(dTheta_i_Mag);
+
+        const dx = tangentialDeflection_mm(r, dTheta_i_Rad);
+        const F = kPerStrip * dx;
+        const TstripNm = (F * r) / 1000;
+        const TtotalNm = TstripNm * n;
+
+        const tau = helicalShearStress_MPa(F, Dm, d, Kw);
+        const ratioPct = (tau / tauAllow) * 100;
+
+        torqueAngle.push({ thetaDeg: theta, torqueTotalNm: TtotalNm, torquePerStripNm: TstripNm });
+        stressAngle.push({ thetaDeg: theta, tauMPa: tau, ratioPct });
+    }
+
+    // Reporting mode
+    // Some screens want to show "total damper" numbers only, but always keep per-strip in payload.
+    const res: ArcSpringResults = {
+        C,
+        Kw,
+
+        kTangentialPerStrip: kPerStrip,
+
+        kThetaTotal_NmmPerDeg: kThetaTotal_NmmPerDeg,
+        kThetaTotal_NmPerDeg: kThetaTotal_NmPerDeg,
+        kThetaPerStrip_NmPerDeg: kThetaPerStrip_NmPerDeg,
+
+        dThetaDeg: dThetaDegMag, // Report magnitude
+        direction,
+        dThetaRad,
+
+        TworkTotal_Nm: TworkTotal_Nm,
+        TworkPerStrip_Nm: TworkPerStrip_Nm,
+
+        dxWork_mm: dxWork,
+        FworkPerStrip_N: FworkPerStrip,
+
+        tauWork_MPa: tauWork,
+        tauAllow_MPa: tauAllow,
+        stressRatio_pct: ratio,
+        safetyFactor: SF,
+
+        limit,
+        curves: { torqueAngle, stressAngle },
         warnings,
     };
+
+    // If you want a strict factory-style warning when ratio is crazy:
+    if (!Number.isFinite(res.tauWork_MPa) || res.tauWork_MPa > 3000) {
+        res.warnings.push({
+            code: "STRESS_IMPLAUSIBLE",
+            message:
+                `Stress is implausibly high (${res.tauWork_MPa.toFixed(0)} MPa). Check unit consistency: use N + mm, and ensure torque is converted via F=T/r (per strip).`,
+        });
+    }
+
+    return res;
 }
 
-export function toFactoryTorqueNm(T_Nmm: number): number {
-    return T_Nmm / 1000;
-}
+/**
+ * Factory-default policy preset (industry locked):
+ * - tauAllow = 0.65*Sy
+ * - report total damper (nParallel included)
+ */
+export const ARC_SPRING_FACTORY_POLICY: ArcSpringPolicy = {
+    tauAllowFactorOfSy: 0.65,
+    springIndexRecommended: { min: 4, max: 20 },
+    reportAsTotalDamper: true,
+};

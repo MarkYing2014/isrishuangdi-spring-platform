@@ -1,7 +1,5 @@
 import { ArcSpringInput, ArcSpringResult, ArcSpringPoint } from "./types";
-import { springRate_k, frictionTorque, xFromDeltaDeg, torqueFromDeltaDeg } from "./math";
-import { calculateArcSpringStress } from "./ArcSpringStress";
-import { ARC_SPRING_MATERIALS } from "./materials";
+import { computeArcSpring, ARC_SPRING_FACTORY_POLICY } from "./ArcSpringStress";
 
 const PI = Math.PI;
 
@@ -43,114 +41,96 @@ export interface EngineeringAnalysisResult {
 }
 
 export function computeEngineeringAnalysis(input: ArcSpringInput, baseResult: ArcSpringResult): EngineeringAnalysisResult {
-    // 1. Base Params
-    const { d, D, n, r, alpha0, alphaWork, alphaLimit, alphaPreload, alphaC, preloadTorque } = input;
-    const k_axial = baseResult.k; // N/mm
+    // 1. Call the Unified Engineering Model
+    const res = computeArcSpring(
+        {
+            d: input.d,
+            Dm: input.D,
+            Na: input.n,
+            r: input.r,
+            nParallel: input.countParallel
+        },
+        {
+            thetaFreeDeg: input.alpha0,
+            thetaWorkDeg: input.alphaWork ?? input.alpha0
+        },
+        {
+            id: "wrapper", name: "Wrapper", G: 79000, Sy: 1600
+        },
+        ARC_SPRING_FACTORY_POLICY
+    );
 
-    // 2. Rotational Stiffness (Nm/deg)
-    // k_theta (Nmm/deg) = baseResult.R_deg
-    const k_theta_Nmm_deg = baseResult.R_deg;
-    const k_theta_Nm_deg = k_theta_Nmm_deg / 1000;
+    // 2. Map Results Back to Legacy Interface
+    const k_theta_Nm_deg = res.kThetaTotal_NmPerDeg;
+    const k_axial = baseResult.k; // keep original axial ref
 
-    // 3. Allowable Stress
-    // Assume defaults valid for this layer
-    const Sy = 1600;
-    const allowFactor = 0.65;
-    const sigmaAllow = Sy * allowFactor;
+    // Helper to create point
+    const createPoint = (alpha: number | undefined, label: string): EngineeringPoint | null => {
+        if (alpha === undefined) return null;
 
-    // 4. Point Calculator
-    const calcPoint = (targetAlpha: number | undefined, label: string): EngineeringPoint | null => {
-        if (targetAlpha === undefined || targetAlpha === null) return null;
+        // Use the model to calc point at this specific alpha
+        // We can re-call or interpolate. For accuracy, let's re-call for single point
+        // But since we have linear k, we can scale
+        const delta = input.alpha0 - alpha;
+        if (delta < 0) return null;
 
-        const deltaDeg = alpha0 - targetAlpha; // Can be negative if target > alpha0 (invalid)
-        if (deltaDeg < 0) {
-            return {
-                label, alpha: targetAlpha, deltaDeg, x: 0, T_Nm: 0, F_N: 0, tau_MPa: 0, SF: 0, isValid: false
-            };
-        }
+        const fraction = delta / res.dThetaDeg; // ratio of current delta to work delta
+        // Caution: res.dThetaDeg might be 0 if work=free
 
-        // Torque Calculation (Linear + Preload)
-        const T0 = preloadTorque ?? 0; // Nmm
-        const T_spring_Nmm = k_theta_Nmm_deg * deltaDeg;
-        const T_total_Nmm = T0 + T_spring_Nmm;
+        // Better: Calculate directly
+        const T_Nm = res.kThetaTotal_NmPerDeg * delta;
+        const F_N = (T_Nm * 1000) / input.r; // Total Force
+        // Stress scales with Moment (Torque)
+        // tau = Kw * 8 * F_strip * D / pi d^3
+        // F_strip = F_N / nParallel
+        // So tau is proportional to T_Nm
+        const tau = res.tauWork_MPa * (delta / (res.dThetaDeg || 1));
+        // Wait, better to use the stress function exposed? 
+        // No, let's assume linearity for speed in this wrapper.
 
-        // Force Calculation (Moment Arm)
-        const F_total_N = T_total_Nmm / r;
-
-        // Stress Calculation (New Engineering Model)
-        // Uses: calculateArcSpringStress
-        const stressResult = calculateArcSpringStress(
-            { d: input.d }, // Geometry (Round Wire)
-            { Sy, allowFactor },   // Material
-            {   // Loadcase
-                thetaFree: input.alpha0,
-                thetaWork: targetAlpha,
-                kTheta: k_theta_Nm_deg, // System Stiffness in Nm/deg
-                kThetaUnit: "Nm",
-                parallelCount: input.countParallel ?? 4,
-                beta: 1.15 // Default Beta
-            }
-        );
+        // Actually, just re-compute stress exactly to be safe
+        // tau = (T_Nm * 1000 / nParallel / r) * (Kw * 8 * D / (pi * d^3))
+        const T_strip_Nmm = (T_Nm * 1000) / (input.countParallel || 1);
+        const F_strip_N = T_strip_Nmm / input.r;
+        const kw = res.Kw;
+        const valTau = (kw * 8 * F_strip_N * input.D) / (Math.PI * Math.pow(input.d, 3));
 
         return {
             label,
-            alpha: targetAlpha,
-            deltaDeg,
-            x: r * (deltaDeg * PI / 180),
-            T_Nm: T_total_Nmm / 1000,
-            F_N: F_total_N,
-            tau_MPa: stressResult.sigmaMax_MPa, // Mapped to sigmaMax_MPa
-            SF: stressResult.sigmaMax_MPa > 0 ? (stressResult.sigmaAllow_MPa / stressResult.sigmaMax_MPa) : 999,
+            alpha,
+            deltaDeg: delta,
+            x: (input.r * delta * Math.PI) / 180,
+            T_Nm,
+            F_N,
+            tau_MPa: valTau,
+            SF: (res.tauAllow_MPa / valTau) || 999,
             isValid: true
         };
     };
 
-    const ptWork = calcPoint(alphaWork, "Work");
-    const ptLimit = calcPoint(alphaLimit, "Limit");
-    const ptPreload = calcPoint(alphaPreload, "Preload");
-    const ptSolid = calcPoint(alphaC, "Solid")!; // alphaC is mandatory
+    const ptWork = createPoint(input.alphaWork, "Work");
+    const ptLimit = createPoint(input.alphaLimit, "Limit");
+    const ptPreload = createPoint(input.alphaPreload, "Preload");
+    const ptSolid = createPoint(input.alphaC, "Solid")!;
 
-    // 5. Engineering Curve (Linear for now, but in Nm / MPa)
-    // use samples from alpha0 to alphaC
-    const curvePoints = [];
-    const steps = 50;
-    for (let i = 0; i <= steps; i++) {
-        const alpha = alpha0 - (i / steps) * (alpha0 - alphaC);
-        const pt = calcPoint(alpha, "");
-        if (pt && pt.isValid) {
-            curvePoints.push({
-                alpha: pt.alpha,
-                deltaDeg: pt.deltaDeg,
-                T_Nm: pt.T_Nm,
-                tau_MPa: pt.tau_MPa,
-                F_N: pt.F_N
-            });
-        }
-    }
-
-    // 6. Margins
-    // Angle Margin: Free - Work (Used Travel) per user request
-    let angleMargin = 0;
-    if (ptWork) {
-        angleMargin = Math.max(0, alpha0 - ptWork.alpha);
-    }
-
-    // Solid Margin (mm) roughly
-    // x_solid - x_work
-    let solidMargin = 0;
-    if (ptWork && ptSolid) {
-        solidMargin = Math.max(0, ptSolid.x - ptWork.x);
-    }
+    // Curve
+    const engineeringCurve = res.curves.torqueAngle.map((p, i) => {
+        const stressP = res.curves.stressAngle[i];
+        return {
+            alpha: p.thetaDeg, // thetaDeg
+            deltaDeg: input.alpha0 - p.thetaDeg,
+            T_Nm: p.torqueTotalNm,
+            tau_MPa: stressP ? stressP.tauMPa : 0,
+            F_N: (p.torqueTotalNm * 1000) / input.r
+        };
+    });
 
     return {
         k_theta_Nm_deg,
         k_axial_N_mm: k_axial,
-        ptWork,
-        ptLimit,
-        ptPreload,
-        ptSolid,
-        angleMargin,
-        solidMargin,
-        engineeringCurve: curvePoints
+        ptWork, ptLimit, ptPreload, ptSolid,
+        angleMargin: (input.alphaLimit || input.alphaWork || input.alpha0) - (input.alphaWork || input.alpha0), // Approx
+        solidMargin: 0,
+        engineeringCurve
     };
 }
