@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/language-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -205,82 +206,76 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
                 <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/20 p-4">
                   <div className="space-y-1">
                     <Label>{isZh ? "内径 ID (mm)" : "Inner Diameter ID (mm)"}</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
+                    <NumericInput
                       value={id}
-                      onChange={(e) => setId(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setId(v ?? 0)}
+                      step={0.1}
+                      min={0}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "外径 OD (mm)" : "Outer Diameter OD (mm)"}</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
+                    <NumericInput
                       value={od}
-                      onChange={(e) => setOd(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setOd(v ?? 0)}
+                      step={0.1}
+                      min={0}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "厚度 t (mm)" : "Thickness t (mm)"}</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
+                    <NumericInput
                       value={thickness_t}
-                      onChange={(e) => setThickness(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setThickness(v ?? 0)}
+                      step={0.01}
+                      min={0}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "径向壁宽 b (mm)" : "Radial Wall b (mm)"}</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
+                    <NumericInput
                       value={radialWall_b}
-                      onChange={(e) => setRadialWall(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setRadialWall(v ?? 0)}
+                      step={0.1}
+                      min={0}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "圈数 Nt" : "Turns Nt"}</Label>
-                    <Input
-                      type="number"
-                      step="1"
-                      min="1"
+                    <NumericInput
                       value={turns_Nt}
-                      onChange={(e) => setTurns(parseFloat(e.target.value) || 1)}
+                      onChange={(v) => setTurns(v ?? 1)}
+                      step={1}
+                      min={1}
+                      decimalScale={0}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "每圈波数 Nw" : "Waves/Turn Nw"}</Label>
-                    <Input
-                      type="number"
-                      step="1"
-                      min="1"
+                    <NumericInput
                       value={wavesPerTurn_Nw}
-                      onChange={(e) => setWavesPerTurn(parseFloat(e.target.value) || 1)}
+                      onChange={(v) => setWavesPerTurn(v ?? 1)}
+                      step={1}
+                      min={1}
+                      decimalScale={0}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "自由高度 Hf (mm)" : "Free Height Hf (mm)"}</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
+                    <NumericInput
                       value={freeHeight_Hf}
-                      onChange={(e) => setFreeHeight(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setFreeHeight(v ?? 0)}
+                      step={0.1}
+                      min={0}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "工作高度 Hw (mm)" : "Working Height Hw (mm)"}</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
+                    <NumericInput
                       value={workingHeight_Hw}
-                      onChange={(e) => setWorkingHeight(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setWorkingHeight(v ?? 0)}
+                      step={0.1}
+                      min={0}
                     />
                   </div>
                 </div>
@@ -308,12 +303,12 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
                   </div>
                   <div className="space-y-1">
                     <Label>{isZh ? "弹性模量 E (MPa)" : "Elastic Modulus E (MPa)"}</Label>
-                    <Input
-                      type="number"
-                      step="1000"
-                      min="0"
+                    <NumericInput
                       value={E_MPa}
-                      onChange={(e) => setE(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setE(v ?? 0)}
+                      step={1000}
+                      min={0}
+                      decimalScale={0}
                     />
                   </div>
                 </div>

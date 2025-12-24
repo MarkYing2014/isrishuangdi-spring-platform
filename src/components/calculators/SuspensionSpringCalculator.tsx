@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -248,44 +249,40 @@ export function SuspensionSpringCalculator() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="wireDiameter">线径 d (mm)</Label>
-                <Input
+                <NumericInput
                   id="wireDiameter"
-                  type="number"
                   value={wireDiameter}
-                  onChange={(e) => setWireDiameter(Number(e.target.value))}
+                  onChange={(v) => setWireDiameter(v ?? 0)}
                   step={0.5}
                   min={1}
                 />
               </div>
               <div>
                 <Label htmlFor="od">外径 OD (mm)</Label>
-                <Input
+                <NumericInput
                   id="od"
-                  type="number"
                   value={od}
-                  onChange={(e) => setOd(Number(e.target.value))}
+                  onChange={(v) => setOd(v ?? 0)}
                   step={1}
                   min={10}
                 />
               </div>
               <div>
                 <Label htmlFor="activeCoils">有效圈数 Na</Label>
-                <Input
+                <NumericInput
                   id="activeCoils"
-                  type="number"
                   value={activeCoils}
-                  onChange={(e) => setActiveCoils(Number(e.target.value))}
+                  onChange={(v) => setActiveCoils(v ?? 0)}
                   step={0.5}
                   min={1}
                 />
               </div>
               <div>
                 <Label htmlFor="freeLength">自由长度 Hf (mm)</Label>
-                <Input
+                <NumericInput
                   id="freeLength"
-                  type="number"
                   value={freeLength}
-                  onChange={(e) => setFreeLength(Number(e.target.value))}
+                  onChange={(v) => setFreeLength(v ?? 0)}
                   step={5}
                   min={10}
                 />
@@ -315,11 +312,10 @@ export function SuspensionSpringCalculator() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label htmlFor="groundTurns">磨平影响圈数 / Ground Turns</Label>
-                  <Input
+                  <NumericInput
                     id="groundTurns"
-                    type="number"
                     value={groundTurnsPerEnd}
-                    onChange={(e) => setGroundTurnsPerEnd(Number(e.target.value))}
+                    onChange={(v) => setGroundTurnsPerEnd(v ?? 0.5)}
                     step={0.25}
                     min={0.25}
                     max={1.5}
@@ -339,44 +335,40 @@ export function SuspensionSpringCalculator() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="preloadN">预载 F₀ (N)</Label>
-                <Input
+                <NumericInput
                   id="preloadN"
-                  type="number"
                   value={preloadN}
-                  onChange={(e) => setPreloadN(Number(e.target.value))}
+                  onChange={(v) => setPreloadN(v ?? 0)}
                   step={50}
                   min={0}
                 />
               </div>
               <div>
                 <Label htmlFor="rideLoadN">行驶载荷 F_ride (N)</Label>
-                <Input
+                <NumericInput
                   id="rideLoadN"
-                  type="number"
                   value={rideLoadN}
-                  onChange={(e) => setRideLoadN(Number(e.target.value))}
+                  onChange={(v) => setRideLoadN(v ?? 0)}
                   step={100}
                   min={0}
                 />
               </div>
               <div>
                 <Label htmlFor="bumpTravel">触底行程 x_bump (mm)</Label>
-                <Input
+                <NumericInput
                   id="bumpTravel"
-                  type="number"
                   value={bumpTravel}
-                  onChange={(e) => setBumpTravel(Number(e.target.value))}
+                  onChange={(v) => setBumpTravel(v ?? 0)}
                   step={5}
                   min={1}
                 />
               </div>
               <div>
                 <Label htmlFor="solidMargin">固高余量 (mm)</Label>
-                <Input
+                <NumericInput
                   id="solidMargin"
-                  type="number"
                   value={solidMargin}
-                  onChange={(e) => setSolidMargin(Number(e.target.value))}
+                  onChange={(v) => setSolidMargin(v ?? 0)}
                   step={1}
                   min={0}
                 />
@@ -423,21 +415,19 @@ export function SuspensionSpringCalculator() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label htmlFor="holeDiameter">导向孔径 (mm)</Label>
-                  <Input
+                  <NumericInput
                     id="holeDiameter"
-                    type="number"
-                    value={holeDiameter ?? ""}
-                    onChange={(e) => setHoleDiameter(e.target.value ? Number(e.target.value) : undefined)}
+                    value={holeDiameter ?? 0}
+                    onChange={(v) => setHoleDiameter(v)}
                     placeholder="可选"
                   />
                 </div>
                 <div>
                   <Label htmlFor="rodDiameter">导向杆径 (mm)</Label>
-                  <Input
+                  <NumericInput
                     id="rodDiameter"
-                    type="number"
-                    value={rodDiameter ?? ""}
-                    onChange={(e) => setRodDiameter(e.target.value ? Number(e.target.value) : undefined)}
+                    value={rodDiameter ?? 0}
+                    onChange={(v) => setRodDiameter(v)}
                     placeholder="可选"
                   />
                 </div>
@@ -461,32 +451,29 @@ export function SuspensionSpringCalculator() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label htmlFor="cornerMass">簧下质量 (kg)</Label>
-                  <Input
+                  <NumericInput
                     id="cornerMass"
-                    type="number"
-                    value={cornerMass ?? ""}
-                    onChange={(e) => setCornerMass(e.target.value ? Number(e.target.value) : undefined)}
+                    value={cornerMass ?? 0}
+                    onChange={(v) => setCornerMass(v)}
                     placeholder="可选"
                   />
                 </div>
                 <div>
                   <Label htmlFor="motionRatio">运动比 MR</Label>
-                  <Input
+                  <NumericInput
                     id="motionRatio"
-                    type="number"
                     value={motionRatio}
-                    onChange={(e) => setMotionRatio(Number(e.target.value))}
+                    onChange={(v) => setMotionRatio(v ?? 1)}
                     step={0.1}
                     min={0.1}
                   />
                 </div>
                 <div>
                   <Label htmlFor="targetFreq">目标频率 (Hz)</Label>
-                  <Input
+                  <NumericInput
                     id="targetFreq"
-                    type="number"
-                    value={targetFreq ?? ""}
-                    onChange={(e) => setTargetFreq(e.target.value ? Number(e.target.value) : undefined)}
+                    value={targetFreq ?? 0}
+                    onChange={(v) => setTargetFreq(v)}
                     placeholder="可选"
                   />
                 </div>
@@ -526,38 +513,34 @@ export function SuspensionSpringCalculator() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>端部并紧圈数</Label>
-                    <Input 
-                      type="number" 
+                    <NumericInput 
                       value={endClosedTurns} 
-                      onChange={e => setEndClosedTurns(Number(e.target.value))}
+                      onChange={v => setEndClosedTurns(v ?? 1)}
                       step={0.25}
                     />
                   </div>
                   <div>
                     <Label>过渡圈数</Label>
-                    <Input 
-                      type="number" 
+                    <NumericInput 
                       value={transitionTurns} 
-                      onChange={e => setTransitionTurns(Number(e.target.value))}
+                      onChange={v => setTransitionTurns(v ?? 0.75)}
                       step={0.25}
                     />
                   </div>
                   <div>
                     <Label>中间节距 (mm)</Label>
-                    <Input 
-                      type="number" 
-                      value={pitchCenter || ""} 
+                    <NumericInput 
+                      value={pitchCenter} 
                       placeholder="Auto"
-                      onChange={e => setPitchCenter(Number(e.target.value))}
+                      onChange={v => setPitchCenter(v ?? 0)}
                     />
                   </div>
                   <div>
                     <Label>端部节距 (mm)</Label>
-                    <Input 
-                      type="number" 
-                      value={pitchEnd || ""} 
+                    <NumericInput 
+                      value={pitchEnd} 
                       placeholder="Auto"
-                      onChange={e => setPitchEnd(Number(e.target.value))}
+                      onChange={v => setPitchEnd(v ?? 0)}
                     />
                   </div>
                 </div>
@@ -597,30 +580,27 @@ export function SuspensionSpringCalculator() {
                 <div className="grid grid-cols-2 gap-3">
                    <div>
                     <Label>起始中径 Dm_start</Label>
-                    <Input 
-                      type="number" 
+                    <NumericInput 
                       value={dmStart} 
-                      onChange={e => setDmStart(Number(e.target.value))}
+                      onChange={v => setDmStart(v ?? 0)}
                     />
                   </div>
                   
                   {diameterMode === "barrel" && (
                     <div>
                       <Label>中间中径 Dm_mid</Label>
-                      <Input 
-                        type="number" 
+                      <NumericInput 
                         value={dmMid} 
-                        onChange={e => setDmMid(Number(e.target.value))}
+                        onChange={v => setDmMid(v ?? 0)}
                       />
                     </div>
                   )}
 
                   <div>
                     <Label>结束中径 Dm_end</Label>
-                    <Input 
-                      type="number" 
+                    <NumericInput 
                       value={dmEnd} 
-                      onChange={e => setDmEnd(Number(e.target.value))}
+                      onChange={v => setDmEnd(v ?? 0)}
                     />
                   </div>
                 </div>

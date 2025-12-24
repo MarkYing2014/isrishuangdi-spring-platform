@@ -36,11 +36,15 @@ const SpiralTorsionSpringVisualizer = dynamic(
 export function Calculator3DPreview({
   expectedType,
   heightClassName = "h-[420px]",
+  geometryOverride,
 }: {
   expectedType: SpringType;
   heightClassName?: string;
+  geometryOverride?: any; // Allow passing partial/full geometry from form state
 }) {
-  const geometry = useSpringDesignStore((s) => s.geometry);
+  const storedGeometry = useSpringDesignStore((s) => s.geometry);
+  const geometry = geometryOverride ?? storedGeometry;
+  
   const material = useSpringDesignStore((s) => s.material);
   const analysis = useSpringDesignStore((s) => s.analysisResult);
 

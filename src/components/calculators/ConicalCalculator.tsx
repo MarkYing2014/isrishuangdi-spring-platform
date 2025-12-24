@@ -748,7 +748,18 @@ export function ConicalCalculator() {
               3D model uses equivalent cylindrical spring / 3D模型使用等效圆柱弹簧
             </p>
             <div className="mt-3">
-              <Calculator3DPreview expectedType="conical" />
+              <Calculator3DPreview 
+                expectedType="conical" 
+                geometryOverride={{
+                  type: "conical",
+                  wireDiameter: watchedValues.wireDiameter ?? 3,
+                  largeOuterDiameter: watchedValues.largeDiameter ?? 30,
+                  smallOuterDiameter: watchedValues.smallDiameter ?? 15,
+                  activeCoils: watchedValues.activeCoils ?? 6,
+                  freeLength: watchedValues.freeLength ?? 50,
+                  shearModulus: watchedValues.shearModulus ?? 79300,
+                }}
+              />
             </div>
           </div>
         </CardContent>

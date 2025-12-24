@@ -12,7 +12,8 @@
  */
 
 import { useState, useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
+import { NumericInput } from "@/components/ui/numeric-input";
 
 import { buildTorsionDesignRuleReport } from "@/lib/designRules";
 import { Button } from "@/components/ui/button";
@@ -268,6 +269,7 @@ export function TorsionCalculator() {
   const [materialId, setMaterialId] = useState<SpringMaterialId>(
     storedMaterial?.id ?? "music_wire_a228"
   );
+  const selectedMaterial = getSpringMaterial(materialId);
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -451,25 +453,73 @@ export function TorsionCalculator() {
             <div className="space-y-2">
               <DimensionHint code="d" label="Wire Diameter" description="线径，弹簧钢丝的直径。" />
               <Label htmlFor="wireDiameter">Wire Diameter d (mm) / 线径</Label>
-              <Input id="wireDiameter" type="number" step="0.01" {...form.register("wireDiameter", { valueAsNumber: true })} />
+              <Controller
+                control={form.control}
+                name="wireDiameter"
+                render={({ field }) => (
+                  <NumericInput
+                    id="wireDiameter"
+                    step={0.01}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
+              />
             </div>
 
             {/* Outer Diameter */}
             <div className="space-y-2">
               <DimensionHint code="Do" label="Outer Diameter" description="外径，线圈外缘到外缘。" />
               <Label htmlFor="outerDiameter">Outer Diameter Do (mm) / 外径</Label>
-              <Input id="outerDiameter" type="number" step="0.1" {...form.register("outerDiameter", { valueAsNumber: true })} />
+              <Controller
+                control={form.control}
+                name="outerDiameter"
+                render={({ field }) => (
+                  <NumericInput
+                    id="outerDiameter"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
+              />
             </div>
 
             {/* Coils */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="totalCoils">Total Coils N / 总圈数</Label>
-                <Input id="totalCoils" type="number" step="0.25" {...form.register("totalCoils", { valueAsNumber: true })} />
+                <Controller
+                  control={form.control}
+                  name="totalCoils"
+                  render={({ field }) => (
+                    <NumericInput
+                      id="totalCoils"
+                      step={0.25}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                    />
+                  )}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="activeCoils">Active Coils Na / 有效圈数</Label>
-                <Input id="activeCoils" type="number" step="0.25" {...form.register("activeCoils", { valueAsNumber: true })} />
+                <Controller
+                  control={form.control}
+                  name="activeCoils"
+                  render={({ field }) => (
+                    <NumericInput
+                      id="activeCoils"
+                      step={0.25}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                    />
+                  )}
+                />
               </div>
             </div>
 
@@ -478,12 +528,36 @@ export function TorsionCalculator() {
               <div className="space-y-2">
                 <DimensionHint code="a1" label="Arm Length 1" description="臂长1，第一个脚的长度。" />
                 <Label htmlFor="armLength1">Arm 1 a1 (mm) / 臂长1</Label>
-                <Input id="armLength1" type="number" step="0.1" {...form.register("armLength1", { valueAsNumber: true })} />
+                <Controller
+                  control={form.control}
+                  name="armLength1"
+                  render={({ field }) => (
+                    <NumericInput
+                      id="armLength1"
+                      step={0.1}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                    />
+                  )}
+                />
               </div>
               <div className="space-y-2">
                 <DimensionHint code="a2" label="Arm Length 2" description="臂长2，第二个脚的长度。" />
                 <Label htmlFor="armLength2">Arm 2 a2 (mm) / 臂长2</Label>
-                <Input id="armLength2" type="number" step="0.1" {...form.register("armLength2", { valueAsNumber: true })} />
+                <Controller
+                  control={form.control}
+                  name="armLength2"
+                  render={({ field }) => (
+                    <NumericInput
+                      id="armLength2"
+                      step={0.1}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                    />
+                  )}
+                />
               </div>
             </div>
 
@@ -491,7 +565,19 @@ export function TorsionCalculator() {
             <div className="space-y-2">
               <DimensionHint code="R" label="Load Radius" description="负载作用半径，力臂长度。" />
               <Label htmlFor="loadRadius">Load Radius R (mm) / 负载作用半径</Label>
-              <Input id="loadRadius" type="number" step="0.1" {...form.register("loadRadius", { valueAsNumber: true })} />
+              <Controller
+                control={form.control}
+                name="loadRadius"
+                render={({ field }) => (
+                  <NumericInput
+                    id="loadRadius"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
+              />
             </div>
 
             {/* Body Length & Pitch */}
@@ -499,12 +585,36 @@ export function TorsionCalculator() {
               <div className="space-y-2">
                 <DimensionHint code="Lmo" label="Body Length" description="簧体长度。" />
                 <Label htmlFor="bodyLength">Body Length Lmo (mm) / 簧体长度</Label>
-                <Input id="bodyLength" type="number" step="0.1" {...form.register("bodyLength", { valueAsNumber: true })} />
+                <Controller
+                  control={form.control}
+                  name="bodyLength"
+                  render={({ field }) => (
+                    <NumericInput
+                      id="bodyLength"
+                      step={0.1}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                    />
+                  )}
+                />
               </div>
               <div className="space-y-2">
                 <DimensionHint code="p" label="Pitch" description="节距，≥线径。" />
                 <Label htmlFor="pitch">Pitch p (mm) / 节距</Label>
-                <Input id="pitch" type="number" step="0.1" {...form.register("pitch", { valueAsNumber: true })} />
+                <Controller
+                  control={form.control}
+                  name="pitch"
+                  render={({ field }) => (
+                    <NumericInput
+                      id="pitch"
+                      step={0.1}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                    />
+                  )}
+                />
               </div>
             </div>
 
@@ -513,12 +623,38 @@ export function TorsionCalculator() {
               <div className="space-y-2">
                 <DimensionHint code="θdi" label="Install Angle" description="装置扭转角度，初始安装时的扭转角。" />
                 <Label htmlFor="installAngle">Install Angle θdi (°) / 装置扭转角</Label>
-                <Input id="installAngle" type="number" step="1" {...form.register("installAngle", { valueAsNumber: true })} />
+                <Controller
+                  control={form.control}
+                  name="installAngle"
+                  render={({ field }) => (
+                    <NumericInput
+                      id="installAngle"
+                      step={1}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      decimalScale={0}
+                    />
+                  )}
+                />
               </div>
               <div className="space-y-2">
                 <DimensionHint code="θdo" label="Working Angle" description="作用扭转角度，工作时的扭转角。" />
                 <Label htmlFor="workingAngle">Working Angle θdo (°) / 作用扭转角</Label>
-                <Input id="workingAngle" type="number" step="1" {...form.register("workingAngle", { valueAsNumber: true })} />
+                <Controller
+                  control={form.control}
+                  name="workingAngle"
+                  render={({ field }) => (
+                    <NumericInput
+                      id="workingAngle"
+                      step={1}
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      decimalScale={0}
+                    />
+                  )}
+                />
               </div>
             </div>
 
@@ -711,7 +847,21 @@ export function TorsionCalculator() {
           <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">3D Preview / 3D 预览</p>
             <div className="mt-3">
-              <Calculator3DPreview expectedType="torsion" />
+              <Calculator3DPreview 
+                expectedType="torsion" 
+                geometryOverride={{
+                  type: "torsion",
+                  wireDiameter: watchedValues.wireDiameter ?? 2,
+                  meanDiameter: watchedValues.outerDiameter ? (watchedValues.outerDiameter - (watchedValues.wireDiameter ?? 2)) : 18,
+                  activeCoils: watchedValues.activeCoils ?? 5,
+                  bodyLength: watchedValues.bodyLength ?? 10,
+                  shearModulus: selectedMaterial?.elasticModulus ?? 207000, 
+                  legLength1: watchedValues.armLength1 ?? 20,
+                  legLength2: watchedValues.armLength2 ?? 20,
+                  windingDirection: watchedValues.handOfCoil ?? "right",
+                  freeAngle: watchedValues.installAngle ?? 90, 
+                }}
+              />
             </div>
           </div>
         </CardContent>

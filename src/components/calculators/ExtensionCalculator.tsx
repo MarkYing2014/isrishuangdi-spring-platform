@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from "react";
-import { type SubmitHandler, useForm } from "react-hook-form";
+import { type SubmitHandler, useForm, Controller } from "react-hook-form";
+import { NumericInput } from "@/components/ui/numeric-input";
 
 import { calculateExtensionSpring, type ExtensionSpringInput } from "@/lib/springMath";
 import { buildExtensionDesignRuleReport } from "@/lib/designRules";
@@ -331,7 +332,9 @@ export function ExtensionCalculator() {
           </div>
         </CardHeader>
         <CardContent>
+
           <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+
             {/* Outer Diameter */}
             <div className="space-y-2">
               <DimensionHint
@@ -340,11 +343,18 @@ export function ExtensionCalculator() {
                 description="外径，从线圈外缘到外缘的距离。"
               />
               <Label htmlFor="outerDiameter">Outer Diameter OD (mm) / 外径</Label>
-              <Input
-                id="outerDiameter"
-                type="number"
-                step="0.1"
-                {...form.register("outerDiameter", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="outerDiameter"
+                render={({ field }) => (
+                  <NumericInput
+                    id="outerDiameter"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 
@@ -356,11 +366,18 @@ export function ExtensionCalculator() {
                 description="线径，弹簧钢丝的直径。"
               />
               <Label htmlFor="wireDiameter">Wire Diameter d (mm) / 线径</Label>
-              <Input
-                id="wireDiameter"
-                type="number"
-                step="0.01"
-                {...form.register("wireDiameter", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="wireDiameter"
+                render={({ field }) => (
+                  <NumericInput
+                    id="wireDiameter"
+                    step={0.01}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 
@@ -372,11 +389,18 @@ export function ExtensionCalculator() {
                 description="有效圈数，参与弹性变形的线圈数量。"
               />
               <Label htmlFor="activeCoils">Active Coils Na / 有效圈数</Label>
-              <Input
-                id="activeCoils"
-                type="number"
-                step="0.5"
-                {...form.register("activeCoils", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="activeCoils"
+                render={({ field }) => (
+                  <NumericInput
+                    id="activeCoils"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 
@@ -385,11 +409,19 @@ export function ExtensionCalculator() {
             {/* Shear Modulus */}
             <div className="space-y-2">
               <Label htmlFor="shearModulus">Shear Modulus G (MPa) / 剪切模量</Label>
-              <Input
-                id="shearModulus"
-                type="number"
-                step="100"
-                {...form.register("shearModulus", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="shearModulus"
+                render={({ field }) => (
+                  <NumericInput
+                    id="shearModulus"
+                    step={100}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    decimalScale={0}
+                  />
+                )}
               />
             </div>
 
@@ -401,11 +433,18 @@ export function ExtensionCalculator() {
                 description="弹簧本体长度，不含钩子的线圈部分。"
               />
               <Label htmlFor="bodyLength">Body Length Lb (mm) / 本体长度 <span className="text-slate-400">(reference)</span></Label>
-              <Input
-                id="bodyLength"
-                type="number"
-                step="0.1"
-                {...form.register("bodyLength", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="bodyLength"
+                render={({ field }) => (
+                  <NumericInput
+                    id="bodyLength"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 
@@ -417,11 +456,18 @@ export function ExtensionCalculator() {
                 description="钩内自由长度，钩内到钩内的距离。"
               />
               <Label htmlFor="freeLengthInsideHooks">Free Length Inside Hooks Lᵢ (mm) / 钩内自由长度 <span className="text-slate-400">(reference)</span></Label>
-              <Input
-                id="freeLengthInsideHooks"
-                type="number"
-                step="0.1"
-                {...form.register("freeLengthInsideHooks", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="freeLengthInsideHooks"
+                render={({ field }) => (
+                  <NumericInput
+                    id="freeLengthInsideHooks"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 
@@ -433,11 +479,18 @@ export function ExtensionCalculator() {
                 description="初拉力，弹簧开始伸长前需要克服的预紧力。"
               />
               <Label htmlFor="initialTension">Initial Tension Fᵢ (N) / 初拉力 <span className="text-slate-400">(optional, default 0)</span></Label>
-              <Input
-                id="initialTension"
-                type="number"
-                step="0.1"
-                {...form.register("initialTension", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="initialTension"
+                render={({ field }) => (
+                  <NumericInput
+                    id="initialTension"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 
@@ -465,11 +518,18 @@ export function ExtensionCalculator() {
                 description="工作伸长量，从自由长度拉伸的行程。"
               />
               <Label htmlFor="workingDeflection">Working Deflection Δx (mm) / 工作伸长量</Label>
-              <Input
-                id="workingDeflection"
-                type="number"
-                step="0.1"
-                {...form.register("workingDeflection", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="workingDeflection"
+                render={({ field }) => (
+                  <NumericInput
+                    id="workingDeflection"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 
@@ -565,7 +625,20 @@ export function ExtensionCalculator() {
           <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">3D Preview / 3D 预览</p>
             <div className="mt-3">
-              <Calculator3DPreview expectedType="extension" />
+              <Calculator3DPreview 
+                expectedType="extension" 
+                geometryOverride={{
+                  type: "extension",
+                  wireDiameter: watchedValues.wireDiameter ?? 2,
+                  outerDiameter: watchedValues.outerDiameter ?? 20,
+                  activeCoils: watchedValues.activeCoils ?? 10,
+                  freeLength: watchedValues.bodyLength ?? 40, // Body length for preview
+                  shearModulus: watchedValues.shearModulus ?? 79300,
+                  hookType: watchedValues.hookType ?? "loop",
+                  initialTension: watchedValues.initialTension ?? 0,
+                  bodyLength: watchedValues.bodyLength ?? 40,
+                }}
+              />
             </div>
           </div>
         </CardContent>

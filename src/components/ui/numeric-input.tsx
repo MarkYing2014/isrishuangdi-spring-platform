@@ -46,7 +46,28 @@ const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
     }, [value]);
 
     const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-      setStrVal(e.target.value);
+      const newVal = e.target.value;
+      setStrVal(newVal);
+
+      // Try to parse and update parent immediately
+      // This ensures 'Enter' key submits or other non-blur actions use the current value
+      if (newVal.trim() === "") {
+        if (allowEmpty) {
+          onChange(undefined);
+        }
+        // If not allowEmpty, we don't update parent to undefined/0 yet, wait for blur? 
+        // Or we update to 0? Let's mimic handleBlur logic but be careful not to annoy user.
+        // Actually, for empty string while typing, it's safer NOT to fire onChange(0) 
+        // because it might trigger validation errors prematurely.
+        // But for allowEmpty, it's fine.
+        return;
+      }
+
+      const val = parseFloat(newVal);
+      if (!Number.isNaN(val)) {
+        // Valid number, update parent
+        onChange(val);
+      }
     };
 
     const handleBlur = (e: FocusEvent<HTMLInputElement>) => {

@@ -954,7 +954,18 @@ export function CompressionCalculator() {
           <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">3D Preview / 3D 预览</p>
             <div className="mt-3">
-              <Calculator3DPreview expectedType="compression" />
+              <Calculator3DPreview 
+                expectedType="compression" 
+                geometryOverride={{
+                  type: "compression",
+                  wireDiameter: watchedValues.wireDiameter ?? 3.2,
+                  meanDiameter: watchedValues.meanDiameter ?? 24,
+                  activeCoils: watchedValues.activeCoils ?? 8,
+                  totalCoils: watchedValues.totalCoils ?? 10,
+                  freeLength: watchedValues.freeLength ?? 50,
+                  shearModulus: watchedValues.shearModulus ?? 79300,
+                }}
+              />
             </div>
           </div>
         </CardContent>

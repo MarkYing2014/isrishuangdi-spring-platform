@@ -32,12 +32,13 @@
  */
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { DimensionHint } from "./DimensionHint";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
@@ -744,15 +745,19 @@ export function SpiralTorsionCalculator() {
                 <div className="space-y-2">
                   <DimensionHint code="b" label="Strip Width" description="带材宽度，弹簧的轴向尺寸。" />
                   <Label htmlFor="stripWidth">Width b (mm) / 带材宽度</Label>
-                  <Input
-                    id="stripWidth"
-                    type="number"
-                    step="0.1"
-                    {...form.register("stripWidth", {
-                      valueAsNumber: true,
-                      required: "b is required",
-                      min: { value: 0.001, message: "b must be > 0" },
-                    })}
+                  <Controller
+                    control={form.control}
+                    name="stripWidth"
+                    rules={{ required: "b is required", min: { value: 0.001, message: "b must be > 0" } }}
+                    render={({ field }) => (
+                      <NumericInput
+                        id="stripWidth"
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        step={0.1}
+                      />
+                    )}
                   />
                   {errors.stripWidth?.message && (
                     <p className="text-xs text-red-600 dark:text-red-300">{String(errors.stripWidth.message)}</p>
@@ -761,15 +766,19 @@ export function SpiralTorsionCalculator() {
                 <div className="space-y-2">
                   <DimensionHint code="t" label="Strip Thickness" description="带材厚度，影响刚度和应力。" />
                   <Label htmlFor="stripThickness">Thickness t (mm) / 带材厚度</Label>
-                  <Input
-                    id="stripThickness"
-                    type="number"
-                    step="0.01"
-                    {...form.register("stripThickness", {
-                      valueAsNumber: true,
-                      required: "t is required",
-                      min: { value: 0.001, message: "t must be > 0" },
-                    })}
+                  <Controller
+                    control={form.control}
+                    name="stripThickness"
+                    rules={{ required: "t is required", min: { value: 0.001, message: "t must be > 0" } }}
+                    render={({ field }) => (
+                      <NumericInput
+                        id="stripThickness"
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        step={0.01}
+                      />
+                    )}
                   />
                   {errors.stripThickness?.message && (
                     <p className="text-xs text-red-600 dark:text-red-300">{String(errors.stripThickness.message)}</p>
@@ -791,15 +800,19 @@ export function SpiralTorsionCalculator() {
               <div className="space-y-2">
                 <DimensionHint code="L" label="Active Length" description="有效带材长度，用于扭矩计算。这是关键参数，直接影响刚度。" />
                 <Label htmlFor="activeLength">Active Length L (mm) / 有效带材长度 ⭐</Label>
-                <Input
-                  id="activeLength"
-                  type="number"
-                  step="1"
-                  {...form.register("activeLength", {
-                    valueAsNumber: true,
-                    required: "L is required",
-                    min: { value: 0.1, message: "L must be > 0" },
-                  })}
+                <Controller
+                  control={form.control}
+                  name="activeLength"
+                  rules={{ required: "L is required", min: { value: 0.1, message: "L must be > 0" } }}
+                  render={({ field }) => (
+                    <NumericInput
+                      id="activeLength"
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      step={1}
+                    />
+                  )}
                 />
                 {errors.activeLength?.message && (
                   <p className="text-xs text-red-600 dark:text-red-300">{String(errors.activeLength.message)}</p>
@@ -812,19 +825,55 @@ export function SpiralTorsionCalculator() {
                 <div className="space-y-2">
                   <DimensionHint code="Di" label="Inner Diameter" description="内径，仅用于空间校核，不参与扭矩计算。" />
                   <Label htmlFor="innerDiameter" className="text-muted-foreground">Inner Dia Di (mm) / 内径 (空间校核)</Label>
-                  <Input id="innerDiameter" type="number" step="0.1" {...form.register("innerDiameter", { valueAsNumber: true })} />
+                  <Controller
+                    control={form.control}
+                    name="innerDiameter"
+                    render={({ field }) => (
+                      <NumericInput
+                        id="innerDiameter"
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        step={0.1}
+                      />
+                    )}
+                  />
                 </div>
                 <div className="space-y-2">
                   <DimensionHint code="Do" label="Outer Diameter" description="外径，仅用于空间校核，不参与扭矩计算。" />
                   <Label htmlFor="outerDiameter" className="text-muted-foreground">Outer Dia Do (mm) / 外径 (空间校核)</Label>
-                  <Input id="outerDiameter" type="number" step="0.1" {...form.register("outerDiameter", { valueAsNumber: true })} />
+                  <Controller
+                    control={form.control}
+                    name="outerDiameter"
+                    render={({ field }) => (
+                      <NumericInput
+                        id="outerDiameter"
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        step={0.1}
+                      />
+                    )}
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <DimensionHint code="Na" label="Active Coils" description="有效圈数，仅用于参考。" />
                 <Label htmlFor="activeCoils" className="text-muted-foreground">Active Coils Na / 有效圈数 (参考)</Label>
-                <Input id="activeCoils" type="number" step="0.5" {...form.register("activeCoils", { valueAsNumber: true })} />
+                <Controller
+                  control={form.control}
+                  name="activeCoils"
+                  render={({ field }) => (
+                    <NumericInput
+                      id="activeCoils"
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      step={0.5}
+                    />
+                  )}
+                />
               </div>
             </div>
 
@@ -845,7 +894,20 @@ export function SpiralTorsionCalculator() {
               <div className="space-y-2">
                 <DimensionHint code="θ0" label="Preload Angle" description="初始预紧角，安装时的预扭转角度。" />
                 <Label htmlFor="preloadAngle">Preload Angle θ0 (°) / 预紧角</Label>
-                <Input id="preloadAngle" type="number" step="1" {...form.register("preloadAngle", { valueAsNumber: true })} />
+                <Controller
+                  control={form.control}
+                  name="preloadAngle"
+                  render={({ field }) => (
+                    <NumericInput
+                      id="preloadAngle"
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      step={1}
+                      decimalScale={0}
+                    />
+                  )}
+                />
                 {/* 实时显示 revolution 换算 */}
                 <p className="text-xs text-muted-foreground">
                   = {((watchedValues.preloadAngle ?? 0) / 360).toFixed(3)} revolution
@@ -856,15 +918,23 @@ export function SpiralTorsionCalculator() {
                 <div className="space-y-2">
                   <DimensionHint code="θmin" label="Min Working Angle" description="最小工作角度，相对中性位。" />
                   <Label htmlFor="minWorkingAngle">Min Angle θmin (°) / 最小角度</Label>
-                  <Input
-                    id="minWorkingAngle"
-                    type="number"
-                    step="1"
-                    {...form.register("minWorkingAngle", {
-                      valueAsNumber: true,
+                  <Controller
+                    control={form.control}
+                    name="minWorkingAngle"
+                    rules={{
                       validate: (v) =>
                         !isFinite(v) || v <= (form.getValues("maxWorkingAngle") ?? v) || "θmin must be ≤ θmax",
-                    })}
+                    }}
+                    render={({ field }) => (
+                      <NumericInput
+                        id="minWorkingAngle"
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        step={1}
+                        decimalScale={0}
+                      />
+                    )}
                   />
                   {errors.minWorkingAngle?.message && (
                     <p className="text-xs text-red-600 dark:text-red-300">{String(errors.minWorkingAngle.message)}</p>
@@ -876,15 +946,23 @@ export function SpiralTorsionCalculator() {
                 <div className="space-y-2">
                   <DimensionHint code="θmax" label="Max Working Angle" description="最大工作角度，相对中性位。" />
                   <Label htmlFor="maxWorkingAngle">Max Angle θmax (°) / 最大角度</Label>
-                  <Input
-                    id="maxWorkingAngle"
-                    type="number"
-                    step="1"
-                    {...form.register("maxWorkingAngle", {
-                      valueAsNumber: true,
+                  <Controller
+                    control={form.control}
+                    name="maxWorkingAngle"
+                    rules={{
                       validate: (v) =>
                         !isFinite(v) || v >= (form.getValues("minWorkingAngle") ?? v) || "θmax must be ≥ θmin",
-                    })}
+                    }}
+                    render={({ field }) => (
+                      <NumericInput
+                        id="maxWorkingAngle"
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        step={1}
+                        decimalScale={0}
+                      />
+                    )}
                   />
                   {errors.maxWorkingAngle?.message && (
                     <p className="text-xs text-red-600 dark:text-red-300">{String(errors.maxWorkingAngle.message)}</p>
@@ -988,15 +1066,20 @@ export function SpiralTorsionCalculator() {
                   <div className="space-y-2">
                     <DimensionHint code="θco" label="Close-out Angle" description="close-out起点角，圈间开始接触的角度。PDF建议：线性区约1圈(360°)。" />
                     <Label htmlFor="closeOutAngle">Close-out Angle θco (°) / 贴合起点角</Label>
-                    <Input
-                      id="closeOutAngle"
-                      type="number"
-                      step="1"
-                      {...form.register("closeOutAngle", {
-                        valueAsNumber: true,
-                        required: "θco is required",
-                        min: { value: 1, message: "θco must be > 0" },
-                      })}
+                    <Controller
+                      control={form.control}
+                      name="closeOutAngle"
+                      rules={{ required: "θco is required", min: { value: 1, message: "θco must be > 0" } }}
+                      render={({ field }) => (
+                        <NumericInput
+                          id="closeOutAngle"
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          step={1}
+                          decimalScale={0}
+                        />
+                      )}
                     />
                     {errors.closeOutAngle?.message && (
                       <p className="text-xs text-red-600 dark:text-red-300">{String(errors.closeOutAngle.message)}</p>
@@ -1025,14 +1108,19 @@ export function SpiralTorsionCalculator() {
                     
                     <div className="space-y-2">
                       <Label htmlFor="allowableStressOverride" className="text-xs">Override σ_allow (MPa) / 覆盖许用应力</Label>
-                      <Input 
-                        id="allowableStressOverride" 
-                        type="number" 
-                        step="10" 
-                        placeholder="留空使用设计准则计算"
-                        {...form.register("allowableStressOverride", { 
-                          setValueAs: (v) => v === "" ? null : Number(v)
-                        })} 
+                      <Controller
+                        control={form.control}
+                        name="allowableStressOverride"
+                        render={({ field }) => (
+                          <NumericInput
+                            id="allowableStressOverride"
+                            value={field.value ?? undefined}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            step={10}
+                            placeholder="留空使用设计准则计算"
+                          />
+                        )}
                       />
                       <p className="text-xs text-blue-200">留空则根据材料和设计准则自动计算</p>
                     </div>
@@ -1333,7 +1421,20 @@ export function SpiralTorsionCalculator() {
           <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">3D Preview / 3D 预览</p>
             <div className="mt-3">
-              <Calculator3DPreview expectedType="spiralTorsion" />
+            <div className="mt-3">
+              <Calculator3DPreview 
+                expectedType="spiralTorsion" 
+                geometryOverride={{
+                  type: "spiralTorsion",
+                  innerDiameter: watchedValues.innerDiameter ?? 10,
+                  outerDiameter: watchedValues.outerDiameter ?? 30,
+                  activeCoils: watchedValues.activeCoils ?? 5,
+                  stripWidth: watchedValues.stripWidth ?? 10,
+                  stripThickness: watchedValues.stripThickness ?? 0.5,
+                  windingDirection: watchedValues.windingDirection ?? "cw",
+                }}
+              />
+            </div>
             </div>
           </div>
         </CardContent>
