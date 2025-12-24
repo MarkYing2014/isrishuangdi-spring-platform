@@ -27,6 +27,8 @@ interface InteractiveForceChartProps {
   lineColor?: string;
   markerColor?: string;
   showMarker?: boolean;
+  xAxisMode?: "deflection" | "height";
+  freeLength?: number;
 }
 
 /**
@@ -61,6 +63,8 @@ export function InteractiveForceChart({
   lineColor = "#3b82f6",
   markerColor = "#ef4444",
   showMarker = true,
+  xAxisMode = "deflection",
+  freeLength,
 }: InteractiveForceChartProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -101,19 +105,38 @@ export function InteractiveForceChart({
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const xLabel: any = xAxisMode === "height" 
+    ? { value: "Height (mm)", position: "insideBottom", offset: -10 } 
+    : { value: xAxisLabel, position: "insideBottom", offset: -10 };
+
+  const chartData = data.map(p => ({
+    ...p,
+    height: freeLength !== undefined ? freeLength - p.deflection : undefined
+  }));
+  const xKey = xAxisMode === "height" && freeLength !== undefined ? "height" : "deflection";
+  
+  const currentPointMapped = currentPoint ? {
+    ...currentPoint,
+    height: freeLength !== undefined ? freeLength - currentPoint.deflection : undefined
+  } : null;
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       <LineChart
-        data={data}
+        data={chartData}
         margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
         onClick={handleChartClick}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
         <XAxis
-          dataKey="deflection"
-          label={{ value: xAxisLabel, position: "insideBottom", offset: -10 }}
+          dataKey={xKey}
+          label={xLabel}
           tick={{ fontSize: 12 }}
           stroke="#64748b"
+          reversed={xAxisMode === "height"}
+          type="number"
+          domain={xAxisMode === "height" ? ['auto', 'auto'] : [0, 'auto']}
         />
         <YAxis
           dataKey="load"
@@ -129,7 +152,11 @@ export function InteractiveForceChart({
             fontSize: "12px",
           }}
           formatter={(value: number) => [`${value.toFixed(2)} N`, "Force"]}
-          labelFormatter={(label: number) => `Deflection: ${label.toFixed(2)} mm`}
+          labelFormatter={(label: number) => 
+             xAxisMode === "height" 
+               ? `Height: ${label.toFixed(2)} mm` 
+               : `Deflection: ${label.toFixed(2)} mm`
+          }
         />
         <Line
           type="monotone"
@@ -141,9 +168,9 @@ export function InteractiveForceChart({
         />
 
         {/* Vertical reference line at current deflection */}
-        {showMarker && currentPoint && (
+        {showMarker && currentPointMapped && (
           <ReferenceLine
-            x={currentPoint.deflection}
+            x={xAxisMode === "height" ? currentPointMapped.height : currentPointMapped.deflection}
             stroke={markerColor}
             strokeWidth={1.5}
             strokeDasharray="4 4"
@@ -151,10 +178,10 @@ export function InteractiveForceChart({
         )}
 
         {/* Marker dot at current point */}
-        {showMarker && currentPoint && (
+        {showMarker && currentPointMapped && (
           <ReferenceDot
-            x={currentPoint.deflection}
-            y={currentPoint.load}
+            x={xAxisMode === "height" ? currentPointMapped.height : currentPointMapped.deflection}
+            y={currentPointMapped.load}
             r={6}
             fill={markerColor}
             stroke="#fff"

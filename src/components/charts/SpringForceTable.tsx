@@ -14,6 +14,7 @@ interface SpringForceTableProps {
   currentDeflection: number;
   onRowClick?: (deflection: number) => void;
   maxHeight?: string;
+  freeLength?: number;
 }
 
 export function SpringForceTable({
@@ -21,10 +22,12 @@ export function SpringForceTable({
   currentDeflection,
   onRowClick,
   maxHeight = "max-h-64",
+  freeLength,
 }: SpringForceTableProps) {
   const { language } = useLanguage();
   const isZh = language === "zh";
   const deflectionLabel = isZh ? "位移 (mm)" : "Deflection (mm)";
+  const heightLabel = isZh ? "剩余高度 (mm)" : "Remaining Height (mm)";
   const forceLabel = isZh ? "载荷 (N)" : "Force (N)";
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -46,8 +49,7 @@ export function SpringForceTable({
     return nearestIdx;
   }, [data, currentDeflection]);
 
-  // Auto-scroll to the highlighted row within the table container only
-  // This prevents the page from scrolling when the slider is moved
+  // Auto-scroll to the highlighted row
   useEffect(() => {
     if (nearestIndex >= 0 && tableRef.current) {
       const container = tableRef.current;
@@ -55,29 +57,17 @@ export function SpringForceTable({
       const targetRow = rows[nearestIndex] as HTMLElement;
       
       if (targetRow) {
-        // Calculate scroll position within the container
         const containerRect = container.getBoundingClientRect();
-        const rowRect = targetRow.getBoundingClientRect();
-        
-        // Only scroll if the row is outside the visible area of the container
+        // const rowRect = targetRow.getBoundingClientRect();
         const rowTop = targetRow.offsetTop;
         const rowHeight = targetRow.offsetHeight;
         const containerScrollTop = container.scrollTop;
         const containerHeight = container.clientHeight;
         
-        // Check if row is above visible area
         if (rowTop < containerScrollTop) {
-          container.scrollTo({
-            top: rowTop - rowHeight,
-            behavior: "smooth",
-          });
-        }
-        // Check if row is below visible area
-        else if (rowTop + rowHeight > containerScrollTop + containerHeight) {
-          container.scrollTo({
-            top: rowTop - containerHeight + rowHeight * 2,
-            behavior: "smooth",
-          });
+          container.scrollTo({ top: rowTop - rowHeight, behavior: "smooth" });
+        } else if (rowTop + rowHeight > containerScrollTop + containerHeight) {
+          container.scrollTo({ top: rowTop - containerHeight + rowHeight * 2, behavior: "smooth" });
         }
       }
     }
@@ -99,6 +89,7 @@ export function SpringForceTable({
         <thead className="bg-slate-100 text-left sticky top-0 z-10">
           <tr>
             <th className="px-4 py-2 font-medium">{deflectionLabel}</th>
+            {freeLength !== undefined && <th className="px-4 py-2 font-medium">{heightLabel}</th>}
             <th className="px-4 py-2 font-medium">{forceLabel}</th>
           </tr>
         </thead>
@@ -123,6 +114,11 @@ export function SpringForceTable({
                     <span className="ml-2 text-xs text-blue-500">◀</span>
                   )}
                 </td>
+                {freeLength !== undefined && (
+                  <td className={cn("px-4 py-2", isHighlighted && "text-blue-700 font-medium")}>
+                    {formatNumber(freeLength - row.deflection)}
+                  </td>
+                )}
                 <td className={cn("px-4 py-2", isHighlighted && "text-blue-700 font-medium")}>
                   {formatNumber(row.load)}
                 </td>

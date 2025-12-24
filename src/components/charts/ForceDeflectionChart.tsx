@@ -19,9 +19,11 @@ export interface ForceDeflectionPoint {
 
 interface Props {
   data: ForceDeflectionPoint[];
+  xAxisMode?: "deflection" | "height";
+  freeLength?: number;
 }
 
-export function ForceDeflectionChart({ data }: Props) {
+export function ForceDeflectionChart({ data, xAxisMode = "deflection", freeLength }: Props) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -44,15 +46,29 @@ export function ForceDeflectionChart({ data }: Props) {
     );
   }
 
+  const chartData = data.map(p => ({
+    ...p,
+    height: freeLength !== undefined ? freeLength - p.deflection : undefined
+  }));
+
+  const xKey = xAxisMode === "height" && freeLength !== undefined ? "height" : "deflection";
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const xLabel: any = xAxisMode === "height" 
+    ? { value: "Height (mm)", position: "insideBottom", offset: -10 } 
+    : { value: "Deflection (mm)", position: "insideBottom", offset: -10 };
+
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+      <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
         <XAxis
-          dataKey="deflection"
-          label={{ value: "Deflection (mm)", position: "insideBottom", offset: -10 }}
+          dataKey={xKey}
+          type="number"
+          label={xLabel}
           tick={{ fontSize: 12 }}
           stroke="#64748b"
+          reversed={xAxisMode === "height"}
+          domain={xAxisMode === "height" ? ['auto', 'auto'] : [0, 'auto']}
         />
         <YAxis
           dataKey="load"
@@ -68,7 +84,11 @@ export function ForceDeflectionChart({ data }: Props) {
             fontSize: "12px",
           }}
           formatter={(value: number) => [`${value.toFixed(2)} N`, "Force"]}
-          labelFormatter={(label: number) => `Deflection: ${label.toFixed(2)} mm`}
+          labelFormatter={(label: number) => 
+            xAxisMode === "height" 
+              ? `Height: ${label.toFixed(2)} mm` 
+              : `Deflection: ${label.toFixed(2)} mm`
+          }
         />
         <Line
           type="monotone"

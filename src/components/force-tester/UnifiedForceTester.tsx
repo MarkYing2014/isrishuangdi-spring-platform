@@ -16,6 +16,7 @@ import {
   SNcurveChart,
   StressDeflectionChart,
 } from "@/components/charts";
+import { Label } from "@/components/ui/label";
 
 import { SpringAnalysisEngine } from "@/lib/engine/SpringAnalysisEngine";
 import type {
@@ -68,6 +69,7 @@ export function UnifiedForceTester({
 
   // Current deflection state
   const [currentDeflection, setCurrentDeflection] = useState(0);
+  const [chartXMode, setChartXMode] = useState<"deflection" | "height">("deflection");
 
   // Run analysis
   const analysisResult = useMemo(() => {
@@ -141,6 +143,15 @@ export function UnifiedForceTester({
     if (n >= 1e3) return `${(n / 1e3).toFixed(1)}k`;
     return n.toString();
   };
+
+  // Determine Free Length for Height mode
+  const freeLength = useMemo(() => {
+    if (geometry.type === "compression" || geometry.type === "conical") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (geometry as any).freeLength as number;
+    }
+    return undefined;
+  }, [geometry]);
 
   const getSafetyColor = (status: "safe" | "warning" | "danger") => {
     switch (status) {
@@ -318,17 +329,41 @@ export function UnifiedForceTester({
           <Card>
             <CardContent className="pt-4">
               <Tabs defaultValue="force" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="force">
-                    {isZh ? "力-位移" : "F-Δx"}
-                  </TabsTrigger>
-                  <TabsTrigger value="stress">
-                    {isZh ? "应力" : "Stress"}
-                  </TabsTrigger>
-                  <TabsTrigger value="fatigue">
-                    {isZh ? "S-N 曲线" : "S-N Curve"}
-                  </TabsTrigger>
-                </TabsList>
+                <div className="flex items-center justify-between mb-2">
+                  <TabsList className="grid w-fit grid-cols-3">
+                    <TabsTrigger value="force">
+                      {isZh ? "力-位移" : "F-Δx"}
+                    </TabsTrigger>
+                    <TabsTrigger value="stress">
+                      {isZh ? "应力" : "Stress"}
+                    </TabsTrigger>
+                    <TabsTrigger value="fatigue">
+                      {isZh ? "S-N 曲线" : "S-N Curve"}
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* Axis Toggle for Force Chart */}
+                  {freeLength !== undefined && (
+                    <div className="flex items-center space-x-1 border rounded-md p-1 bg-slate-100">
+                      <Button
+                        variant={chartXMode === "deflection" ? "secondary" : "ghost"}
+                        size="sm"
+                        className={cn("h-6 px-2 text-xs", chartXMode === "deflection" && "shadow-sm bg-white text-slate-900")}
+                        onClick={() => setChartXMode("deflection")}
+                      >
+                        {isZh ? "位移" : "Deflection"}
+                      </Button>
+                      <Button
+                        variant={chartXMode === "height" ? "secondary" : "ghost"}
+                        size="sm"
+                        className={cn("h-6 px-2 text-xs", chartXMode === "height" && "shadow-sm bg-white text-slate-900")}
+                        onClick={() => setChartXMode("height")}
+                      >
+                        {isZh ? "高度" : "Height"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
 
                 <TabsContent value="force" className="pt-4">
                   <div className="h-[280px]">
@@ -344,6 +379,8 @@ export function UnifiedForceTester({
                       lineColor="#3b82f6"
                       markerColor="#ef4444"
                       showMarker={true}
+                      xAxisMode={chartXMode}
+                      freeLength={freeLength}
                     />
                   </div>
                 </TabsContent>
@@ -391,6 +428,7 @@ export function UnifiedForceTester({
                 currentDeflection={currentDeflection}
                 onRowClick={handleDeflectionChange}
                 maxHeight="max-h-48"
+                freeLength={freeLength}
               />
             </CardContent>
           </Card>
