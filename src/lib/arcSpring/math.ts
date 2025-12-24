@@ -99,11 +99,11 @@ export function validateArcSpringInput(input: ArcSpringInput): string[] {
  */
 function computeHysteresisWork(curve: ArcSpringPoint[]): number {
   if (curve.length < 2) return 0;
-  
+
   let work = 0;
   for (let i = 1; i < curve.length; i++) {
-    const dAlpha = curve[i].deltaDeg - curve[i-1].deltaDeg;
-    const avgTf = (curve[i].Tf + curve[i-1].Tf) / 2;
+    const dAlpha = curve[i].deltaDeg - curve[i - 1].deltaDeg;
+    const avgTf = (curve[i].Tf + curve[i - 1].Tf) / 2;
     work += 2 * avgTf * dAlpha; // 回线面积 = 2 * ∫Tf dα
   }
   return work;
@@ -172,9 +172,9 @@ export function computeArcSpringCurveSingle(input: ArcSpringInput): ArcSpringRes
     curve.push({
       deltaDeg,
       alphaDeg: input.alpha0 - deltaDeg,
-      x, 
-      F: F_total, 
-      M: M_total, 
+      x,
+      F: F_total,
+      M: M_total,
       Tf: Tf_total,
       M_load,
       M_unload,
@@ -193,8 +193,8 @@ export function computeArcSpringCurveSingle(input: ArcSpringInput): ArcSpringRes
   // 阻尼效率 = Hysteresis Energy / Total Potential Energy * 100%
   // Total Potential Energy ≈ 0.5 * M_max * Δα_max (简化为三角形面积)
   const totalPotentialEnergy = 0.5 * MMax_load * deltaAlphaMax;
-  const dampingCapacity = totalPotentialEnergy > 0 
-    ? (hysteresisWork / totalPotentialEnergy) * 100 
+  const dampingCapacity = totalPotentialEnergy > 0
+    ? (hysteresisWork / totalPotentialEnergy) * 100
     : 0;
 
   // 干涉检查
@@ -214,11 +214,11 @@ export function computeArcSpringCurveSingle(input: ArcSpringInput): ArcSpringRes
 
   if (!isFinite(k) || k <= 0) warnings.push("Computed k is not valid.");
 
-  return { 
-    k, R_deg, deltaAlphaMax, xMax, MMax_load, MMax_unload, 
+  return {
+    k, R_deg, deltaAlphaMax, xMax, MMax_load, MMax_unload,
     De, Di, springIndex, wahlFactor, tauMax,
     safetyMarginToSolid, housingClearance, hysteresisWork, dampingCapacity,
-    curve, warnings 
+    curve, warnings
   };
 }
 
@@ -247,6 +247,7 @@ export function computeArcSpringCurve(input: ArcSpringInput): ArcSpringResult {
     n: input.spring2?.n ?? input.n,
     r: input.spring2?.r ?? input.r,
     alpha0: input.spring2?.alpha0 ?? input.alpha0,
+    alphaWork: input.spring2?.alphaWork ?? input.alphaWork,
     alphaC: input.spring2?.alphaC ?? input.alphaC,
   };
 
@@ -330,8 +331,8 @@ export function computeArcSpringCurve(input: ArcSpringInput): ArcSpringResult {
 
   // 阻尼效率 = Hysteresis Energy / Total Potential Energy * 100%
   const totalPotentialEnergy = 0.5 * MMax_load * deltaAlphaMax;
-  const dampingCapacity = totalPotentialEnergy > 0 
-    ? (hysteresisWork / totalPotentialEnergy) * 100 
+  const dampingCapacity = totalPotentialEnergy > 0
+    ? (hysteresisWork / totalPotentialEnergy) * 100
     : 0;
 
   // 双级系统：计算内外弹簧间隙
@@ -354,12 +355,29 @@ export function computeArcSpringCurve(input: ArcSpringInput): ArcSpringResult {
   const F_max = MMax_load / input.r;
   const tauMax = wahlFactor * (8 * F_max * input.D) / (PI * Math.pow(input.d, 3));
 
-  return { 
-    k, R_deg, deltaAlphaMax, xMax, MMax_load, MMax_unload, 
+  // 工作点计算
+  let deltaAlphaWork: number | undefined;
+  let M_work: number | undefined;
+  let tauWork: number | undefined;
+
+  if (input.alphaWork !== undefined) {
+    deltaAlphaWork = Math.max(0, input.alpha0 - input.alphaWork);
+    const pWork = sampleAt({ curve, deltaAlphaMax: deltaAlphaMax } as any, deltaAlphaWork);
+    if (pWork) {
+      M_work = pWork.M_load; // 使用加载扭矩
+      // 计算工作应力 (基于外弹簧/主弹簧尺寸)
+      const F_work = M_work / input.r;
+      tauWork = wahlFactor * (8 * F_work * input.D) / (PI * Math.pow(input.d, 3));
+    }
+  }
+
+  return {
+    k, R_deg, deltaAlphaMax, xMax, MMax_load, MMax_unload,
     De, Di, springIndex, wahlFactor, tauMax,
+    deltaAlphaWork, M_work, tauWork,
     safetyMarginToSolid, housingClearance, hysteresisWork, dampingCapacity,
     engageAngleMarker, spring2Clearance,
-    curve, warnings 
+    curve, warnings
   };
 }
 

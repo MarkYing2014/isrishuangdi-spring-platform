@@ -27,6 +27,7 @@ export interface ArcSpringInput {
   // Arc layout (弧形布局) - 圆弧配置
   r: number;       // mm - 工作半径 (力臂，决定扭矩)
   alpha0: number;  // deg - 自由角
+  alphaWork?: number; // deg - 工作角 (Working Angle)
   alphaC: number;  // deg - 压并角 (alphaC < alpha0)
   countParallel?: number; // 并联弹簧数量 (DMF 常用多根并联，默认 1)
 
@@ -75,34 +76,39 @@ export interface ArcSpringResult {
   // 基本刚度
   k: number;              // N/mm - 弹簧刚度 (切向线刚度，中间计算值)
   R_deg: number;          // N·mm/deg - 旋转刚度 (系统核心参数)
-  
+
   // 行程与扭矩
   deltaAlphaMax: number;  // deg - 最大转角
   xMax: number;           // mm - 最大位移
   MMax_load: number;      // N·mm - 最大加载扭矩
   MMax_unload: number;    // N·mm - 最大卸载扭矩
-  
+
+  // 工作点 (如果提供了 alphaWork)
+  deltaAlphaWork?: number; // deg - 工作转角
+  M_work?: number;         // N·mm - 工作扭矩
+  tauWork?: number;        // MPa - 工作应力
+
   // 几何尺寸
   De: number;             // mm - 外径 (Outer coil diameter) = D + d
   Di: number;             // mm - 内径 (Inner coil diameter) = D - d
-  
+
   // 安全裕度
   safetyMarginToSolid: number;  // deg - 剩余行程安全裕度
   housingClearance?: number;    // mm - 与滑壳的间隙 (如果提供了 maxHousingDiameter)
-  
+
   // 应力分析 (Wahl Factor)
   springIndex: number;          // C = D/d - 弹簧指数
   wahlFactor: number;           // K_W - Wahl 应力修正因子
   tauMax: number;               // MPa - 最大剪切应力 (考虑 Wahl 修正)
-  
+
   // 迟滞与阻尼
   hysteresisWork: number;       // N·mm·deg - 阻尼能量 (迟滞回线面积)
   dampingCapacity: number;      // % - 阻尼效率 (Hysteresis Energy / Total Potential Energy)
-  
+
   // 双级系统
   engageAngleMarker?: number;   // deg - 拐点角度 (dual_staged 模式)
   spring2Clearance?: number;    // mm - 内外弹簧间隙 (dual 模式)
-  
+
   // 曲线数据
   curve: ArcSpringPoint[];
   warnings: string[];

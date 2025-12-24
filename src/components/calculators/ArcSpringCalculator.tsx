@@ -154,6 +154,7 @@ type ArcIssueField =
   | "n"
   | "r"
   | "alpha0"
+  | "alphaWork"
   | "alphaC"
   | "countParallel"
   | "maxHousingDiameter"
@@ -441,6 +442,20 @@ export function ArcSpringCalculator() {
                     unit="deg"
                     min={10}
                     max={180}
+                    step={1}
+                  />
+                </div>
+                <div
+                  ref={setFieldRef("alphaWork")}
+                  className={highlightField === "alphaWork" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
+                >
+                  <SliderNumberInput
+                    label="Working Angle α_work"
+                    value={input.alphaWork ?? input.alpha0}
+                    onChange={(v) => updateInput("alphaWork", v)}
+                    unit="deg"
+                    min={0}
+                    max={input.alpha0}
                     step={1}
                   />
                 </div>
@@ -956,7 +971,7 @@ export function ArcSpringCalculator() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-2 bg-muted rounded-lg">
-                  <div className="text-xs text-muted-foreground">Spring Rate k (切向)</div>
+                  <div className="text-xs text-muted-foreground">Tangential stiffness k_t</div>
                   <div className="text-sm font-semibold">
                     {isFinite(result.k) ? result.k.toFixed(2) : "—"} N/mm
                   </div>
@@ -980,6 +995,33 @@ export function ArcSpringCalculator() {
                   </div>
                 </div>
               </div>
+
+              {/* Working Point (Optional) */}
+              {result.M_work !== undefined && (
+                <div className="grid grid-cols-3 gap-3 p-3 bg-emerald-50 dark:bg-emerald-950 rounded-lg border border-emerald-100">
+                  <div className="col-span-3 text-xs text-emerald-600 font-medium pb-1 border-b border-emerald-200 mb-1">
+                    Working State (at α_work = {input.alphaWork?.toFixed(1)}°, Δα = {result.deltaAlphaWork?.toFixed(1)}°)
+                  </div>
+                  <div>
+                    <div className="text-xs text-emerald-600/80">Working Torque</div>
+                    <div className="text-sm font-bold text-emerald-700">
+                      {result.M_work.toFixed(0)} N·mm
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-emerald-600/80">Working Stress</div>
+                    <div className="text-sm font-bold text-emerald-700">
+                      {result.tauWork?.toFixed(0)} MPa
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-emerald-600/80">SF (Work)</div>
+                    <div className="text-sm font-bold text-emerald-700">
+                      {result.tauWork ? (allowableTau / result.tauWork).toFixed(2) : "-"}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Geometry & Safety */}
               <div className="pt-2 border-t">
