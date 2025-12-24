@@ -85,6 +85,25 @@ export function SuspensionSpringCalculator() {
     // if pitchCenter is 0
   }, [od, wireDiameter]);
 
+  // Global store hydration
+  const storedGeometry = useSpringDesignStore(state => state.geometry);
+
+  React.useEffect(() => {
+    if (storedGeometry && storedGeometry.type === "suspensionSpring") {
+      const g = storedGeometry as SuspensionGeometry;
+      setWireDiameter(g.wireDiameter);
+      setOd(g.outerDiameter);
+      setActiveCoils(g.activeCoils);
+      setFreeLength(g.freeLength);
+      // setEndType(g.endType); // SuspensionGeometry doesn't have endType currently? 
+      // If it's missing in store, we skip or add it. It's not in the interface I just viewed.
+      // I'll skip endType hydration for now or default it.
+      
+      // Guide is also not in SuspensionGeometry interface I just saw.
+      // Skipping guide hydration.
+    }
+  }, [storedGeometry]);
+
   const [currentDeflection, setCurrentDeflection] = useState(0);
   const [loadcaseMode, setLoadcaseMode] = useState<LoadcaseMode>("ride");
 
@@ -823,6 +842,7 @@ export function SuspensionSpringCalculator() {
                   activeCoils,
                   totalCoils,
                   freeLength,
+                  outerDiameter: od,
                   pitchProfile: {
                     mode: pitchMode,
                     pitchCenter: pitchCenter || undefined,

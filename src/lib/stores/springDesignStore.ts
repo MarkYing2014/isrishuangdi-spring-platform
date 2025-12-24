@@ -158,10 +158,24 @@ export interface SuspensionGeometry {
   activeCoils: number;
   totalCoils: number;
   freeLength: number;
+  outerDiameter: number; // For simpler form restoration
   pitchProfile: PitchProfile; // 变节距配置
   diameterProfile: DiameterProfile; // 变中径配置 (Barrel/Conical)
   materialId?: SpringMaterialId;
   shearModulus?: number;
+}
+
+/** 弧形弹簧几何参数 */
+export interface ArcGeometry {
+  type: "arc";
+  wireDiameter: number;
+  meanDiameter: number;
+  coils: number;
+  workingRadius: number; // r
+  unloadedAngle: number; // alpha0
+  workingAngle: number; // alphaWork
+  solidAngle: number; // alphaC
+  materialId?: SpringMaterialId;
 }
 
 /** 波形弹簧几何参数 (Crest-to-crest) */
@@ -186,8 +200,10 @@ export type SpringGeometry =
   | ConicalGeometry
   | DieSpringGeometry
   | SpiralTorsionGeometry
+  | SpiralTorsionGeometry
   | SuspensionGeometry
-  | WaveSpringGeometry;
+  | WaveSpringGeometry
+  | ArcGeometry;
 
 // ============================================================================
 // 材料信息
@@ -761,6 +777,7 @@ export function generateDesignCode(geometry: SpringGeometry): string {
     spiralTorsion: "STS",
     suspensionSpring: "SUS",
     wave: "WS",
+    arc: "ARC",
   };
   const prefix = prefixMap[geometry.type];
 

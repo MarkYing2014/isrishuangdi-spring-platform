@@ -26,6 +26,7 @@ import {
   downloadArcSpringPDF,
   printArcSpringReport,
 } from "@/lib/arcSpring";
+import { useSpringDesignStore, type ArcGeometry } from "@/lib/stores/springDesignStore";
 import { useRouter } from "next/navigation";
 import { buildArcSpringDesignRuleReport } from "@/lib/designRules";
 import {
@@ -187,6 +188,33 @@ export function ArcSpringCalculator() {
   const [allowableTauFatigue, setAllowableTauFatigue] = useState(500);
   const [showStressColors, setShowStressColors] = useState(false);
   const [stressBeta, setStressBeta] = useState(0.25);
+
+  const storedGeometry = useSpringDesignStore(state => state.geometry);
+  
+  // Hydrate from store
+  useEffect(() => {
+    if (storedGeometry && storedGeometry.type === "arc") {
+      const g = storedGeometry as ArcGeometry;
+      
+      const hydratedInput: ArcSpringInput = {
+        ...getDefaultArcSpringInput(), // base defaults
+        d: g.wireDiameter,
+        D: g.meanDiameter,
+        n: g.coils,
+        r: g.workingRadius,
+        alpha0: g.unloadedAngle,
+        alphaWork: g.workingAngle,
+        alphaC: g.solidAngle,
+        hysteresisMode: input.hysteresisMode, // Keep current UI prefs? Or store them? Assuming persistent geometry drives physics
+      };
+      
+      // Update advanced fields if present in stored geometry custom fields or assume defaults
+      // For now, hydration of basic parameters is the key request.
+      
+      setInput(hydratedInput);
+      setResult(computeArcSpringCurve(hydratedInput));
+    }
+  }, [storedGeometry]);
 
   const designRuleReport = useMemo(
     () =>

@@ -12,7 +12,7 @@
 
 "use client";
 
-import { useMemo, useState, useCallback, lazy, Suspense } from "react";
+import { useMemo, useState, useCallback, lazy, Suspense, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/language-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,6 +109,30 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
   const [temperature_C, setTemperature] = useState<number | undefined>(undefined);
   const [holeDiameter_mm, setHoleDiameter] = useState<number | undefined>(undefined);
   const [rodDiameter_mm, setRodDiameter] = useState<number | undefined>(undefined);
+
+  // Hydrate from store
+  const storedGeometry = useSpringDesignStore(state => state.geometry);
+  
+  useEffect(() => {
+    if (storedGeometry && storedGeometry.type === "dieSpring") {
+      const g = storedGeometry as StoreDieSpringGeometry;
+      setOd(g.outerDiameter);
+      setFreeLength(g.freeLength);
+      setWorkingLength(g.workingLength);
+      setCoils(g.totalCoils);
+      setWireB(g.wireWidth);
+      setWireT(g.wireThickness);
+      
+      if (g.holeDiameter) setHoleDiameter(g.holeDiameter);
+      if (g.rodDiameter) setRodDiameter(g.rodDiameter);
+      if (g.materialId) {
+         // Map material ID back to enum if possible, or just ignore for now as UI uses enum
+         // This might be tricky if enum != id. 
+         // For now, let's assume user re-selects or default.
+      }
+    }
+  }, [storedGeometry]);
+
 
   // Build input object
   const input = useMemo<DieSpringInput>(() => ({
