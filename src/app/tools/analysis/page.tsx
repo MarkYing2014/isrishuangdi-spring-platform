@@ -35,7 +35,8 @@ import { Brain } from "lucide-react";
 import { SpiralTorsionAnalysisPanel } from "@/components/analysis/SpiralTorsionAnalysisPanel";
 import { SuspensionAnalysisPanel } from "@/components/analysis/SuspensionAnalysisPanel";
 import { ArcSpringEngineeringPage } from "@/components/analysis/ArcSpringEngineeringPage";
-import { isSpiralTorsionDesign, isSuspensionDesign } from "@/lib/stores/springDesignStore";
+import { DiskSpringAnalysisPanel } from "@/components/analysis/DiskSpringAnalysisPanel";
+import { isSpiralTorsionDesign, isSuspensionDesign, isDiskSpringDesign } from "@/lib/stores/springDesignStore";
 import { useSearchParams } from "next/navigation";
 
 // Dynamic imports for 3D visualizers
@@ -128,10 +129,10 @@ function AnalysisContent() {
     );
   }
 
-  // Suspension Spring uses dedicated analysis panel
-  if (isSuspensionDesign(designGeometry)) {
+  // Disk Spring uses dedicated analysis panel
+  if (isDiskSpringDesign(designGeometry)) {
     return (
-      <SuspensionAnalysisPanel
+      <DiskSpringAnalysisPanel
         isZh={isZh}
         geometry={designGeometry}
         material={designMaterial}
@@ -199,10 +200,10 @@ function AnalysisReady({
   const springType = designGeometry.type;
   const materialId = designMaterial.id;
   
-  // Wire spring 专用字段 - 不包含 spiralTorsion 或 dieSpring
-  const wireDiameter = designGeometry.wireDiameter;
-  const activeCoils = designGeometry.activeCoils;
-  const shearModulus = designGeometry.shearModulus ?? designMaterial.shearModulus;
+  // Wire spring (compression/extension/torsion/conical) uses original analysis panel
+  const wireDiameter = (designGeometry as any).wireDiameter;
+  const activeCoils = (designGeometry as any).activeCoils;
+  const shearModulus = (designGeometry as any).shearModulus ?? designMaterial.shearModulus;
   const elasticModulus = designMaterial.elasticModulus ?? shearModulus * 2.5;
 
   let meanDiameter: number | undefined;

@@ -5,7 +5,7 @@ import type { SpringMaterialId } from "@/lib/materials/springMaterials";
 // 弹簧类型定义
 // ============================================================================
 
-export type SpringType = "compression" | "extension" | "torsion" | "conical" | "spiralTorsion" | "wave" | "dieSpring" | "suspensionSpring" | "arc" | "variablePitchCompression";
+export type SpringType = "compression" | "extension" | "torsion" | "conical" | "spiralTorsion" | "wave" | "dieSpring" | "suspensionSpring" | "arc" | "variablePitchCompression" | "disk";
 
 export const SPRING_TYPE_LABELS: Record<SpringType, { en: string; zh: string }> = {
   compression: { en: "Compression Spring", zh: "压缩弹簧" },
@@ -18,6 +18,7 @@ export const SPRING_TYPE_LABELS: Record<SpringType, { en: string; zh: string }> 
   suspensionSpring: { en: "Suspension Spring", zh: "减震器弹簧" },
   arc: { en: "Arc Spring", zh: "弧形弹簧" },
   variablePitchCompression: { en: "Variable Pitch Compression", zh: "变节距压缩弹簧" },
+  disk: { en: "Disk / Belleville Spring", zh: "碟形弹簧" },
 };
 
 // ============================================================================
@@ -208,7 +209,8 @@ export type SpringDesign =
   | ConicalSpringDesign
   | ExtensionSpringDesign
   | TorsionSpringDesign
-  | VariablePitchCompressionDesign;
+  | VariablePitchCompressionDesign
+  | DiskSpringDesign;
 
 // ============================================================================
 // LEGACY INTERFACE (for backward compatibility)
@@ -330,6 +332,10 @@ export function isVariablePitchDesign(design: SpringDesign): design is VariableP
   return design.type === "variablePitchCompression";
 }
 
+export function isDiskDesign(design: SpringDesign): design is DiskSpringDesign {
+  return design.type === "disk";
+}
+
 // ============================================================================
 // SUSPENSION SPRING GEOMETRY
 // 减震器弹簧/悬架弹簧高级几何
@@ -402,5 +408,47 @@ export interface VariablePitchCompressionDesign extends SpringDesignBase {
   freeLength?: number;
   /** Coil segments with varying pitch */
   segments: VariablePitchSegment[];
+}
+
+// ============================================================================
+// DISK / BELLEVILLE SPRING DESIGN
+// 碟形弹簧（碟簧）设计 (DIN 2092/2093 style)
+// ============================================================================
+
+export type DiskSpringGroup = "G1" | "G2" | "G3";
+
+export interface DiskSpringDesign extends SpringDesignBase {
+  type: "disk";
+  /** Outer diameter De in millimeters */
+  outerDiameter: number;
+  /** Inner diameter Di in millimeters */
+  innerDiameter: number;
+  /** Thickness t in millimeters */
+  thickness: number;
+  /** Free cone height h0 in millimeters */
+  freeConeHeight: number;
+  /** DIN 2093 Group */
+  group?: DiskSpringGroup;
+
+  /** Stacking: Number of disks in parallel (nP) */
+  parallelCount: number;
+  /** Stacking: Number of series stacks (nS) */
+  seriesCount: number;
+  /** Friction coefficient (mu_f) */
+  frictionCoeff?: number;
+
+  /** Preload deflection s_pre */
+  deflectionPreload?: number;
+  /** Operating deflection s_work */
+  deflectionOperating?: number;
+  /** Maximum deflection s_max */
+  deflectionMax?: number;
+
+  /** Elastic Modulus E in MPa */
+  elasticModulus?: number;
+  /** Poisson Ratio nu */
+  poissonRatio?: number;
+  /** Yield Strength Sy in MPa */
+  yieldStrength?: number;
 }
 

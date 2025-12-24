@@ -13,6 +13,7 @@ import { SpiralTorsionCalculator } from "@/components/calculators/SpiralTorsionC
 import { WaveSpringCalculator } from "@/components/calculators/WaveSpringCalculator";
 import { DieSpringCalculator } from "@/components/calculators/DieSpringCalculator";
 import { SuspensionSpringCalculator } from "@/components/calculators/SuspensionSpringCalculator";
+import { DiskSpringCalculator } from "@/components/calculators/DiskSpringCalculator";
 import { SpringSeoContent } from "@/components/seo/SpringSeoContent";
 
 const springTypes: {
@@ -86,6 +87,14 @@ const springTypes: {
     nameZh: "减震器弹簧",
     descEn: "Shock absorber, vehicle suspension",
     descZh: "减震器，车辆悬挂系统",
+  },
+  {
+    type: "disk",
+    icon: "⊚",
+    nameEn: "Disk Spring",
+    nameZh: "碟形弹簧",
+    descEn: "Belleville washers, high force",
+    descZh: "中空锥形垫圈，高弹性力",
   },
 ];
 
@@ -214,6 +223,7 @@ export default function SpringCalculatorPage() {
         {selectedType === "wave" && <WaveSpringCalculator isZh={isZh} />}
         {selectedType === "dieSpring" && <DieSpringCalculator isZh={isZh} />}
         {selectedType === "suspensionSpring" && <SuspensionSpringCalculator />}
+        {selectedType === "disk" && <DiskSpringCalculator />}
 
         {/* SEO Content Section */}
         <SpringSeoContent type={selectedType} />

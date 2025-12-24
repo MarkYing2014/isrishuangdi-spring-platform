@@ -55,6 +55,18 @@ const VariablePitchCompressionSpringVisualizer = dynamic(
   }
 );
 
+const DiskSpringVisualizer = dynamic(
+  () => import("@/components/three/DiskSpringVisualizer").then((mod) => mod.DiskSpringVisualizer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full w-full flex items-center justify-center bg-slate-50 rounded-lg">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-500" />
+      </div>
+    ),
+  }
+);
+
 export function Calculator3DPreview({
   expectedType,
   heightClassName = "h-[420px]",
@@ -154,9 +166,23 @@ const WaveSpringVisualizer = dynamic(
           freeLength={geometry.freeLength}
           segments={geometry.segments}
           deflection={analysis?.workingDeflection ?? 0}
+          springRate={analysis?.springRate}
+        />
+      );
+    }
+
+    if (geometry.type === "disk") {
+      return (
+        <DiskSpringVisualizer
+          outerDiameter={geometry.outerDiameter}
+          innerDiameter={geometry.innerDiameter}
+          thickness={geometry.thickness}
+          freeConeHeight={geometry.freeConeHeight}
+          deflection={analysis?.workingDeflection ?? 0}
+          nP={geometry.parallelCount}
+          nS={geometry.seriesCount}
           showStressColors={showStressColors}
           stressUtilization={stressUtilization}
-          stressBeta={stressBeta}
           springRate={analysis?.springRate}
         />
       );

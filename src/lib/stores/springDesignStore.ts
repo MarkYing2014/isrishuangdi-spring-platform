@@ -206,6 +206,20 @@ export interface WaveSpringGeometry {
   materialId?: SpringMaterialId;
 }
 
+/** 碟形弹簧（碟簧）几何参数 */
+export interface DiskGeometry {
+  type: "disk";
+  outerDiameter: number;   // De
+  innerDiameter: number;   // Di
+  thickness: number;       // t
+  freeConeHeight: number;  // h0
+  group?: "G1" | "G2" | "G3";
+  parallelCount: number;   // nP
+  seriesCount: number;     // nS
+  frictionCoeff?: number;
+  materialId?: SpringMaterialId;
+}
+
 /** 所有几何参数联合类型 - 这是 Store 的核心类型 */
 export type SpringGeometry =
   | CompressionGeometry
@@ -214,11 +228,11 @@ export type SpringGeometry =
   | ConicalGeometry
   | DieSpringGeometry
   | SpiralTorsionGeometry
-  | SpiralTorsionGeometry
   | SuspensionGeometry
   | WaveSpringGeometry
   | ArcGeometry
-  | VariablePitchCompressionGeometry;
+  | VariablePitchCompressionGeometry
+  | DiskGeometry;
 
 // ============================================================================
 // 材料信息
@@ -383,6 +397,11 @@ export function isDieSpringDesign(design: SpringGeometry | null): design is DieS
 /** 检查是否为波形弹簧设计 */
 export function isWaveSpringDesign(design: SpringGeometry | null): design is WaveSpringGeometry {
   return design?.type === "wave";
+}
+
+/** 检查是否为碟形弹簧设计 */
+export function isDiskSpringDesign(design: SpringGeometry | null): design is DiskGeometry {
+  return design?.type === "disk";
 }
 
 // ============================================================================
@@ -794,6 +813,7 @@ export function generateDesignCode(geometry: SpringGeometry): string {
     wave: "WS",
     arc: "ARC",
     variablePitchCompression: "VPC",
+    disk: "BDS", // Belleville Disk Spring
   };
   const prefix = prefixMap[geometry.type];
 
