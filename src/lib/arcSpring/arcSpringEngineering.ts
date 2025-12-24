@@ -126,11 +126,10 @@ export function computeEngineeringAnalysis(input: ArcSpringInput, baseResult: Ar
     }
 
     // 6. Margins
-    // Angle Margin: Limit - Work (if Limit exists) or Solid - Work
+    // Angle Margin: Free - Work (Used Travel) per user request
     let angleMargin = 0;
     if (ptWork) {
-        if (ptLimit) angleMargin = Math.max(0, ptWork.alpha - ptLimit.alpha); // alpha decreases as compressed
-        else angleMargin = Math.max(0, ptWork.alpha - alphaC);
+        angleMargin = Math.max(0, alpha0 - ptWork.alpha);
     }
 
     // Solid Margin (mm) roughly

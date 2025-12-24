@@ -46,6 +46,9 @@ export function ArcSpringEngineeringPage() {
       
       materialKey: (searchParams.get("mat") as any) ?? "EN10270_2",
       hand: (searchParams.get("hand") as any) ?? "right",
+      // Factory Report implies 4 springs (or 2 pairs) for Stiffness target 5.25.
+      // 1.29 * 4 = 5.16 ~ 5.25.
+      countParallel: getNum("nParallel", 4), 
       samples: 100
     };
   }, [searchParams]);
@@ -92,7 +95,7 @@ export function ArcSpringEngineeringPage() {
           label="Angle Margin" 
           value={engResult.angleMargin.toFixed(1)} 
           unit="deg" 
-          sub="(Limit - Work)"
+          sub="(Free - Work)"
         />
         <KpiCard label="Solid Margin" value={engResult.solidMargin.toFixed(1)} unit="mm" />
         <KpiCard label="Max Stress" value={engResult.ptLimit?.tau_MPa.toFixed(0) ?? "-"} unit="MPa" />
