@@ -197,17 +197,20 @@ export function ArcSpringCalculator() {
     if (storedGeometry && storedGeometry.type === "arc") {
       const g = storedGeometry as ArcGeometry;
       
-      const hydratedInput: ArcSpringInput = {
-        ...getDefaultArcSpringInput(), // base defaults
-        d: g.wireDiameter,
-        D: g.meanDiameter,
-        n: g.coils,
-        r: g.workingRadius,
-        alpha0: g.unloadedAngle,
-        alphaWork: g.workingAngle,
-        alphaC: g.solidAngle,
-        hysteresisMode: input.hysteresisMode, // Keep current UI prefs? Or store them? Assuming persistent geometry drives physics
-      };
+        const def = getDefaultArcSpringInput();
+        const hydratedInput: ArcSpringInput = {
+          ...def,
+          d: g.wireDiameter ?? def.d,
+          D: g.meanDiameter ?? def.D,
+          n: g.coils ?? def.n,
+          r: g.workingRadius ?? def.r,
+          alpha0: g.unloadedAngle ?? def.alpha0,
+          alphaWork: g.workingAngle ?? def.alphaWork,
+          alphaC: g.solidAngle ?? def.alphaC,
+          hysteresisMode: input.hysteresisMode,
+          // 保留系统模式和其他高级参数，如果store中没有对应字段，则保留当前state或默认
+          systemMode: input.systemMode, 
+        };
       
       // Update advanced fields if present in stored geometry custom fields or assume defaults
       // For now, hydration of basic parameters is the key request.
@@ -254,8 +257,44 @@ export function ArcSpringCalculator() {
 
   const updateInput = <K extends keyof ArcSpringInput>(key: K, value: ArcSpringInput[K]) => {
     setInput((prev) => ({ ...prev, [key]: value }));
-    setCalculated(false); // 参数变化后，标记为未计算
+    setCalculated(false);
   };
+
+  // Persistence Effect: Save to store when input changes (debounced)
+  useEffect(() => {
+    if (!mounted) return;
+    
+    // Only save if we have a valid single or mapped structure
+    // Mapping ArcSpringInput back to ArcGeometry
+    const geometry: ArcGeometry = {
+      type: "arc",
+      wireDiameter: input.d,
+      meanDiameter: input.D,
+      coils: input.n,
+      workingRadius: input.r,
+      unloadedAngle: input.alpha0,
+      workingAngle: input.alphaWork ?? 0,
+      solidAngle: input.alphaC,
+      materialId: input.materialKey === "CUSTOM" ? undefined : input.materialKey as any,
+    };
+
+    // Use a small timeout to avoid thrashing the store on every keystroke/slider move
+    const timer = setTimeout(() => {
+      useSpringDesignStore.getState().setEds({
+        type: "arc" as any, // Bypass TS check if needed, or update store types to accept generic EDS
+        // Ideally we use a specific action, but for now we manually set geometry
+      } as any); 
+      
+      // Direct store manipulation for geometry since setEds might be compression-specific
+      useSpringDesignStore.setState(state => ({
+        geometry,
+        springType: "arc",
+        hasValidDesign: true, 
+      }));
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [input, mounted]);
 
   const updateSpring2 = <K extends keyof ArcSpringInput>(key: K, value: ArcSpringInput[K]) => {
     setInput((prev) => ({

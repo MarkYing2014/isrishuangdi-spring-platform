@@ -184,9 +184,13 @@ function CadExportContent() {
   // Note: dieSpring 有专用工程分析页面，CAD 导出暂不支持
   const isDieSpring = storeGeometry?.type === "dieSpring";
   // 使用 in 操作符安全访问 activeCoils
-  const activeCoils = ("activeCoils" in (storeGeometry ?? {})
-    ? (storeGeometry as { activeCoils?: number })?.activeCoils
-    : undefined) ?? numberOrUndefined(searchParams.get("Na")) ?? 8;
+  // 使用 in 操作符安全访问 activeCoils
+  // arc spring uses 'coils', others use 'activeCoils'
+  const activeCoils = (storeGeometry?.type === "arc" 
+    ? (storeGeometry as any).coils 
+    : "activeCoils" in (storeGeometry ?? {})
+      ? (storeGeometry as { activeCoils?: number })?.activeCoils
+      : undefined) ?? numberOrUndefined(searchParams.get("Na")) ?? 8;
   const totalCoils = (storeGeometry?.type === "compression" ? storeGeometry.totalCoils : undefined) 
     ?? numberOrUndefined(searchParams.get("Nt")) ?? activeCoils + 2;
   const freeLength = (storeGeometry?.type === "compression" || storeGeometry?.type === "conical" 
@@ -665,7 +669,7 @@ function CadExportContent() {
     springType, code, wireDiameter, meanDiameter, activeCoils, totalCoils, 
     freeLength, bodyLength, hookType, initialTension, legLength1, legLength2, 
     windingDirection, largeDiameter, smallDiameter, materialName, springRate, safetyFactor,
-    conicalTotalCoils, conicalEndType
+    conicalTotalCoils, conicalEndType, arcRadius, arcAlpha0
   ]);
 
   const rfqUrl = useMemo(() => {

@@ -833,7 +833,7 @@ export function generateDesignCode(geometry: SpringGeometry): string {
  * @returns meanDiameter (mm) 或 null（对于不适用的弹簧类型）
  */
 export function getMeanDiameter(geometry: SpringGeometry): number | null {
-  if (geometry.type === "compression" || geometry.type === "torsion") {
+  if (geometry.type === "compression" || geometry.type === "torsion" || geometry.type === "arc") {
     return geometry.meanDiameter;
   } else if (geometry.type === "extension") {
     return geometry.outerDiameter - geometry.wireDiameter;
