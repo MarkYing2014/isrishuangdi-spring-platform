@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -191,32 +191,42 @@ export function ArcSpringCalculator() {
   const [stressBeta, setStressBeta] = useState(0.25);
 
   const storedGeometry = useSpringDesignStore(state => state.geometry);
+  const lastSavedJsonRef = useRef<string>("");
+  const isHydratingRef = useRef<boolean>(false);
   
   // Hydrate from store
   useEffect(() => {
     if (storedGeometry && storedGeometry.type === "arc") {
       const g = storedGeometry as ArcGeometry;
+      const gJson = JSON.stringify(g);
       
-        const def = getDefaultArcSpringInput();
-        const hydratedInput: ArcSpringInput = {
-          ...def,
-          d: g.wireDiameter ?? def.d,
-          D: g.meanDiameter ?? def.D,
-          n: g.coils ?? def.n,
-          r: g.workingRadius ?? def.r,
-          alpha0: g.unloadedAngle ?? def.alpha0,
-          alphaWork: g.workingAngle ?? def.alphaWork,
-          alphaC: g.solidAngle ?? def.alphaC,
-          hysteresisMode: input.hysteresisMode,
-          // 保留系统模式和其他高级参数，如果store中没有对应字段，则保留当前state或默认
-          systemMode: input.systemMode, 
-        };
+      // Skip if this update came from our own persistence logic
+      if (gJson === lastSavedJsonRef.current && input.d !== undefined) return;
+      lastSavedJsonRef.current = gJson;
       
-      // Update advanced fields if present in stored geometry custom fields or assume defaults
-      // For now, hydration of basic parameters is the key request.
+      isHydratingRef.current = true;
+      const def = getDefaultArcSpringInput();
+      const hydratedInput: ArcSpringInput = {
+        ...def,
+        d: g.wireDiameter ?? def.d,
+        D: g.meanDiameter ?? def.D,
+        n: g.coils ?? def.n,
+        r: g.workingRadius ?? def.r,
+        alpha0: g.unloadedAngle ?? def.alpha0,
+        alphaWork: g.workingAngle ?? def.alphaWork,
+        alphaC: g.solidAngle ?? def.alphaC,
+        hysteresisMode: input.hysteresisMode,
+        systemMode: input.systemMode,
+      };
       
       setInput(hydratedInput);
       setResult(computeArcSpringCurve(hydratedInput));
+      setCalculated(true);
+      
+      // Reset hydration flag after state update
+      setTimeout(() => {
+        isHydratingRef.current = false;
+      }, 50);
     }
   }, [storedGeometry]);
 
@@ -280,14 +290,12 @@ export function ArcSpringCalculator() {
 
     // Use a small timeout to avoid thrashing the store on every keystroke/slider move
     const timer = setTimeout(() => {
-      useSpringDesignStore.getState().setEds({
-        type: "arc" as any, // Bypass TS check if needed, or update store types to accept generic EDS
-        // Ideally we use a specific action, but for now we manually set geometry
-      } as any); 
-      
       // Direct store manipulation for geometry since setEds might be compression-specific
+      const finalGeometry = { ...geometry };
+      lastSavedJsonRef.current = JSON.stringify(finalGeometry);
+      
       useSpringDesignStore.setState(state => ({
-        geometry,
+        geometry: finalGeometry,
         springType: "arc",
         hasValidDesign: true, 
       }));
@@ -327,8 +335,10 @@ export function ArcSpringCalculator() {
   useEffect(() => {
     if (!autoCalculate) return;
     if (hasRuleError) return;
-    setIsCalculating(true);
+    if (isHydratingRef.current) return; // Skip calculation flash if we just hydrated from store
+
     const t = setTimeout(() => {
+      setIsCalculating(true);
       const newResult = computeArcSpringCurve(input);
       setResult(newResult);
       setCalculated(true);
