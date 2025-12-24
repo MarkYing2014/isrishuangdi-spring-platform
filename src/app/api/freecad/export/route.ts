@@ -92,7 +92,7 @@ const SCRIPT_PATH = path.join(process.cwd(), "cad-worker/freecad/run_export.py")
 const TEMP_DIR = path.join(process.cwd(), ".tmp/freecad");
 
 interface ExportRequest {
-  springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion" | "variable_pitch_compression";
+  springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion" | "variable_pitch_compression" | "suspension_spring";
   geometry: {
     wireDiameter: number;
     meanDiameter?: number;
@@ -115,6 +115,9 @@ interface ExportRequest {
     smallOuterDiameter?: number;
     // Variable Pitch
     segments?: any[];
+    // Suspension
+    pitchProfile?: any;
+    diameterProfile?: any;
   };
   export: {
     formats: ("STEP" | "IGES" | "STL" | "FCStd")[];

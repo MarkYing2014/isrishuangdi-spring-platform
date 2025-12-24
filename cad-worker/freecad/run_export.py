@@ -771,6 +771,182 @@ def generate_extension_body_centerline(params):
     return points, 0.0, extended_length
 
 
+def smoothstep01(x):
+    """0到1之间的平滑步进函数"""
+    t = max(0, min(1, x))
+    return t * t * (3 - 2 * t)
+
+
+def wPitch(theta, thetaClosed, thetaTotal):
+    """计算节距权重（用于并紧端处理）"""
+    if thetaClosed <= 0: return 1
+    if theta < thetaClosed:
+        return smoothstep01(theta / thetaClosed)
+    if theta > thetaTotal - thetaClosed:
+        u = (thetaTotal - theta) / thetaClosed
+        return smoothstep01(u)
+    return 1
+
+
+def numericAvgWPitch(thetaClosed, thetaTotal, segments=200):
+    """数值计算 wPitch 的平均值，用于反推 pitchActive"""
+    if thetaTotal <= 0: return 1
+    total = 0
+    dTheta = thetaTotal / segments
+    for i in range(segments):
+        theta = (i + 0.5) * dTheta
+        total += wPitch(theta, thetaClosed, thetaTotal)
+    return total / segments
+
+
+def groundWeight(theta, thetaGround, thetaTotal):
+    """计算磨平权重"""
+    if thetaGround <= 0: return 0
+    if theta < thetaGround:
+        u = 1 - theta / thetaGround
+        return smoothstep01(u)
+    if theta > thetaTotal - thetaGround:
+        u = 1 - (thetaTotal - theta) / thetaGround
+        return smoothstep01(u)
+    return 0
+
+
+def generate_suspension_centerline(params):
+    """
+    生成悬架弹簧/减震器弹簧中心线点集
+    支持变节距、变中径、并紧端和磨平处理
+    """
+    d = params.get("wireDiameter", 12.0)
+    Na = params.get("activeCoils", 6.0)
+    Nt_in = params.get("totalCoils", 8.0)
+    L0 = params.get("freeLength", 300.0)
+    
+    pitch_prof = params.get("pitchProfile", {"mode": "uniform"})
+    diam_prof = params.get("diameterProfile", {"mode": "constant", "DmStart": 100.0})
+    
+    # 解析端部定义
+    end_type = pitch_prof.get("endType", "closed_ground")
+    closed_turns = pitch_prof.get("endClosedTurns", 1.0)
+    ground_turns = 0.5 if end_type == "closed_ground" else 0.0
+    
+    # 悬架弹簧通常总圈数 > 有效圈数
+    Nt = Nt_in if Nt_in > Na else Na + 2.0
+    
+    segments_per_coil = 80
+    num_segs = int(max(120, Nt * segments_per_coil))
+    theta_total = 2.0 * math.pi * Nt
+    d_theta = theta_total / num_segs
+    
+    has_closed = end_type in ["closed", "closed_ground"]
+    theta_closed = 2.0 * math.pi * closed_turns if has_closed else 0.0
+    theta_ground = 2.0 * math.pi * ground_turns if end_type == "closed_ground" else 0.0
+    
+    # 计算 pitchActive 保证总高度一致
+    w_avg = numericAvgWPitch(theta_closed, theta_total, num_segs)
+    pitch_active = L0 / (Nt * max(w_avg, 0.1))
+    
+    # 1. 积分生成 Z 坐标
+    z_raw = [0.0]
+    z_current = 0.0
+    
+    for i in range(1, num_segs + 1):
+        theta_mid = (i - 0.5) * d_theta
+        
+        # 计算该位置的节距权重
+        w = wPitch(theta_mid, theta_closed, theta_total)
+        
+        # 处理渐进节距 (Two-Stage/Three-Stage)
+        p_center = pitch_prof.get("pitchCenter", pitch_active)
+        if p_center <= 0: p_center = pitch_active
+        
+        p_end = pitch_prof.get("pitchEnd", p_center * 0.15)
+        
+        trans_turns = pitch_prof.get("transitionTurns", 0.75)
+        theta_trans = 2.0 * math.pi * trans_turns
+        
+        p = pitch_active # 默认
+        
+        if not has_closed:
+            p = p_center if pitch_prof.get("mode") != "uniform" else pitch_active
+        else:
+            # 权重化的节距
+            if pitch_prof.get("mode") == "uniform":
+                p = pitch_active * w
+            else:
+                # 渐进模式
+                if theta_mid < theta_closed:
+                    p = p_end
+                elif theta_mid < theta_closed + theta_trans:
+                    u = smoothstep01((theta_mid - theta_closed) / theta_trans)
+                    p = p_end + (p_center - p_end) * u
+                elif theta_mid > theta_total - (theta_closed + theta_trans):
+                    if theta_mid < theta_total - theta_closed:
+                        u = smoothstep01((theta_total - theta_closed - theta_mid) / theta_trans)
+                        p = p_end + (p_center - p_end) * u
+                    else:
+                        p = p_end
+                else:
+                    p = p_center
+        
+        z_current += (p / (2.0 * math.pi)) * d_theta
+        z_raw.append(z_current)
+        
+    z_end = z_raw[-1]
+    
+    # 2. 磨平处理 (Flattening)
+    z_flattened = []
+    for i in range(num_segs + 1):
+        theta = i * d_theta
+        z = z_raw[i]
+        
+        if end_type == "closed_ground" and theta_ground > 0:
+            wg = groundWeight(theta, theta_ground, theta_total)
+            if theta < theta_ground:
+                z = z * (1.0 - wg) # 向 0 靠拢
+            elif theta > theta_total - theta_ground:
+                z = z_end - (z_end - z) * (1.0 - wg) # 向 z_end 靠拢
+        
+        z_flattened.append(z)
+        
+    # 3. 修正 Z 缩放
+    total_h_flat = z_flattened[-1] - z_flattened[0]
+    scale_z = L0 / total_h_flat if total_h_flat > 1e-6 else 1.0
+    
+    # 4. 生成 3D 点
+    points = []
+    for i in range(num_segs + 1):
+        theta = i * d_theta
+        
+        # 计算该位置的中径 Dm
+        t_pos = theta / theta_total
+        mode_d = diam_prof.get("mode", "constant")
+        dm_start = diam_prof.get("DmStart", 100.0)
+        dm_mid = diam_prof.get("DmMid", 120.0)
+        dm_end = diam_prof.get("DmEnd", 100.0)
+        
+        if mode_d == "constant":
+            dm = dm_start
+        elif mode_d == "conical":
+            dm = dm_start + (dm_end - dm_start) * t_pos
+        elif mode_d == "barrel":
+            if t_pos < 0.5:
+                u = smoothstep01(t_pos / 0.5)
+                dm = dm_start + (dm_mid - dm_start) * u
+            else:
+                u = smoothstep01((t_pos - 0.5) / 0.5)
+                dm = dm_mid + (dm_end - dm_mid) * u
+        else:
+            dm = dm_start
+            
+        R_pos = dm / 2.0
+        x = R_pos * math.cos(theta)
+        y = R_pos * math.sin(theta)
+        z = (z_flattened[i] - z_flattened[0]) * scale_z
+        
+        points.append(App.Vector(x, y, z))
+        
+    return points, 0.0, L0
+
 def generate_variable_pitch_centerline(params):
     """
     生成变节距压缩弹簧中心线
@@ -877,6 +1053,56 @@ def make_variable_pitch_compression_spring(params):
             spring_solid = cut_result
         except Exception as e:
             print(f"[VariablePitch] Ground end cutting failed: {e}")
+            
+    return spring_solid
+
+def make_suspension_spring(params):
+    """
+    生成悬架弹簧/减震器弹簧固态模型
+    """
+    d = params.get("wireDiameter", 12.0)
+    pitch_prof = params.get("pitchProfile", {})
+    end_type = pitch_prof.get("endType", "closed_ground")
+    
+    # 1. 生成中心线
+    points, min_z, max_z = generate_suspension_centerline(params)
+    
+    # 2. 创建 B-Spline 路径并进行平面扫掠
+    path = make_bspline_from_points(points)
+    spring_solid = sweep_wire_along_path(path, d)
+    
+    # 3. 处理磨平 (端部切削)
+    if end_type == "closed_ground" and spring_solid:
+        EPS = max(0.05 * d, 0.05)
+        if not spring_solid.isValid():
+            spring_solid = spring_solid.removeSplitter()
+        
+        grind_depth = d * 0.4
+        dm_start = params.get("diameterProfile", {}).get("DmStart", 100.0)
+        box_size = dm_start * 4
+        box_height = d * 6
+        
+        bottom_box = Part.makeBox(
+            box_size, box_size, box_height,
+            App.Vector(-box_size/2, -box_size/2, grind_depth + EPS - box_height)
+        )
+        
+        top_box = Part.makeBox(
+            box_size, box_size, box_height,
+            App.Vector(-box_size/2, -box_size/2, max_z - grind_depth - EPS)
+        )
+        
+        try:
+            cut_result = spring_solid.cut(bottom_box)
+            cut_result = cut_result.cut(top_box)
+            
+            if cut_result.ShapeType == "Compound" and cut_result.Solids:
+                cut_result = max(cut_result.Solids, key=lambda s: s.Volume)
+            
+            spring_solid = cut_result
+            print(f"[Suspension] Boolean cut applied: max_z={max_z:.2f}")
+        except Exception as e:
+            print(f"[Suspension] Warning: Boolean cut failed: {e}")
             
     return spring_solid
 
@@ -2505,6 +2731,8 @@ def main():
         spring = make_conical_spring(geometry)
     elif spring_type == "variable_pitch_compression":
         spring = make_variable_pitch_compression_spring(geometry)
+    elif spring_type == "suspension_spring":
+        spring = make_suspension_spring(geometry)
     else:
         print(f"Unknown spring type: {spring_type}")
         sys.exit(1)

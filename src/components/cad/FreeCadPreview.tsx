@@ -62,7 +62,7 @@ export function clearGeometryCache(): void {
 // ============================================================================
 
 interface FreeCadPreviewProps {
-  springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion";
+  springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion" | "variable_pitch_compression" | "suspension_spring";
   geometry: {
     wireDiameter?: number;
     meanDiameter?: number;
@@ -88,6 +88,11 @@ interface FreeCadPreviewProps {
     stripWidth?: number;
     stripThickness?: number;
     handedness?: "cw" | "ccw";
+    // Variable Pitch specific
+    segments?: any[];
+    // Suspension specific
+    pitchProfile?: any;
+    diameterProfile?: any;
   };
   className?: string;
 }

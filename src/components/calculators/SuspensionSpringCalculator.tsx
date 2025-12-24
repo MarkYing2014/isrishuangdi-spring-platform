@@ -197,6 +197,75 @@ export function SuspensionSpringCalculator() {
     [designParams]
   );
 
+  const handleSyncStore = useCallback(() => {
+    // Save to global store before navigation
+    const geo: SuspensionGeometry = {
+      type: "suspensionSpring",
+      wireDiameter,
+      activeCoils,
+      totalCoils,
+      freeLength,
+      outerDiameter: od,
+      pitchProfile: {
+        mode: pitchMode,
+        pitchCenter: pitchCenter || undefined,
+        pitchEnd: pitchEnd || undefined,
+        endClosedTurns,
+        transitionTurns,
+        endType,
+        endSpec: {
+          type: endType,
+          closedTurnsPerEnd: endClosedTurns,
+          groundTurnsPerEnd: endType === "closed_ground" ? groundTurnsPerEnd : 0,
+          seatDrop: 0,
+          endAngleExtra: endType === "closed_ground" ? 0.25 : 0,
+        },
+      },
+      diameterProfile: {
+        mode: diameterMode,
+        DmStart: dmStart,
+        DmMid: dmMid,
+        DmEnd: dmEnd,
+      },
+    };
+    useSpringDesignStore.getState().setGeometry(geo);
+    useSpringDesignStore.getState().setMaterial({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      id: materialPreset as any,
+      name: material.name,
+      elasticModulus: 206000,
+      shearModulus: material.shearModulus_G_MPa,
+      tensileStrength: material.yieldStrength_MPa,
+      density: 7850,
+    });
+    useSpringDesignStore.getState().setAnalysisResult({
+      springRate: result.springRate_N_per_mm,
+      springRateUnit: "N/mm",
+      maxStress: result.stress.tauBump_MPa,
+      staticSafetyFactor: result.stress.yieldSafetyFactor_bump,
+    });
+  }, [
+    wireDiameter,
+    activeCoils,
+    totalCoils,
+    freeLength,
+    od,
+    pitchMode,
+    pitchCenter,
+    pitchEnd,
+    endClosedTurns,
+    transitionTurns,
+    endType,
+    groundTurnsPerEnd,
+    diameterMode,
+    dmStart,
+    dmMid,
+    dmEnd,
+    materialPreset,
+    material,
+    result,
+  ]);
+
   const currentStressRatio = useMemo(() => {
     if (result.errors.length > 0) return 0;
     return calculateStressRatioAtDeflection(
@@ -835,66 +904,22 @@ export function SuspensionSpringCalculator() {
               variant="outline" 
               className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
               onClick={() => {
-                // Save to global store before navigation
-                const geo: SuspensionGeometry = {
-                  type: "suspensionSpring",
-                  wireDiameter,
-                  activeCoils,
-                  totalCoils,
-                  freeLength,
-                  outerDiameter: od,
-                  pitchProfile: {
-                    mode: pitchMode,
-                    pitchCenter: pitchCenter || undefined,
-                    pitchEnd: pitchEnd || undefined,
-                    endClosedTurns,
-                    transitionTurns,
-                    endType,
-                    endSpec: {
-                      type: endType,
-                      closedTurnsPerEnd: endClosedTurns,
-                      groundTurnsPerEnd: endType === "closed_ground" ? groundTurnsPerEnd : 0,
-                      seatDrop: 0,
-                      endAngleExtra: endType === "closed_ground" ? 0.25 : 0,
-                    },
-                  },
-                  diameterProfile: {
-                    mode: diameterMode,
-                    DmStart: dmStart,
-                    DmMid: dmMid,
-                    DmEnd: dmEnd,
-                  },
-                };
-                useSpringDesignStore.getState().setGeometry(geo);
-                useSpringDesignStore.getState().setMaterial({
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  id: materialPreset as any, // Suspension material IDs differ from standard spring materials
-                  name: material.name,
-                  elasticModulus: 206000, // Typical steel E
-                  shearModulus: material.shearModulus_G_MPa,
-                  tensileStrength: material.yieldStrength_MPa,
-                  density: 7850, // Steel density kg/m³
-                });
-                useSpringDesignStore.getState().setAnalysisResult({
-                  springRate: result.springRate_N_per_mm,
-                  springRateUnit: "N/mm",
-                  maxStress: result.stress.tauBump_MPa,
-                  staticSafetyFactor: result.stress.yieldSafetyFactor_bump,
-                });
+                handleSyncStore();
                 window.location.href = analysisUrl;
               }}
             >
               Send to Engineering Analysis / 发送到工程分析
             </Button>
             <Button 
-              asChild 
               variant="outline" 
               className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10"
               disabled={result.errors.length > 0}
+              onClick={() => {
+                handleSyncStore();
+                window.location.href = cadExportUrl;
+              }}
             >
-              <a href={cadExportUrl}>
-                Export CAD / 导出 CAD
-              </a>
+              Export CAD / 导出 CAD
             </Button>
           </CardContent>
         </Card>
