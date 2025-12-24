@@ -3,8 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export interface NumericInputProps extends Omit<React.ComponentProps<"input">, "onChange" | "value" | "min" | "max" | "step"> {
-  value: number;
-  onChange: (value: number) => void;
+  value: number | undefined;
+  onChange: (value: number | undefined) => void;
   min?: number;
   max?: number;
   step?: number;
@@ -32,11 +32,16 @@ const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
     // Sync from parent prop (if changed externally)
     useEffect(() => {
         // Only update if the parsed value is different to avoid cursor jumping or fighting user input
-        // But for engineering apps, usually external updates are rare during editing.
         // We check if Number(strVal) is significantly different from value.
         const currentNum = parseFloat(strVal);
-        if (Math.abs(currentNum - value) > Number.EPSILON || (strVal === "" && value !== 0)) {
-             setStrVal(value !== undefined && value !== null && !Number.isNaN(value) ? value.toString() : "");
+        const valDefined = value !== undefined && value !== null && !Number.isNaN(value);
+        
+        if (!valDefined) {
+            if (strVal !== "") setStrVal("");
+        } else {
+             if (Math.abs(currentNum - (value as number)) > Number.EPSILON || strVal === "") {
+                 setStrVal(value!.toString());
+             }
         }
     }, [value]);
 
@@ -50,13 +55,13 @@ const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
       // Handle empty
       if (raw.trim() === "") {
         if (allowEmpty) {
-            // maybe propagate undefined? For now assume 0 or last valid.
-            // But prop says onChange(number).
-            onChange(0);  
-            setStrVal("0");
+            onChange(undefined);
+            setStrVal("");
         } else {
-             // Revert to current prop value
-             setStrVal(value.toString());
+             // Revert to current prop value (if valid) or 0
+             const safe = value ?? 0;
+             setStrVal(safe.toString());
+             onChange(safe); // re-emit to ensure sync
         }
         return;
       }
@@ -67,7 +72,8 @@ const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
       // Validate Nan
       if (Number.isNaN(val)) {
         // Revert
-        setStrVal(value.toString());
+        const safe = value ?? 0;
+        setStrVal(safe.toString());
         return;
       }
 

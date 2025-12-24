@@ -296,7 +296,7 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                     <Label>{isZh ? "外径 OD (mm)" : "Outer Diameter OD (mm)"}</Label>
                     <NumericInput
                       value={od_mm}
-                      onChange={setOd}
+                      onChange={(v) => setOd(v ?? 0)}
                       step={0.5}
                       min={0}
                     />
@@ -305,7 +305,7 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                     <Label>{isZh ? "自由长度 L0 (mm)" : "Free Length L0 (mm)"}</Label>
                     <NumericInput
                       value={freeLength_mm}
-                      onChange={setFreeLength}
+                      onChange={(v) => setFreeLength(v ?? 0)}
                       step={1}
                       min={0}
                     />
@@ -314,7 +314,7 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                     <Label>{isZh ? "工作长度 Lw (mm)" : "Working Length Lw (mm)"}</Label>
                     <NumericInput
                       value={workingLength_mm}
-                      onChange={setWorkingLength}
+                      onChange={(v) => setWorkingLength(v ?? 0)}
                       step={1}
                       min={0}
                     />
@@ -323,7 +323,7 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                     <Label>{isZh ? "总圈数" : "Total Coils"}</Label>
                     <NumericInput
                       value={coils}
-                      onChange={setCoils}
+                      onChange={(v) => setCoils(v ?? 0)}
                       step={0.5}
                       min={0}
                     />
@@ -336,7 +336,7 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                             <Label className="text-[10px]">{isZh ? "宽度 b (mm)" : "Width b (mm)"}</Label>
                             <NumericInput
                                 value={wire_b_mm}
-                                onChange={setWireB}
+                                onChange={(v) => setWireB(v ?? 0)}
                                 step={0.1}
                                 min={0}
                                 placeholder="e.g. 4.0"
@@ -346,7 +346,7 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                             <Label className="text-[10px]">{isZh ? "厚度 t (mm)" : "Thickness t (mm)"}</Label>
                             <NumericInput
                                 value={wire_t_mm}
-                                onChange={setWireT}
+                                onChange={(v) => setWireT(v ?? 0)}
                                 step={0.1}
                                 min={0}
                                 placeholder="e.g. 2.0"
@@ -460,7 +460,7 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                       <Label>{isZh ? "当前高度 H (mm)" : "Current Height H (mm)"}</Label>
                       <NumericInput
                         value={currentHeight_mm}
-                        onChange={setCurrentHeight}
+                        onChange={(v) => setCurrentHeight(v ?? 0)}
                         step={1}
                         min={result.solidHeight_mm || 0}
                         max={freeLength_mm}

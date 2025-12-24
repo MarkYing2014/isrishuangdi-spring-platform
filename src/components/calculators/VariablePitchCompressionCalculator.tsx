@@ -21,6 +21,7 @@ import { useVariablePitchCompressionStore } from "@/lib/stores/variablePitchComp
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
@@ -405,22 +406,20 @@ export function VariablePitchCompressionCalculator() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label>Wire Diameter d (mm)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
+                    <NumericInput
+                      step={0.01}
+                      min={0}
                       value={wireDiameter}
-                      onChange={(e) => setWireDiameter(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setWireDiameter(v ?? 0)}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>Mean Diameter Dm (mm)</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
+                    <NumericInput
+                      step={0.1}
+                      min={0}
                       value={meanDiameter}
-                      onChange={(e) => setMeanDiameter(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setMeanDiameter(v ?? 0)}
                     />
                   </div>
                 </div>
@@ -428,22 +427,20 @@ export function VariablePitchCompressionCalculator() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label>Active Coils Na0</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
+                    <NumericInput
+                      step={0.1}
+                      min={0}
                       value={activeCoils0}
-                      onChange={(e) => setActiveCoils0(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setActiveCoils0(v ?? 0)}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>Total Coils Nt</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
+                    <NumericInput
+                      step={0.1}
+                      min={0}
                       value={totalCoils}
-                      onChange={(e) => setTotalCoils(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setTotalCoils(v ?? 0)}
                     />
                   </div>
                 </div>
@@ -451,25 +448,22 @@ export function VariablePitchCompressionCalculator() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label>Shear Modulus G (MPa)</Label>
-                    <Input
-                      type="number"
-                      step="100"
-                      min="0"
+                    <NumericInput
+                      step={100}
+                      min={0}
                       value={shearModulus}
-                      onChange={(e) => setShearModulus(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setShearModulus(v ?? 0)}
+                      decimalScale={0}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label>Free Length L0 (mm)</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={freeLength ?? ""}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setFreeLength(v === "" ? undefined : parseFloat(v) || 0);
-                      }}
+                    <NumericInput
+                      step={0.1}
+                      min={0}
+                      value={freeLength}
+                      onChange={(v) => setFreeLength(v)} // v can be undefined
+                      allowEmpty
                     />
                   </div>
                 </div>
@@ -494,27 +488,25 @@ export function VariablePitchCompressionCalculator() {
                         return (
                           <TableRow key={idx}>
                             <TableCell>
-                              <Input
-                                type="number"
-                                step="0.25"
-                                min="0"
+                              <NumericInput
+                                step={0.25}
+                                min={0}
                                 value={seg.coils}
-                                onChange={(e) =>
+                                onChange={(v) =>
                                   setSegment(idx, {
-                                    coils: parseFloat(e.target.value) || 0,
+                                    coils: v ?? 0,
                                   })
                                 }
                               />
                             </TableCell>
                             <TableCell>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
+                              <NumericInput
+                                step={0.01}
+                                min={0}
                                 value={seg.pitch}
-                                onChange={(e) =>
+                                onChange={(v) =>
                                   setSegment(idx, {
-                                    pitch: parseFloat(e.target.value) || 0,
+                                    pitch: v ?? 0,
                                   })
                                 }
                               />
@@ -591,22 +583,21 @@ export function VariablePitchCompressionCalculator() {
                   </TabsList>
                   <TabsContent value="deflection" className="mt-3 space-y-2">
                     <Label>Deflection Δx (mm)</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
+                    <NumericInput
+                      step={0.1}
+                      min={0}
                       value={deflection}
-                      onChange={(e) => setDeflection(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setDeflection(v ?? 0)}
                     />
                   </TabsContent>
                   <TabsContent value="load" className="mt-3 space-y-2">
                     <Label>Load F (N)</Label>
-                    <Input
-                      type="number"
-                      step="1"
-                      min="0"
+                    <NumericInput
+                      step={1}
+                      min={0}
                       value={load}
-                      onChange={(e) => setLoad(parseFloat(e.target.value) || 0)}
+                      onChange={(v) => setLoad(v ?? 0)}
+                      decimalScale={0}
                     />
                     <p className="text-xs text-muted-foreground">
                       Solved deflection: {formatNumber(computedDeflection ?? 0)} mm
@@ -640,13 +631,12 @@ export function VariablePitchCompressionCalculator() {
                       {workingPoints.map((dx, idx) => (
                         <TableRow key={idx}>
                           <TableCell>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              min="0"
+                            <NumericInput
+                              step={0.1}
+                              min={0}
                               value={dx}
-                              onChange={(e) =>
-                                setWorkingPoint(idx, parseFloat(e.target.value) || 0)
+                              onChange={(v) =>
+                                setWorkingPoint(idx, v ?? 0)
                               }
                             />
                           </TableCell>
@@ -702,11 +692,10 @@ export function VariablePitchCompressionCalculator() {
                     </label>
                     <div className="flex items-center gap-2">
                       <div className="text-xs text-muted-foreground">β</div>
-                      <Input
-                        type="number"
+                      <NumericInput
                         value={stressBeta}
-                        onChange={(e) =>
-                          setStressBeta(Math.max(0, Math.min(0.9, parseFloat(e.target.value) || 0)))
+                        onChange={(v) =>
+                          setStressBeta(Math.max(0, Math.min(0.9, v ?? 0)))
                         }
                         min={0}
                         max={0.9}

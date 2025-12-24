@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -66,10 +67,9 @@ function NumberInput({ label, value, onChange, unit, min = 0, step = 0.1, disabl
       <Label className="text-sm text-muted-foreground">
         {label} {unit && <span className="text-xs">({unit})</span>}
       </Label>
-      <Input
-        type="number"
+      <NumericInput
         value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+        onChange={(v) => onChange(v ?? 0)}
         min={min}
         step={step}
         disabled={disabled}
@@ -120,10 +120,9 @@ function SliderNumberInput({
         <Label className="text-sm text-muted-foreground">
           {label} {unit && <span className="text-xs">({unit})</span>}
         </Label>
-        <Input
-          type="number"
+        <NumericInput
           value={Number.isFinite(value) ? value : 0}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          onChange={(v) => onChange(v ?? 0)}
           min={min}
           step={step}
           disabled={disabled}
@@ -709,10 +708,9 @@ export function ArcSpringCalculator() {
                 </label>
                 <div className="flex items-center gap-2">
                   <div className="text-xs text-muted-foreground">per end</div>
-                  <Input
-                    type="number"
+                  <NumericInput
                     value={deadCoilsPerEnd}
-                    onChange={(e) => setDeadCoilsPerEnd(Math.max(0, Math.round(parseFloat(e.target.value) || 0)))}
+                    onChange={(v) => setDeadCoilsPerEnd(Math.max(0, Math.round(v ?? 0)))}
                     min={0}
                     step={1}
                     disabled={!showDeadCoils}
@@ -722,20 +720,18 @@ export function ArcSpringCalculator() {
               </div>
               <div className="flex items-center justify-end gap-2 pb-3">
                 <div className="text-xs text-muted-foreground">k</div>
-                <Input
-                  type="number"
+                <NumericInput
                   value={deadTightnessK}
-                  onChange={(e) => setDeadTightnessK(Math.max(0, parseFloat(e.target.value) || 0))}
+                  onChange={(v) => setDeadTightnessK(Math.max(0, v ?? 0))}
                   min={0}
                   step={0.5}
                   disabled={!showDeadCoils}
                   className="h-8 w-20 arc-no-spinner"
                 />
                 <div className="text-xs text-muted-foreground">σ</div>
-                <Input
-                  type="number"
+                <NumericInput
                   value={deadTightnessSigma}
-                  onChange={(e) => setDeadTightnessSigma(Math.max(0, parseFloat(e.target.value) || 0))}
+                  onChange={(v) => setDeadTightnessSigma(Math.max(0, v ?? 0))}
                   min={0}
                   step={0.01}
                   disabled={!showDeadCoils}
@@ -753,10 +749,9 @@ export function ArcSpringCalculator() {
                 </label>
                 <div className="flex items-center gap-2">
                   <div className="text-xs text-muted-foreground">β</div>
-                  <Input
-                    type="number"
+                  <NumericInput
                     value={stressBeta}
-                    onChange={(e) => setStressBeta(Math.max(0, Math.min(0.9, parseFloat(e.target.value) || 0)))}
+                    onChange={(v) => setStressBeta(Math.max(0, Math.min(0.9, v ?? 0)))}
                     min={0}
                     max={0.9}
                     step={0.05}
@@ -811,20 +806,18 @@ export function ArcSpringCalculator() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">Allowable τ (yield)</div>
-                  <Input
-                    type="number"
+                  <NumericInput
                     value={allowableTau}
-                    onChange={(e) => setAllowableTau(Math.max(0, parseFloat(e.target.value) || 0))}
+                    onChange={(v) => setAllowableTau(Math.max(0, v ?? 0))}
                     step={50}
                     className="h-8 arc-no-spinner"
                   />
                 </div>
                 <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">Allowable τ (fatigue)</div>
-                  <Input
-                    type="number"
+                  <NumericInput
                     value={allowableTauFatigue}
-                    onChange={(e) => setAllowableTauFatigue(Math.max(0, parseFloat(e.target.value) || 0))}
+                    onChange={(v) => setAllowableTauFatigue(Math.max(0, v ?? 0))}
                     step={50}
                     className="h-8 arc-no-spinner"
                   />

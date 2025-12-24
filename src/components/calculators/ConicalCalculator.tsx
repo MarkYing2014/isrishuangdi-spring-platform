@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useCallback } from "react";
-import { type SubmitHandler, useForm } from "react-hook-form";
+import { type SubmitHandler, useForm, Controller } from "react-hook-form";
 
 import {
   calculateLoadAndStress,
@@ -15,6 +15,7 @@ import { buildConicalDesignRuleReport } from "@/lib/designRules";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { DimensionHint } from "./DimensionHint";
@@ -312,11 +313,18 @@ export function ConicalCalculator() {
                 description="大端外径，锥形弹簧较大一端的外径。"
               />
               <Label htmlFor="largeDiameter">Large Diameter D₁ (mm) / 大端外径</Label>
-              <Input
-                id="largeDiameter"
-                type="number"
-                step="0.1"
-                {...form.register("largeDiameter", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="largeDiameter"
+                render={({ field }) => (
+                  <NumericInput
+                    id="largeDiameter"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 
@@ -328,11 +336,18 @@ export function ConicalCalculator() {
                 description="小端外径，锥形弹簧较小一端的外径。"
               />
               <Label htmlFor="smallDiameter">Small Diameter D₂ (mm) / 小端外径</Label>
-              <Input
-                id="smallDiameter"
-                type="number"
-                step="0.1"
-                {...form.register("smallDiameter", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="smallDiameter"
+                render={({ field }) => (
+                  <NumericInput
+                    id="smallDiameter"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 
@@ -344,11 +359,18 @@ export function ConicalCalculator() {
                 description="线径，弹簧钢丝的直径。"
               />
               <Label htmlFor="wireDiameter">Wire Diameter d (mm) / 线径</Label>
-              <Input
-                id="wireDiameter"
-                type="number"
-                step="0.01"
-                {...form.register("wireDiameter", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="wireDiameter"
+                render={({ field }) => (
+                  <NumericInput
+                    id="wireDiameter"
+                    step={0.01}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 
@@ -360,22 +382,36 @@ export function ConicalCalculator() {
                 description="自由长度，弹簧未受力时的高度。"
               />
               <Label htmlFor="freeLength">Free Length L₀ (mm) / 自由长度</Label>
-              <Input
-                id="freeLength"
-                type="number"
-                step="0.1"
-                {...form.register("freeLength", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="freeLength"
+                render={({ field }) => (
+                  <NumericInput
+                    id="freeLength"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 
             {/* Active Coils */}
             <div className="space-y-2">
               <Label htmlFor="activeCoils">Active Coils Na / 有效圈数</Label>
-              <Input
-                id="activeCoils"
-                type="number"
-                step="0.1"
-                {...form.register("activeCoils", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="activeCoils"
+                render={({ field }) => (
+                  <NumericInput
+                    id="activeCoils"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 
@@ -387,11 +423,18 @@ export function ConicalCalculator() {
                 description="总圈数，包括两端的死圈。通常 Nt = Na + 2（两端各 1 圈死圈）。"
               />
               <Label htmlFor="totalCoils">Total Coils Nt / 总圈数</Label>
-              <Input
-                id="totalCoils"
-                type="number"
-                step="0.5"
-                {...form.register("totalCoils", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="totalCoils"
+                render={({ field }) => (
+                  <NumericInput
+                    id="totalCoils"
+                    step={0.5}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 
@@ -423,11 +466,19 @@ export function ConicalCalculator() {
             {/* Shear Modulus */}
             <div className="space-y-2">
               <Label htmlFor="shearModulus">Shear Modulus G (MPa) / 剪切模量</Label>
-              <Input
-                id="shearModulus"
-                type="number"
-                step="100"
-                {...form.register("shearModulus", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="shearModulus"
+                render={({ field }) => (
+                  <NumericInput
+                    id="shearModulus"
+                    step={100}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    decimalScale={0}
+                  />
+                )}
               />
             </div>
 
@@ -439,11 +490,18 @@ export function ConicalCalculator() {
                 description="工作压缩量，从自由长度压缩的行程。"
               />
               <Label htmlFor="deflection">Working Deflection Δx (mm) / 工作压缩量</Label>
-              <Input
-                id="deflection"
-                type="number"
-                step="0.1"
-                {...form.register("deflection", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="deflection"
+                render={({ field }) => (
+                  <NumericInput
+                    id="deflection"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
 

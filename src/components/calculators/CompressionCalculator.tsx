@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { type SubmitHandler, type Resolver, useForm } from "react-hook-form";
+import { type SubmitHandler, type Resolver, useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -27,6 +27,7 @@ import { buildCompressionDesignRuleReport } from "@/lib/designRules";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -381,11 +382,18 @@ export function CompressionCalculator() {
                 description="线径 d，弹簧钢丝的直径。"
               />
               <Label htmlFor="wireDiameter">Wire Diameter d (mm) / 线径</Label>
-              <Input
-                id="wireDiameter"
-                type="number"
-                step="0.01"
-                {...form.register("wireDiameter", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="wireDiameter"
+                render={({ field }) => (
+                  <NumericInput
+                    id="wireDiameter"
+                    step={0.01}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
               {form.formState.errors.wireDiameter && (
                 <p className="text-sm text-red-500">{form.formState.errors.wireDiameter.message}</p>
@@ -400,11 +408,18 @@ export function CompressionCalculator() {
                 description="中径 Dm = (外径 + 内径) / 2。"
               />
               <Label htmlFor="meanDiameter">Mean Diameter Dm (mm) / 中径</Label>
-              <Input
-                id="meanDiameter"
-                type="number"
-                step="0.1"
-                {...form.register("meanDiameter", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="meanDiameter"
+                render={({ field }) => (
+                  <NumericInput
+                    id="meanDiameter"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
               {form.formState.errors.meanDiameter && (
                 <p className="text-sm text-red-500">{form.formState.errors.meanDiameter.message}</p>
@@ -414,11 +429,18 @@ export function CompressionCalculator() {
             {/* Active Coils */}
             <div className="space-y-2">
               <Label htmlFor="activeCoils">Active Coils Na / 有效圈数</Label>
-              <Input
-                id="activeCoils"
-                type="number"
-                step="0.1"
-                {...form.register("activeCoils", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="activeCoils"
+                render={({ field }) => (
+                  <NumericInput
+                    id="activeCoils"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
               {form.formState.errors.activeCoils && (
                 <p className="text-sm text-red-500">{form.formState.errors.activeCoils.message}</p>
@@ -428,11 +450,18 @@ export function CompressionCalculator() {
             {/* Total Coils */}
             <div className="space-y-2">
               <Label htmlFor="totalCoils">Total Coils Nt / 总圈数</Label>
-              <Input
-                id="totalCoils"
-                type="number"
-                step="0.1"
-                {...form.register("totalCoils", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="totalCoils"
+                render={({ field }) => (
+                  <NumericInput
+                    id="totalCoils"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
               {form.formState.errors.totalCoils && (
                 <p className="text-sm text-red-500">{form.formState.errors.totalCoils.message}</p>
@@ -442,11 +471,19 @@ export function CompressionCalculator() {
             {/* Shear Modulus */}
             <div className="space-y-2">
               <Label htmlFor="shearModulus">Shear Modulus G (MPa) / 剪切模量</Label>
-              <Input
-                id="shearModulus"
-                type="number"
-                step="100"
-                {...form.register("shearModulus", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="shearModulus"
+                render={({ field }) => (
+                  <NumericInput
+                    id="shearModulus"
+                    step={100}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    decimalScale={0}
+                  />
+                )}
               />
               {form.formState.errors.shearModulus && (
                 <p className="text-sm text-red-500">{form.formState.errors.shearModulus.message}</p>
@@ -456,11 +493,19 @@ export function CompressionCalculator() {
             {/* Free Length */}
             <div className="space-y-2">
               <Label htmlFor="freeLength">Free Length L₀ (mm) / 自由长度 <span className="text-slate-400">(optional)</span></Label>
-              <Input
-                id="freeLength"
-                type="number"
-                step="0.1"
-                {...form.register("freeLength", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="freeLength"
+                render={({ field }) => (
+                  <NumericInput
+                    id="freeLength"
+                    step={0.1}
+                    value={field.value ?? 0}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    allowEmpty
+                  />
+                )}
               />
             </div>
 
@@ -472,11 +517,18 @@ export function CompressionCalculator() {
                 description="工作压缩量，从自由长度压缩的行程。"
               />
               <Label htmlFor="deflection">Working Deflection Δx (mm) / 工作压缩量</Label>
-              <Input
-                id="deflection"
-                type="number"
-                step="0.1"
-                {...form.register("deflection", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="deflection"
+                render={({ field }) => (
+                  <NumericInput
+                    id="deflection"
+                    step={0.1}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
               {form.formState.errors.deflection && (
                 <p className="text-sm text-red-500">{form.formState.errors.deflection.message}</p>
@@ -488,12 +540,20 @@ export function CompressionCalculator() {
               <Label htmlFor="preloadDeflection">
                 Preload x₀ (mm) / 预压缩量 <span className="text-slate-400">(optional)</span>
               </Label>
-              <Input
-                id="preloadDeflection"
-                type="number"
-                step="0.1"
-                min="0"
-                {...form.register("preloadDeflection", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="preloadDeflection"
+                render={({ field }) => (
+                  <NumericInput
+                    id="preloadDeflection"
+                    step={0.1}
+                    min={0}
+                    value={field.value ?? 0}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    allowEmpty
+                  />
+                )}
               />
               <p className="text-xs text-muted-foreground">
                 Initial compression before working load / 工作载荷前的初始压缩量
@@ -505,13 +565,20 @@ export function CompressionCalculator() {
               <Label htmlFor="stressRatio">
                 Stress Ratio τ_min/τ_max / 应力比 <span className="text-slate-400">(for fatigue)</span>
               </Label>
-              <Input
-                id="stressRatio"
-                type="number"
-                step="0.05"
-                min="0"
-                max="1"
-                {...form.register("stressRatio", { valueAsNumber: true })}
+              <Controller
+                control={form.control}
+                name="stressRatio"
+                render={({ field }) => (
+                  <NumericInput
+                    id="stressRatio"
+                    step={0.05}
+                    min={0}
+                    max={1}
+                    value={field.value ?? 0.3}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
               <p className="text-xs text-muted-foreground">
                 0 = pulsating, 0.5 = partial reversal / 0=脉动，0.5=部分反向
