@@ -64,6 +64,19 @@ const SpiralTorsionSpringVisualizer = dynamic(
   }
 );
 
+// Dynamic import for Wave Spring 3D preview
+const WaveSpringVisualizer = dynamic(
+  () => import("@/components/three/WaveSpringVisualizer").then(mod => mod.WaveSpringVisualizer),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="h-[400px] bg-white rounded-lg flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    )
+  }
+);
+
 // Dynamic import for 2D drawing canvas
 const EngineeringDrawingCanvas = dynamic(
   () => import("@/components/drawing/EngineeringDrawingCanvas").then(mod => mod.EngineeringDrawingCanvas),
@@ -136,7 +149,7 @@ function CadExportContent() {
   // 从 store 或 URL 获取数据
   const code = storeMeta?.designCode ?? searchParams.get("code") ?? undefined;
   // Note: dieSpring has its own dedicated engineering page and is not supported in CAD export
-const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compression") as SpringGeometry['type'] | "spiralTorsion";
+const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compression") as SpringGeometry['type'] | "spiralTorsion" | "wave";
   
   // 几何参数 - 优先从 store 读取
   // 螺旋扭转弹簧没有 wireDiameter，使用 stripThickness 作为替代
@@ -305,6 +318,11 @@ const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compress
     if (isSpiralTorsion) {
       // 返回 null 让 FreeCAD 导出使用 storeGeometry
       return null;
+    }
+
+    // 波形弹簧也不使用通用引擎适配器
+    if (storeGeometry?.type === "wave") {
+      return null; 
     }
     
     if (storeGeometry) {
@@ -537,11 +555,29 @@ const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compress
     const baseItems = [
       { label: "Spring Type / 类型", value: springTypeLabels[springType] ?? springType },
       { label: "Design Code / 设计编号", value: code ?? "—" },
-      { label: "Wire Diameter d / 线径", value: `${wireDiameter.toFixed(2)} mm` },
+      { label: "Wire Diameter d / 线径", value: springType === "wave" ? "—" : `${wireDiameter.toFixed(2)} mm` },
     ];
     
     // 根据弹簧类型添加特定参数
     switch (springType) {
+      case "wave": {
+        // Assume storeGeometry is available and is WaveSpringGeometry
+        const g = storeGeometry as any; 
+        if (!g) return baseItems;
+        return [
+          { label: "Spring Type / 类型", value: "Wave / 波形弹簧" },
+          { label: "Material / 材料", value: materialName },
+          { label: "Inner Diameter ID / 内径", value: `${g.id} mm` },
+          { label: "Outer Diameter OD / 外径", value: `${g.od} mm` },
+          { label: "Thickness t / 厚度", value: `${g.thickness_t} mm` },
+          { label: "Radial Wall b / 壁宽", value: `${g.radialWall_b} mm` },
+          { label: "Turns Nt / 圈数", value: String(g.turns_Nt) },
+          { label: "Waves/Turn Nw / 波数", value: String(g.wavesPerTurn_Nw) },
+          { label: "Free Height Hf / 自由高度", value: `${g.freeHeight_Hf} mm` },
+          { label: "Working Height Hw / 工作高度", value: `${g.workingHeight_Hw} mm` },
+          { label: "Spring Rate k / 刚度", value: springRate ? `${springRate.toFixed(2)} N/mm` : "—" },
+        ];
+      }
       case "extension":
         return [
           ...baseItems,
@@ -734,6 +770,26 @@ const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compress
                     />
                   </p>
                 </>
+              ) : storeGeometry?.type === "wave" ? (
+                <>
+                  <div className="h-[400px] rounded-lg overflow-hidden bg-white border">
+                    <WaveSpringVisualizer
+                      meanDiameter={(storeGeometry as any).od - (storeGeometry as any).radialWall_b}
+                      thickness={(storeGeometry as any).thickness_t}
+                      width={(storeGeometry as any).radialWall_b}
+                      amplitude={((storeGeometry as any).freeHeight_Hf - ((storeGeometry as any).turns_Nt * (storeGeometry as any).thickness_t)) / (2 * (storeGeometry as any).turns_Nt * (storeGeometry as any).wavesPerTurn_Nw)}
+                      waves={(storeGeometry as any).wavesPerTurn_Nw}
+                      turns={(storeGeometry as any).turns_Nt}
+                      color="#6b9bd1"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    <LanguageText 
+                      en="Wave Spring • Internal 3D Renderer"
+                      zh="波形弹簧 • 内置 3D 渲染器"
+                    />
+                  </p>
+                </>
               ) : (
                 <>
                   <CadPreview3D 
@@ -766,68 +822,96 @@ const springType = (storeGeometry?.type ?? searchParams.get("type") ?? "compress
             </TabsContent>
             
             <TabsContent value="cad">
-              <FreeCadPreview
-                springType={isSpiralTorsion ? "spiral_torsion" : springType}
-                geometry={isSpiralTorsion && storeGeometry?.type === "spiralTorsion" 
-                  ? {
-                      innerDiameter: storeGeometry.innerDiameter,
-                      outerDiameter: storeGeometry.outerDiameter,
-                      turns: storeGeometry.activeCoils,
-                      stripWidth: storeGeometry.stripWidth,
-                      stripThickness: storeGeometry.stripThickness,
-                      handedness: "ccw",
+              {springType === "wave" ? (
+                <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 rounded-lg p-6 border text-center">
+                  <AlertCircle className="w-10 h-10 text-slate-300 mb-4" />
+                  <p className="text-muted-foreground">
+                    <LanguageText 
+                      en="FreeCAD preview is not available for Wave Springs yet."
+                      zh="波形弹簧暂不支持 FreeCAD 预览。"
+                    />
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <FreeCadPreview
+                    springType={isSpiralTorsion ? "spiral_torsion" : springType as any}
+                    geometry={isSpiralTorsion && storeGeometry?.type === "spiralTorsion" 
+                      ? {
+                          innerDiameter: storeGeometry.innerDiameter,
+                          outerDiameter: storeGeometry.outerDiameter,
+                          turns: storeGeometry.activeCoils,
+                          stripWidth: storeGeometry.stripWidth,
+                          stripThickness: storeGeometry.stripThickness,
+                          handedness: "ccw",
+                        }
+                      : {
+                          wireDiameter,
+                          meanDiameter,
+                          outerDiameter: springType === "extension" || springType === "torsion" ? meanDiameter + wireDiameter : undefined,
+                          activeCoils,
+                          totalCoils: springType === "conical" ? conicalTotalCoils : totalCoils,
+                          freeLength,
+                          bodyLength,
+                          hookType,
+                          legLength1,
+                          legLength2,
+                          windingDirection,
+                          largeOuterDiameter: largeDiameter,
+                          smallOuterDiameter: smallDiameter,
+                          topGround: storeGeometry?.type === "compression" ? storeGeometry.topGround : undefined,
+                          bottomGround: storeGeometry?.type === "compression" ? storeGeometry.bottomGround : undefined,
+                          endType: springType === "conical" ? conicalEndType : undefined,
+                        }
                     }
-                  : {
-                      wireDiameter,
-                      meanDiameter,
-                      outerDiameter: springType === "extension" || springType === "torsion" ? meanDiameter + wireDiameter : undefined,
-                      activeCoils,
-                      totalCoils: springType === "conical" ? conicalTotalCoils : totalCoils,
-                      freeLength,
-                      bodyLength,
-                      hookType,
-                      legLength1,
-                      legLength2,
-                      windingDirection,
-                      largeOuterDiameter: largeDiameter,
-                      smallOuterDiameter: smallDiameter,
-                      topGround: storeGeometry?.type === "compression" ? storeGeometry.topGround : undefined,
-                      bottomGround: storeGeometry?.type === "compression" ? storeGeometry.bottomGround : undefined,
-                      endType: springType === "conical" ? conicalEndType : undefined,
-                    }
-                }
-                className="h-[400px] rounded-lg overflow-hidden"
-              />
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                <LanguageText 
-                  en="Real CAD model generated by FreeCAD - Click Generate to create"
-                  zh="由 FreeCAD 生成的真实 CAD 模型 - 点击生成按钮创建"
-                />
-              </p>
+                    className="h-[400px] rounded-lg overflow-hidden"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    <LanguageText 
+                      en="Real CAD model generated by FreeCAD - Click Generate to create"
+                      zh="由 FreeCAD 生成的真实 CAD 模型 - 点击生成按钮创建"
+                    />
+                  </p>
+                </>
+              )}
             </TabsContent>
             
             <TabsContent value="2d">
-              <FreeCadDrawing
-                springType={springType as "compression" | "extension" | "torsion" | "conical"}
-                geometry={{
-                  wireDiameter,
-                  meanDiameter,
-                  outerDiameter: meanDiameter + wireDiameter,
-                  activeCoils,
-                  totalCoils,
-                  freeLength,
-                  bodyLength,
-                }}
-                material={storeMaterial ?? undefined}
-                analysis={storeAnalysis ? { springRate: storeAnalysis.springRate } : undefined}
-                className="min-h-[500px]"
-              />
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                <LanguageText 
-                  en="Professional engineering drawing generated by FreeCAD - Click Generate to create"
-                  zh="由 FreeCAD 生成的专业工程图 - 点击生成按钮创建"
-                />
-              </p>
+              {springType === "wave" ? (
+                <div className="flex flex-col items-center justify-center h-[500px] bg-slate-50 rounded-lg p-6 border text-center">
+                  <FileText className="w-10 h-10 text-slate-300 mb-4" />
+                  <p className="text-muted-foreground">
+                    <LanguageText 
+                      en="Engineering drawing generation is not available for Wave Springs yet."
+                      zh="波形弹簧暂不支持工程图生成。"
+                    />
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <FreeCadDrawing
+                    springType={springType as "compression" | "extension" | "torsion" | "conical"}
+                    geometry={{
+                      wireDiameter,
+                      meanDiameter,
+                      outerDiameter: meanDiameter + wireDiameter,
+                      activeCoils,
+                      totalCoils,
+                      freeLength,
+                      bodyLength,
+                    }}
+                    material={storeMaterial ?? undefined}
+                    analysis={storeAnalysis ? { springRate: storeAnalysis.springRate } : undefined}
+                    className="min-h-[500px]"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    <LanguageText 
+                      en="Professional engineering drawing generated by FreeCAD - Click Generate to create"
+                      zh="由 FreeCAD 生成的专业工程图 - 点击生成按钮创建"
+                    />
+                  </p>
+                </>
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>
