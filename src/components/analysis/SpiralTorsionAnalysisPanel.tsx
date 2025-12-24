@@ -317,7 +317,7 @@ export function SpiralTorsionAnalysisPanel({
       {/* Header */}
       <div className="mb-8">
         <div className="flex gap-2 mb-4">
-          <Link href="/tools/analysis">
+          <Link href="/tools/calculator">
             <Button variant="outline" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
               {isZh ? "返回" : "Back"}
