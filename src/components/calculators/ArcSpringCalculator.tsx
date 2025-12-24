@@ -26,7 +26,7 @@ import {
   downloadArcSpringPDF,
   printArcSpringReport,
 } from "@/lib/arcSpring";
-import { LanguageText } from "@/components/language-context";
+import { LanguageText, useLanguage } from "@/components/language-context";
 import { useSpringDesignStore, type ArcGeometry } from "@/lib/stores/springDesignStore";
 import { useRouter } from "next/navigation";
 import { buildArcSpringDesignRuleReport } from "@/lib/designRules";
@@ -66,9 +66,9 @@ interface NumberInputProps {
 
 function NumberInput({ label, value, onChange, unit, min = 0, step = 0.1, disabled }: NumberInputProps) {
   return (
-    <div className="space-y-1">
-      <Label className="text-sm text-muted-foreground">
-        {label} {unit && <span className="text-xs">({unit})</span>}
+    <div className="flex flex-col gap-1.5">
+      <Label className="text-xs font-medium text-muted-foreground/80">
+        {label} {unit && `(${unit})`}
       </Label>
       <NumericInput
         value={value}
@@ -76,7 +76,7 @@ function NumberInput({ label, value, onChange, unit, min = 0, step = 0.1, disabl
         min={min}
         step={step}
         disabled={disabled}
-        className="h-9 arc-no-spinner"
+        className="h-9 w-full arc-no-spinner"
       />
     </div>
   );
@@ -118,10 +118,11 @@ function SliderNumberInput({
   const effectiveMax = Math.max(min, expandedMax);
   const sliderValue = Math.min(Math.max(value, min), effectiveMax);
   return (
-    <div className="space-y-2">
-      <div className="flex items-end justify-between gap-2">
-        <Label className="text-sm text-muted-foreground">
-          {label} {unit && <span className="text-xs">({unit})</span>}
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
+        <Label className="text-xs font-medium text-muted-foreground/80 flex items-center justify-between">
+          <span>{label}</span>
+          {unit && <span className="text-[10px] opacity-60">({unit})</span>}
         </Label>
         <NumericInput
           value={Number.isFinite(value) ? value : 0}
@@ -129,24 +130,23 @@ function SliderNumberInput({
           min={min}
           step={step}
           disabled={disabled}
-          className="h-9 w-28 arc-no-spinner flex-shrink-0"
+          className="h-9 w-full arc-no-spinner"
         />
       </div>
-      <Slider
-        value={[sliderValue]}
-        min={min}
-        max={effectiveMax}
-        step={step}
-        onValueChange={(v) => onChange(v[0] ?? 0)}
-        disabled={disabled}
-      />
-      <div className="flex justify-between text-[10px] text-muted-foreground">
-        <span>
-          {min}{unit ? ` ${unit}` : ""}
-        </span>
-        <span>
-          {effectiveMax}{unit ? ` ${unit}` : ""}
-        </span>
+      <div className="space-y-1">
+        <Slider
+          value={[sliderValue]}
+          min={min}
+          max={effectiveMax}
+          step={step}
+          onValueChange={(v) => onChange(v[0] ?? 0)}
+          disabled={disabled}
+          className="py-1"
+        />
+        <div className="flex justify-between text-[9px] text-muted-foreground/60 font-mono">
+          <span>{min}</span>
+          <span>{effectiveMax}</span>
+        </div>
       </div>
     </div>
   );
@@ -170,6 +170,8 @@ type ArcIssueField =
 
 export function ArcSpringCalculator() {
   const router = useRouter();
+  const { language } = useLanguage();
+  const isZh = language === "zh";
   const [input, setInput] = useState<ArcSpringInput>(getDefaultArcSpringInput());
   const [mounted, setMounted] = useState(false);
   const [calculated, setCalculated] = useState(true); // 默认显示示例数据的计算结果
@@ -439,16 +441,16 @@ export function ArcSpringCalculator() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Circle className="w-4 h-4" />
-                Geometry / 几何参数
+                <LanguageText en="Geometry" zh="几何参数" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-3 gap-4">
+            <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div
                 ref={setFieldRef("d")}
                 className={highlightField === "d" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
               >
                 <SliderNumberInput
-                  label="Wire Diameter d"
+                  label={isZh ? "线径 d" : "Wire Diameter d"}
                   value={input.d}
                   onChange={(v) => updateInput("d", v)}
                   unit="mm"
@@ -462,7 +464,7 @@ export function ArcSpringCalculator() {
                 className={highlightField === "D" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
               >
                 <SliderNumberInput
-                  label="Mean Coil Diameter D"
+                  label={isZh ? "线圈中径 D" : "Mean Coil Diameter D"}
                   value={input.D}
                   onChange={(v) => updateInput("D", v)}
                   unit="mm"
@@ -476,7 +478,7 @@ export function ArcSpringCalculator() {
                 className={highlightField === "n" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
               >
                 <SliderNumberInput
-                  label="Active Coils n"
+                  label={isZh ? "有效圈数 n" : "Active Coils n"}
                   value={input.n}
                   onChange={(v) => updateInput("n", v)}
                   min={1}
@@ -492,17 +494,17 @@ export function ArcSpringCalculator() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Settings2 className="w-4 h-4" />
-                Arc Layout / 弧形布局
+                <LanguageText en="Arc Layout" zh="弧形布局" />
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 <div
                   ref={setFieldRef("r")}
                   className={highlightField === "r" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
                 >
                   <SliderNumberInput
-                    label="Working Radius r"
+                    label={isZh ? "工作半径 r" : "Working Radius r"}
                     value={input.r}
                     onChange={(v) => updateInput("r", v)}
                     unit="mm"
@@ -516,7 +518,7 @@ export function ArcSpringCalculator() {
                   className={highlightField === "alpha0" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
                 >
                   <SliderNumberInput
-                    label="Free Angle α₀"
+                    label={isZh ? "自由角度 α₀" : "Free Angle α₀"}
                     value={input.alpha0}
                     onChange={(v) => updateInput("alpha0", v)}
                     unit="deg"
@@ -530,7 +532,7 @@ export function ArcSpringCalculator() {
                   className={highlightField === "alphaWork" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
                 >
                   <SliderNumberInput
-                    label="Working Angle α_work"
+                    label={isZh ? "工作角度 α_work" : "Working Angle α_work"}
                     value={input.alphaWork ?? input.alpha0}
                     onChange={(v) => updateInput("alphaWork", v)}
                     unit="deg"
@@ -544,7 +546,7 @@ export function ArcSpringCalculator() {
                   className={highlightField === "alphaC" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
                 >
                   <SliderNumberInput
-                    label="Coil Bind Angle αc"
+                    label={isZh ? "压并角度 αc" : "Coil Bind Angle αc"}
                     value={input.alphaC}
                     onChange={(v) => updateInput("alphaC", v)}
                     unit="deg"
@@ -558,7 +560,7 @@ export function ArcSpringCalculator() {
                   className={highlightField === "countParallel" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
                 >
                   <SliderNumberInput
-                    label="Parallel Count"
+                    label={isZh ? "并联数量" : "Parallel Count"}
                     value={input.countParallel ?? 1}
                     onChange={(v) => updateInput("countParallel", Math.max(1, Math.round(v)))}
                     min={1}
@@ -577,7 +579,7 @@ export function ArcSpringCalculator() {
                     className={highlightField === "maxHousingDiameter" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
                   >
                     <SliderNumberInput
-                      label="Max Housing Diameter"
+                      label={isZh ? "最大外壳内径" : "Max Housing Diameter"}
                       value={input.maxHousingDiameter ?? 0}
                       onChange={(v) => updateInput("maxHousingDiameter", v > 0 ? v : undefined)}
                       unit="mm"
@@ -591,7 +593,7 @@ export function ArcSpringCalculator() {
                     className={highlightField === "minClearance" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
                   >
                     <SliderNumberInput
-                      label="Min Clearance"
+                      label={isZh ? "最小间隙" : "Min Clearance"}
                       value={input.minClearance ?? 1}
                       onChange={(v) => updateInput("minClearance", v)}
                       unit="mm"
@@ -610,12 +612,14 @@ export function ArcSpringCalculator() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Layers className="w-4 h-4" />
-                Material / 材料
+                <LanguageText en="Material" zh="材料参数" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label className="text-sm text-muted-foreground">Material Standard</Label>
+                <Label className="text-xs font-medium text-muted-foreground/80">
+                  {isZh ? "材料标准" : "Material Standard"}
+                </Label>
                 <Select
                   value={input.materialKey}
                   onValueChange={(v) => updateInput("materialKey", v as MaterialKey)}
@@ -635,7 +639,7 @@ export function ArcSpringCalculator() {
               {input.materialKey === "CUSTOM" && (
                 <div>
                   <SliderNumberInput
-                    label="Shear Modulus G"
+                    label={isZh ? "剪切模量 G" : "Shear Modulus G"}
                     value={input.G_override ?? 80000}
                     onChange={(v) => updateInput("G_override", v)}
                     unit="N/mm²"
@@ -1102,22 +1106,22 @@ export function ArcSpringCalculator() {
               {result.M_work !== undefined && (
                 <div className="grid grid-cols-3 gap-3 p-3 bg-emerald-50 dark:bg-emerald-950 rounded-lg border border-emerald-100">
                   <div className="col-span-3 text-xs text-emerald-600 font-medium pb-1 border-b border-emerald-200 mb-1">
-                    Working State (at α_work = {input.alphaWork?.toFixed(1)}°, Δα = {result.deltaAlphaWork?.toFixed(1)}°)
+                    {isZh ? "工作状态" : "Working State"} (at α_work = {input.alphaWork?.toFixed(1)}°, Δα = {result.deltaAlphaWork?.toFixed(1)}°)
                   </div>
                   <div>
-                    <div className="text-xs text-emerald-600/80">Working Torque</div>
+                    <div className="text-xs text-emerald-600/80">{isZh ? "工作扭矩" : "Working Torque"}</div>
                     <div className="text-sm font-bold text-emerald-700">
                       {result.M_work.toFixed(0)} N·mm
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-emerald-600/80">Working Stress</div>
+                    <div className="text-xs text-emerald-600/80">{isZh ? "工作应力" : "Working Stress"}</div>
                     <div className="text-sm font-bold text-emerald-700">
                       {result.tauWork?.toFixed(0)} MPa
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-emerald-600/80">SF (Work)</div>
+                    <div className="text-xs text-emerald-600/80">{isZh ? "安全系数" : "SF (Work)"}</div>
                     <div className="text-sm font-bold text-emerald-700">
                       {result.tauWork ? (allowableTau / result.tauWork).toFixed(2) : "-"}
                     </div>
@@ -1138,7 +1142,7 @@ export function ArcSpringCalculator() {
                     <div className="font-medium">{isFinite(result.Di) ? result.Di.toFixed(1) : "—"} mm</div>
                   </div>
                   <div className="p-2 bg-slate-50 dark:bg-slate-900 rounded">
-                    <div className="text-muted-foreground">Safety Margin</div>
+                    <div className="text-muted-foreground">{isZh ? "安全裕度" : "Safety Margin"}</div>
                     <div className="font-medium">{isFinite(result.safetyMarginToSolid) ? result.safetyMarginToSolid.toFixed(1) : "—"}°</div>
                   </div>
                 </div>
@@ -1218,7 +1222,9 @@ export function ArcSpringCalculator() {
           {/* Chart Card */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Torque–Angle Curve / 扭矩-角度曲线</CardTitle>
+              <CardTitle className="text-base">
+                <LanguageText en="Torque–Angle Curve" zh="扭矩-角度曲线" />
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[400px]">
@@ -1281,8 +1287,8 @@ export function ArcSpringCalculator() {
               </div>
               <p className="text-xs text-muted-foreground mt-2 text-center">
                 {input.hysteresisMode === "none"
-                  ? "No hysteresis - Loading and Unloading curves overlap"
-                  : "Hysteresis loop shows friction effect between loading and unloading"}
+                  ? isZh ? "无迟滞 - 加载和卸载曲线重合" : "No hysteresis - Loading and Unloading curves overlap"
+                  : isZh ? "迟滞回线显示了加载和卸载之间的摩擦效应" : "Hysteresis loop shows friction effect between loading and unloading"}
               </p>
             </CardContent>
           </Card>
@@ -1292,7 +1298,7 @@ export function ArcSpringCalculator() {
       {/* Advanced Analysis Panel */}
       {calculated && isFinite(result.k) && (
         <ArcSpringAdvancedPanel
-          isZh={false}
+          isZh={isZh}
           input={input}
           result={result}
           allowableTau={allowableTau}
