@@ -519,6 +519,9 @@ export function buildFreeCADRequest(
   if (geometry.type === "wave") {
     return null;
   }
+  if (geometry.type === "arc") {
+    return null;
+  }
 
   const design: FreeCADExportRequest["design"] = {
     springType: geometry.type,
@@ -637,6 +640,8 @@ export function generateFreeCADScript(geometry: SpringGeometry): string {
       return "# Die spring FreeCAD export not yet implemented";
     case "wave":
       return "# Wave spring FreeCAD export not yet implemented";
+    case "arc":
+      return "# Arc spring FreeCAD export not yet implemented";
     default:
       return "# Unknown spring type for FreeCAD export";
   }

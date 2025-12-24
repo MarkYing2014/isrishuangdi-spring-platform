@@ -137,6 +137,18 @@ export const SPRING_PIPELINES: Record<SpringType, SpringPipelineConfig> = {
     icon: "Car",
     implemented: true,
   },
+  arc: {
+    type: "arc",
+    label: { en: "Arc Spring", zh: "弧形弹簧" },
+    calculatorPath: "/tools/calculator?type=arcSpring",
+    analysisPath: "/tools/analysis?type=arc",
+    simulatorPath: "/tools/simulator?type=arc", // Not implemented yet but route exists
+    reportPath: "/tools/report?type=arc",
+    cadExportPath: "/tools/cad-export?type=arcSpring",
+    rfqPath: "/rfq?springType=arc",
+    icon: "Circle",
+    implemented: true,
+  },
 };
 
 /**
@@ -164,13 +176,13 @@ export function buildPipelineUrl(
   params: Record<string, string | number | boolean | undefined>
 ): string {
   const searchParams = new URLSearchParams();
-  
+
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== "") {
       searchParams.set(key, String(value));
     }
   }
-  
+
   const queryString = searchParams.toString();
   return queryString ? `${basePath}${basePath.includes("?") ? "&" : "?"}${queryString}` : basePath;
 }
@@ -187,23 +199,23 @@ export const PARAM_KEYS = {
   materialId: "mat",
   activeCoils: "Na",
   freeLength: "L0",
-  
+
   // Compression
   meanDiameter: "Dm",
   totalCoils: "Nt",
   deflection: "dx",
-  
+
   // Conical
   largeOuterDiameter: "D1",
   smallOuterDiameter: "D2",
   maxDeflection: "dxMax",
-  
+
   // Extension
   outerDiameter: "OD",
   bodyLength: "Lb",
   initialTension: "F0",
   extension: "ext",
-  
+
   // Torsion
   legLength1: "leg1",
   legLength2: "leg2",
@@ -218,7 +230,7 @@ export function serializeDesignToParams(
   design: Record<string, unknown>
 ): Record<string, string> {
   const params: Record<string, string> = {};
-  
+
   const keyMap: Record<string, string> = {
     type: PARAM_KEYS.type,
     wireDiameter: PARAM_KEYS.wireDiameter,
@@ -237,14 +249,14 @@ export function serializeDesignToParams(
     legLength2: PARAM_KEYS.legLength2,
     workingAngle: PARAM_KEYS.workingAngle,
   };
-  
+
   for (const [key, value] of Object.entries(design)) {
     if (value !== undefined && value !== null) {
       const paramKey = keyMap[key] || key;
       params[paramKey] = String(value);
     }
   }
-  
+
   return params;
 }
 
@@ -256,7 +268,7 @@ export function parseParamsToDesign(
   searchParams: URLSearchParams
 ): Record<string, string | number> {
   const design: Record<string, string | number> = {};
-  
+
   const reverseKeyMap: Record<string, string> = {
     [PARAM_KEYS.type]: "type",
     [PARAM_KEYS.wireDiameter]: "wireDiameter",
@@ -278,7 +290,7 @@ export function parseParamsToDesign(
     [PARAM_KEYS.maxDeflection]: "maxDeflection",
     [PARAM_KEYS.extension]: "extension",
   };
-  
+
   searchParams.forEach((value, key) => {
     const designKey = reverseKeyMap[key] || key;
     const numValue = Number(value);
@@ -286,6 +298,6 @@ export function parseParamsToDesign(
       ? numValue
       : value;
   });
-  
+
   return design;
 }
