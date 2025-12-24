@@ -91,6 +91,8 @@ export function Calculator3DPreview({
           risk={geometry.risk ?? "low"}
           autoRotate={false} 
           backgroundColor="#f8fafc" // slate-50
+          springRate={analysis?.springRate}
+          solidHeight={analysis?.solidHeight}
         />
       );
     }
