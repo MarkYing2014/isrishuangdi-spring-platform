@@ -26,6 +26,7 @@ import {
   downloadArcSpringPDF,
   printArcSpringReport,
 } from "@/lib/arcSpring";
+import { useRouter } from "next/navigation";
 import { buildArcSpringDesignRuleReport } from "@/lib/designRules";
 import {
   LineChart,
@@ -166,6 +167,7 @@ type ArcIssueField =
   | "engageAngle2";
 
 export function ArcSpringCalculator() {
+  const router = useRouter();
   const [input, setInput] = useState<ArcSpringInput>(getDefaultArcSpringInput());
   const [mounted, setMounted] = useState(false);
   const [calculated, setCalculated] = useState(true); // 默认显示示例数据的计算结果
@@ -921,6 +923,28 @@ export function ArcSpringCalculator() {
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <CardTitle className="text-base">Results / 计算结果</CardTitle>
               <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  onClick={() => {
+                    const params = new URLSearchParams();
+                    params.set("type", "arc");
+                    params.set("d", input.d.toString());
+                    params.set("D", input.D.toString());
+                    params.set("n", input.n.toString());
+                    params.set("r", input.r.toString());
+                    params.set("alpha0", input.alpha0.toString());
+                    params.set("alphaC", input.alphaC.toString());
+                    params.set("mat", input.materialKey);
+                    if (input.alphaWork) params.set("alphaWork", input.alphaWork.toString());
+                    if (symmetricDeadCoils && deadCoilsPerEnd) params.set("Nt", (input.n + deadCoilsPerEnd * 2).toString());
+                    
+                    router.push(`/tools/analysis?${params.toString()}`);
+                  }}
+                >
+                  <Activity className="w-4 h-4 mr-1" />
+                  Engineering Analysis
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"

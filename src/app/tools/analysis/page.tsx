@@ -33,7 +33,9 @@ import Link from "next/link";
 import { Brain } from "lucide-react";
 import { SpiralTorsionAnalysisPanel } from "@/components/analysis/SpiralTorsionAnalysisPanel";
 import { SuspensionAnalysisPanel } from "@/components/analysis/SuspensionAnalysisPanel";
+import { ArcSpringEngineeringPage } from "@/components/analysis/ArcSpringEngineeringPage";
 import { isSpiralTorsionDesign, isSuspensionDesign } from "@/lib/stores/springDesignStore";
+import { useSearchParams } from "next/navigation";
 
 // Dynamic imports for 3D visualizers
 const CompressionSpringVisualizer = dynamic(
@@ -71,6 +73,13 @@ function AnalysisContent() {
   const designGeometry = useSpringDesignStore(state => state.geometry);
   const designMaterial = useSpringDesignStore(state => state.material);
   const designAnalysis = useSpringDesignStore(state => state.analysisResult);
+  
+  const searchParams = useSearchParams();
+  const analysisType = searchParams.get("type");
+
+  if (analysisType === "arc") {
+    return <ArcSpringEngineeringPage />;
+  }
 
   if (!designGeometry || !designMaterial || !designAnalysis) {
     return (

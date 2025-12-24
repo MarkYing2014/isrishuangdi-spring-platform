@@ -23,11 +23,14 @@ export interface ArcSpringInput {
   d: number;   // mm - 线径
   D: number;   // mm - 中径 (Mean coil diameter)
   n: number;   // 有效圈数
+  Nt?: number; // 总圈数 (Total coils)
+  hand?: Handedness; // 旋向
 
   // Arc layout (弧形布局) - 圆弧配置
   r: number;       // mm - 工作半径 (力臂，决定扭矩)
   alpha0: number;  // deg - 自由角
   alphaWork?: number; // deg - 工作角 (Working Angle)
+  alphaLimit?: number; // deg - 极限角/Bump角 (Limit/Bump Angle)
   alphaC: number;  // deg - 压并角 (alphaC < alpha0)
   countParallel?: number; // 并联弹簧数量 (DMF 常用多根并联，默认 1)
 
@@ -58,6 +61,10 @@ export interface ArcSpringInput {
   >>;
 
   engageAngle2?: number; // deg - 仅用于 dual_staged (Δα 阈值，拐点角度)
+
+  // Loadcase (工况)
+  preloadTorque?: number; // N·mm - 装配预载扭矩 T0
+  alphaPreload?: number;  // deg - 预载角度 (Preload Angle)
 }
 
 export interface ArcSpringPoint {
@@ -87,6 +94,10 @@ export interface ArcSpringResult {
   deltaAlphaWork?: number; // deg - 工作转角
   M_work?: number;         // N·mm - 工作扭矩
   tauWork?: number;        // MPa - 工作应力
+
+  // 极限点 (如果提供了 alphaLimit)
+  M_limit?: number;        // N·mm - 极限扭矩
+  tauLimit?: number;       // MPa - 极限应力
 
   // 几何尺寸
   De: number;             // mm - 外径 (Outer coil diameter) = D + d
