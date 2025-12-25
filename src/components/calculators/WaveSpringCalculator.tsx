@@ -45,9 +45,11 @@ import { buildWaveSpringDesignRuleReport } from "@/lib/designRules/waveSpringRul
 import { buildWaveRiskRadar } from "@/lib/riskRadar/builders";
 import { useSpringDesignStore } from "@/lib/stores/springDesignStore";
 import { computeAxialTravel, waveTravel } from "@/lib/travel/AxialTravelModel";
-import { Info } from "lucide-react";
+import { Info, Factory } from "lucide-react";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
+import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
+import { generateDesignCode } from "@/lib/stores/springDesignStore";
 
 import { Calculator3DPreview } from "./Calculator3DPreview";
 import { SavedDesignManager } from "@/components/analysis/SavedDesignManager";
@@ -483,6 +485,50 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
                    className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
                 >
                   {isZh ? "发送到工程分析 / Engineering Analysis" : "Send to Engineering Analysis / 发送到工程分析"}
+                </Button>
+                
+                <Button
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
+                  disabled={!unifiedAudit || unifiedAudit.status === "FAIL"}
+                  onClick={() => {
+                    if (!result || !result.isValid || !unifiedAudit) return;
+                    
+                    // Create Work Order
+                    const store = useWorkOrderStore.getState();
+                    const wo = store.createWorkOrder({
+                      designCode: generateDesignCode({type: "wave", ...input.geometry}),
+                      springType: "wave",
+                      geometry: { type: "wave", ...input.geometry },
+                      material: {
+                        id: materialId as any,
+                        name: input.material?.name || "17-7PH",
+                        shearModulus: E_MPa / (2 * (1 + 0.3)),
+                        elasticModulus: E_MPa,
+                        density: 7800,
+                        tensileStrength: 1200, // Approximate for stainless/inconel in wave springs if not provided
+                        surfaceFactor: 1.0,
+                        tempFactor: 1.0,
+                      },
+                      analysis: {
+                        springRate: result.springRate_Nmm,
+                        springRateUnit: "N/mm",
+                        workingLoad: result.loadAtWorkingHeight_N,
+                        maxStress: result.stressMax_MPa,
+                        springIndex: result.meanDiameter_mm / thickness_t,
+                        workingDeflection: result.travel_mm,
+                        maxDeflection: result.travel_mm,
+                      },
+                      audit: unifiedAudit,
+                      quantity: 1000,
+                      createdBy: "Engineer",
+                      notes: unifiedAudit.status === "WARN" ? "Warning: Engineering audit has warnings. Review required." : undefined
+                    });
+                    
+                    window.location.href = `/manufacturing/workorder/${wo.workOrderId}`;
+                  }}
+                >
+                  <Factory className="w-4 h-4 mr-2" />
+                  {isZh ? "创建生产工单 / Create Work Order" : "Create Work Order / 创建生产工单"}
                 </Button>
                 <Button 
                   onClick={handleExportCad}

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useLanguage } from "@/components/language-context";
-import { Info, Calculator, Send, AlertTriangle } from "lucide-react";
+import { Info, Calculator, Send, AlertTriangle, Factory } from "lucide-react";
+import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
 import { 
   Card, 
   CardContent, 
@@ -379,6 +380,68 @@ export function DiskSpringCalculator() {
                 <Send className="h-4 w-4 mr-2" />
                 Engineering Analysis / 工程分析
              </Button>
+
+             <Button
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
+                disabled={!unifiedAudit || unifiedAudit.status === "FAIL"}
+                onClick={() => {
+                  if (!result || !result.designRules.geometryOk || !unifiedAudit) return;
+                  handleSyncStore();
+                  
+                  // Create Work Order
+                  const store = useWorkOrderStore.getState();
+                  // We need to re-construct geometry/material if not waiting for handleSyncStore to settle (which updates store asynchronously potentially, but zustand is sync usually)
+                  // However, let's use the input object we have locally to be safe.
+                  
+                  // Reconstruct material info locally since it's not fully in 'result'
+                  const materialInfo = {
+                    id: "custom" as any,
+                    name: "Spring Steel (User)",
+                    shearModulus: E / (2 * (1 + nu)),
+                    elasticModulus: E,
+                    density: 7850,
+                    tensileStrength: Sy, // Used Sy as yield, rough approx for tensile if not better known
+                    surfaceFactor: 1.0,
+                    tempFactor: 1.0,
+                  };
+
+                  const wo = store.createWorkOrder({
+                    designCode: `DISK-${outerDiameter}-${innerDiameter}-${thickness}`, // unique enough for now
+                    springType: "disk",
+                    geometry: {
+                      type: "disk",
+                      outerDiameter,
+                      innerDiameter,
+                      thickness,
+                      freeConeHeight,
+                      group,
+                      parallelCount,
+                      seriesCount,
+                      frictionCoeff,
+                    },
+                    material: materialInfo,
+                    analysis: {
+                      springRate: result.points.work.k_stack,
+                      springRateUnit: "N/mm",
+                      workingLoad: result.points.work.F_stack,
+                      maxLoad: result.points.max.F_stack,
+                      maxStress: result.points.max.sigma_eq,
+                      staticSafetyFactor: 1 / (result.points.max.ratio || 1),
+                      workingDeflection: travelDerived.delta,
+                      maxDeflection: sMax,
+                    },
+                    audit: unifiedAudit,
+                    quantity: 1000,
+                    createdBy: "Engineer",
+                    notes: unifiedAudit.status === "WARN" ? "Warning: Engineering audit has warnings. Review required." : undefined
+                  });
+                  
+                  window.location.href = `/manufacturing/workorder/${wo.workOrderId}`;
+                }}
+              >
+                <Factory className="w-4 h-4 mr-2" />
+                Create Work Order / 创建生产工单
+              </Button>
              <Button 
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/10"
                 disabled={!result.designRules.geometryOk}

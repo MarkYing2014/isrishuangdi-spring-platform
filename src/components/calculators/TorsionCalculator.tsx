@@ -38,9 +38,10 @@ import {
   generateDesignCode,
 } from "@/lib/stores/springDesignStore";
 import { computeAngles, torsionAngles, type AngleDerived } from "@/lib/angle/AngleModel";
-import { Info, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Info, AlertTriangle, CheckCircle2, Factory } from "lucide-react";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
+import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
 
 interface FormValues {
   wireDiameter: number;        // d - 线径
@@ -903,6 +904,43 @@ export function TorsionCalculator() {
             >
               <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
             </Button>
+            
+            <Button
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
+              disabled={!unifiedAudit || unifiedAudit.status === "FAIL"}
+              onClick={() => {
+                if (!lastTorsion || !lastTorsionAnalysis || !unifiedAudit || !selectedMaterial) return;
+                
+                // Create Work Order
+                const store = useWorkOrderStore.getState();
+                const wo = store.createWorkOrder({
+                  designCode: generateDesignCode(lastTorsion),
+                  springType: "torsion",
+                  geometry: lastTorsion,
+                  material: {
+                    id: selectedMaterial.id,
+                    name: selectedMaterial.nameEn,
+                    shearModulus: selectedMaterial.shearModulus,
+                    elasticModulus: selectedMaterial.elasticModulus ?? 207000,
+                    density: selectedMaterial.density ?? 7850,
+                    tensileStrength: selectedMaterial.tensileStrength,
+                    surfaceFactor: selectedMaterial.surfaceFactor,
+                    tempFactor: selectedMaterial.tempFactor,
+                  },
+                  analysis: lastTorsionAnalysis,
+                  audit: unifiedAudit,
+                  quantity: 1000,
+                  createdBy: "Engineer",
+                  notes: unifiedAudit.status === "WARN" ? "Warning: Engineering audit has warnings. Review required." : undefined
+                });
+                
+                window.location.href = `/manufacturing/workorder/${wo.workOrderId}`;
+              }}
+            >
+              <Factory className="w-4 h-4 mr-2" />
+              Create Work Order / 创建生产工单
+            </Button>
+
             <Button 
               asChild 
               variant="outline" 

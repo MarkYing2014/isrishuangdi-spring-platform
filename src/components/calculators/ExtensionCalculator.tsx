@@ -2,8 +2,10 @@
 
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { type SubmitHandler, useForm, Controller } from "react-hook-form";
+import { Factory } from "lucide-react";
 import { NumericInput } from "@/components/ui/numeric-input";
 
+import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
 import { calculateExtensionSpring, type ExtensionSpringInput } from "@/lib/springMath";
 import { buildExtensionDesignRuleReport } from "@/lib/designRules";
 import { Button } from "@/components/ui/button";
@@ -631,6 +633,43 @@ export function ExtensionCalculator() {
             >
               <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
             </Button>
+            
+            <Button
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
+              disabled={!unifiedAudit || unifiedAudit.status === "FAIL"}
+              onClick={() => {
+                if (!lastExtensionGeometry || !lastExtensionAnalysis || !unifiedAudit) return;
+                
+                // Create Work Order
+                const store = useWorkOrderStore.getState();
+                const wo = store.createWorkOrder({
+                  designCode: generateDesignCode(lastExtensionGeometry),
+                  springType: "extension",
+                  geometry: lastExtensionGeometry,
+                  material: {
+                    id: selectedMaterial.id,
+                    name: selectedMaterial.nameEn,
+                    shearModulus: selectedMaterial.shearModulus,
+                    elasticModulus: selectedMaterial.elasticModulus ?? 206000,
+                    density: selectedMaterial.density ?? 7850,
+                    tensileStrength: selectedMaterial.tensileStrength,
+                    surfaceFactor: selectedMaterial.surfaceFactor,
+                    tempFactor: selectedMaterial.tempFactor,
+                  },
+                  analysis: lastExtensionAnalysis,
+                  audit: unifiedAudit,
+                  quantity: 1000,
+                  createdBy: "Engineer",
+                  notes: unifiedAudit.status === "WARN" ? "Warning: Engineering audit has warnings. Review required." : undefined
+                });
+                
+                window.location.href = `/manufacturing/workorder/${wo.workOrderId}`;
+              }}
+            >
+              <Factory className="w-4 h-4 mr-2" />
+              Create Work Order / 创建生产工单
+            </Button>
+
             <Button 
               variant="outline" 
               className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10" 

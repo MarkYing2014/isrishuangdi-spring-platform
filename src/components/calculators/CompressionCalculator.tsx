@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { type SubmitHandler, type Resolver, useForm, Controller } from "react-hook-form";
 import { z } from "zod";
+import { Factory } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { 
@@ -49,6 +50,7 @@ import {
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 import { SavedDesignManager } from "@/components/analysis/SavedDesignManager";
+import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
 
 const formSchema = z
   .object({
@@ -999,6 +1001,46 @@ export function CompressionCalculator() {
             <div className="flex justify-center py-2">
               <SavedDesignManager />
             </div>
+
+            <Button
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+              disabled={!unifiedAudit || unifiedAudit.status === "FAIL"}
+              onClick={() => {
+                if (!lastCompressionGeometry || !lastCompressionAnalysis || !unifiedAudit) return;
+                
+                // Create Work Order
+                const store = useWorkOrderStore.getState();
+                const wo = store.createWorkOrder({
+                  designCode: generateDesignCode(lastCompressionGeometry),
+                  springType: "compression",
+                  geometry: lastCompressionGeometry,
+                  material: {
+                    id: selectedMaterial.id,
+                    name: selectedMaterial.nameEn,
+                    shearModulus: selectedMaterial.shearModulus,
+                    elasticModulus: selectedMaterial.elasticModulus ?? 200000,
+                    density: selectedMaterial.density ?? 7850,
+                    tensileStrength: selectedMaterial.tensileStrength,
+                    surfaceFactor: selectedMaterial.surfaceFactor,
+                    tempFactor: selectedMaterial.tempFactor,
+                  },
+                  analysis: lastCompressionAnalysis,
+                  audit: unifiedAudit,
+                  quantity: 1000,
+                  createdBy: "Engineer",
+                  notes: unifiedAudit.status === "WARN" ? "Warning: Engineering audit has warnings. Review required." : undefined
+                });
+                
+                // Redirect using window.location since we are in a client component but might not have router hook setup right here for push
+                // Actually we checked imports, let's double check if we can use router.
+                // We see 'useRouter' is NOT imported yet. We need to add imports first.
+                // For now, let's just use window.location.href or try to use Link if possible, but this is an action.
+                window.location.href = `/manufacturing/workorder/${wo.workOrderId}`;
+              }}
+            >
+              <Factory className="w-4 h-4 mr-2" />
+              Create Work Order / 创建生产工单
+            </Button>
 
             <Button 
               asChild 
