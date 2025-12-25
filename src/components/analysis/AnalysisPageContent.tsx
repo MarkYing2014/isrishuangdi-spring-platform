@@ -28,7 +28,7 @@ import {
   type AnalysisResult,
 } from "@/lib/stores/springDesignStore";
 import { convertStoreGeometryToEngine } from "@/lib/engine/geometryAdapters";
-import { EXTENSION_HOOK_LABELS, type ExtensionHookType, type SpringType } from "@/lib/springTypes";
+import { EXTENSION_HOOK_LABELS, type ExtensionHookType, type SpringType, SPRING_TYPE_LABELS } from "@/lib/springTypes";
 import Link from "next/link";
 import { Brain } from "lucide-react";
 import { SpiralTorsionAnalysisPanel } from "@/components/analysis/SpiralTorsionAnalysisPanel";
@@ -178,15 +178,32 @@ function AnalysisReady({
   };
   // ⚠️ 注意：spiralTorsion 和 dieSpring 已在上层被拦截，此函数只处理 wire spring
   // 不要在这里添加 spiralTorsion 或 dieSpring 的兼容代码
-  if (designGeometry.type === "spiralTorsion") {
-    throw new Error("spiralTorsion should be handled by SpiralTorsionAnalysisPanel");
+  // Handles specialized types that have their own engineering pages
+  if (designGeometry.type === "spiralTorsion" || designGeometry.type === "wave" || designGeometry.type === "dieSpring") {
+    const typeLabel = SPRING_TYPE_LABELS[designGeometry.type][isZh ? "zh" : "en"];
+    const specializedUrl = designGeometry.type === "wave" 
+      ? "/tools/engineering/wave-spring" 
+      : designGeometry.type === "dieSpring"
+        ? "/tools/engineering/die-spring"
+        : "/tools/calculator?type=spiral"; // Spiral Torsion analysis is being refactored
+
+    return (
+      <main className="container mx-auto py-12 text-center">
+        <h1 className="text-2xl font-bold mb-4">{typeLabel}</h1>
+        <p className="text-muted-foreground mb-6">
+          {isZh 
+            ? "此弹簧类型拥有专门的工程分析页面，正在为您跳转或请点击下方按钮。" 
+            : "This spring type has a specialized engineering analysis page. Please click the button below to navigate."}
+        </p>
+        <Button asChild variant="default">
+          <Link href={specializedUrl}>
+            {isZh ? "前往专门分析页面" : "Go to Specialized Analysis"}
+          </Link>
+        </Button>
+      </main>
+    );
   }
-  if (designGeometry.type === "dieSpring") {
-    throw new Error("dieSpring should be handled by DieSpringEngineeringPage");
-  }
-  if (designGeometry.type === "wave") {
-    throw new Error("waveSpring should be handled by WaveSpringEngineeringPage");
-  }
+
   if (designGeometry.type === "arc") {
     return (
       <div className="container mx-auto py-12 text-center">

@@ -188,7 +188,7 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
   }), [id, od, thickness_t, radialWall_b, turns_Nt, wavesPerTurn_Nw, freeHeight_Hf, workingHeight_Hw, E_MPa, materialId]);
 
   const analysisUrl = useMemo(() => 
-    buildPipelineUrl("/tools/analysis?type=wave", designParams), 
+    buildPipelineUrl("/tools/engineering/wave-spring", designParams), 
     [designParams]
   );
 
