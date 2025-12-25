@@ -10,13 +10,15 @@ import {
   Info,
   Layers,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Trophy,
+  Zap
 } from "lucide-react";
 import Link from "next/link";
 import { useSpringDesignStore, type SavedDesign } from "@/lib/stores/springDesignStore";
 import { useLanguage } from "@/components/language-context";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
   Table, 
@@ -37,6 +39,9 @@ import {
   ResponsiveContainer 
 } from "recharts";
 import { ComparisonEngine } from "@/lib/comparison/ComparisonEngine";
+import { normalizeAudit } from "@/lib/engineering/normalizeAudit";
+import { calculateRecommendationScore } from "@/lib/engineering/recommendationScore";
+import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { cn } from "@/lib/utils";
 
 export default function CompareDesignsPage() {
@@ -58,6 +63,22 @@ export default function CompareDesignsPage() {
     ComparisonEngine.getComparisonMatrix(selectedDesigns),
     [selectedDesigns]
   );
+
+  // Calculate recommendation scores for selected designs
+  const recommendations = useMemo(() => {
+    return selectedDesigns.map(design => {
+      const auditResult = AuditEngine.evaluate({
+        springType: design.springType,
+        geometry: design.geometry as any,
+        results: design.analysisResult as any
+      });
+      const normalized = normalizeAudit(auditResult);
+      const score = calculateRecommendationScore(normalized, design.analysisResult);
+      return { id: design.id, design, score };
+    }).sort((a, b) => (b.score.totalScore || 0) - (a.score.totalScore || 0));
+  }, [selectedDesigns]);
+
+  const bestDesign = recommendations[0]?.score.eligible ? recommendations[0] : null;
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 
@@ -128,6 +149,49 @@ export default function CompareDesignsPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr,350px] gap-8">
         <div className="space-y-8">
+          {/* Best Recommendation Card */}
+          {bestDesign && (
+            <Card className="border-none bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-xl overflow-hidden animate-in slide-in-from-top duration-500">
+              <div className="absolute top-0 right-0 p-8 opacity-10">
+                <Trophy className="h-32 w-32" />
+              </div>
+              <CardHeader className="relative">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge className="bg-white/20 hover:bg-white/30 text-white border-none backdrop-blur-md">
+                    <Zap className="mr-1 h-3 w-3 fill-yellow-300 text-yellow-300" />
+                    {isZh ? "推荐方案" : "Recommended Solution"}
+                  </Badge>
+                  <span className="text-blue-100 text-xs font-medium">
+                    Score: {bestDesign.score.totalScore}/100
+                  </span>
+                </div>
+                <CardTitle className="text-2xl font-bold">
+                  {bestDesign.design.designCode}
+                </CardTitle>
+                <CardDescription className="text-blue-100/80">
+                  {isZh 
+                    ? `该方案在安全性、疲劳寿命与可制造性之间达到了最佳平衡。` 
+                    : `This design achieves the optimal balance between safety, fatigue life, and manufacturability.`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="relative space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {bestDesign.score.reasons.map((reason, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm bg-white/10 p-2 rounded-lg border border-white/5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-300 shrink-0" />
+                      <span className="text-blue-50">{reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+              <CardFooter className="relative bg-black/10 border-t border-white/5 py-3">
+                <p className="text-[10px] text-blue-200/60 uppercase tracking-widest font-bold">
+                  {isZh ? "基于 ISRI-SHUANGDI 工程算法引擎" : "Powered by ISRI-SHUANGDI Engineering Engine"}
+                </p>
+              </CardFooter>
+            </Card>
+          )}
+
           {/* Comparison Table */}
           <Card className="overflow-hidden border-2 border-slate-100 shadow-sm">
             <CardHeader className="bg-slate-50/50 pb-4">
@@ -299,20 +363,31 @@ export default function CompareDesignsPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900 text-slate-100 border-none shadow-xl">
-            <CardHeader>
+          <Card className="bg-slate-900 text-slate-100 border-none shadow-xl overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <History className="h-24 w-24" />
+            </div>
+            <CardHeader className="relative">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-400" />
-                    {isZh ? "系统选型建议" : "Selection Insight"}
+                    <Info className="h-4 w-4 text-blue-400" />
+                    {isZh ? "选择建议" : "Selection Advice"}
                 </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="relative space-y-4">
                 <p className="text-xs text-slate-400 leading-relaxed">
                     {isZh 
-                      ? "基于当前工程指标，系统会自动识别最优解（Blue Text）。建议优先平衡“安全系数”与“体积效率”。" 
-                      : "The system identifies optimal values in Blue. We recommend balancing Safety Factor and Volumetric Efficiency."}
+                      ? "评估得分综合考虑了：应力安全性 (35%)、疲劳储备 (25%)、几何余量 (20%) 以及制造可行性 (10%)。蓝色高亮指标代表该维度下的最优表现。" 
+                      : "Scores are weighted by: Safety (35%), Fatigue (25%), Margin (20%), and Manufacturability (10%). Blue highlights indicate best performance in that metric."}
                 </p>
-                <Button className="w-full bg-blue-600 hover:bg-blue-500 h-9 rounded-full text-xs font-bold" variant="default">
+                <div className="pt-2">
+                  <Button asChild className="w-full bg-blue-600 hover:bg-blue-500 h-9 rounded-full text-xs font-bold" variant="default">
+                    <Link href="/tools/select">
+                      {isZh ? "找不到理想方案？进入选型导航" : "Can't find ideal design? Enter Wizard"}
+                    </Link>
+                  </Button>
+                </div>
+                <div className="h-px bg-slate-800" />
+                <Button className="w-full bg-slate-800 hover:bg-slate-700 h-9 rounded-full text-xs font-bold text-slate-300 border-slate-700" variant="outline">
                     {isZh ? "申请专家评审" : "Request Expert Review"}
                 </Button>
             </CardContent>
