@@ -12,6 +12,7 @@ import {
   buildTorsionSpringGeometry,
   type TorsionSpringParams,
 } from "@/lib/spring3d/torsionSpringGeometry";
+import { computeAngles, torsionAngles } from "@/lib/angle/AngleModel";
 import { useFeaStore } from "@/lib/stores/feaStore";
 import { applyFeaColors, findMaxSigmaNodeIndex, findMaxDispNodeIndex } from "@/lib/fea/feaTypes";
 import { Html } from "@react-three/drei";
@@ -128,12 +129,17 @@ function AnimatedTorsionSpring() {
       pitch,
       legLength1,
       legLength2,
-      freeAngle,
       windingDirection,
     } = torsionDesign;
 
     // Use pitch from design, or default to wire diameter (close-wound)
     const effectivePitch = pitch || wireDiameter;
+
+    // Use the unified AngleModel to derive visual angles
+    // θref (install) and θtarget (work) are used to define the engineering Δθ
+    // For visualization, we center Δθ around θ=0
+    const angleDerived = computeAngles(torsionAngles(0, currentDeflection));
+    const { minDeg, maxDeg } = angleDerived.visual;
 
     const params: TorsionSpringParams = {
       wireDiameter,
@@ -143,8 +149,8 @@ function AnimatedTorsionSpring() {
       pitch: effectivePitch,
       legLength1,
       legLength2,
-      freeAngle,
-      workingAngle: currentDeflection, // Deflection is working angle in degrees
+      freeAngle: maxDeg - minDeg, // This is Δθ (magnitude)
+      workingAngle: maxDeg,       // Current pose (top of range)
       windingDirection: windingDirection || "right",
       scale,
       legType: "straight",
@@ -174,16 +180,16 @@ function AnimatedTorsionSpring() {
   return (
     <group rotation={[Math.PI / 2, 0, 0]}>
       {/* Main spring body - key forces re-render when FEA mode changes */}
-      <mesh key={`spring-${isFeaMode}-${colorMode}`} geometry={bodyGeometry} material={bodyMaterial} />
+      <mesh key={`spring-${isFeaMode}-${colorMode}`} geometry={bodyGeometry} material={bodyMaterial} rotation={[0, 0, THREE.MathUtils.degToRad(-currentDeflection / 2)]} />
       
       {/* Leg 1 */}
       {leg1Geometry && (
-        <mesh geometry={leg1Geometry} material={legMaterial} />
+        <mesh geometry={leg1Geometry} material={legMaterial} rotation={[0, 0, THREE.MathUtils.degToRad(-currentDeflection / 2)]} />
       )}
       
       {/* Leg 2 */}
       {leg2Geometry && (
-        <mesh geometry={leg2Geometry} material={legMaterial} />
+        <mesh geometry={leg2Geometry} material={legMaterial} rotation={[0, 0, THREE.MathUtils.degToRad(-currentDeflection / 2)]} />
       )}
       
       {/* Center axis indicator */}
@@ -402,7 +408,7 @@ export function TorsionSpringVisualizer() {
       {/* Status overlay */}
       <div className="absolute top-2 right-2 rounded bg-white/90 px-2 py-1.5 text-xs shadow space-y-0.5">
         <div className="flex justify-between gap-4">
-          <span className="text-slate-500">θ:</span>
+          <span className="text-slate-500">Δθ:</span>
           <span className="font-medium">{currentDeflection.toFixed(1)}°</span>
         </div>
         <div className="flex justify-between gap-4">
@@ -410,8 +416,8 @@ export function TorsionSpringVisualizer() {
           <span className="font-medium">{currentLoad.toFixed(2)} N·mm</span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-slate-500">角度:</span>
-          <span className="font-medium">{currentAngle.toFixed(1)}°</span>
+          <span className="text-slate-500">Engineering:</span>
+          <span className="font-medium">Δθ-First</span>
         </div>
         <div className="flex justify-between gap-4">
           <span className="text-slate-500">k:</span>

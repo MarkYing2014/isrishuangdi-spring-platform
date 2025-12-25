@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useLanguage } from "@/components/language-context";
 import { Info, Calculator, Send, AlertTriangle } from "lucide-react";
 import { 
   Card, 
@@ -24,6 +25,7 @@ import { calculateDiskSpring, type DiskSpringResult } from "@/lib/springMath/dis
 import { useSpringDesignStore } from "@/lib/stores/springDesignStore";
 import { Calculator3DPreview } from "@/components/calculators/Calculator3DPreview";
 import { buildPipelineUrl } from "@/lib/pipeline/springPipelines";
+import { computeAxialTravel, diskTravel } from "@/lib/travel/AxialTravelModel";
 
 const Separator = ({ className }: { className?: string }) => <div className={`h-px bg-slate-200 w-full ${className || "my-1"}`} />;
 
@@ -77,6 +79,16 @@ export function DiskSpringCalculator() {
 
   const result = useMemo(() => calculateDiskSpring(input), [input]);
 
+  // Unified Travel Model (Phase 4)
+  const travelDerived = useMemo(() => {
+    // Flattening limit: s_total = h0 * nS
+    const h0Total = freeConeHeight * seriesCount;
+    return computeAxialTravel(
+      diskTravel(sPreload, sOperating),
+      { hardLimit: h0Total, maxSafeTravel: h0Total * 0.75 }
+    );
+  }, [sPreload, sOperating, freeConeHeight, seriesCount]);
+
   // --- Actions ---
   const handleSyncStore = useCallback(() => {
     useSpringDesignStore.getState().setDesign({
@@ -106,7 +118,7 @@ export function DiskSpringCalculator() {
         maxLoad: result.points.max.F_stack,
         maxStress: result.points.max.sigma_eq,
         staticSafetyFactor: 1 / (result.points.max.ratio || 1),
-        workingDeflection: sOperating,
+        workingDeflection: travelDerived.delta,
         maxDeflection: sMax,
       }
     });
@@ -221,21 +233,51 @@ export function DiskSpringCalculator() {
           <CardContent className="space-y-4">
              <div className="space-y-3">
                 <div className="flex items-center gap-4">
-                  <div className="w-1/3 text-sm text-muted-foreground">Preload s1</div>
+                  <div className="w-1/3 text-sm text-muted-foreground font-mono">Preload s1</div>
                   <NumericInput value={sPreload} onChange={(v) => setSPreload(v ?? 0)} className="flex-1" />
                   <span className="text-xs">mm</span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="w-1/3 text-sm text-muted-foreground font-medium">Work s2</div>
+                  <div className="w-1/3 text-sm text-muted-foreground font-mono font-medium">Work s2</div>
                   <NumericInput value={sOperating} onChange={(v) => setSOperating(v ?? 0)} className="flex-1" />
                   <span className="text-xs font-semibold">mm</span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="w-1/3 text-sm text-muted-foreground">Max s3</div>
+                  <div className="w-1/3 text-sm text-muted-foreground font-mono">Max s3</div>
                   <NumericInput value={sMax} onChange={(v) => setSMax(v ?? 0)} className="flex-1" />
                   <span className="text-xs">mm</span>
                 </div>
              </div>
+
+             {/* Travel Audit Card */}
+             <Card className={`border shadow-none ${
+                travelDerived.audit.severity === "fail" ? "bg-red-50/50 border-red-100" :
+                travelDerived.audit.severity === "warn" ? "bg-amber-50/50 border-amber-100" :
+                "bg-slate-50/50 border-slate-100"
+              }`}>
+              <CardContent className="p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <Info className={`h-4 w-4 ${
+                      travelDerived.audit.severity === "fail" ? "text-red-500" :
+                      travelDerived.audit.severity === "warn" ? "text-amber-500" :
+                      "text-blue-500"
+                    }`} />
+                    <span>Travel Audit / 行程审计</span>
+                  </div>
+                  <Badge variant="outline" className="font-mono bg-white">
+                    Δs = {travelDerived.delta.toFixed(2)}mm
+                  </Badge>
+                </div>
+                <p className={`text-[11px] leading-relaxed ${
+                  travelDerived.audit.severity === "fail" ? "text-red-600 font-medium" :
+                  travelDerived.audit.severity === "warn" ? "text-amber-700" :
+                  "text-slate-600"
+                }`}>
+                  {useLanguage().language === "zh" ? travelDerived.audit.messageZh : travelDerived.audit.messageEn}
+                </p>
+              </CardContent>
+            </Card>
           </CardContent>
         </Card>
 
@@ -313,11 +355,15 @@ export function DiskSpringCalculator() {
                    <span className="text-muted-foreground">Max Force F3 (最大载荷):</span>
                    <span className="font-semibold tabular-nums">{result.points.max.F_stack.toFixed(1)} N</span>
                 </div>
-                <Separator className="my-1" />
-                <div className="flex justify-between items-center text-sm">
-                   <span className="text-muted-foreground">Stiffness k_work (总成刚度):</span>
-                   <span className="font-medium">{result.points.work.k_stack.toFixed(2)} N/mm</span>
-                </div>
+                 <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground font-mono">Travel Δs (有效行程):</span>
+                    <span className="font-semibold tabular-nums">{travelDerived.delta.toFixed(2)} mm</span>
+                 </div>
+                 <Separator className="my-1" />
+                 <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Stiffness k_work (总成刚度):</span>
+                    <span className="font-medium">{result.points.work.k_stack.toFixed(2)} N/mm</span>
+                 </div>
                 <div className="flex justify-between items-center text-sm">
                    <span className="text-muted-foreground">Energy Capacity W_max (总储能):</span>
                    <span className="font-medium">{(result.points.max.W_stack / 1000).toFixed(2)} J</span>

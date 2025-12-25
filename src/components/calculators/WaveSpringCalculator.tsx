@@ -44,6 +44,8 @@ import {
 import { buildWaveSpringDesignRuleReport } from "@/lib/designRules/waveSpringRules";
 import { buildWaveRiskRadar } from "@/lib/riskRadar/builders";
 import { useSpringDesignStore } from "@/lib/stores/springDesignStore";
+import { computeAxialTravel, waveTravel } from "@/lib/travel/AxialTravelModel";
+import { Info } from "lucide-react";
 
 import { Calculator3DPreview } from "./Calculator3DPreview";
 
@@ -142,6 +144,16 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
 
   // Risk radar
   const riskRadar = useMemo(() => buildWaveRiskRadar({ input, result }), [input, result]);
+
+  // Unified Travel Model (Phase 4)
+  const travelDerived = useMemo(() => {
+    // Solid height policy
+    const solidHeight = turns_Nt * thickness_t;
+    return computeAxialTravel(
+      waveTravel(freeHeight_Hf, workingHeight_Hw),
+      { hardLimit: freeHeight_Hf - solidHeight }
+    );
+  }, [freeHeight_Hf, workingHeight_Hw, turns_Nt, thickness_t]);
 
   // Build URLs for pipeline navigation
   const designParams = useMemo(() => ({
@@ -331,6 +343,39 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
                     />
                   </div>
                 </div>
+
+                {/* Travel Audit Card */}
+                <Card className={`border shadow-none ${
+                    travelDerived.audit.severity === "fail" ? "bg-red-50/50 border-red-100" :
+                    travelDerived.audit.severity === "warn" ? "bg-amber-50/50 border-amber-100" :
+                    "bg-slate-50/50 border-slate-100"
+                  }`}>
+                  <CardContent className="p-4 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <Info className={`h-4 w-4 ${
+                          travelDerived.audit.severity === "fail" ? "text-red-500" :
+                          travelDerived.audit.severity === "warn" ? "text-amber-500" :
+                          "text-blue-500"
+                        }`} />
+                        <span>{isZh ? "行程审计 / Travel Audit" : "Travel Audit"}</span>
+                      </div>
+                      <Badge variant="outline" className="font-mono">
+                        Δs = {travelDerived.delta.toFixed(2)}mm
+                      </Badge>
+                    </div>
+                    <p className={`text-xs ${
+                      travelDerived.audit.severity === "fail" ? "text-red-600 font-medium" :
+                      travelDerived.audit.severity === "warn" ? "text-amber-700" :
+                      "text-slate-600"
+                    }`}>
+                      {isZh ? travelDerived.audit.messageZh : travelDerived.audit.messageEn}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground italic">
+                      {isZh ? travelDerived.directionNoteZh : travelDerived.directionNoteEn}
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Material Section */}
@@ -438,8 +483,8 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <ResultRow
-                    label={isZh ? "行程 (Hf - Hw)" : "Travel (Hf - Hw)"}
-                    value={fmt(result.travel_mm)}
+                    label={isZh ? "有效行程 Δs" : "Used Travel Δs"}
+                    value={fmt(travelDerived.delta)}
                     unit="mm"
                   />
                   <ResultRow

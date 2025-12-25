@@ -10,8 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer, Download, BookOpen, HelpCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { computeAngles, arcAngles } from "@/lib/angle/AngleModel";
+import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer, Download, BookOpen, HelpCircle, Info, AlertTriangle } from "lucide-react";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { ArcSpringAdvancedPanel } from "@/components/calculators/ArcSpringAdvancedPanel";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -362,6 +363,11 @@ export function ArcSpringCalculator() {
     }));
   }, [result.curve, calculated]);
 
+  const angleDerived = useMemo(() => computeAngles(arcAngles(
+    input.alpha0,
+    input.alphaWork ?? input.alpha0
+  )), [input.alpha0, input.alphaWork]);
+
   const isDual = input.systemMode === "dual_parallel" || input.systemMode === "dual_staged";
 
   return (
@@ -519,7 +525,7 @@ export function ArcSpringCalculator() {
                   className={highlightField === "alpha0" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
                 >
                   <SliderNumberInput
-                    label={isZh ? "自由角度 α₀" : "Free Angle α₀"}
+                    label={isZh ? "自由弧度角 θfree" : "Free Angle θfree"}
                     value={input.alpha0}
                     onChange={(v) => updateInput("alpha0", v)}
                     unit="deg"
@@ -533,7 +539,7 @@ export function ArcSpringCalculator() {
                   className={highlightField === "alphaWork" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
                 >
                   <SliderNumberInput
-                    label={isZh ? "工作角度 α_work" : "Working Angle α_work"}
+                    label={isZh ? "工作弧度角 θwork" : "Work Angle θwork"}
                     value={input.alphaWork ?? input.alpha0}
                     onChange={(v) => updateInput("alphaWork", v)}
                     unit="deg"
@@ -604,6 +610,31 @@ export function ArcSpringCalculator() {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Angle Audit Card */}
+              <div className="pt-4 border-t">
+                <Alert variant={angleDerived.audit.severity === "fail" ? "destructive" : "default"} className="bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
+                  <div className="flex items-start gap-3">
+                    {angleDerived.audit.severity === "fail" ? (
+                      <AlertTriangle className="h-5 w-5 text-red-500" />
+                    ) : angleDerived.audit.severity === "warn" ? (
+                      <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    ) : (
+                      <Info className="h-5 w-5 text-blue-500" />
+                    )}
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold mb-1 flex items-center justify-between">
+                        <span>Angle Audit / 角度审计</span>
+                        <Badge variant="outline" className="text-[10px] font-mono">Δθ = {angleDerived.deltaDeg.toFixed(1)}°</Badge>
+                      </div>
+                      <AlertDescription className="text-xs text-muted-foreground space-y-1">
+                        <p>{isZh ? angleDerived.audit.messageZh : angleDerived.audit.messageEn}</p>
+                        <p>{isZh ? angleDerived.directionNoteZh : angleDerived.directionNoteEn}</p>
+                      </AlertDescription>
+                    </div>
+                  </div>
+                </Alert>
               </div>
             </CardContent>
           </Card>

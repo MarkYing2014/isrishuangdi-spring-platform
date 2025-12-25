@@ -29,6 +29,7 @@ import {
   type SpringMaterial,
   getSpringMaterial 
 } from "@/lib/materials/springMaterials";
+import { LanguageText, useLanguage } from "@/components/language-context";
 import { 
   useSpringDesignStore,
   type TorsionGeometry,
@@ -36,6 +37,9 @@ import {
   type AnalysisResult,
   generateDesignCode,
 } from "@/lib/stores/springDesignStore";
+import { computeAngles, torsionAngles, type AngleDerived } from "@/lib/angle/AngleModel";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Info, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 interface FormValues {
   wireDiameter: number;        // d - 线径
@@ -107,8 +111,7 @@ function calculateTorsionSpring(
   wireDiameter: number,
   outerDiameter: number,
   activeCoils: number,
-  installAngle: number,
-  workingAngle: number,
+  angles: AngleDerived, // 使用新的角度模型
   loadRadius: number,
   armLength1: number,
   armLength2: number,
@@ -146,19 +149,19 @@ function calculateTorsionSpring(
   // Convert to g·mm/deg (1 N = 101.97 g)
   const springRateGmm = springRate * 101.97;
   
-  // Total angles
-  const totalAngle = installAngle + workingAngle;
+  // Engineering: Δθ is the only angle used for torque and stress
+  const deltaTheta = angles.deltaDeg;
   
   // Torques
-  const installTorque = springRate * installAngle; // N·mm
-  const workingTorque = springRate * totalAngle;   // N·mm
+  const installTorque = springRate * 0; // Reference zero
+  const workingTorque = springRate * deltaTheta;   // N·mm
   const installTorqueGmm = installTorque * 101.97; // g·mm
   const workingTorqueGmm = workingTorque * 101.97; // g·mm
   
   // Forces at load radius: P = M / R
-  const installForce = loadRadius > 0 ? installTorque / loadRadius : 0; // N
+  const installForce = 0; // N
   const workingForce = loadRadius > 0 ? workingTorque / loadRadius : 0; // N
-  const installForceG = installForce * 101.97; // g
+  const installForceG = 0; // g
   const workingForceG = workingForce * 101.97; // g
   
   // Bending stress σ = 32·M / (π·d³)
@@ -186,10 +189,10 @@ function calculateTorsionSpring(
   
   // Rotated inner diameter: Ds = Di - (θ/360) * d * Na / Na_original
   // When spring is wound tighter, inner diameter decreases
-  const rotatedInnerDiameter = innerDiameter - (totalAngle / 360) * wireDiameter * 0.1;
+  const rotatedInnerDiameter = innerDiameter - (deltaTheta / 360) * wireDiameter * 0.1;
   
   // Rotated length: L = Lmo + additional coil compression
-  const rotatedLength = bodyLength + (totalAngle / 360) * wireDiameter * 0.5;
+  const rotatedLength = bodyLength + (deltaTheta / 360) * wireDiameter * 0.5;
   
   // Spring weight: M = ρ × V = ρ × π × (d/2)² × L_wire
   // L_wire = π × Dm × Na + X1 + X2
@@ -205,7 +208,7 @@ function calculateTorsionSpring(
     warnings.push("安全系数较低 (< 1.2)，建议减小变形量");
   }
   
-  if (totalAngle > 360) {
+  if (deltaTheta > 360) {
     warnings.push("总扭转角 > 360°，可能需要多圈");
   }
   
@@ -248,6 +251,8 @@ function calculateTorsionSpring(
 }
 
 export function TorsionCalculator() {
+  const { language } = useLanguage();
+  const isZh = language === "zh";
   // 全局设计存储
   const setDesign = useSpringDesignStore(state => state.setDesign);
   const designGeometry = useSpringDesignStore(state => state.geometry);
@@ -324,13 +329,17 @@ export function TorsionCalculator() {
     
     const material = getSpringMaterial(materialId);
     if (!material) return null;
+
+    const angleDerived = computeAngles(torsionAngles(
+      watchedValues.installAngle ?? 0,
+      watchedValues.workingAngle ?? 45
+    ));
     
     return calculateTorsionSpring(
       watchedValues.wireDiameter ?? 1.5,
       watchedValues.outerDiameter ?? 15,
       watchedValues.activeCoils ?? 6,
-      watchedValues.installAngle ?? 0,
-      watchedValues.workingAngle ?? 45,
+      angleDerived,
       watchedValues.loadRadius ?? 20,
       watchedValues.armLength1 ?? 25,
       watchedValues.armLength2 ?? 25,
@@ -338,6 +347,11 @@ export function TorsionCalculator() {
       material
     );
   }, [submitted, watchedValues, materialId]);
+
+  const angleDerived = useMemo(() => computeAngles(torsionAngles(
+    watchedValues.installAngle ?? 0,
+    watchedValues.workingAngle ?? 45
+  )), [watchedValues.installAngle, watchedValues.workingAngle]);
 
   const onSubmit = () => {
     setSubmitted(true);
@@ -383,12 +397,16 @@ export function TorsionCalculator() {
     };
     
     // 计算结果（使用 results 如果已经计算）
+    const angleDerivedLocal = computeAngles(torsionAngles(
+      values.installAngle,
+      values.workingAngle
+    ));
+
     const calcResults = calculateTorsionSpring(
       values.wireDiameter,
       values.outerDiameter,
       values.activeCoils,
-      values.installAngle,
-      values.workingAngle,
+      angleDerivedLocal,
       values.loadRadius,
       values.armLength1,
       values.armLength2,
@@ -404,7 +422,7 @@ export function TorsionCalculator() {
       maxStress: calcResults.correctedStress,
       springIndex: calcResults.springIndex,
       staticSafetyFactor: calcResults.safetyFactor,
-      workingDeflection: values.workingAngle,
+      workingDeflection: angleDerivedLocal.deltaDeg,
     };
     
     setDesign({
@@ -648,7 +666,7 @@ export function TorsionCalculator() {
             {/* Angles */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <DimensionHint code="θdi" label="Install Angle" description="装置扭转角度，初始安装时的扭转角。" />
+                <DimensionHint code="θdi" label="Install Angle" description="安装完成、未进入工作载荷时的参考角。" />
                 <Label htmlFor="installAngle">Install Angle θdi (°) / 装置扭转角</Label>
                 <Controller
                   control={form.control}
@@ -666,8 +684,8 @@ export function TorsionCalculator() {
                 />
               </div>
               <div className="space-y-2">
-                <DimensionHint code="θdo" label="Working Angle" description="作用扭转角度，工作时的扭转角。" />
-                <Label htmlFor="workingAngle">Working Angle θdo (°) / 作用扭转角</Label>
+                <DimensionHint code="θdo" label="Working Angle" description="达到工作工况（载荷/行程）时的角。" />
+                <Label htmlFor="workingAngle">Working Angle θdo (°) / 工作扭转角</Label>
                 <Controller
                   control={form.control}
                   name="workingAngle"
@@ -684,6 +702,28 @@ export function TorsionCalculator() {
                 />
               </div>
             </div>
+
+            {/* Angle Audit Card */}
+            <Alert variant={angleDerived.audit.severity === "fail" ? "destructive" : "default"} className="bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
+              <div className="flex items-start gap-4">
+                {angleDerived.audit.severity === "fail" ? (
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                ) : angleDerived.audit.severity === "warn" ? (
+                  <AlertTriangle className="h-5 w-5 text-amber-500" />
+                ) : (
+                  <Info className="h-5 w-5 text-blue-500" />
+                )}
+                <div>
+                  <AlertTitle className="text-sm font-semibold mb-1">
+                    Angle Audit / 角度审计: Δθ = {angleDerived.deltaDeg.toFixed(1)}°
+                  </AlertTitle>
+                  <AlertDescription className="text-xs text-muted-foreground space-y-1">
+                    <p>{isZh ? angleDerived.audit.messageZh : angleDerived.audit.messageEn}</p>
+                    <p>{isZh ? angleDerived.directionNoteZh : angleDerived.directionNoteEn}</p>
+                  </AlertDescription>
+                </div>
+              </div>
+            </Alert>
 
             {/* Hand of Coil */}
             <div className="space-y-2">
@@ -886,7 +926,7 @@ export function TorsionCalculator() {
                   legLength1: watchedValues.armLength1 ?? 20,
                   legLength2: watchedValues.armLength2 ?? 20,
                   windingDirection: watchedValues.handOfCoil ?? "right",
-                  freeAngle: watchedValues.installAngle ?? 90, 
+                  freeAngle: angleDerived.deltaDeg, 
                 }}
               />
             </div>
