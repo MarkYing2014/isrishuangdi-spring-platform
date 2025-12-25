@@ -46,6 +46,8 @@ import {
 
 import { Calculator3DPreview } from "@/components/calculators/Calculator3DPreview";
 import { VariablePitchAdvancedPanel } from "@/components/calculators/VariablePitchAdvancedPanel";
+import { AuditEngine } from "@/lib/audit/AuditEngine";
+import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 
 import { mapToVariablePitchCompressionReportPayload } from "@/lib/reports/variablePitchCompressionReport";
 import {
@@ -233,6 +235,28 @@ export function VariablePitchCompressionCalculator() {
       deflection: deflectionUsed,
     });
   }, [variablePitchBase, deflectionUsed]);
+
+  const unifiedAudit = useMemo(() => {
+    return AuditEngine.evaluate({
+      springType: "variablePitchCompression",
+      geometry: {
+        type: "variablePitchCompression",
+        wireDiameter,
+        meanDiameter,
+        activeCoils: activeCoils0,
+        totalCoils,
+        freeLength,
+        segments: l0Dominant.segmentsUsed,
+        materialId,
+        shearModulus,
+      },
+      results: {
+        ...result,
+        maxStress: result.shearStress,
+        totalDeflectionCapacity: result.deltaMax,
+      },
+    });
+  }, [variablePitchBase, result, l0Dominant.segmentsUsed, materialId, shearModulus]);
 
   // Sync with global SpringDesignStore for CAD export and 3D orchestration
   const setDesign = useSpringDesignStore((s) => s.setDesign);
@@ -435,6 +459,13 @@ export function VariablePitchCompressionCalculator() {
   return (
     <div className="space-y-6">
       <DesignRulePanel report={designRuleReport} title="Design Rules / 设计规则" />
+
+      {unifiedAudit && (
+        <EngineeringAuditCard 
+          audit={unifiedAudit} 
+          governingVariable="Δx" 
+        />
+      )}
 
       <Card>
         <CardHeader>

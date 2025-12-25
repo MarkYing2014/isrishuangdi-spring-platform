@@ -38,8 +38,9 @@ import {
   generateDesignCode,
 } from "@/lib/stores/springDesignStore";
 import { computeAngles, torsionAngles, type AngleDerived } from "@/lib/angle/AngleModel";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AuditEngine } from "@/lib/audit/AuditEngine";
+import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 
 interface FormValues {
   wireDiameter: number;        // d - 线径
@@ -352,6 +353,21 @@ export function TorsionCalculator() {
     watchedValues.installAngle ?? 0,
     watchedValues.workingAngle ?? 45
   )), [watchedValues.installAngle, watchedValues.workingAngle]);
+
+  const unifiedAudit = useMemo(() => {
+    if (!results) return null;
+    return AuditEngine.evaluate({
+      springType: "torsion",
+      geometry: watchedValues,
+      results: {
+        ...results,
+        angles: angleDerived,
+        // Map torsion specific terms to audit engine expectations
+        maxStress: results.correctedStress,
+        allowableStress: selectedMaterial?.allowShearStatic ? selectedMaterial.allowShearStatic * 1.25 : 1000,
+      }
+    });
+  }, [results, watchedValues, angleDerived, selectedMaterial]);
 
   const onSubmit = () => {
     setSubmitted(true);
@@ -703,27 +719,13 @@ export function TorsionCalculator() {
               </div>
             </div>
 
-            {/* Angle Audit Card */}
-            <Alert variant={angleDerived.audit.severity === "fail" ? "destructive" : "default"} className="bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
-              <div className="flex items-start gap-4">
-                {angleDerived.audit.severity === "fail" ? (
-                  <AlertTriangle className="h-5 w-5 text-red-500" />
-                ) : angleDerived.audit.severity === "warn" ? (
-                  <AlertTriangle className="h-5 w-5 text-amber-500" />
-                ) : (
-                  <Info className="h-5 w-5 text-blue-500" />
-                )}
-                <div>
-                  <AlertTitle className="text-sm font-semibold mb-1">
-                    Angle Audit / 角度审计: Δθ = {angleDerived.deltaDeg.toFixed(1)}°
-                  </AlertTitle>
-                  <AlertDescription className="text-xs text-muted-foreground space-y-1">
-                    <p>{isZh ? angleDerived.audit.messageZh : angleDerived.audit.messageEn}</p>
-                    <p>{isZh ? angleDerived.directionNoteZh : angleDerived.directionNoteEn}</p>
-                  </AlertDescription>
-                </div>
-              </div>
-            </Alert>
+            {/* Unified Engineering Audit Card */}
+            {unifiedAudit && (
+              <EngineeringAuditCard 
+                audit={unifiedAudit} 
+                governingVariable="Δθ" 
+              />
+            )}
 
             {/* Hand of Coil */}
             <div className="space-y-2">

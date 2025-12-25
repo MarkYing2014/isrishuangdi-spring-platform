@@ -42,6 +42,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AuditEngine } from "@/lib/audit/AuditEngine";
+import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 
 interface FormValues {
   wireDiameter: number;
@@ -112,6 +114,15 @@ export function ConicalCalculator() {
   
   // Derived: extract curve from nonlinear result
   const nonlinearCurve = nonlinearResult?.curve ?? null;
+
+  const unifiedAudit = useMemo(() => {
+    if (!lastConicalGeometry || !lastConicalAnalysis) return null;
+    return AuditEngine.evaluate({
+      springType: "conical",
+      geometry: lastConicalGeometry,
+      results: lastConicalAnalysis,
+    });
+  }, [lastConicalGeometry, lastConicalAnalysis]);
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -323,8 +334,15 @@ export function ConicalCalculator() {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      <div className="md:col-span-2">
+      <div className="md:col-span-2 space-y-6">
         <DesignRulePanel report={designRuleReport} title="Design Rules / 设计规则" />
+        
+        {unifiedAudit && (
+          <EngineeringAuditCard 
+            audit={unifiedAudit} 
+            governingVariable="Δx" 
+          />
+        )}
       </div>
 
       <Card>

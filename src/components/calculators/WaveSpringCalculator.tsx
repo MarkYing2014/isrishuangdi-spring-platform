@@ -46,6 +46,8 @@ import { buildWaveRiskRadar } from "@/lib/riskRadar/builders";
 import { useSpringDesignStore } from "@/lib/stores/springDesignStore";
 import { computeAxialTravel, waveTravel } from "@/lib/travel/AxialTravelModel";
 import { Info } from "lucide-react";
+import { AuditEngine } from "@/lib/audit/AuditEngine";
+import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 
 import { Calculator3DPreview } from "./Calculator3DPreview";
 
@@ -154,6 +156,22 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
       { hardLimit: freeHeight_Hf - solidHeight }
     );
   }, [freeHeight_Hf, workingHeight_Hw, turns_Nt, thickness_t]);
+
+  const unifiedAudit = useMemo(() => {
+    if (!result) return null;
+    return AuditEngine.evaluate({
+      springType: "wave",
+      geometry: input.geometry,
+      results: {
+        ...result,
+        travel_mm: travelDerived.delta,
+        maxTravel: freeHeight_Hf - (turns_Nt * thickness_t),
+        // Map wave specific terms to audit engine expectations
+        maxStress: result.stressMax_MPa,
+        allowableStress: (result as any).allowableStress_MPa || 1200, // Fallback
+      }
+    });
+  }, [result, input.geometry, travelDerived.delta, freeHeight_Hf, turns_Nt, thickness_t]);
 
   // Build URLs for pipeline navigation
   const designParams = useMemo(() => ({
@@ -344,38 +362,13 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
                   </div>
                 </div>
 
-                {/* Travel Audit Card */}
-                <Card className={`border shadow-none ${
-                    travelDerived.audit.severity === "fail" ? "bg-red-50/50 border-red-100" :
-                    travelDerived.audit.severity === "warn" ? "bg-amber-50/50 border-amber-100" :
-                    "bg-slate-50/50 border-slate-100"
-                  }`}>
-                  <CardContent className="p-4 flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <Info className={`h-4 w-4 ${
-                          travelDerived.audit.severity === "fail" ? "text-red-500" :
-                          travelDerived.audit.severity === "warn" ? "text-amber-500" :
-                          "text-blue-500"
-                        }`} />
-                        <span>{isZh ? "行程审计 / Travel Audit" : "Travel Audit"}</span>
-                      </div>
-                      <Badge variant="outline" className="font-mono">
-                        Δs = {travelDerived.delta.toFixed(2)}mm
-                      </Badge>
-                    </div>
-                    <p className={`text-xs ${
-                      travelDerived.audit.severity === "fail" ? "text-red-600 font-medium" :
-                      travelDerived.audit.severity === "warn" ? "text-amber-700" :
-                      "text-slate-600"
-                    }`}>
-                      {isZh ? travelDerived.audit.messageZh : travelDerived.audit.messageEn}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground italic">
-                      {isZh ? travelDerived.directionNoteZh : travelDerived.directionNoteEn}
-                    </p>
-                  </CardContent>
-                </Card>
+                {/* Unified Engineering Audit Card */}
+                {unifiedAudit && (
+                  <EngineeringAuditCard 
+                    audit={unifiedAudit} 
+                    governingVariable="Δx" 
+                  />
+                )}
               </div>
 
               {/* Material Section */}

@@ -26,6 +26,8 @@ import { useSpringDesignStore } from "@/lib/stores/springDesignStore";
 import { Calculator3DPreview } from "@/components/calculators/Calculator3DPreview";
 import { buildPipelineUrl } from "@/lib/pipeline/springPipelines";
 import { computeAxialTravel, diskTravel } from "@/lib/travel/AxialTravelModel";
+import { AuditEngine } from "@/lib/audit/AuditEngine";
+import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 
 const Separator = ({ className }: { className?: string }) => <div className={`h-px bg-slate-200 w-full ${className || "my-1"}`} />;
 
@@ -88,6 +90,22 @@ export function DiskSpringCalculator() {
       { hardLimit: h0Total, maxSafeTravel: h0Total * 0.75 }
     );
   }, [sPreload, sOperating, freeConeHeight, seriesCount]);
+
+  const unifiedAudit = useMemo(() => {
+    if (!result) return null;
+    return AuditEngine.evaluate({
+      springType: "disk",
+      geometry: input,
+      results: {
+        ...result,
+        travel_mm: travelDerived.delta,
+        maxTravel: freeConeHeight * seriesCount,
+        // Map disk specific terms to audit engine expectations
+        maxStress: result.points.max.sigma_eq,
+        allowableStress: Sy,
+      }
+    });
+  }, [result, input, travelDerived.delta, freeConeHeight, seriesCount, Sy]);
 
   // --- Actions ---
   const handleSyncStore = useCallback(() => {
@@ -249,35 +267,13 @@ export function DiskSpringCalculator() {
                 </div>
              </div>
 
-             {/* Travel Audit Card */}
-             <Card className={`border shadow-none ${
-                travelDerived.audit.severity === "fail" ? "bg-red-50/50 border-red-100" :
-                travelDerived.audit.severity === "warn" ? "bg-amber-50/50 border-amber-100" :
-                "bg-slate-50/50 border-slate-100"
-              }`}>
-              <CardContent className="p-4 flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                    <Info className={`h-4 w-4 ${
-                      travelDerived.audit.severity === "fail" ? "text-red-500" :
-                      travelDerived.audit.severity === "warn" ? "text-amber-500" :
-                      "text-blue-500"
-                    }`} />
-                    <span>Travel Audit / 行程审计</span>
-                  </div>
-                  <Badge variant="outline" className="font-mono bg-white">
-                    Δs = {travelDerived.delta.toFixed(2)}mm
-                  </Badge>
-                </div>
-                <p className={`text-[11px] leading-relaxed ${
-                  travelDerived.audit.severity === "fail" ? "text-red-600 font-medium" :
-                  travelDerived.audit.severity === "warn" ? "text-amber-700" :
-                  "text-slate-600"
-                }`}>
-                  {useLanguage().language === "zh" ? travelDerived.audit.messageZh : travelDerived.audit.messageEn}
-                </p>
-              </CardContent>
-            </Card>
+             {/* Unified Engineering Audit Card */}
+             {unifiedAudit && (
+               <EngineeringAuditCard 
+                 audit={unifiedAudit} 
+                 governingVariable="Δx" 
+               />
+             )}
           </CardContent>
         </Card>
 

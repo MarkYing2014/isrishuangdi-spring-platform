@@ -46,6 +46,8 @@ import {
   type AnalysisResult,
   generateDesignCode,
 } from "@/lib/stores/springDesignStore";
+import { AuditEngine } from "@/lib/audit/AuditEngine";
+import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 
 const formSchema = z
   .object({
@@ -113,6 +115,16 @@ export function CompressionCalculator() {
   }, [lastCompressionGeometry, lastCompressionAnalysis]);
   
   const [result, setResult] = useState<CalculationResult>(initialResult);
+
+  const unifiedAudit = useMemo(() => {
+    if (!lastCompressionGeometry || !lastCompressionAnalysis) return null;
+    return AuditEngine.evaluate({
+      springType: "compression",
+      geometry: lastCompressionGeometry,
+      results: lastCompressionAnalysis,
+    });
+  }, [lastCompressionGeometry, lastCompressionAnalysis]);
+
   const initialMaterial = useMemo(() => {
     if (storedMaterial?.id) {
       return getSpringMaterial(storedMaterial.id) ?? getDefaultSpringMaterial();
@@ -390,8 +402,15 @@ export function CompressionCalculator() {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      <div className="md:col-span-2">
+      <div className="md:col-span-2 space-y-6">
         <DesignRulePanel report={designRuleReport} title="Design Rules / 设计规则" />
+        
+        {unifiedAudit && (
+          <EngineeringAuditCard 
+            audit={unifiedAudit} 
+            governingVariable="Δx" 
+          />
+        )}
       </div>
 
       <Card>

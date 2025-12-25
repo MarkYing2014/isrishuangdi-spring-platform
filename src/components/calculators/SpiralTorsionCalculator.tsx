@@ -62,6 +62,8 @@ import {
   type SpiralSpringMaterial,
 } from "@/lib/spring3d/spiralSpringMaterials";
 import { buildSpiralSpringDesignRuleReport } from "@/lib/designRules";
+import { AuditEngine } from "@/lib/audit/AuditEngine";
+import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 
 // ================================================================
 // Types
@@ -613,6 +615,21 @@ export function SpiralTorsionCalculator() {
     );
   }, [watchedValues, materialId]);
 
+  const unifiedAudit = useMemo(() => {
+    if (!results) return null;
+    return AuditEngine.evaluate({
+      springType: "spiralTorsion",
+      geometry: {
+        type: "spiralTorsion",
+        ...watchedValues,
+      },
+      results: {
+        ...results,
+        maxStress: results.maxStressLinear,
+      },
+    });
+  }, [results, watchedValues]);
+
   const designRuleReport = useMemo(() => {
     const geometry: SpiralTorsionGeometry = {
       type: "spiralTorsion",
@@ -721,8 +738,15 @@ export function SpiralTorsionCalculator() {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      <div className="md:col-span-2">
+      <div className="md:col-span-2 space-y-6">
         <DesignRulePanel report={designRuleReport} title="Design Rules / 设计规则" />
+        
+        {unifiedAudit && (
+          <EngineeringAuditCard 
+            audit={unifiedAudit} 
+            governingVariable="Δθ" 
+          />
+        )}
       </div>
 
       {/* Input Card */}

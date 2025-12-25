@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { computeAngles, arcAngles } from "@/lib/angle/AngleModel";
 import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer, Download, BookOpen, HelpCircle, Info, AlertTriangle } from "lucide-react";
+import { AuditEngine } from "@/lib/audit/AuditEngine";
+import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { ArcSpringAdvancedPanel } from "@/components/calculators/ArcSpringAdvancedPanel";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -368,6 +370,21 @@ export function ArcSpringCalculator() {
     input.alphaWork ?? input.alpha0
   )), [input.alpha0, input.alphaWork]);
 
+  const unifiedAudit = useMemo(() => {
+    if (!result) return null;
+    return AuditEngine.evaluate({
+      springType: "arc",
+      geometry: input,
+      results: {
+        ...result,
+        angles: angleDerived,
+        // Map arc specific terms to audit engine expectations
+        maxStress: result.tauMax,
+        allowableStress: allowableTau,
+      }
+    });
+  }, [result, input, angleDerived, allowableTau]);
+
   const isDual = input.systemMode === "dual_parallel" || input.systemMode === "dual_staged";
 
   return (
@@ -612,30 +629,15 @@ export function ArcSpringCalculator() {
                 </div>
               </div>
 
-              {/* Angle Audit Card */}
-              <div className="pt-4 border-t">
-                <Alert variant={angleDerived.audit.severity === "fail" ? "destructive" : "default"} className="bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800">
-                  <div className="flex items-start gap-3">
-                    {angleDerived.audit.severity === "fail" ? (
-                      <AlertTriangle className="h-5 w-5 text-red-500" />
-                    ) : angleDerived.audit.severity === "warn" ? (
-                      <AlertTriangle className="h-5 w-5 text-amber-500" />
-                    ) : (
-                      <Info className="h-5 w-5 text-blue-500" />
-                    )}
-                    <div className="flex-1">
-                      <div className="text-sm font-semibold mb-1 flex items-center justify-between">
-                        <span>Angle Audit / 角度审计</span>
-                        <Badge variant="outline" className="text-[10px] font-mono">Δθ = {angleDerived.deltaDeg.toFixed(1)}°</Badge>
-                      </div>
-                      <AlertDescription className="text-xs text-muted-foreground space-y-1">
-                        <p>{isZh ? angleDerived.audit.messageZh : angleDerived.audit.messageEn}</p>
-                        <p>{isZh ? angleDerived.directionNoteZh : angleDerived.directionNoteEn}</p>
-                      </AlertDescription>
-                    </div>
-                  </div>
-                </Alert>
-              </div>
+              {/* Unified Engineering Audit Card */}
+              {unifiedAudit && (
+                <div className="pt-4 border-t">
+                  <EngineeringAuditCard 
+                    audit={unifiedAudit} 
+                    governingVariable="Δθ" 
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -31,6 +31,8 @@ import {
   type AnalysisResult,
   generateDesignCode,
 } from "@/lib/stores/springDesignStore";
+import { AuditEngine } from "@/lib/audit/AuditEngine";
+import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 
 interface FormValues {
   outerDiameter: number;
@@ -86,6 +88,16 @@ export function ExtensionCalculator() {
   }, [lastExtensionGeometry, storedAnalysis]);
   
   const [result, setResult] = useState<CalculationResult>(initialResult);
+
+  const unifiedAudit = useMemo(() => {
+    if (!lastExtensionGeometry || !lastExtensionAnalysis) return null;
+    return AuditEngine.evaluate({
+      springType: "extension",
+      geometry: lastExtensionGeometry,
+      results: lastExtensionAnalysis,
+    });
+  }, [lastExtensionGeometry, lastExtensionAnalysis]);
+
   const initialMaterial = useMemo<SpringMaterial>(() => {
     if (storedMaterial?.id) {
       return getSpringMaterial(storedMaterial.id) ?? getDefaultSpringMaterial();
@@ -318,8 +330,15 @@ export function ExtensionCalculator() {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      <div className="md:col-span-2">
+      <div className="md:col-span-2 space-y-6">
         <DesignRulePanel report={designRuleReport} title="Design Rules / 设计规则" />
+        
+        {unifiedAudit && (
+          <EngineeringAuditCard 
+            audit={unifiedAudit} 
+            governingVariable="Δx" 
+          />
+        )}
       </div>
 
       <Card>
