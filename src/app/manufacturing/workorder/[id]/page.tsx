@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { WorkOrder } from "@/lib/manufacturing/workOrderTypes";
 import { 
   ArrowLeft, 
   Printer, 
@@ -28,13 +29,19 @@ export default function WorkOrderDetailPage() {
   const { language } = useLanguage();
   const isZh = language === "zh";
   const { getById, updateStatus } = useWorkOrderStore();
-  const [workOrder, setWorkOrder] = useState(getById(id as string));
+  const [isMounted, setIsMounted] = useState(false);
+  const [workOrder, setWorkOrder] = useState<WorkOrder | undefined>(undefined);
 
   useEffect(() => {
+    setIsMounted(true);
     if (id) {
       setWorkOrder(getById(id as string));
     }
   }, [id, getById]);
+
+  if (!isMounted) {
+    return null;
+  }
 
   if (!workOrder) {
     return (
