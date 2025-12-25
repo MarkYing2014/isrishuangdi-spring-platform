@@ -48,6 +48,7 @@ import {
 } from "@/lib/stores/springDesignStore";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
+import { SavedDesignManager } from "@/components/analysis/SavedDesignManager";
 
 const formSchema = z
   .object({
@@ -994,6 +995,11 @@ export function CompressionCalculator() {
             >
               <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
             </Button>
+            
+            <div className="flex justify-center py-2">
+              <SavedDesignManager />
+            </div>
+
             <Button 
               asChild 
               variant="outline" 

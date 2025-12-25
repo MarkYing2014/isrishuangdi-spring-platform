@@ -50,6 +50,7 @@ import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 
 import { Calculator3DPreview } from "./Calculator3DPreview";
+import { SavedDesignManager } from "@/components/analysis/SavedDesignManager";
 
 interface WaveSpringCalculatorProps {
   isZh?: boolean;
@@ -173,6 +174,35 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
     });
   }, [result, input.geometry, travelDerived.delta, freeHeight_Hf, turns_Nt, thickness_t]);
 
+  // Phase 5: Auto-sync to global store to enable Save/Export/Analysis
+  useEffect(() => {
+    if (result && result.isValid) {
+      setDesign({
+        springType: "wave",
+        geometry: {
+          type: "wave",
+          ...input.geometry
+        },
+        material: {
+          id: materialId as any,
+          name: input.material?.name || "17-7PH",
+          elasticModulus: E_MPa,
+          shearModulus: E_MPa / (2 * (1 + 0.3)), // estimate
+          density: 7800,
+        },
+        analysisResult: {
+          springRate: result.springRate_Nmm,
+          springRateUnit: "N/mm",
+          workingLoad: result.loadAtWorkingHeight_N,
+          maxStress: result.stressMax_MPa,
+          springIndex: result.meanDiameter_mm / thickness_t,
+          workingDeflection: result.travel_mm,
+          maxDeflection: result.travel_mm, // Synchronize for unified audit
+        }
+      });
+    }
+  }, [result, input.geometry, materialId, E_MPa, input.material?.name, thickness_t, setDesign]);
+
   // Build URLs for pipeline navigation
   const designParams = useMemo(() => ({
     id: String(id),
@@ -247,6 +277,11 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
       }
     });
     router.push(cadExportUrl);
+  };
+
+  const handleSaveToHistory = () => {
+    // We already have handleSendToEngineering which sets the current design.
+    // We can also trigger a save here or just let the SavedDesignManager handle it.
   };
 
   // Format number helper
@@ -457,6 +492,10 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
                 >
                   {isZh ? "导出 CAD / Export CAD" : "Export CAD / 导出 CAD"}
                 </Button>
+                
+                <div className="flex justify-center py-2">
+                  <SavedDesignManager />
+                </div>
               </div>
             </div>
 

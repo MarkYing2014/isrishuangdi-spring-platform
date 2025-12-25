@@ -18,7 +18,6 @@ import { useLanguage } from "@/components/language-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-// import { Separator } from "@/components/ui/separator";
 import { 
   Table, 
   TableBody, 
@@ -37,6 +36,8 @@ import {
   Legend, 
   ResponsiveContainer 
 } from "recharts";
+import { ComparisonEngine } from "@/lib/comparison/ComparisonEngine";
+import { cn } from "@/lib/utils";
 
 export default function CompareDesignsPage() {
   const { language } = useLanguage();
@@ -52,11 +53,17 @@ export default function CompareDesignsPage() {
     [savedDesigns, selectedIds]
   );
 
+  // Generate semantic comparison matrix
+  const comparisonMatrix = useMemo(() => 
+    ComparisonEngine.getComparisonMatrix(selectedDesigns),
+    [selectedDesigns]
+  );
+
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 
       prev.includes(id) 
         ? prev.filter(i => i !== id) 
-        : [...prev, id]
+        : (prev.length < 5 ? [...prev, id] : prev)
     );
   };
 
@@ -103,11 +110,11 @@ export default function CompareDesignsPage() {
               {isZh ? "工程分析" : "Engineering Analysis"}
             </Link>
             <ChevronRight className="h-3 w-3" />
-            <span className="text-foreground font-medium">{isZh ? "对比工具" : "Comparison Tool"}</span>
+            <span className="text-foreground font-medium">{isZh ? "方案对比" : "Comparison Tool"}</span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">{isZh ? "方案对比 / Comparison" : "Design Case Comparison"}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{isZh ? "统一工程方案对比" : "Unified Component Comparison"}</h1>
           <p className="text-muted-foreground">
-            {isZh ? "侧重物理性能、安全系数与成本潜力的多维度评估。" : "Side-by-side evaluation of physical performance, safety factors, and cost potential."}
+            {isZh ? "跨类型弹簧的物理性能、安全系数与几何限制的多维度评估。" : "Cross-type spring evaluation of physics, safety, and geometry limits."}
           </p>
         </div>
         
@@ -126,79 +133,74 @@ export default function CompareDesignsPage() {
             <CardHeader className="bg-slate-50/50 pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Layers className="h-5 w-5 text-blue-600" />
-                {isZh ? "性能矩阵对照" : "Performance Matrix"}
+                {isZh ? "工程性能矩阵" : "Engineering Matrix"}
               </CardTitle>
             </CardHeader>
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-50/30">
-                  <TableHead className="w-[150px]">{isZh ? "指标" : "Metric"}</TableHead>
-                  {selectedDesigns.map((d, idx) => (
-                    <TableHead key={d.id} className="min-w-[120px]">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-blue-600 font-mono text-xs">{d.designCode}</span>
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">{d.springType}</span>
-                            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: colors[idx % colors.length] }} />
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50/30">
+                    <TableHead className="w-[180px] font-bold">{isZh ? "工程指标" : "Metric"}</TableHead>
+                    {selectedDesigns.map((d, idx) => (
+                      <TableHead key={d.id} className="min-w-[140px]">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-blue-600 font-mono text-xs">{d.designCode}</span>
+                          <div className="flex items-center justify-between">
+                              <span className="text-[10px] uppercase font-bold text-muted-foreground px-1.5 py-0.5 bg-slate-100 rounded">{d.springType}</span>
+                              <div className="h-2 w-2 rounded-full" style={{ backgroundColor: colors[idx % colors.length] }} />
+                          </div>
                         </div>
-                      </div>
-                    </TableHead>
-                  ))}
-                  {selectedDesigns.length === 0 && <TableHead>{isZh ? "请从侧边栏选择方案" : "Select designs from sidebar"}</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium text-muted-foreground">{isZh ? "刚度 k" : "Rate k"}</TableCell>
-                  {selectedDesigns.map(d => (
-                    <TableCell key={d.id} className="font-semibold tabular-nums">
-                        {d.analysisResult.springRate.toFixed(3)} <span className="text-[10px] font-normal text-muted-foreground">{d.analysisResult.springRateUnit}</span>
-                    </TableCell>
-                  ))}
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium text-muted-foreground">{isZh ? "安全系数 SF" : "Safety Factor"}</TableCell>
-                  {selectedDesigns.map(d => (
-                    <TableCell key={d.id}>
-                       <Badge 
-                         variant={ (d.analysisResult.staticSafetyFactor ?? 0) < 1.1 ? "destructive" : "secondary" }
-                         className="rounded-full px-2"
-                       >
-                         {d.analysisResult.staticSafetyFactor?.toFixed(2) ?? "-"}
-                       </Badge>
-                    </TableCell>
-                  ))}
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium text-muted-foreground">{isZh ? "最大应力" : "Max Stress"}</TableCell>
-                  {selectedDesigns.map(d => (
-                    <TableCell key={d.id} className="tabular-nums">
-                        {d.analysisResult.maxStress?.toFixed(0)} <span className="text-[10px] text-muted-foreground">MPa</span>
-                    </TableCell>
-                  ))}
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium text-muted-foreground">{isZh ? "估算体积" : "Est. Volume"}</TableCell>
-                  {selectedDesigns.map(d => (
-                    <TableCell key={d.id} className="text-muted-foreground italic">
-                        {isZh ? "计算中..." : "Calculating..."}
-                    </TableCell>
-                  ))}
-                </TableRow>
-                <TableRow className="bg-slate-50/20">
-                    <TableCell className="font-medium">{isZh ? "操作" : "Action"}</TableCell>
-                    {selectedDesigns.map(d => (
-                        <TableCell key={d.id}>
-                             <Button size="sm" variant="ghost" className="text-blue-600 h-8" asChild onClick={() => handleRestore(d)}>
-                               <Link href="/tools/analysis">
-                                 {isZh ? "载入" : "Load"}
-                               </Link>
-                             </Button>
-                        </TableCell>
+                      </TableHead>
                     ))}
-                </TableRow>
-              </TableBody>
-            </Table>
+                    {selectedDesigns.length === 0 && <TableHead>{isZh ? "请从侧边栏选择方案" : "Select designs from sidebar"}</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {comparisonMatrix.map((row, rowIdx) => (
+                    <TableRow key={row.definition.key} className={cn(rowIdx % 5 === 0 && "bg-slate-50/10")}>
+                      <TableCell className="font-medium text-slate-500 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span>{isZh ? row.definition.labelZh : row.definition.labelEn}</span>
+                          {row.definition.unit && <span className="text-[10px] text-muted-foreground">({row.definition.unit})</span>}
+                        </div>
+                      </TableCell>
+                      {row.cells.map((cell, cellIdx) => (
+                        <TableCell key={cell.id} className={cn("tabular-nums", cell.isBest && "text-blue-700 font-bold")}>
+                          {row.definition.key === "audit_status" ? (
+                            <Badge 
+                              variant={cell.value === "PASS" ? "secondary" : cell.value === "WARN" ? "outline" : "destructive"}
+                              className={cn(
+                                "rounded-sm px-1 text-[10px] uppercase tracking-wider",
+                                cell.value === "PASS" && "bg-emerald-50 text-emerald-700 border-emerald-100"
+                              )}
+                            >
+                              {cell.value}
+                            </Badge>
+                          ) : (
+                            <div className="flex flex-col">
+                               <span>{cell.formattedValue}</span>
+                               {cell.isBest && <span className="text-[9px] uppercase text-blue-500">{isZh ? "最优" : "Best"}</span>}
+                            </div>
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-slate-50/50 border-t-2">
+                      <TableCell className="font-bold">{isZh ? "决策操作" : "Decision"}</TableCell>
+                      {selectedDesigns.map(d => (
+                          <TableCell key={d.id}>
+                               <Button size="sm" variant="default" className="h-8 text-xs w-full shadow-sm" asChild onClick={() => handleRestore(d)}>
+                                 <Link href="/tools/analysis">
+                                   {isZh ? "载入及详审" : "Load & Review"}
+                                 </Link>
+                               </Button>
+                          </TableCell>
+                      ))}
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
           </Card>
 
           {/* Performance Curves */}
@@ -252,9 +254,9 @@ export default function CompareDesignsPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">{isZh ? "选择对比方案" : "Select Designs"}</CardTitle>
+              <CardTitle className="text-sm font-semibold">{isZh ? "设计方案库" : "Design Library"}</CardTitle>
               <CardDescription className="text-xs">
-                {isZh ? `最多选择 5 个方案 (已选 ${selectedIds.length})` : `Pick up to 5 cases (Selected ${selectedIds.length})`}
+                {isZh ? `支持跨类型对比 (已选 ${selectedIds.length}/5)` : `Cross-type ready (Selected ${selectedIds.length}/5)`}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 max-h-[500px] overflow-y-auto">
@@ -281,7 +283,10 @@ export default function CompareDesignsPage() {
                         <p className="text-[10px] text-muted-foreground">{new Date(design.timestamp).toLocaleDateString()}</p>
                     </div>
                   </div>
-                  {selectedIds.includes(design.id) && <CheckCircle2 className="h-4 w-4 text-blue-600" />}
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[9px] px-1 py-0">{design.springType}</Badge>
+                    {selectedIds.includes(design.id) && <CheckCircle2 className="h-4 w-4 text-blue-600" />}
+                  </div>
                 </div>
               ))}
 
@@ -294,21 +299,21 @@ export default function CompareDesignsPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900 text-slate-100 border-none">
+          <Card className="bg-slate-900 text-slate-100 border-none shadow-xl">
             <CardHeader>
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-amber-400" />
-                    {isZh ? "推荐决策" : "Recommendation"}
+                    {isZh ? "系统选型建议" : "Selection Insight"}
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
                 <p className="text-xs text-slate-400 leading-relaxed">
                     {isZh 
-                      ? "基于选定方案，系统检测到方案 A 的安全系数最高，但方案 B 的体积效率最佳。" 
-                      : "Based on selected cases, Case A has the highest SF, while Case B offers the best volumetric efficiency."}
+                      ? "基于当前工程指标，系统会自动识别最优解（Blue Text）。建议优先平衡“安全系数”与“体积效率”。" 
+                      : "The system identifies optimal values in Blue. We recommend balancing Safety Factor and Volumetric Efficiency."}
                 </p>
-                <Button className="w-full bg-blue-600 hover:bg-blue-500 h-9 rounded-full text-xs" variant="default">
-                    {isZh ? "申请制造可行性评审" : "Request Feasibility Review"}
+                <Button className="w-full bg-blue-600 hover:bg-blue-500 h-9 rounded-full text-xs font-bold" variant="default">
+                    {isZh ? "申请专家评审" : "Request Expert Review"}
                 </Button>
             </CardContent>
           </Card>
@@ -316,9 +321,4 @@ export default function CompareDesignsPage() {
       </div>
     </div>
   );
-}
-
-// Helper for conditional classes
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(" ");
 }

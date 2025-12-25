@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { LanguageProvider } from "@/components/language-context";
 import { MainNav } from "@/components/main-nav";
 import { SiteFooter } from "@/components/site-footer";
+import { Analytics } from "@vercel/analytics/next";
 
 import "./globals.css";
 
@@ -41,6 +42,7 @@ export default function RootLayout({
             </main>
             <SiteFooter />
           </div>
+          <Analytics />
         </LanguageProvider>
       </body>
     </html>
