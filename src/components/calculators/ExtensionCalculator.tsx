@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useCallback, useEffect } from "react";
 import { type SubmitHandler, useForm, Controller } from "react-hook-form";
 import { Factory } from "lucide-react";
@@ -52,6 +54,10 @@ type CalculationResult = ReturnType<typeof calculateExtensionSpring> | null;
 
 export function ExtensionCalculator() {
   const [error, setError] = useState<string | null>(null);
+  // Local state for immediate button updates (bypass store sync delay)
+  const [latestAudit, setLatestAudit] = useState<any | null>(null); 
+  const [latestGeometry, setLatestGeometry] = useState<ExtensionGeometry | null>(null);
+  const [latestAnalysis, setLatestAnalysis] = useState<AnalysisResult | null>(null);
   
   // 全局设计存储
   const storedGeometry = useSpringDesignStore(state => state.geometry);
@@ -107,6 +113,18 @@ export function ExtensionCalculator() {
     return getDefaultSpringMaterial();
   }, [storedMaterial?.id]);
   const [selectedMaterial, setSelectedMaterial] = useState<SpringMaterial>(initialMaterial);
+  
+  // Initialize router
+  const router = useRouter();
+
+  // Sync store to local state on initial load/change provided getting store updates
+  useEffect(() => {
+    if (lastExtensionGeometry && lastExtensionAnalysis && unifiedAudit) {
+        setLatestGeometry(lastExtensionGeometry);
+        setLatestAnalysis(lastExtensionAnalysis);
+        setLatestAudit(unifiedAudit);
+    }
+  }, [lastExtensionGeometry, lastExtensionAnalysis, unifiedAudit]);
   const defaultDeflection = storedAnalysis?.maxDeflection ?? storedAnalysis?.workingDeflection ?? 15;
 
   const form = useForm<FormValues>({
@@ -168,6 +186,18 @@ export function ExtensionCalculator() {
         springIndex: calc.springIndex,
         wahlFactor: calc.wahlFactor,
       };
+
+      // Calculate audit synchronously for immediate button update
+      const localAudit = AuditEngine.evaluate({
+        springType: "extension",
+        geometry,
+        results: analysisResult,
+      });
+
+      // Update local state immediately
+      setLatestGeometry(geometry);
+      setLatestAnalysis(analysisResult);
+      setLatestAudit(localAudit);
 
       setDesign({
         springType: "extension",
@@ -634,37 +664,72 @@ export function ExtensionCalculator() {
               <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
             </Button>
             
+            {/* DEBUG: Show Audit Status */}
+            <div className="text-xs text-center text-slate-500 mb-2">
+               Audit Ready: {String(!!latestAudit)} / Status: {latestAudit?.status ?? "Initializing..."} ({latestAudit?.status === "FAIL" ? "Fail/失败" : "Pass/通过"})
+            </div>
+
             <Button
               type="button"
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
-              disabled={!unifiedAudit || unifiedAudit.status === "FAIL"}
+              disabled={!latestAudit}
               onClick={() => {
-                if (!lastExtensionGeometry || !lastExtensionAnalysis || !unifiedAudit) return;
-                
-                // Create Work Order
-                const store = useWorkOrderStore.getState();
-                const wo = store.createWorkOrder({
-                  designCode: generateDesignCode(lastExtensionGeometry),
-                  springType: "extension",
-                  geometry: lastExtensionGeometry,
-                  material: {
-                    id: selectedMaterial.id,
-                    name: selectedMaterial.nameEn,
-                    shearModulus: selectedMaterial.shearModulus,
-                    elasticModulus: selectedMaterial.elasticModulus ?? 206000,
-                    density: selectedMaterial.density ?? 7850,
-                    tensileStrength: selectedMaterial.tensileStrength,
-                    surfaceFactor: selectedMaterial.surfaceFactor,
-                    tempFactor: selectedMaterial.tempFactor,
-                  },
-                  analysis: lastExtensionAnalysis,
-                  audit: unifiedAudit,
-                  quantity: 1000,
-                  createdBy: "Engineer",
-                  notes: unifiedAudit.status === "WARN" ? "Warning: Engineering audit has warnings. Review required." : undefined
-                });
-                
-                window.location.href = `/manufacturing/workorder/${wo.workOrderId}`;
+                try {
+                  // Use local state if available, fallback to store (though local should be set if button is enabled)
+                  const geom = latestGeometry || lastExtensionGeometry;
+                  const anal = latestAnalysis || lastExtensionAnalysis;
+                  const aud = latestAudit || unifiedAudit;
+
+                  if (!geom || !anal || !aud) {
+                     const missing = [];
+                     if (!geom) missing.push("Geometry");
+                     if (!anal) missing.push("Analysis");
+                     if (!aud) missing.push("Audit");
+                     
+                     console.error("Missing data for Work Order", { missing });
+                     alert(`Cannot create Work Order. Missing data: ${missing.join(", ")}`);
+                     return;
+                  }
+                  
+                  // Confirm validation if Audit Failed
+                  if (aud.status === "FAIL") {
+                    const proceed = window.confirm(
+                      "⚠️ Engineering Audit Failed (Design invalid) / 工程审核未通过（设计无效）。\n\n" +
+                      "Are you sure you want to FORCE create a work order? / 确定要强制创建工单吗？"
+                    );
+                    if (!proceed) return;
+                  }
+                  
+                  // Create Work Order
+                  const store = useWorkOrderStore.getState();
+                  const wo = store.createWorkOrder({
+                    designCode: generateDesignCode(geom),
+                    springType: "extension",
+                    geometry: geom,
+                    material: {
+                      id: selectedMaterial.id,
+                      name: selectedMaterial.nameEn,
+                      shearModulus: selectedMaterial.shearModulus,
+                      elasticModulus: selectedMaterial.elasticModulus ?? 206000,
+                      density: selectedMaterial.density ?? 7850,
+                      tensileStrength: selectedMaterial.tensileStrength,
+                      surfaceFactor: selectedMaterial.surfaceFactor,
+                      tempFactor: selectedMaterial.tempFactor,
+                    },
+                    analysis: anal,
+                    audit: aud,
+                    quantity: 1000,
+                    createdBy: "Engineer",
+                    notes: aud.status === "WARN" || aud.status === "FAIL" ? `[${aud.status}] Engineering Audit Issues Override / 工程审核问题强制覆盖` : undefined
+                  });
+                  
+                  console.log("Work Order created, redirecting...", wo.workOrderId);
+                  router.push(`/manufacturing/workorder/${wo.workOrderId}`);
+                  
+                } catch(e: any) {
+                  console.error("Failed to create work order", e);
+                  alert(`System Error: Failed to create Work Order / 系统错误：创建工单失败。\n${e?.message || e}`);
+                }
               }}
             >
               <Factory className="w-4 h-4 mr-2" />
