@@ -21,52 +21,15 @@ export function getDefaultTorsionalSystemDesign(): TorsionalSpringSystemDesign {
     return {
         type: "torsionalSpringSystem",
         groups: [
-            {
-                id: "s1",
-                name: "Stage 1",
-                stage: 1,
-                stageName: "Idle / NVH",
-                role: "Low-torque damping",
-                stageColor: "#cbd5e1",
-                enabled: true,
-                n: 4,
-                k: 10.0,
-                R: 75,
-                theta_start: 0,
-                d: 3.0,
-                Dm: 18,
-                L_free: 65,
-                L_solid: 40,
-                clearance: 5,
-                materialId: "music_wire_a228"
-            },
-            {
-                id: "s2",
-                name: "Stage 2",
-                stage: 2,
-                stageName: "Main Drive",
-                role: "Primary load path",
-                stageColor: "#64748b",
-                enabled: true,
-                n: 4,
-                k: 22.0,
-                R: 105,
-                theta_start: 5,
-                d: 4.2,
-                Dm: 24,
-                L_free: 58,
-                L_solid: 36,
-                clearance: 3.5,
-                materialId: "music_wire_a228"
-            }
+            { ...DEFAULT_TORSIONAL_GROUP }
         ],
-        frictionTorque: 8.0,
+        frictionTorque: 5.0,
         referenceAngle: 10.0,
-        outerOD: 260,
-        innerID: 45,
+        outerOD: 250,
+        innerID: 40,
         carrierThickness: 3.5,
-        boltCount: 10,
-        boltCircleRadius: 125
+        boltCount: 12,
+        boltCircleRadius: 110
     };
 }
 
