@@ -47,10 +47,10 @@ import {
   type AnalysisResult,
   generateDesignCode,
 } from "@/lib/stores/springDesignStore";
+import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 import { SavedDesignManager } from "@/components/analysis/SavedDesignManager";
-import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
 
 const formSchema = z
   .object({
