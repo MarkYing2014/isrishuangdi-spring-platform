@@ -185,6 +185,18 @@ export const SPRING_PIPELINES: Record<SpringType, SpringPipelineConfig> = {
     icon: "CircleDashed",
     implemented: true,
   },
+  torsionalSpringSystem: {
+    type: "torsionalSpringSystem",
+    label: { en: "Torsional Spring System", zh: "扭簧系统" },
+    calculatorPath: "/tools/calculator?tab=torsionalSpringSystem",
+    analysisPath: "/tools/analysis?type=torsionalSpringSystem",
+    simulatorPath: "/tools/simulator?type=torsionalSpringSystem",
+    reportPath: "/tools/report?type=torsionalSpringSystem",
+    cadExportPath: "/tools/cad-export?type=torsionalSpringSystem",
+    rfqPath: "/rfq?springType=torsionalSpringSystem",
+    icon: "Settings2",
+    implemented: true,
+  },
 };
 
 /**
