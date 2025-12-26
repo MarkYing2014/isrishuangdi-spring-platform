@@ -382,6 +382,7 @@ export function DiskSpringCalculator() {
              </Button>
 
              <Button
+                type="button"
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
                 disabled={!unifiedAudit || unifiedAudit.status === "FAIL"}
                 onClick={() => {

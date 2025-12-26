@@ -32,7 +32,7 @@ export interface WorkOrderStore {
     clear: () => void;
 }
 
-let workOrderCounter = 1;
+
 
 export const useWorkOrderStore = create<WorkOrderStore>()(
     persist(
@@ -83,9 +83,18 @@ export const useWorkOrderStore = create<WorkOrderStore>()(
                     manufacturingAudit.overallStatus === "FAIL" ? "blocked" : "created";
 
                 // Generate WorkOrder ID
+                // Generate WorkOrder ID based on existing orders to prevent duplicates on reload
                 const now = new Date();
                 const year = now.getFullYear();
-                const workOrderId = `WO-${year}-${String(workOrderCounter++).padStart(5, "0")}`;
+
+                // Find max sequence number for current year
+                const currentYearPrefix = `WO-${year}-`;
+                const existingIds = get().workOrders
+                    .filter(w => w.workOrderId.startsWith(currentYearPrefix))
+                    .map(w => parseInt(w.workOrderId.split('-')[2] || "0", 10));
+
+                const nextSequence = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+                const workOrderId = `${currentYearPrefix}${String(nextSequence).padStart(5, "0")}`;
 
                 const newWorkOrder: WorkOrder = {
                     workOrderId,
