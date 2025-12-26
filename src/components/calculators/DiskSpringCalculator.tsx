@@ -36,8 +36,8 @@ export function DiskSpringCalculator() {
   // --- Form State ---
   const [outerDiameter, setOuterDiameter] = useState(50);
   const [innerDiameter, setInnerDiameter] = useState(25.4);
-  const [thickness, setThickness] = useState(2.5);
-  const [freeConeHeight, setFreeConeHeight] = useState(1.5);
+  const [thickness, setThickness] = useState(2.0); // DIN 2093 Series B approx
+  const [freeConeHeight, setFreeConeHeight] = useState(1.6); // DIN 2093 Series B approx
   const [group, setGroup] = useState<"G1" | "G2" | "G3">("G2");
 
   const [parallelCount, setParallelCount] = useState(1);
@@ -45,12 +45,12 @@ export function DiskSpringCalculator() {
   const [frictionCoeff, setFrictionCoeff] = useState(0.08);
 
   const [sPreload, setSPreload] = useState(0.5);
-  const [sOperating, setSOperating] = useState(1.0);
-  const [sMax, setSMax] = useState(1.2);
+  const [sOperating, setSOperating] = useState(1.2); // ~75% of h0 (1.6)
+  const [sMax, setSMax] = useState(1.6); // Flat
 
   const [E, setE] = useState(206000);
   const [nu, setNu] = useState(0.3);
-  const [Sy, setSy] = useState(1200);
+  const [Sy, setSy] = useState(1400); // 1.4 GPa for key spring steels
 
   const [showStressColors, setShowStressColors] = useState(true);
 

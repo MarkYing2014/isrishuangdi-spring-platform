@@ -280,17 +280,17 @@ export function TorsionCalculator() {
 
   const form = useForm<FormValues>({
     defaultValues: {
-      wireDiameter: lastTorsion?.wireDiameter ?? 1.5,
-      outerDiameter: lastTorsion?.outerDiameter ?? 15,
-      totalCoils: lastTorsion?.activeCoils ?? 6,
-      activeCoils: lastTorsion?.activeCoils ?? 6,
-      armLength1: lastTorsion?.legLength1 ?? 25,
-      armLength2: lastTorsion?.legLength2 ?? 25,
-      loadRadius: 20,
-      bodyLength: lastTorsion?.bodyLength ?? 10,
+      wireDiameter: lastTorsion?.wireDiameter ?? 2.0,
+      outerDiameter: lastTorsion?.outerDiameter ?? 22,
+      totalCoils: lastTorsion?.activeCoils ?? 12, // Increased for safety
+      activeCoils: lastTorsion?.activeCoils ?? 12, // Increased for safety
+      armLength1: lastTorsion?.legLength1 ?? 50,
+      armLength2: lastTorsion?.legLength2 ?? 50,
+      loadRadius: 50,
+      bodyLength: lastTorsion?.bodyLength ?? 25,
       // 由上次保存的 workingAngle 反推总转角，暂时全部放在 workingAngle，installAngle 保持 0
       installAngle: 0,
-      workingAngle: lastTorsion?.workingAngle ?? 45,
+      workingAngle: lastTorsion?.workingAngle ?? 60, // Reduced from 90 to 60 for safety with d=2, Dm=20
       pitch: 1.5,
       handOfCoil: lastTorsion?.windingDirection ?? "right",
     },

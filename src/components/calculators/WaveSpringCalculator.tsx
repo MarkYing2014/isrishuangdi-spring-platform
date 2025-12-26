@@ -83,7 +83,7 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
   const [turns_Nt, setTurns] = useState(5);
   const [wavesPerTurn_Nw, setWavesPerTurn] = useState(3);
   const [freeHeight_Hf, setFreeHeight] = useState(10);
-  const [workingHeight_Hw, setWorkingHeight] = useState(7);
+  const [workingHeight_Hw, setWorkingHeight] = useState(7.5); // Improved safety from 7.0
 
   // Material state
   const [materialId, setMaterialId] = useState(DEFAULT_WAVE_SPRING_MATERIAL.id);
