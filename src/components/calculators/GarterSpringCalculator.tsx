@@ -25,6 +25,7 @@ import { DimensionHint } from "./DimensionHint";
 import { MaterialSelector } from "./MaterialSelector";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
+import { buildGarterSpringDesignRuleReport } from "@/lib/designRules";
 
 import { useSpringDesignStore, type MaterialInfo, type AnalysisResult, generateDesignCode } from "@/lib/stores/springDesignStore";
 import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
@@ -252,6 +253,23 @@ export function GarterSpringCalculator() {
 
   const watchValues = form.watch();
 
+  const designRuleReport = useMemo(() => {
+    const geo: GarterSpringDesign = {
+        type: "garter",
+        wireDiameter: watchValues.wireDiameter,
+        meanDiameter: watchValues.meanDiameter,
+        activeCoils: watchValues.activeCoils,
+        totalCoils: watchValues.totalCoils ?? watchValues.activeCoils,
+        freeLength: watchValues.freeLength,
+        ringFreeDiameter: watchValues.ringFreeDiameter,
+        ringInstalledDiameter: watchValues.ringInstalledDiameter,
+        jointType: watchValues.jointType as GarterJointType,
+        jointFactor: getDefaultJointFactor(watchValues.jointType as GarterJointType),
+        shearModulus: watchValues.shearModulus,
+    };
+    return buildGarterSpringDesignRuleReport(geo, result);
+  }, [watchValues, result]);
+
   return (
     <div className="grid gap-6 md:grid-cols-2">
       <div className="md:col-span-2 space-y-6">
@@ -382,6 +400,12 @@ export function GarterSpringCalculator() {
       </Card>
       
       <div className="space-y-6">
+        {/* Design Rules */}
+        <DesignRulePanel 
+          report={designRuleReport} 
+          title="Garter Design Rules / 环形拉簧设计规则"
+        />
+
         {/* 3D Preview */}
         <Card className="overflow-hidden">
              <div className="h-[300px] w-full bg-slate-50">

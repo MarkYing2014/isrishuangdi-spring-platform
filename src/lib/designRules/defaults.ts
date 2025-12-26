@@ -102,4 +102,13 @@ export const designRulesDefaults = {
     theta_warn_rad: 8 * Math.PI,
     theta_fail_rad: 12 * Math.PI,
   },
+
+  garter: {
+    springIndexPrefMin: 4,
+    springIndexPrefMax: 15,
+    springIndexVeryLowWarn: 3,
+    stretchRatioWarn: 0.10,
+    stretchRatioHigh: 0.15,
+    minCoilCount: 50,
+  },
 } as const;

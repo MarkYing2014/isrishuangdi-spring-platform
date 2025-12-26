@@ -624,8 +624,265 @@ const seoContent: Record<string, SeoData> = {
         }
       ]
     }
+  },
+  disk: {
+    en: {
+      h1: "Belleville Washer & Disk Spring Calculator",
+      sections: [
+        {
+          title: "What is a Disk Spring (Belleville Washer)?",
+          content: "A disk spring is a conical-shaped washer typically used to apply high loads in confined spaces. Unlike coil springs, they provide a much higher force-to-space ratio. They are governed by the Almen-Laszlo equations, which account for the non-linear behavior of the conical geometry."
+        },
+        {
+          title: "Series vs. Parallel Stacking",
+          content: "• Parallel Stacking (nested): Increases force proportionally to the number of disks, while deflection remains equal to a single disk.\n• Series Stacking (opposed): Increases deflection proportionally to the number of disks, while the force remains equal to a single disk.\n• Mixed Stacking: Allows for tailored force-deflection curves by combining both methods."
+        },
+        {
+          title: "Stress Distribution in Conical Disks",
+          content: "Stress is not uniform across the disk. The highest tensile stresses typically occur at the inner diameter (ID) edge, while the highest compressive stresses are at the outer diameter (OD) edge. Fatigue life is governed by the stress range at these critical points."
+        },
+        {
+          title: "Friction & Hysteresis",
+          content: "In stacked applications, friction between disks causes a 'Hysteresis' effect where the unloading force is significantly lower than the loading force. This is useful for damping vibration but must be accounted for in precision assemblies."
+        }
+      ],
+      faqs: [
+        {
+          q: "When should I use parallel stacking?",
+          a: "Use parallel stacking when you need extremely high forces in very little axial space."
+        },
+        {
+          q: "How can I increase the total deflection of a disk spring setup?",
+          a: "Stack multiple disks in 'Series' (facing opposite directions) to multiply the deflection of a single disk."
+        },
+        {
+          q: "What material is best for high-temperature disk springs?",
+          a: "50CrV4 is standard, but Inconel or stainless steels are used for high-temperature or corrosive environments to prevent relaxation."
+        }
+      ]
+    },
+    zh: {
+      h1: "碟形弹簧 (Belleville Washer) 计算器与组合设计",
+      sections: [
+        {
+          title: "什么是碟形弹簧？",
+          content: "碟形弹簧（又称贝尔维尔垫圈）是一种中空的锥形垫圈。其特点是能在极小的轴向空间内产生极大的载荷。碟簧的工作原理基于 Almen-Laszlo 理论，其载荷-位移曲线通常是非线性的。"
+        },
+        {
+          title: "串联与并联：自由组合力与行程",
+          content: "• 并联 (Parallel Stacking)：同向嵌套。载荷随碟簧数量成倍增加，但行程保持单片水平。\n• 串联 (Series Stacking)：背对背堆叠。行程随碟簧数量成倍增加，但载荷保持单片水平。\n• 混合组合：通过灵活组合串并联，可以实现复杂的渐进式力学特性曲线。"
+        },
+        {
+          title: "应力分布与疲劳寿命",
+          content: "碟簧内部的应力分布极不均匀。通常在内径 (ID) 边缘产生最高张应力，而在外径 (OD) 边缘产生最高压应力。疲劳寿命主要取决于这些关键点位在工作循环中的应力幅值。"
+        },
+        {
+          title: "摩擦力与滞后效应 (Hysteresis)",
+          content: "在组合使用时，碟簧间的相互摩擦会导致“滞后”现象：即卸载时的力值低于加载时的力值。这种特性对于阻尼减震非常有利，但在精密力值控制应用中需要额外注意。"
+        }
+      ],
+      faqs: [
+        {
+          q: "什么时候该选择并联组合方式？",
+          a: "当你需要在极小的安装高度内获得超大输出压力时，应选择并联嵌套。"
+        },
+        {
+          q: "如何增加碟簧系统的总行程？",
+          a: "将多片碟簧以“串联”（背对背）方式堆叠，总行程等于单片行程乘以碟簧数量。"
+        },
+        {
+          q: "环境温度对碟形弹簧有影响吗？",
+          a: "有。高温会导致弹簧材料蠕变或松弛。常规 50CrV4 适用于 100°C 以下，更高温环境需选用不锈钢或高温合金材料。"
+        }
+      ]
+    }
+  },
+  garter: {
+    en: {
+      h1: "Garter Spring Calculator & Radial Force Engineering",
+      sections: [
+        {
+          title: "What is a Garter Spring?",
+          content: "A garter spring is a helical tension spring whose ends are joined to form a closed circle. They are primarily used to provide a constant radial force in oil seals, electrical connectors, and motor brushes. The principal effect is creating 'Hoop Tension' to apply uniform inward pressure."
+        },
+        {
+          title: "Hoop Tension to Radial Force Conversion",
+          content: "The spring provides an axial tension (F_hoop). In a circular assembly, this creates a total radial pressure. \nFormula: Total Radial Force (F_r) = 2π * F_hoop. \nThis uniform distribution is critical for maintaining a leak-proof seal on rotating shafts."
+        },
+        {
+          title: "Common Joint Types",
+          content: "• Hook and Loop: One end is a traditional hook, the other is an eye loop. Simplest but creates a slight gap.\n• Screw Joint (Nib and Taper): One end is reduced in diameter (Nib) and screwed into the regular coils of the other end. Provides the most continuous and uniform radial pressure.\n• Interlocked Coils: Direct entanglement of coils for low-precision applications."
+        },
+        {
+          title: "Criticality of Initial Tension",
+          content: "Garter springs must have high initial tension to ensure the coils stay closed and provide pressure even at small diameters. Without sufficient initial tension, the spring might feel 'loose' or fail to respond to minor shaft run-out (eccentricity)."
+        }
+      ],
+      faqs: [
+        {
+          q: "How do I calculate the radial force of a garter spring?",
+          a: "First calculate the tension force based on the extension of the ring, then use the hoop tension formula (Fr = 2π * Ft). The tighter the ring is stretched over the shaft, the higher the pressure."
+        },
+        {
+          q: "What is the best joint for high-speed oil seals?",
+          a: "The 'Screw Joint' (Nib type) is preferred as it minimizes the mechanical discontinuity at the junction, preventing uneven wear on the seal lip."
+        },
+        {
+          q: "Can garter springs be used for extension?",
+          a: "While they are essentially tension springs, their primary design goal is radial compression. Using them purely for axial extension is rare compared to standard extension springs."
+        }
+      ]
+    },
+    zh: {
+      h1: "环形拉簧 (Garter Spring) 计算器与径向力设计",
+      sections: [
+        {
+          title: "什么是环形拉簧？",
+          content: "环形拉簧是一种两端连接成闭合圆环的螺旋拉伸弹簧。它们主要用于在油封 (Oil Seals)、电连接器和电机碳刷中提供持续的径向紧固力。其核心物理效应是通过“周向张力” (Hoop Tension) 产生均匀的向内压力。"
+        },
+        {
+          title: "周向张力与径向力的转化",
+          content: "弹簧本身产生的是切向拉力 (F_hoop)。在圆形组件中，这转化为总的径向紧固力。\n公式：总径向力 (F_r) = 2π * F_hoop。\n这种均匀分布的压力对于保持旋转轴的零泄漏密封至关重要。"
+        },
+        {
+          title: "常见的接头设计类型",
+          content: "• 钩环连接 (Hook & Loop)：一端为钩，一端为环。结构简单但接头处存在微小缝隙。\n• 螺纹连接 (Screw Joint/Nib)：一端缩径后直接旋入另一端的线圈。这种方式提供的径向压力最均匀，是高精密油封的标准方案。\n• 互锁连接：通过线圈直接扣合，适用于低精度场合。"
+        },
+        {
+          title: "初张力 (Initial Tension) 的重要性",
+          content: "环形拉簧必须具备较高的初张力，以确保线圈在工作状态下保持紧密。如果没有足够初张力，弹簧在应对轴的微小跳动（偏心）时会反应迟钝，导致密封失效。"
+        }
+      ],
+      faqs: [
+        {
+          q: "如何计算环形弹簧产生的向内压力？",
+          a: "首先根据弹簧拉伸后的长度计算出周向张力 Ft，然后利用公式 Fr = 2π * Ft 转换为径向力。直径被拉伸得越多，压力越大。"
+        },
+        {
+          q: "高速旋转油封推荐使用哪种接头？",
+          a: "推荐使用“螺纹式缩径接头” (Nib type)。它能最大程度保证接头处的平滑过渡，避免油封唇口受力不均导致异常磨损。"
+        },
+        {
+          q: "环形拉簧可以当做普通拉簧使用吗？",
+          a: "虽然其本质是拉簧，但其设计重点在于径向压缩。如果仅作为轴向拉伸使用，通常直接选用标准的拉伸弹簧。"
+        }
+      ]
+    }
+  },
+  arc: {
+    en: {
+      h1: "Arc Spring (Curved Helical Spring) Calculator",
+      sections: [
+        {
+          title: "What is an Arc Spring?",
+          content: "An arc spring is a helical compression spring whose axis is curved into an arc. They are primarily used in high-torque vibration damping systems, such as Dual-Mass Flywheels (DMF) in automotive drivetrains. They allow for large rotation angles while maintaining high torque capacity."
+        },
+        {
+          title: "The Role of Centrifugal Force",
+          content: "In rotating applications, centrifugal force pushes the arc spring against its housing. This creates significant friction which provides a secondary damping effect beyond the spring's own material hysteresis. This is critical for dampening engine speed oscillations."
+        },
+        {
+          title: "Geometric Complexity",
+          content: "Designing an arc spring requires balancing the spring diameter, coil pitch, and the radius of the arc. If the arc radius is too tight relative to the spring diameter, the inner coils may touch (pre-mature solid) while the outer coils are still open."
+        }
+      ],
+      faqs: [
+        {
+          q: "Where are arc springs mostly used?",
+          a: "They are nearly universal in modern dual-mass flywheels and torque converters to isolate engine vibrations from the gearbox."
+        },
+        {
+          q: "How does friction affect arc spring performance?",
+          a: "Friction against the guide rail or housing adds damping but also causes wear. Hardened housings or lubricating grease are often required."
+        }
+      ]
+    },
+    zh: {
+      h1: "弧形弹簧 (Arc Spring) 计算与双质量飞轮设计",
+      sections: [
+        {
+          title: "什么是弧形弹簧？",
+          content: "弧形弹簧（又称弯曲螺旋弹簧）是一种中心轴线预弯成弧形的压缩弹簧。它们主要用于高扭矩减震系统，如汽车传动系统中的双质量飞轮 (DMF)。它们允许极大的扭转角度，同时提供平稳的扭矩传递。"
+        },
+        {
+          title: "离心力与辅助阻尼",
+          content: "在旋转工况下，离心力会将弧形弹簧压向外部壳体。这种接触产生的摩擦力构成了系统的辅助阻尼，有助于吸收引擎的转速波动，保护变速箱。"
+        },
+        {
+          title: "设计的几何约束",
+          content: "设计弧形弹簧需要平衡中径、节距与圆弧半径。如果圆弧半径相对于弹簧直径过小，内侧线圈会提前接触（压死），而外侧仍有间隙，导致受力极不均匀。"
+        }
+      ],
+      faqs: [
+        {
+          q: "弧形弹簧主要应用在哪里？",
+          a: "广泛应用于现代汽车的双质量飞轮、离合器减震器和扭矩转换器中，用于隔离发动机振动。"
+        },
+        {
+          q: "摩擦力对弧形弹簧有什么影响？",
+          a: "摩擦力提供了必要的能量耗散（阻尼），但也会导致磨损。通常需要使用专用的衬层或润滑脂，并对壳体进行硬化处理。"
+        }
+      ]
+    }
+  },
+  variablePitchCompression: {
+    en: {
+      h1: "Variable Pitch Compression Spring Calculator",
+      sections: [
+        {
+          title: "What is Variable Pitch?",
+          content: "A variable pitch spring has a changing distance between its coils throughout its length. This design creates a progressive spring rate: as the spring compresses, the coils with the smaller pitch touch first and become inactive, gradually increasing the stiffness of the remaining spring."
+        },
+        {
+          title: "Suppression of Resonance (Spring Surge)",
+          content: "Because a variable pitch spring doesn't have a single fixed natural frequency, it is far less likely to resonate (surge) at high frequencies. This makes them ideal for high-speed engine valves and performance suspension where constant-rate springs might vibrate uncontrollably."
+        },
+        {
+          title: "Force-Deflection Characterization",
+          content: "The load curve for a variable pitch spring is non-linear—it curves upwards. Engineering such a spring requires segmenting the spring into different zones and calculating when each zone becomes solid."
+        }
+      ],
+      faqs: [
+        {
+          q: "Why use variable pitch instead of standard compression springs?",
+          a: "To achieve a soft initial feel for comfort while maintaining high load capacity at the end of the stroke, and to prevent high-speed resonance."
+        },
+        {
+          q: "Is it harder to manufacture variable pitch springs?",
+          a: "Yes. CNC coiling machines must vary the pitch precisely during the coiling process, requiring advanced control and specialized QC verification."
+        }
+      ]
+    },
+    zh: {
+      h1: "变节距压缩弹簧 (Variable Pitch) 计算与特性",
+      sections: [
+        {
+          title: "什么是变节距设计？",
+          content: "变节距弹簧的线圈间距在长度方向上是变化的。这种设计能产生“渐进式刚度”：随着压缩进行，节距较小的线圈先接触并失去弹性（变为无效圈），从而使剩余部分的刚度逐渐变大。"
+        },
+        {
+          title: "抑制共振与驻波 (Resonance)",
+          content: "由于变节距弹簧没有单一的固有频率，它极难在高频冲击下产生共振（Surge）。这使其成为高速发动机气门弹簧和高性能悬挂弹簧的理想选择，能有效避免弹簧在高频工作下的剧烈震动。"
+        },
+        {
+          title: "载荷-位移曲线特性",
+          content: "变节距弹簧的载荷曲线是非线性的（向上弯曲）。工程计算需要将弹簧划分为多个区域，并精确计算每个区域在何时达到“压并”状态，从而得出完整的力学特性。"
+        }
+      ],
+      faqs: [
+        {
+          q: "为什么要用变节距而不是普通压簧？",
+          a: "为了在初段行程提供柔顺的触感，而在末段行程提供强大的支撑力，同时防止高频工况下的共振破坏。"
+        },
+        {
+          q: "变节距弹簧的制造难度大吗？",
+          a: "较大。需要高精度的 CNC 卷簧机在加工过程中动态调整节距，且生产后的力度检测需要多个行程点的全量校验。"
+        }
+      ]
+    }
   }
 };
+
 
 interface SpringSeoContentProps {
   type: SpringType;

@@ -19,3 +19,5 @@ export { buildVariablePitchCompressionDesignRuleReport } from "./variablePitchRu
 export { buildSpiralSpringDesignRuleReport } from "./spiralSpringRules";
 export { buildWaveSpringDesignRuleReport } from "./waveSpringRules";
 export { buildDieSpringDesignRuleReport } from "./dieSpringRules";
+export { buildGarterSpringDesignRuleReport } from "./garterRules";
+export * from "./garterRules";
