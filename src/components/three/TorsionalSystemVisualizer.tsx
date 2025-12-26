@@ -142,7 +142,20 @@ function SpringGroupInstances({
   const deltaX = groupRes?.springDeltaX ?? 0;
   const currentL = group.L_free - deltaX;
   const utilization = groupRes?.utilization ?? 0;
-  const isStopping = (groupRes?.isStopping ?? false) || utilization > 1.0;
+  
+  // OEM Stage vs State Logic:
+  // - Stage = Design Attribute (fixed color per group)
+  // - State = Operating Attribute (COAST / WORKING / LIMIT / STOP)
+  const isActive = deltaX > 0;
+  const isThisGroupStopping = (groupRes?.isStopping ?? false) || utilization > 1.0;
+  
+  // State determines visual treatment:
+  // - COAST: Semi-transparent (not engaged)
+  // - WORKING: Full opacity, Stage color
+  // - STOP: Only THIS group turns red (not others)
+  const baseColor = stageColor || "#cbd5e1";
+  const displayColor = isThisGroupStopping ? "#ef4444" : baseColor;
+  const displayOpacity = isActive ? 1.0 : 0.4;
 
   const helixGeo = useMemo(() => {
     const geo = buildLightweightSpringGeometry(group.d, group.Dm, currentL, 8, globalScale);
@@ -185,7 +198,7 @@ function SpringGroupInstances({
                <meshStandardMaterial color="#64748b" metalness={0.8} roughness={0.2} />
              </mesh>
 
-             {/* Helical Spring */}
+             {/* Helical Spring - Stage Color + State Opacity */}
              <mesh 
                geometry={helixGeo} 
                dispose={null}
@@ -193,9 +206,11 @@ function SpringGroupInstances({
                onPointerLeave={() => onHover(null)}
              >
                <meshStandardMaterial 
-                 color={isStopping ? "#ef4444" : (stageColor || "#cbd5e1")} 
+                 color={displayColor} 
                  metalness={0.9} 
-                 roughness={0.05} 
+                 roughness={0.05}
+                 transparent={displayOpacity < 1}
+                 opacity={displayOpacity}
                />
              </mesh>
           </group>

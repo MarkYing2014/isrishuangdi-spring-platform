@@ -139,57 +139,90 @@ function KPICard({
 
 /**
  * StageLegendCard
+ * OEM Standard: Stage (Design) + State (Operating)
  */
 function StageLegendCard({ design, result }: { design: TorsionalSpringSystemDesign, result: TorsionalSystemResult }) {
   const { language } = useLanguage();
   const isZh = language === "zh";
+  
+  // Count activated stages
+  const activatedCount = result.perGroup.filter(g => g.springDeltaX > 0).length;
+  const totalStages = Math.max(...design.groups.map(g => g.stage), 1);
 
   return (
     <Card className="border-slate-200 shadow-sm overflow-hidden">
-      <CardHeader className="py-2 px-4 border-b bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500">
-          {isZh ? "分级图例 (Stage Legend)" : "Stage Legend"}
+      <CardHeader className="py-2 px-4 border-b bg-slate-50 flex flex-row items-center justify-between">
+        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+          {isZh ? "分级图例" : "Stage Legend"}
+        </span>
+        <Badge variant="outline" className="text-[8px] px-1.5 py-0 h-4 font-bold text-emerald-600 bg-emerald-50 border-emerald-200">
+          {isZh ? `激活: ${activatedCount}/${totalStages}` : `Active: ${activatedCount}/${totalStages}`}
+        </Badge>
       </CardHeader>
       <CardContent className="p-0 divide-y divide-slate-100">
         {design.groups.map((group, i) => {
           const groupResult = result.perGroup.find(pg => pg.groupId === group.id);
           const deltaX = groupResult?.springDeltaX || 0;
           const isActive = deltaX > 0;
-          const isStopping = groupResult?.isStopping || (groupResult?.utilization || 0) > 1.0;
+          const isThisGroupStopping = groupResult?.isStopping || (groupResult?.utilization || 0) > 1.0;
           
-          let statusLabel = isZh ? "备用" : "COAST";
-          let statusColor = group.stageColor || "#94a3b8"; // Silver
+          // Stage = Design Attribute (fixed base color)
+          const stageBaseColor = group.stageColor || "#94a3b8";
           
-          if (isStopping) {
-              statusLabel = isZh ? "止挡" : "STOP";
-              statusColor = "#ef4444";
+          // State = Operating Attribute
+          let stateLabel: string;
+          let stateBadgeClass: string;
+          
+          if (isThisGroupStopping) {
+            stateLabel = isZh ? "止挡" : "STOP";
+            stateBadgeClass = "text-rose-600 bg-rose-50 border-rose-200";
           } else if (isActive) {
-              statusLabel = isZh ? "工作" : "WORKING";
+            stateLabel = isZh ? "工作" : "WORKING";
+            stateBadgeClass = "text-emerald-600 bg-emerald-50 border-emerald-200";
+          } else {
+            stateLabel = isZh ? "待机" : "COAST";
+            stateBadgeClass = "text-slate-400 bg-slate-50 border-slate-200";
           }
 
           return (
-            <div key={group.id} className={`p-3 space-y-1 transition-colors ${isActive ? 'bg-slate-50/50' : 'opacity-40'}`}>
+            <div key={group.id} className={`p-3 space-y-1 transition-colors ${isActive ? '' : 'opacity-50'}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusColor }} />
+                  {/* Stage Color Indicator (Always shows Stage base color) */}
+                  <div 
+                    className="w-2.5 h-2.5 rounded-full" 
+                    style={{ 
+                      backgroundColor: isThisGroupStopping ? "#ef4444" : stageBaseColor,
+                      boxShadow: `0 0 0 1px ${stageBaseColor}`
+                    }} 
+                  />
                   <span className="text-[10px] font-black uppercase text-slate-700">
                     S{group.stage} - {group.stageName || `Stage ${i+1}`}
                   </span>
                 </div>
-                <Badge variant="outline" className={`text-[8px] px-1 py-0 h-4 border-slate-200 font-bold ${isStopping ? 'text-rose-600 bg-rose-50' : isActive ? 'text-blue-600 bg-blue-50' : 'text-slate-400 bg-slate-50'}`}>
-                  {statusLabel}
+                <Badge variant="outline" className={`text-[8px] px-1 py-0 h-4 font-bold ${stateBadgeClass}`}>
+                  {stateLabel}
                 </Badge>
               </div>
               <p className="text-[9px] text-slate-500 font-medium leading-tight pl-4 italic">
                 {group.role || "Torsional damping element"}
               </p>
               <div className="flex items-center gap-3 pl-4 pt-1 text-[8px] font-mono text-slate-400">
-                <span>Eng: {group.theta_start}°</span>
-                <span>k: {group.k} Nmm/deg</span>
+                <span>θ: {group.theta_start}°</span>
+                <span>R: {group.R}mm</span>
+                <span>k: {group.k} N/mm</span>
               </div>
             </div>
           );
         })}
       </CardContent>
+      {/* OEM Clarification */}
+      <div className="px-3 py-2 bg-blue-50/50 border-t text-[8px] text-blue-600 leading-relaxed">
+        <strong>{isZh ? "说明：" : "Note:"}</strong> {isZh 
+          ? "Stage 为设计属性（固定颜色），State 为工况属性（随转角变化）。STOP 仅影响该 Stage。"
+          : "Stage = Design Attribute (fixed color). State = Operating status. STOP only affects that specific Stage."
+        }
+      </div>
     </Card>
   );
 }
