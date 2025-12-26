@@ -43,7 +43,54 @@ export function calculateTorsionalSystem(
         };
     });
 
-    // 2. Identify System Stop Angle
+    // 2. Physical Collision Audit (Angular Gap)
+    const radiusBuckets: Record<number, TorsionalSpringGroup[]> = {};
+    groups.forEach(g => {
+        if (!g.enabled) return;
+        const bucketR = Math.round(g.R * 10) / 10;
+        if (!radiusBuckets[bucketR]) radiusBuckets[bucketR] = [];
+        radiusBuckets[bucketR].push(g);
+    });
+
+    Object.entries(radiusBuckets).forEach(([R_str, bucketGroups]) => {
+        const R = parseFloat(R_str);
+        const allSprings: { angle: number, OD: number, groupId: string }[] = [];
+
+        bucketGroups.forEach(g => {
+            const OD = g.Dm + g.d;
+            for (let i = 0; i < g.n; i++) {
+                allSprings.push({
+                    angle: (g.theta_start + i * (360 / g.n)) % 360,
+                    OD,
+                    groupId: g.id
+                });
+            }
+        });
+
+        if (allSprings.length <= 1) return;
+
+        allSprings.sort((a, b) => a.angle - b.angle);
+
+        for (let i = 0; i < allSprings.length; i++) {
+            const nextIdx = (i + 1) % allSprings.length;
+            const s1 = allSprings[i];
+            const s2 = allSprings[nextIdx];
+
+            let angularGap = (s2.angle - s1.angle + 360) % 360;
+            // Handle precision/wrap-around edge case
+            if (angularGap > 359.9) angularGap = 0;
+
+            // minGap = (avgOD / R) * (180/PI) + clearance
+            const avgOD = (s1.OD + s2.OD) / 2;
+            const minRequiredGap = (avgOD / R) * (180 / Math.PI) + 1.5; // 1.5 deg clearance
+
+            if (angularGap < minRequiredGap && s1.groupId !== s2.groupId) {
+                warnings.push(`Angular collision detected at R=${R}mm between springs of different groups (Gap: ${angularGap.toFixed(1)}°, Min: ${minRequiredGap.toFixed(1)}°)`);
+            }
+        }
+    });
+
+    // 3. Identify System Stop Angle
     const systemStopTheta = groupProps.length > 0
         ? Math.min(...groupProps.map(gp => gp.theta_stop_i))
         : 0;
@@ -137,11 +184,12 @@ export function calculateTorsionalSystem(
         const isStopping = referenceAngle >= gp.theta_stop_i;
 
         const effectiveTheta = Math.min(referenceAngle, systemStopTheta, gp.theta_stop_i);
+        let springDeltaX = 0;
 
         if (gp.enabled && effectiveTheta >= gp.theta_start) {
+            springDeltaX = gp.R * (effectiveTheta - gp.theta_start) * (Math.PI / 180);
+
             // Group torque contribution (load balanced)
-            // Note: we use exactTotalK if we want load sharing at referenceAngle
-            // If past system stop, load sharing becomes complex, we assume nominal distribution
             const groupNominalK = gp.K_theta_deg * gp.n;
             const totalNominalKAtRef = groupProps.reduce((sum, g) =>
                 (g.enabled && Math.min(referenceAngle, systemStopTheta, g.theta_stop_i) >= g.theta_start)
@@ -181,7 +229,8 @@ export function calculateTorsionalSystem(
             force: f_per,
             stress: stress,
             utilization,
-            isStopping
+            isStopping,
+            springDeltaX
         };
     });
 
@@ -194,6 +243,7 @@ export function calculateTorsionalSystem(
         },
         totalStiffness: exactK,
         thetaStop: systemStopTheta,
+        isPastStop: isPastStopRef,
         warnings
     };
 }

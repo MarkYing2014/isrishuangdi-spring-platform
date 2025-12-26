@@ -21,8 +21,8 @@ export const TORSIONAL_SYSTEM_POLICY_V1 = {
         max: 20
     },
 
-    // Kθ_stop = Kθ * 1e6
-    stopMultiplier: 1e6,
+    // Kθ_stop = Kθ * 1000
+    stopMultiplier: 1000,
 
     // Scaling for Rigid contact modeling
     rigidStiffnessFactor: 1000,

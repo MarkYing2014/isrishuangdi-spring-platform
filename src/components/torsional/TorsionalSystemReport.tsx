@@ -88,7 +88,7 @@ function ReportHeader({ design }: { design: TorsionalSpringSystemDesign }) {
         <div className="w-px h-3 bg-slate-200" />
         <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 font-bold uppercase">
           <Target className="w-3 h-3" />
-          <span>Stop: 10^6 stiffness</span>
+          <span>Stop: 1000x stiffness</span>
         </div>
       </div>
     </Card>
@@ -131,6 +131,63 @@ function KPICard({
         <p className="text-[10px] uppercase font-bold tracking-widest text-slate-500">{label}</p>
         <p className={`text-2xl font-black font-mono tracking-tight ${textColors[status]}`}>{value}</p>
         {subtext && <p className="text-[9px] font-medium text-slate-400 line-clamp-1">{subtext}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * StageLegendCard
+ */
+function StageLegendCard({ design, result }: { design: TorsionalSpringSystemDesign, result: TorsionalSystemResult }) {
+  const { language } = useLanguage();
+  const isZh = language === "zh";
+
+  return (
+    <Card className="border-slate-200 shadow-sm overflow-hidden">
+      <CardHeader className="py-2 px-4 border-b bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500">
+          {isZh ? "分级图例 (Stage Legend)" : "Stage Legend"}
+      </CardHeader>
+      <CardContent className="p-0 divide-y divide-slate-100">
+        {design.groups.map((group, i) => {
+          const groupResult = result.perGroup.find(pg => pg.groupId === group.id);
+          const deltaX = groupResult?.springDeltaX || 0;
+          const isActive = deltaX > 0;
+          const isStopping = groupResult?.isStopping || (groupResult?.utilization || 0) > 1.0;
+          
+          let statusLabel = isZh ? "备用" : "COAST";
+          let statusColor = group.stageColor || "#94a3b8"; // Silver
+          
+          if (isStopping) {
+              statusLabel = isZh ? "止挡" : "STOP";
+              statusColor = "#ef4444";
+          } else if (isActive) {
+              statusLabel = isZh ? "工作" : "WORKING";
+          }
+
+          return (
+            <div key={group.id} className={`p-3 space-y-1 transition-colors ${isActive ? 'bg-slate-50/50' : 'opacity-40'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: statusColor }} />
+                  <span className="text-[10px] font-black uppercase text-slate-700">
+                    S{group.stage} - {group.stageName || `Stage ${i+1}`}
+                  </span>
+                </div>
+                <Badge variant="outline" className={`text-[8px] px-1 py-0 h-4 border-slate-200 font-bold ${isStopping ? 'text-rose-600 bg-rose-50' : isActive ? 'text-blue-600 bg-blue-50' : 'text-slate-400 bg-slate-50'}`}>
+                  {statusLabel}
+                </Badge>
+              </div>
+              <p className="text-[9px] text-slate-500 font-medium leading-tight pl-4 italic">
+                {group.role || "Torsional damping element"}
+              </p>
+              <div className="flex items-center gap-3 pl-4 pt-1 text-[8px] font-mono text-slate-400">
+                <span>Eng: {group.theta_start}°</span>
+                <span>k: {group.k} Nmm/deg</span>
+              </div>
+            </div>
+          );
+        })}
       </CardContent>
     </Card>
   );
@@ -182,6 +239,18 @@ export function TorsionalSystemReport({
     <div className="space-y-6 max-w-[1280px] mx-auto pb-12">
       <ReportHeader design={design} />
 
+      {/* High-Priority Engineering Warnings */}
+      {result.warnings.length > 0 && (
+        <div className="space-y-2">
+          {result.warnings.map((w, i) => (
+            <div key={i} className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs font-bold animate-pulse shadow-sm">
+              <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>{isZh ? "工程碰撞/限制警告：" : "Engineering Constraint Warning:"} {w}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* 2. Executive Summary */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <KPICard 
@@ -192,14 +261,21 @@ export function TorsionalSystemReport({
         />
         <KPICard 
           label={isZh ? "最大扭矩" : "MAX TORQUE"} 
-          value={`${result.totalTorque.load.toFixed(0)} Nm`} 
-          subtext={`At stop condition`}
+          value={result.isPastStop ? "RIGID STOP" : `${result.totalTorque.load.toFixed(0)} Nm`} 
+          subtext={result.isPastStop ? "Bottomed out" : "Elastic loading range"}
+          status={result.isPastStop ? "error" : "default"}
         />
         <KPICard 
-          label={isZh ? "当前刚度" : "NOMINAL K"} 
-          value={`${result.totalStiffness.toFixed(1)}`} 
-          subtext="Nm/deg (System Effective)"
-          status="info"
+          label={isZh ? "当前刚度" : "SYSTEM K"} 
+          value={result.isPastStop ? "INFINITE" : `${result.totalStiffness.toFixed(1)}`} 
+          subtext={result.isPastStop ? "Mechanical limit" : "System Effective (Nm/deg)"}
+          status={result.isPastStop ? "warning" : "info"}
+        />
+        <KPICard 
+          label={isZh ? "参与级数" : "ACTIVATED STAGES"} 
+          value={`${result.perGroup.filter(g => g.springDeltaX > 0).length} / ${Math.max(...design.groups.map(g => g.stage), 1)}`} 
+          subtext={isZh ? "分段载荷路径" : "Radial load paths"}
+          status="success"
         />
         <KPICard 
           label={isZh ? "最小安全系数" : "MIN SAFETY FACTOR"} 
@@ -381,6 +457,9 @@ export function TorsionalSystemReport({
         {/* Right Column (4 units) */}
         <div className="xl:col-span-4 space-y-6">
           
+          {/* OEM Stage Legend */}
+          <StageLegendCard design={design} result={result} />
+
           {/* Engineering Audit */}
           <DesignRulePanel 
             report={auditReport} 

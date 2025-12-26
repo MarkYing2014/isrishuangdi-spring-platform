@@ -29,6 +29,11 @@ export interface TorsionalSpringGroup {
     clearance: number; // additional clearance before rigid stop [mm]
 
     materialId?: string;
+    // OEM Metadata
+    stage: 1 | 2 | 3;
+    role?: string;
+    stageName?: string;
+    stageColor?: string;
 }
 
 export interface TorsionalSpringSystemDesign {
@@ -45,6 +50,13 @@ export interface TorsionalSpringSystemDesign {
 
     // Optional inertia (V2)
     inertia?: number;
+
+    // Assembly-level parameters (OEM Visuals)
+    outerOD: number;
+    innerID: number;
+    carrierThickness: number;
+    boltCount: number;
+    boltCircleRadius: number;
 }
 
 /**
@@ -68,6 +80,7 @@ export interface TorsionalGroupResult {
     stress: number;      // Current shear stress [MPa]
     utilization: number; // stress / allowable
     isStopping: boolean; // if this group hit its own geometry stop
+    springDeltaX: number; // Actual axial compression of a spring in this group [mm]
 }
 
 export interface TorsionalSystemResult {
@@ -79,5 +92,6 @@ export interface TorsionalSystemResult {
     };
     totalStiffness: number; // [Nm/deg]
     thetaStop: number;      // System-wide stop angle [deg]
+    isPastStop: boolean;    // If referenceAngle >= thetaStop
     warnings: string[];
 }
