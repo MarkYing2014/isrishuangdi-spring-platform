@@ -912,16 +912,36 @@ const seoContent: Record<string, SeoData> = {
       ],
       faqs: [
         {
-          q: "Why do clutch dampers have different spring lengths?",
-          a: "To create different stages of engagement. Shorter springs engage later as the angle increases, providing a progressive increase in system stiffness."
+          q: "Q1. What is the primary function of the compression spring pack in the clutch damper?",
+          a: "The primary function of the compression spring pack is to generate controlled torsional resistance between the input and output components of the clutch or DMF system. This resistance filters engine torsional vibrations, smooths torque transmission, and protects the drivetrain under transient load conditions."
         },
         {
-          q: "How is load sharing calculated in a torsional system?",
-          a: "Load is distributed proportionally to each active spring's stiffness and radius. Precise kᵢ·Rᵢ² weighting ensures each group carries its engineering share."
+          q: "Q2. How is torque generated and calculated using compression springs?",
+          a: "Torque is generated when relative angular displacement causes the circumferentially mounted compression springs to compress. The system converts angular displacement into linear spring compression, and spring force acting at a defined radius produces torque. For engineering evaluation, the spring pack is treated as an equivalent torsional spring system, where total torque is the sum of contributions from all active spring groups as a function of angular displacement."
         },
         {
-          q: "What is the significance of the stop angle?",
-          a: "It defines the mechanical envelope of the hub. Exceeding this angle causes rigid contact, protecting the springs from permanent deformation or coil bind."
+          q: "Q3. Why are compression springs used instead of torsion bars?",
+          a: "Compression springs are preferred over torsion bars due to: Superior packaging flexibility within clutch hubs; Capability to implement multi-stage stiffness characteristics; Better NVH tuning at low angular amplitudes; Proven manufacturing robustness and cost efficiency; Natural mechanical stop through spring solid height. These advantages make compression springs the industry standard for modern clutch damper systems."
+        },
+        {
+          q: "Q4. What is the purpose of multi-stage (Stage 1 / 2 / 3) spring design?",
+          a: "The multi-stage spring design allows the torsional system to adapt to different operating conditions by progressively engaging spring groups with increasing stiffness. Stage 1 handles Idle/NVH Filtering, Stage 2 handles Normal Driving Load, and Stage 3 handles Peak Torque/Protection."
+        },
+        {
+          q: "Q5. How does each stage correspond to NVH and torque conditions?",
+          a: "Stage 1: Idle / NVH Filtering — filters engine firing pulses and suppresses noise at idle. Stage 2: Normal Driving Load — balances comfort and response for normal driving. Stage 3: Peak Torque / Protection — handles high torque and shock loads to protect the drivetrain."
+        },
+        {
+          q: "Q6. How is overload or end-of-travel handled in the system?",
+          a: "Overload protection is achieved through mechanical stops defined by spring solid height and system geometry. Once the maximum angular travel is reached, the system transitions to a rigid stop condition, preventing further torque transmission and protecting surrounding components."
+        },
+        {
+          q: "Q7. How does the design support OEM-specific tuning requirements?",
+          a: "The system allows independent tuning of: Number of springs per stage; Spring stiffness and preload; Installation radius per stage; Engagement angles between stages. This enables precise matching to OEM-specific NVH targets and torque capacity requirements."
+        },
+        {
+          q: "Q8. Is this design aligned with current OEM and Tier-1 practices?",
+          a: "Yes. The staged compression spring pack architecture is widely used in current clutch damper and DMF systems across passenger and commercial vehicle applications and is fully aligned with established OEM engineering practices (ISRI, ZF, Schaeffler, Valeo). The proposed torsional spring pack architecture provides a robust, tunable, and OEM-proven solution for balancing NVH performance and torque capacity across all operating conditions."
         }
       ]
     },
@@ -955,16 +975,36 @@ const seoContent: Record<string, SeoData> = {
       ],
       faqs: [
         {
-          q: "离合器减震器中为什么弹簧长度不一？",
-          a: "目的是实现分级介入。较短的弹簧会较晚参与工作，从而随着扭转角度增加逐渐提高系统整体刚度。"
+          q: "问题 1：离合器减振器中的压缩弹簧包主要作用是什么？",
+          a: "压缩弹簧包的主要作用是在离合器或双质量飞轮系统的输入端与输出端之间产生受控的扭转阻力，用于过滤发动机扭转振动、平顺扭矩传递，并在瞬态载荷下保护传动系统。"
         },
         {
-          q: "如何计算各组弹簧的负载分配？",
-          a: "负载根据各活动弹簧组的等效刚度 kᵢ·Rᵢ² 进行比例分配，确保各组弹簧在工程设计中的应力都在安全范围内。"
+          q: "问题 2：压缩弹簧是如何产生并计算扭矩的？",
+          a: "当输入端与输出端产生相对转角时，沿圆周布置的压缩弹簧被压缩，从而产生力矩。系统将转角位移转化为弹簧轴向压缩，弹簧力在安装半径处产生扭矩。在工程评估中，弹簧包被等效为一个扭转弹簧系统，系统总扭矩为所有已介入弹簧组在给定转角下的扭矩贡献之和。"
         },
         {
-          q: "止挡转角的意义是什么？",
-          a: "它定义了轮毂的机械极限。超过此角度将发生材料间的刚性接触，从而保护弹簧不发生永久塑性变形。"
+          q: "问题 3：为什么选用压缩弹簧而不是扭杆？",
+          a: "相比扭杆，压缩弹簧具有以下优势：更高的布置灵活性，适合集成于离合器轮毂；可实现多级刚度特性；小转角区间 NVH 调校能力更强；制造工艺成熟，成本与可靠性优势明显；弹簧压实高度天然形成机械止挡。因此，压缩弹簧成为现代离合器减振系统的行业标准方案。"
+        },
+        {
+          q: "问题 4：多级（Stage 1 / 2 / 3）弹簧设计的目的是什么？",
+          a: "多级弹簧设计通过逐步介入不同刚度的弹簧组，使系统能够适应不同工况下的扭矩与 NVH 要求。每个阶段均针对特定工况进行优化。"
+        },
+        {
+          q: "问题 5：各个 Stage 与 NVH / 扭矩工况如何对应？",
+          a: "Stage 1：怠速与小负载下过滤发动机点火脉动，抑制异响。Stage 2：正常驾驶扭矩传递，兼顾舒适性与响应。Stage 3：高扭矩与冲击载荷工况，保护传动系统。"
+        },
+        {
+          q: "问题 6：系统如何应对过载或行程末端？",
+          a: "系统通过弹簧压实高度及结构几何形成的机械止挡实现过载保护。当达到最大允许转角后，系统进入刚性止挡状态，防止进一步传扭并保护相关部件。"
+        },
+        {
+          q: "问题 7：该设计如何支持主机厂的定制化调校需求？",
+          a: "该系统支持以下参数的独立调校：各 Stage 的弹簧数量；弹簧刚度与预载；各 Stage 的安装半径；不同 Stage 的介入转角。从而精确匹配主机厂的 NVH 目标与扭矩需求。"
+        },
+        {
+          q: "问题 8：该设计是否符合当前 OEM / Tier-1 的工程实践？",
+          a: "是的。分级压缩弹簧包架构已广泛应用于乘用车及商用车的离合器减振器和双质量飞轮系统，完全符合 ISRI、ZF、Schaeffler、Valeo 等主机厂及一级供应商的成熟工程实践。所提出的扭转弹簧包架构在全工况范围内实现了 NVH 性能与扭矩能力的平衡，具备可靠性、可调性及成熟的 OEM 应用基础。"
         }
       ]
     }
