@@ -1,12 +1,13 @@
 import type { SpringMaterialId } from "@/lib/materials/springMaterials";
 import { GarterSpringDesign, GarterCalculationResult } from "./springTypes/garter";
+import { TorsionalSpringSystemDesign, TorsionalSystemResult } from "./torsional/torsionalSystemTypes";
 
 // ============================================================================
 // SPRING TYPE DEFINITIONS
 // 弹簧类型定义
 // ============================================================================
 
-export type SpringType = "compression" | "extension" | "torsion" | "conical" | "spiralTorsion" | "wave" | "dieSpring" | "suspensionSpring" | "arc" | "variablePitchCompression" | "disk" | "garter";
+export type SpringType = "compression" | "extension" | "torsion" | "conical" | "spiralTorsion" | "wave" | "dieSpring" | "suspensionSpring" | "arc" | "variablePitchCompression" | "disk" | "garter" | "torsionalSpringSystem";
 
 export const SPRING_TYPE_LABELS: Record<SpringType, { en: string; zh: string }> = {
   compression: { en: "Compression Spring", zh: "压缩弹簧" },
@@ -21,6 +22,7 @@ export const SPRING_TYPE_LABELS: Record<SpringType, { en: string; zh: string }> 
   variablePitchCompression: { en: "Variable Pitch Compression", zh: "变节距压缩弹簧" },
   disk: { en: "Disk / Belleville Spring", zh: "碟形弹簧" },
   garter: { en: "Garter Spring", zh: "油封/环形拉伸弹簧" },
+  torsionalSpringSystem: { en: "Torsional Spring Pack", zh: "离合器弹簧包系统" },
 };
 
 // ============================================================================
@@ -220,7 +222,8 @@ export type SpringDesign =
   | TorsionSpringDesign
   | VariablePitchCompressionDesign
   | DiskSpringDesign
-  | GarterSpringDesign;
+  | GarterSpringDesign
+  | TorsionalSpringSystemDesign;
 
 // ============================================================================
 // LEGACY INTERFACE (for backward compatibility)
@@ -316,7 +319,8 @@ export type SpringCalculationResult =
   | ConicalCalculationResult
   | ExtensionCalculationResult
   | TorsionCalculationResult
-  | GarterCalculationResult;
+  | GarterCalculationResult
+  | TorsionalSystemResult;
 
 // ============================================================================
 // TYPE GUARDS

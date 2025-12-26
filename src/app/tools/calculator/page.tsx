@@ -15,6 +15,7 @@ import { DieSpringCalculator } from "@/components/calculators/DieSpringCalculato
 import { GarterSpringCalculator } from "@/components/calculators/GarterSpringCalculator";
 import { SuspensionSpringCalculator } from "@/components/calculators/SuspensionSpringCalculator";
 import { DiskSpringCalculator } from "@/components/calculators/DiskSpringCalculator";
+import { TorsionalSystemCalculator } from "@/components/calculators/TorsionalSystemCalculator";
 import { SpringSeoContent } from "@/components/seo/SpringSeoContent";
 
 const springTypes: {
@@ -104,6 +105,14 @@ const springTypes: {
     nameZh: "环形拉簧 (Oil Seal)",
     descEn: "Radial force, closed ring",
     descZh: "径向紧固，闭合圆环",
+  },
+  {
+    type: "torsionalSpringSystem",
+    icon: "⚙️",
+    nameEn: "Torsional Spring Pack",
+    nameZh: "弹簧包 (Spring Pack)",
+    descEn: "Clutch dampening, multi-group",
+    descZh: "离合器减震，多组弹簧包",
   },
 ];
 
@@ -234,6 +243,7 @@ export default function SpringCalculatorPage() {
         {selectedType === "suspensionSpring" && <SuspensionSpringCalculator />}
         {selectedType === "disk" && <DiskSpringCalculator />}
         {selectedType === "garter" && <GarterSpringCalculator />}
+        {selectedType === "torsionalSpringSystem" && <TorsionalSystemCalculator />}
 
         {/* SEO Content Section */}
         <SpringSeoContent type={selectedType} />

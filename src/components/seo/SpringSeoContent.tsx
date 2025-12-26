@@ -880,6 +880,86 @@ const seoContent: Record<string, SeoData> = {
         }
       ]
     }
+  },
+  torsionalSpringSystem: {
+    en: {
+      h1: "Torsional Spring Pack (Clutch Damper) Engineering & Design",
+      sections: [
+        {
+          title: "The Multi-Stage Spring Pack Concept",
+          content: "Spring packs are complex assemblies found in automotive powertrains and industrial couplings. They use multiple helical springs arranged circumferentially to provide a staged torque-angle response, critical for isolating engine vibrations."
+        },
+        {
+          title: "Equivalent Unwrapped Model",
+          content: "For high-precision engineering, these spring pack systems are mapped to an 'unwrapped' linear equivalent. Torque T is derived from individual spring stiffness kᵢ and their radial position Rᵢ: T = Σ (kᵢ · Rᵢ² · θ). This abstraction allows for rigorous stress and load sharing analysis."
+        },
+        {
+          title: "Staged Engagement Logic",
+          content: "Efficiency in dampers is achieved by staggering the start angles (θ_start) of different spring groups. This creates a multi-rate characteristic: soft for idling and low-load conditions, and progressively stiffer for high-torque acceleration, protecting the drivetrain from shock."
+        },
+        {
+          title: "Mechanical Stops & Rigid Contact",
+          content: "To protect the springs from over-stress (coil bind), mechanical stops limit maximum travel. Our calculator models this rigid contact with a 10⁶ stiffness multiplier once the system limit θ_stop is reached, simulating the metal-to-metal contact of the hub."
+        },
+        {
+          title: "Frictional Hysteresis",
+          content: "Real dampers exhibit hysteresis due to friction between springs and their housing. This is modeled using Coulomb friction T_f, creating a load/unload loop that dissipates energy and prevents engine speed oscillations from reaching the transmission."
+        }
+      ],
+      faqs: [
+        {
+          q: "Why do clutch dampers have different spring lengths?",
+          a: "To create different stages of engagement. Shorter springs engage later as the angle increases, providing a progressive increase in system stiffness."
+        },
+        {
+          q: "How is load sharing calculated in a torsional system?",
+          a: "Load is distributed proportionally to each active spring's stiffness and radius. Precise kᵢ·Rᵢ² weighting ensures each group carries its engineering share."
+        },
+        {
+          q: "What is the significance of the stop angle?",
+          a: "It defines the mechanical envelope of the hub. Exceeding this angle causes rigid contact, protecting the springs from permanent deformation or coil bind."
+        }
+      ]
+    },
+    zh: {
+      h1: "离合器弹簧包 (Spring Pack) 工程设计与分析",
+      sections: [
+        {
+          title: "多级弹簧包系统概念",
+          content: "弹簧包系统广泛应用于汽车传动系统（如离合器从动盘、双质量飞轮）和工业联轴器。通过在圆周方向布置多组螺旋弹簧，实现分段的扭矩-转座响应，有效隔离发动机振动。"
+        },
+        {
+          title: "等效展开模型",
+          content: "为了精确进行工程计算，这些弹簧包中的径向布置弹簧被映射为“等效展开”线性模型。系统总扭矩 T 由各组弹簧的刚度 kᵢ 及其安装半径 Rᵢ 共同决定：T = Σ (kᵢ · Rᵢ² · θ)。这种抽象模型使得应力分析和负载分配更加严谨。"
+        },
+        {
+          title: "分级工作逻辑",
+          content: "弹簧包的高效率源于对各组弹簧“起始转角” (θ_start) 的分段设计。这产生了多级刚度特性：怠速或低载荷下较软，高扭矩加速时变硬，防止传动系统受到冲击。"
+        },
+        {
+          title: "机械止挡与刚性接触",
+          content: "为防止弹簧发生压并 (Coil Bind) 损坏，系统设有旋转止挡。本工具在达到系统极限角 θ_stop 后，使用 10⁶ 倍刚度系数模拟金属刚性碰撞，保护弹簧组不被过度压缩。"
+        },
+        {
+          title: "摩擦滞后效应",
+          content: "由于弹簧与座圈之间的摩擦，实际系统存在滞后现象。我们通过库仑摩擦模型 T_f 模拟加载/卸载循环中的能量消散，防止转速波动传递到变速箱。"
+        }
+      ],
+      faqs: [
+        {
+          q: "离合器减震器中为什么弹簧长度不一？",
+          a: "目的是实现分级介入。较短的弹簧会较晚参与工作，从而随着扭转角度增加逐渐提高系统整体刚度。"
+        },
+        {
+          q: "如何计算各组弹簧的负载分配？",
+          a: "负载根据各活动弹簧组的等效刚度 kᵢ·Rᵢ² 进行比例分配，确保各组弹簧在工程设计中的应力都在安全范围内。"
+        },
+        {
+          q: "止挡转角的意义是什么？",
+          a: "它定义了轮毂的机械极限。超过此角度将发生材料间的刚性接触，从而保护弹簧不发生永久塑性变形。"
+        }
+      ]
+    }
   }
 };
 
