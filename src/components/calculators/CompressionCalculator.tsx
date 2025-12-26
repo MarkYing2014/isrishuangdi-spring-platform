@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { type SubmitHandler, type Resolver, useForm, Controller } from "react-hook-form";
 import { z } from "zod";
@@ -78,6 +79,10 @@ export function CompressionCalculator() {
   const [error, setError] = useState<string | null>(null);
   const [stressAnalysis, setStressAnalysis] = useState<StressAnalysisResult | null>(null);
   const [preloadResult, setPreloadResult] = useState<PreloadResult | null>(null);
+  // Local state for immediate button updates (bypass store sync delay)
+  const [latestAudit, setLatestAudit] = useState<any | null>(null); 
+  const [latestGeometry, setLatestGeometry] = useState<CompressionGeometry | null>(null);
+  const [latestAnalysis, setLatestAnalysis] = useState<AnalysisResult | null>(null);
   
   // 全局设计存储
   const storedGeometry = useSpringDesignStore((state) => state.geometry);
@@ -142,6 +147,15 @@ export function CompressionCalculator() {
       ? Math.max(lastCompressionAnalysis.maxDeflection - lastCompressionAnalysis.workingDeflection, 0)
       : 0;
 
+  // Sync store to local state on initial load/change provided getting store updates
+  useEffect(() => {
+    if (lastCompressionGeometry && lastCompressionAnalysis && unifiedAudit) {
+        setLatestGeometry(lastCompressionGeometry);
+        setLatestAnalysis(lastCompressionAnalysis);
+        setLatestAudit(unifiedAudit);
+    }
+  }, [lastCompressionGeometry, lastCompressionAnalysis, unifiedAudit]);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as Resolver<FormValues>,
     defaultValues: {
@@ -192,6 +206,9 @@ export function CompressionCalculator() {
     }
   }, [lastCompressionGeometry, lastCompressionAnalysis, form, initialMaterial]);
 
+  // Initialize router
+  const router = useRouter();
+
   // Handle material change
   const handleMaterialChange = (material: SpringMaterial) => {
     setSelectedMaterial(material);
@@ -201,6 +218,13 @@ export function CompressionCalculator() {
       form.handleSubmit(onSubmit)();
     }
   };
+
+  // Trigger initial calculation on mount if no result exists (to populate store)
+  useEffect(() => {
+    if (!result && !lastCompressionGeometry) {
+      form.handleSubmit(onSubmit)();
+    }
+  }, []);
 
   const simulatorUrl = useMemo(() => {
     if (!result) return "";
@@ -344,6 +368,18 @@ export function CompressionCalculator() {
         workingDeflection: values.deflection,
         maxDeflection: values.deflection,
       };
+      
+      // Calculate audit synchronously for immediate button update
+      const localAudit = AuditEngine.evaluate({
+        springType: "compression",
+        geometry,
+        results: analysisResultData,
+      });
+
+      // Update local state immediately
+      setLatestGeometry(geometry);
+      setLatestAnalysis(analysisResultData);
+      setLatestAudit(localAudit);
       
       setDesign({
         springType: "compression",
@@ -1002,41 +1038,73 @@ export function CompressionCalculator() {
               <SavedDesignManager />
             </div>
 
+            {/* DEBUG: Show Audit Status */}
+            <div className="text-xs text-center text-slate-500 mb-2">
+               Audit Ready: {String(!!latestAudit)} / Status: {latestAudit?.status ?? "Initializing..."} ({latestAudit?.status === "FAIL" ? "Fail/失败" : "Pass/通过"})
+            </div>
+
             <Button
               type="button"
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-              disabled={!unifiedAudit || unifiedAudit.status === "FAIL"}
+              disabled={!latestAudit} // Only disable if no audit exists at all
               onClick={() => {
-                if (!lastCompressionGeometry || !lastCompressionAnalysis || !unifiedAudit) return;
                 
-                // Create Work Order
-                const store = useWorkOrderStore.getState();
-                const wo = store.createWorkOrder({
-                  designCode: generateDesignCode(lastCompressionGeometry),
-                  springType: "compression",
-                  geometry: lastCompressionGeometry,
-                  material: {
-                    id: selectedMaterial.id,
-                    name: selectedMaterial.nameEn,
-                    shearModulus: selectedMaterial.shearModulus,
-                    elasticModulus: selectedMaterial.elasticModulus ?? 200000,
-                    density: selectedMaterial.density ?? 7850,
-                    tensileStrength: selectedMaterial.tensileStrength,
-                    surfaceFactor: selectedMaterial.surfaceFactor,
-                    tempFactor: selectedMaterial.tempFactor,
-                  },
-                  analysis: lastCompressionAnalysis,
-                  audit: unifiedAudit,
-                  quantity: 1000,
-                  createdBy: "Engineer",
-                  notes: unifiedAudit.status === "WARN" ? "Warning: Engineering audit has warnings. Review required." : undefined
-                });
-                
-                // Redirect using window.location since we are in a client component but might not have router hook setup right here for push
-                // Actually we checked imports, let's double check if we can use router.
-                // We see 'useRouter' is NOT imported yet. We need to add imports first.
-                // For now, let's just use window.location.href or try to use Link if possible, but this is an action.
-                window.location.href = `/manufacturing/workorder/${wo.workOrderId}`;
+                try {
+                  // Use local state if available, fallback to store (though local should be set if button is enabled)
+                  const geom = latestGeometry || lastCompressionGeometry;
+                  const anal = latestAnalysis || lastCompressionAnalysis;
+                  const aud = latestAudit || unifiedAudit;
+
+                  if (!geom || !anal || !aud) {
+                    const missing = [];
+                    if (!geom) missing.push("Geometry");
+                    if (!anal) missing.push("Analysis");
+                    if (!aud) missing.push("Audit");
+                    
+                    console.error("Missing data for Work Order", { missing });
+                    alert(`Cannot create Work Order. Missing data: ${missing.join(", ")}`);
+                    return;
+                  }
+
+                  // Confirm validation if Audit Failed
+                  if (aud.status === "FAIL") {
+                    const proceed = window.confirm(
+                      "⚠️ Engineering Audit Failed (Design invalid) / 工程审核未通过（设计无效）。\n\n" +
+                      "Are you sure you want to FORCE create a work order? / 确定要强制创建工单吗？"
+                    );
+                    if (!proceed) return;
+                  }
+                  
+                  // Create Work Order
+                  const store = useWorkOrderStore.getState();
+                  const wo = store.createWorkOrder({
+                    designCode: generateDesignCode(geom),
+                    springType: "compression",
+                    geometry: geom,
+                    material: {
+                      id: selectedMaterial.id,
+                      name: selectedMaterial.nameEn,
+                      shearModulus: selectedMaterial.shearModulus,
+                      elasticModulus: selectedMaterial.elasticModulus ?? 200000,
+                      density: selectedMaterial.density ?? 7850,
+                      tensileStrength: selectedMaterial.tensileStrength,
+                      surfaceFactor: selectedMaterial.surfaceFactor,
+                      tempFactor: selectedMaterial.tempFactor,
+                    },
+                    analysis: anal,
+                    audit: aud,
+                    quantity: 1000,
+                    createdBy: "Engineer",
+                    notes: aud.status === "WARN" || aud.status === "FAIL" ? `[${aud.status}] Engineering Audit Issues Override / 工程审核问题强制覆盖` : undefined
+                  });
+                  
+                  console.log("Work Order created, redirecting...", wo.workOrderId);
+                  router.push(`/manufacturing/workorder/${wo.workOrderId}`);
+                  
+                } catch(e: any) {
+                  console.error("Failed to create work order", e);
+                  alert(`System Error: Failed to create Work Order / 系统错误：创建工单失败。\n${e?.message || e}`);
+                }
               }}
             >
               <Factory className="w-4 h-4 mr-2" />

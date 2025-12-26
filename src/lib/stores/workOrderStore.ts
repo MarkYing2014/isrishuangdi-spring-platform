@@ -160,6 +160,23 @@ export const useWorkOrderStore = create<WorkOrderStore>()(
         {
             name: "work-order-storage",
             storage: createJSONStorage(() => localStorage),
+            onRehydrateStorage: () => (state) => {
+                if (state) {
+                    // Deduplicate work orders by ID to fix "Encountered two children with the same key" error
+                    // This handles legacy data where ID generation might have produced duplicates
+                    const uniqueOrders = new Map();
+                    state.workOrders.forEach(wo => {
+                        if (!uniqueOrders.has(wo.workOrderId)) {
+                            uniqueOrders.set(wo.workOrderId, wo);
+                        }
+                    });
+
+                    if (uniqueOrders.size !== state.workOrders.length) {
+                        console.warn("[WorkOrderStore] Removed duplicate work orders during rehydration");
+                        state.workOrders = Array.from(uniqueOrders.values());
+                    }
+                }
+            },
         }
     )
 );
