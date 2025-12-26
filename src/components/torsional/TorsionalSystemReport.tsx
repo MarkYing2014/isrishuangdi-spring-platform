@@ -48,6 +48,7 @@ import {
   Pie
 } from "recharts";
 import { buildTorsionalSystemDesignRuleReport } from "@/lib/torsional/torsionalSystemRules";
+import { auditStageTransitions, type StageTransitionAuditResult, type TransitionSeverity } from "@/lib/torsional/torsionalStageAudit";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 
 /**
@@ -188,6 +189,89 @@ function StageLegendCard({ design, result }: { design: TorsionalSpringSystemDesi
             </div>
           );
         })}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * StageTransitionAuditCard
+ * OEM-Grade Stage Switching Analysis
+ */
+function StageTransitionAuditCard({ design, result }: { design: TorsionalSpringSystemDesign, result: TorsionalSystemResult }) {
+  const { language } = useLanguage();
+  const isZh = language === "zh";
+  
+  const auditResult = useMemo(() => auditStageTransitions(design, result), [design, result]);
+  
+  const severityColors: Record<TransitionSeverity, string> = {
+    PASS: "text-emerald-600 bg-emerald-50",
+    WARN: "text-amber-600 bg-amber-50",
+    FAIL: "text-rose-600 bg-rose-50"
+  };
+  
+  const severityIcons: Record<TransitionSeverity, React.ReactNode> = {
+    PASS: <ShieldCheck className="w-4 h-4 text-emerald-500" />,
+    WARN: <ShieldAlert className="w-4 h-4 text-amber-500" />,
+    FAIL: <ShieldX className="w-4 h-4 text-rose-500" />
+  };
+  
+  return (
+    <Card className="border-slate-200 shadow-sm overflow-hidden">
+      <CardHeader className="py-2 px-4 border-b bg-slate-50 flex flex-row items-center justify-between">
+        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+          <Activity className="w-3.5 h-3.5" />
+          {isZh ? "阶段切换审计" : "Stage Transition Audit"}
+        </CardTitle>
+        <Badge className={`text-[8px] px-1.5 py-0 h-4 font-bold ${severityColors[auditResult.overall]}`}>
+          {auditResult.overall}
+        </Badge>
+      </CardHeader>
+      <CardContent className="p-0">
+        {/* Summary */}
+        <div className="px-4 py-3 border-b bg-slate-50/50">
+          <p className="text-[10px] text-slate-600 leading-relaxed">
+            {isZh ? auditResult.summaryZh : auditResult.summaryEn}
+          </p>
+        </div>
+        
+        {/* Findings Table */}
+        <div className="divide-y divide-slate-100">
+          {auditResult.findings.length === 0 ? (
+            <div className="px-4 py-3 text-[10px] text-slate-400 italic">
+              {isZh ? "无阶段切换点" : "No stage transitions detected"}
+            </div>
+          ) : (
+            auditResult.findings.map((f, i) => (
+              <div key={i} className="px-4 py-2.5 flex items-center gap-3">
+                {severityIcons[f.severity]}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-700">
+                      {f.fromStage ? `S${f.fromStage} → S${f.toStage}` : `→ S${f.toStage}`}
+                    </span>
+                    <span className="text-[9px] font-mono text-slate-400">
+                      @ {f.thetaDeg.toFixed(1)}°
+                    </span>
+                    <Badge variant="outline" className={`text-[7px] px-1 py-0 h-3.5 font-bold ${severityColors[f.severity]}`}>
+                      ΔK/K: {(Math.abs(f.jumpRatio) * 100).toFixed(0)}%
+                    </Badge>
+                  </div>
+                  <p className="text-[9px] text-slate-500 mt-0.5 truncate">
+                    {isZh ? f.messageZh : f.messageEn}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        
+        {/* OEM Rating Legend */}
+        <div className="px-4 py-2 bg-slate-50 border-t text-[8px] text-slate-400 flex items-center gap-4">
+          <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>≤30% Smooth</span>
+          <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>30-60% NVH Risk</span>
+          <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>≥60% Harsh</span>
+        </div>
       </CardContent>
     </Card>
   );
@@ -465,6 +549,9 @@ export function TorsionalSystemReport({
             report={auditReport} 
             title={isZh ? "工厂设计审计 (V1)" : "Design Policy Audit (V1)"} 
           />
+
+          {/* Stage Transition Audit */}
+          <StageTransitionAuditCard design={design} result={result} />
 
           {/* Load Sharing Analytics */}
           <Card className="border-slate-200 shadow-sm">
