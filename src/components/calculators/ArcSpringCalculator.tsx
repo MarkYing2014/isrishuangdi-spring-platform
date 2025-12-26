@@ -172,6 +172,63 @@ type ArcIssueField =
   | "systemMode"
   | "engageAngle2";
 
+const ARC_SPRING_SAMPLES = [
+  {
+    id: "dm24002-013",
+    nameEn: "DMF Primary Spring (DM24002-013)",
+    nameZh: "双质量飞轮主弹簧 (DM24002-013)",
+    input: {
+      d: 3.7,
+      D: 12.2,
+      n: 50.3,
+      r: 120.0,
+      alpha0: 127.0,
+      alphaWork: 115.0,
+      alphaC: 103.0,
+      materialKey: "EN10270_2" as MaterialKey,
+      systemMode: "single" as const,
+      hysteresisMode: "proportional" as const,
+      cf: 0.12,
+    }
+  },
+  {
+    id: "dmf-secondary-small",
+    nameEn: "DMF Secondary Spring (Compact)",
+    nameZh: "双质量飞轮次级弹簧 (紧凑型)",
+    input: {
+      d: 2.0,
+      D: 8.5,
+      n: 35.0,
+      r: 95.0,
+      alpha0: 90.0,
+      alphaWork: 80.0,
+      alphaC: 72.0,
+      materialKey: "EN10270_2" as MaterialKey,
+      systemMode: "single" as const,
+      hysteresisMode: "proportional" as const,
+      cf: 0.10,
+    }
+  },
+  {
+    id: "high-torque-heavy",
+    nameEn: "High-Torque Performance Spring",
+    nameZh: "高性能高扭矩型弹簧",
+    input: {
+      d: 5.0,
+      D: 28.0,
+      n: 12.0,
+      r: 130.0,
+      alpha0: 60.0,
+      alphaWork: 50.0,
+      alphaC: 42.0,
+      materialKey: "EN10270_2" as MaterialKey,
+      systemMode: "single" as const,
+      hysteresisMode: "constant" as const,
+      Tf_const: 5000,
+    }
+  }
+];
+
 export function ArcSpringCalculator() {
   const router = useRouter();
   const { language } = useLanguage();
@@ -460,6 +517,50 @@ export function ArcSpringCalculator() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column: Input Cards */}
         <div className="space-y-4">
+          {/* Quick Samples Card */}
+          <Card className="border-indigo-100 bg-indigo-50/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-indigo-700">
+                <BookOpen className="w-4 h-4" />
+                <LanguageText en="Real-World Samples" zh="真实案例数据" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {ARC_SPRING_SAMPLES.map((sample) => (
+                  <Button
+                    key={sample.id}
+                    variant="outline"
+                    size="sm"
+                    className="text-[11px] h-7 bg-white/80 hover:bg-indigo-100 hover:border-indigo-200"
+                    onClick={() => {
+                      const newInput = { ...getDefaultArcSpringInput(), ...sample.input };
+                      setInput(newInput);
+                      setResult(computeArcSpringCurve(newInput));
+                      setCalculated(true);
+                      // Scroll to results if needed, but usually visible
+                    }}
+                  >
+                    {isZh ? sample.nameZh : sample.nameEn}
+                  </Button>
+                ))}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-[11px] h-7 text-muted-foreground underline"
+                    onClick={() => {
+                      const def = getDefaultArcSpringInput();
+                      setInput(def);
+                      setResult(computeArcSpringCurve(def));
+                      setCalculated(true);
+                    }}
+                >
+                    Reset / 重置
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Geometry Card */}
           <Card>
             <CardHeader className="pb-3">
