@@ -1,11 +1,12 @@
 import type { SpringMaterialId } from "@/lib/materials/springMaterials";
+import { GarterSpringDesign, GarterCalculationResult } from "./springTypes/garter";
 
 // ============================================================================
 // SPRING TYPE DEFINITIONS
 // 弹簧类型定义
 // ============================================================================
 
-export type SpringType = "compression" | "extension" | "torsion" | "conical" | "spiralTorsion" | "wave" | "dieSpring" | "suspensionSpring" | "arc" | "variablePitchCompression" | "disk";
+export type SpringType = "compression" | "extension" | "torsion" | "conical" | "spiralTorsion" | "wave" | "dieSpring" | "suspensionSpring" | "arc" | "variablePitchCompression" | "disk" | "garter";
 
 export const SPRING_TYPE_LABELS: Record<SpringType, { en: string; zh: string }> = {
   compression: { en: "Compression Spring", zh: "压缩弹簧" },
@@ -19,6 +20,7 @@ export const SPRING_TYPE_LABELS: Record<SpringType, { en: string; zh: string }> 
   arc: { en: "Arc Spring", zh: "弧形弹簧" },
   variablePitchCompression: { en: "Variable Pitch Compression", zh: "变节距压缩弹簧" },
   disk: { en: "Disk / Belleville Spring", zh: "碟形弹簧" },
+  garter: { en: "Garter Spring", zh: "油封/环形拉伸弹簧" },
 };
 
 // ============================================================================
@@ -217,7 +219,8 @@ export type SpringDesign =
   | ExtensionSpringDesign
   | TorsionSpringDesign
   | VariablePitchCompressionDesign
-  | DiskSpringDesign;
+  | DiskSpringDesign
+  | GarterSpringDesign;
 
 // ============================================================================
 // LEGACY INTERFACE (for backward compatibility)
@@ -312,7 +315,8 @@ export type SpringCalculationResult =
   | CompressionCalculationResult
   | ConicalCalculationResult
   | ExtensionCalculationResult
-  | TorsionCalculationResult;
+  | TorsionCalculationResult
+  | GarterCalculationResult;
 
 // ============================================================================
 // TYPE GUARDS
@@ -341,6 +345,10 @@ export function isVariablePitchDesign(design: SpringDesign): design is VariableP
 
 export function isDiskDesign(design: SpringDesign): design is DiskSpringDesign {
   return design.type === "disk";
+}
+
+export function isGarterDesign(design: SpringDesign): design is GarterSpringDesign {
+  return design.type === "garter";
 }
 
 // ============================================================================

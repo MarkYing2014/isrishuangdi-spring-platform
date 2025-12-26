@@ -173,6 +173,18 @@ export const SPRING_PIPELINES: Record<SpringType, SpringPipelineConfig> = {
     icon: "Disc",
     implemented: true,
   },
+  garter: {
+    type: "garter",
+    label: { en: "Garter Spring", zh: "箍簧" },
+    calculatorPath: "/tools/calculator?tab=garter",
+    analysisPath: "/tools/analysis?type=garter",
+    simulatorPath: "/tools/simulator?type=garter",
+    reportPath: "/tools/report?type=garter",
+    cadExportPath: "/tools/cad-export?type=garter",
+    rfqPath: "/rfq?springType=garter",
+    icon: "CircleDashed",
+    implemented: true,
+  },
 };
 
 /**

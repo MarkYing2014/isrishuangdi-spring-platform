@@ -31,17 +31,20 @@ export function EngineeringAuditCard({ audit, governingVariable }: EngineeringAu
     PASS: <ShieldCheck className="w-5 h-5 text-emerald-500" />,
     WARN: <ShieldAlert className="w-5 h-5 text-amber-500" />,
     FAIL: <ShieldX className="w-5 h-5 text-rose-500" />,
+    INFO: <Info className="w-5 h-5 text-blue-500" />,
   };
 
   const statusColors: Record<AuditStatus, string> = {
     PASS: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
     WARN: "bg-amber-500/10 text-amber-600 border-amber-200",
     FAIL: "bg-rose-500/10 text-rose-600 border-rose-200",
+    INFO: "bg-blue-500/10 text-blue-600 border-blue-200",
   };
 
   const getProgressColor = (status: AuditStatus) => {
     if (status === "FAIL") return "bg-rose-500";
     if (status === "WARN") return "bg-amber-500";
+    if (status === "INFO") return "bg-blue-500";
     return "bg-emerald-500";
   };
 
@@ -196,11 +199,13 @@ function AuditMetric({ icon, label, status }: { icon: React.ReactNode, label: st
         PASS: "border-emerald-200 bg-emerald-50/20",
         WARN: "border-amber-200 bg-amber-50/20",
         FAIL: "border-rose-200 bg-rose-50/20",
+        INFO: "border-blue-200 bg-blue-50/20",
     };
     const texts: Record<AuditStatus, string> = {
         PASS: "text-emerald-700",
         WARN: "text-amber-700",
         FAIL: "text-rose-700",
+        INFO: "text-blue-700",
     };
 
     return (
@@ -211,7 +216,7 @@ function AuditMetric({ icon, label, status }: { icon: React.ReactNode, label: st
             <span className="text-[10px] font-extrabold uppercase tracking-tight text-slate-500">
                 {label}
             </span>
-            <div className={`h-1 w-6 rounded-full ${status === "FAIL" ? "bg-rose-500" : status === "WARN" ? "bg-amber-500" : "bg-emerald-500"}`} />
+            <div className={`h-1 w-6 rounded-full ${status === "FAIL" ? "bg-rose-500" : status === "WARN" ? "bg-amber-500" : status === "INFO" ? "bg-blue-500" : "bg-emerald-500"}`} />
         </div>
     );
 }

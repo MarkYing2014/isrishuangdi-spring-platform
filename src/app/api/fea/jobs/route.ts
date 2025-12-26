@@ -1,146 +1,98 @@
-/**
- * FEA Jobs API Route
- * Proxy to fea-calculix-worker service
- */
+import { NextResponse } from "next/server";
 
-import { NextRequest, NextResponse } from "next/server";
-
-const FEA_WORKER_URL = process.env.FEA_WORKER_URL || "http://localhost:8080";
-
-export interface FeaJobRequest {
-    design_code: string;
-    geometry: {
-        wire_diameter: number;
-        mean_diameter: number;
-        active_coils: number;
-        total_coils: number;
-        free_length: number;
-        end_type: string;
-        dm_start?: number;
-        dm_mid?: number;
-        dm_end?: number;
-    };
-    material?: {
-        E?: number;
-        nu?: number;
-        G?: number;
-        name?: string;
-    };
-    loadcases: Array<{
-        name: string;
-        target_height: number;
-    }>;
-    mesh_level?: "coarse" | "medium" | "fine";
-}
-
-export interface FeaJobResponse {
-    job_id: string;
-    status: "success" | "failed" | "error";
-    elapsed_ms: number;
-    results?: {
-        job_name: string;
-        num_steps: number;
-        success: boolean;
-        errors: string[];
-        warnings: string[];
-        steps: Array<{
-            step_number: number;
-            step_name: string;
-            reaction_force: Record<string, { fx: number; fy: number; fz: number; magnitude: number }>;
-            max_stress: number;
-            max_stress_element: number;
-        }>;
-    };
-    error_message?: string;
-}
-
-/**
- * POST /api/fea/jobs
- * Submit FEA job to worker
- */
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
     try {
-        const body: FeaJobRequest = await request.json();
+        const body = await req.json();
+        const { inputs, springType } = body;
 
-        // Validate required fields
-        if (!body.geometry || !body.loadcases || body.loadcases.length === 0) {
-            return NextResponse.json(
-                { error: "Missing geometry or loadcases" },
-                { status: 400 }
-            );
+        if (springType !== "garter") {
+            return new NextResponse("Only garter spring supported currently", { status: 400 });
         }
 
-        // Forward to FEA worker
-        const response = await fetch(`${FEA_WORKER_URL}/run`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
+        // Map Garter Inputs (Ring) to Linear Spring FEA (Unwrapped)
+        // PERFORMANCE OPTIMIZATION:
+        // Garter springs have high coil counts (e.g. 300+). Meshing full length is slow.
+        // Since k ~ 1/N, we can simulate a shorter "Representative Model" with fewer coils
+        // and proportionally scaled length/deflection.
+        // If we scale N' = N/S, L' = L/S, and Target' = Target/S:
+        // k' = S * k
+        // F' = k' * (Delta/S) = (S * k) * (Delta/S) = k * Delta = F_real
+        // Stress (function of F and D) remains identical.
+
+        const MAX_SIM_COILS = 50;
+        const N_real = inputs.N || 100;
+        const scaleFactor = N_real > MAX_SIM_COILS ? (N_real / MAX_SIM_COILS) : 1.0;
+
+        const N_sim = N_real / scaleFactor;
+
+        // Calculate Real Unwrapped geometry
+        const L0_real = Math.PI * (inputs.D_free || 100);
+        const L_target_real = Math.PI * (inputs.D_inst || 100);
+
+        // Scale for Simulation
+        const L0_sim = L0_real / scaleFactor;
+        const L_target_sim = L_target_real / scaleFactor;
+
+        const workerPayload = {
+            design_code: "GARTER-VERIFY",
+            geometry: {
+                section_type: "CIRC",
+                wire_diameter: inputs.d,
+                mean_diameter: inputs.Dm,
+                active_coils: N_sim,
+                total_coils: N_sim, // Neglect hooks
+                free_length: L0_sim,
+                end_type: "closed_ground",
             },
-            body: JSON.stringify(body),
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            return NextResponse.json(
-                { error: `FEA worker error: ${errorText}` },
-                { status: response.status }
-            );
-        }
-
-        const result: FeaJobResponse = await response.json();
-        return NextResponse.json(result);
-
-    } catch (error) {
-        console.error("[FEA Jobs] Error:", error);
-
-        // Check if worker is not available
-        if (error instanceof TypeError && error.message.includes("fetch")) {
-            return NextResponse.json(
+            material: {
+                name: "STEEL",
+                G: inputs.G,
+                E: inputs.G * 2.5,
+                nu: 0.3
+            },
+            loadcases: [
                 {
-                    error: "FEA worker not available",
-                    hint: "Ensure FEA_WORKER_URL is set and worker is running"
-                },
-                { status: 503 }
-            );
-        }
+                    name: "INSTALLED_STATE",
+                    target_height: L_target_sim
+                }
+            ],
+            mesh_level: "coarse" // Use coarse for even faster linear check
+        };
 
-        return NextResponse.json(
-            { error: String(error) },
-            { status: 500 }
-        );
-    }
-}
+        const base = process.env.FEA_WORKER_URL || "http://localhost:8080";
 
-/**
- * GET /api/fea/jobs
- * Check FEA worker health
- */
-export async function GET() {
-    try {
-        const response = await fetch(`${FEA_WORKER_URL}/health`);
-
-        if (!response.ok) {
-            return NextResponse.json(
-                { status: "unhealthy", worker_url: FEA_WORKER_URL },
-                { status: 503 }
-            );
-        }
-
-        const health = await response.json();
-        return NextResponse.json({
-            status: "healthy",
-            worker: health,
-            worker_url: FEA_WORKER_URL,
+        // Call Worker /run (Synchronous)
+        const r = await fetch(`${base}/run`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(workerPayload),
         });
 
-    } catch {
-        return NextResponse.json(
-            {
-                status: "unavailable",
-                worker_url: FEA_WORKER_URL,
-                hint: "Worker not reachable"
-            },
-            { status: 503 }
-        );
+        if (!r.ok) {
+            const errText = await r.text();
+            return new NextResponse(`FEA Worker Error: ${errText}`, { status: r.status });
+        }
+
+        const jobData = await r.json();
+
+        // Transform Worker Response to GarterFeaResult structure for Frontend
+        // Worker returns: { status: "success", results: { steps: [...], max_stress: ... } }
+        const steps = jobData.results?.steps || [];
+        const firstStep = steps[0] || {};
+
+        const frontendResult = {
+            jobId: jobData.job_id,
+            status: jobData.status === "success" ? "SUCCEEDED" : "FAILED",
+            message: jobData.error_message, // If any
+            maxStress: firstStep.max_stress,
+            reactionForce: firstStep.reaction_force_z, // Axial force = Hoop Tension F_t
+            deformation: firstStep.max_displacement_z
+        };
+
+        return NextResponse.json(frontendResult);
+
+    } catch (e: any) {
+        console.error("FEA Proxy Error:", e);
+        return new NextResponse(JSON.stringify({ error: "Internal Server Error", details: e.message }), { status: 500 });
     }
 }

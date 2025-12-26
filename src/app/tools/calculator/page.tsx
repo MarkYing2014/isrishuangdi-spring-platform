@@ -12,6 +12,7 @@ import { ConicalCalculator } from "@/components/calculators/ConicalCalculator";
 import { SpiralTorsionCalculator } from "@/components/calculators/SpiralTorsionCalculator";
 import { WaveSpringCalculator } from "@/components/calculators/WaveSpringCalculator";
 import { DieSpringCalculator } from "@/components/calculators/DieSpringCalculator";
+import { GarterSpringCalculator } from "@/components/calculators/GarterSpringCalculator";
 import { SuspensionSpringCalculator } from "@/components/calculators/SuspensionSpringCalculator";
 import { DiskSpringCalculator } from "@/components/calculators/DiskSpringCalculator";
 import { SpringSeoContent } from "@/components/seo/SpringSeoContent";
@@ -95,6 +96,14 @@ const springTypes: {
     nameZh: "碟形弹簧",
     descEn: "Belleville washers, high force",
     descZh: "中空锥形垫圈，高弹性力",
+  },
+  {
+    type: "garter",
+    icon: "⭕",
+    nameEn: "Garter Spring",
+    nameZh: "环形拉簧 (Oil Seal)",
+    descEn: "Radial force, closed ring",
+    descZh: "径向紧固，闭合圆环",
   },
 ];
 
@@ -224,6 +233,7 @@ export default function SpringCalculatorPage() {
         {selectedType === "dieSpring" && <DieSpringCalculator isZh={isZh} />}
         {selectedType === "suspensionSpring" && <SuspensionSpringCalculator />}
         {selectedType === "disk" && <DiskSpringCalculator />}
+        {selectedType === "garter" && <GarterSpringCalculator />}
 
         {/* SEO Content Section */}
         <SpringSeoContent type={selectedType} />

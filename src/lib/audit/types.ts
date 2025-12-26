@@ -1,7 +1,7 @@
 // src/lib/audit/types.ts
 // Unified Engineering Audit Framework Schema
 
-export type AuditStatus = "PASS" | "WARN" | "FAIL";
+export type AuditStatus = "PASS" | "WARN" | "FAIL" | "INFO";
 
 export interface GeometryAudit {
     springIndex?: {
@@ -29,6 +29,7 @@ export interface GeometryAudit {
         labelZh: string;
         value: string | number;
         status: AuditStatus;
+        notes?: string;
     }>;
 }
 

@@ -12,6 +12,7 @@ import { SmartAnalysisPanel } from "@/components/analysis/SmartAnalysisPanel";
 import { AdvancedSimulationPanel } from "@/components/analysis/AdvancedSimulationPanel";
 import { SpringTypeSpecificPanel } from "@/components/analysis/SpringTypeSpecificPanel";
 import { FeaPanel } from "@/components/analysis/FeaPanel";
+import { GarterEngineeringAnalysis } from "@/components/analysis/GarterEngineeringAnalysis";
 import { getMaterialOptions, type SpringMaterialId } from "@/lib/materials/springMaterials";
 import type { SpringGeometry as EngineSpringGeometry, WorkingConditions } from "@/lib/engine/types";
 import {
@@ -210,6 +211,30 @@ function AnalysisReady({
           </Link>
         </Button>
       </div>
+    );
+  }
+
+  // Garter Spring Route
+  if (designGeometry.type === "garter") {
+    // Map Store Geometry to GarterV2Inputs
+    // Using explicit casting as the store geometry is a union type
+    const garterInputs: any = {
+        d: (designGeometry as any).wireDiameter || 1,
+        Dm: (designGeometry as any).meanDiameter || 10,
+        N: (designGeometry as any).activeCoils || 10,
+        D_free: (designGeometry as any).ringFreeDiameter || 100,
+        D_inst: (designGeometry as any).ringInstalledDiameter || (designGeometry as any).ringFreeDiameter || 100,
+        G: (designGeometry as any).shearModulus || 79000,
+        jointType: (designGeometry as any).jointType || "hook",
+        jointFactor: 1.0,
+        tensileStrength: undefined // Or pull from material store if available
+    };
+
+    return (
+        <main className="container mx-auto py-8">
+            <h1 className="text-2xl font-bold mb-6">{isZh ? "环形拉簧 (Oil Seal) 工程分析" : "Garter Spring Engineering Analysis"}</h1>
+            <GarterEngineeringAnalysis inputs={garterInputs} />
+        </main>
     );
   }
   

@@ -13,6 +13,7 @@
 import { create, type StoreApi } from "zustand";
 import { persist } from "zustand/middleware";
 import type { SpringType, ExtensionHookType } from "@/lib/springTypes";
+import type { GarterSpringDesign } from "@/lib/springTypes/garter";
 import type { SpringMaterialId } from "@/lib/materials/springMaterials";
 import type { SpiralSpringMaterial } from "@/lib/spring3d/spiralSpringMaterials";
 import type {
@@ -232,7 +233,10 @@ export type SpringGeometry =
   | WaveSpringGeometry
   | ArcGeometry
   | VariablePitchCompressionGeometry
-  | DiskGeometry;
+  | ArcGeometry
+  | VariablePitchCompressionGeometry
+  | DiskGeometry
+  | GarterSpringDesign;
 
 // ============================================================================
 // 材料信息
@@ -427,6 +431,11 @@ export function isWaveSpringDesign(design: SpringGeometry | null): design is Wav
 /** 检查是否为碟形弹簧设计 */
 export function isDiskSpringDesign(design: SpringGeometry | null): design is DiskGeometry {
   return design?.type === "disk";
+}
+
+/** 检查是否为环形拉簧设计 */
+export function isGarterDesign(design: SpringGeometry | null): design is GarterSpringDesign {
+  return design?.type === "garter";
 }
 
 // ============================================================================
@@ -870,6 +879,7 @@ export function generateDesignCode(geometry: SpringGeometry): string {
     arc: "ARC",
     variablePitchCompression: "VPC",
     disk: "BDS", // Belleville Disk Spring
+    garter: "GS",
   };
   const prefix = prefixMap[geometry.type];
 

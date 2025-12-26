@@ -201,11 +201,11 @@ Spring FEA (Beam Model) - {{ design_code }}
 {% if section_type == "CIRC" %}
 *BEAM SECTION, ELSET=SPRING, MATERIAL={{ material.name }}, SECTION=CIRC
 {{ "%.4f"|format(wire_radius) }}
-1.0, 0.0, 0.0
+0.0, 0.0, 1.0
 {% else %}
 *BEAM SECTION, ELSET=SPRING, MATERIAL={{ material.name }}, SECTION=RECT
 {{ "%.4f"|format(wire_width) }}, {{ "%.4f"|format(wire_thickness) }}
-1.0, 0.0, 0.0
+0.0, 0.0, 1.0
 {% endif %}
 
 ** -----------------------------------------------
@@ -226,14 +226,15 @@ BOTTOM, 1, 6, 0.0
 ** STEP: {{ lc.name }}
 ** Target height: {{ "%.2f"|format(lc.target_height) }} mm
 ** ===============================================
-*STEP, NLGEOM
+*STEP
 *STATIC
-0.1, 1.0, 0.001, 1.0
+
 
 ** Apply displacement to top node (Z direction = axial for helical spring)
 ** Displacement = target_height - free_length
 *BOUNDARY
 TOP, 3, 3, {{ "%.6f"|format(lc.target_height - free_length) }}
+TOP, 4, 6, 0.0
 
 ** Output requests
 *NODE FILE
