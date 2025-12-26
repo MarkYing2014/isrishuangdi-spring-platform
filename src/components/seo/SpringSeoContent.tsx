@@ -883,8 +883,12 @@ const seoContent: Record<string, SeoData> = {
   },
   torsionalSpringSystem: {
     en: {
-      h1: "Torsional Spring Pack (Clutch Damper) Engineering & Design",
+      h1: "Clutch Spring Pack (Torsional Spring System) Engineering Design & Analysis",
       sections: [
+        {
+          title: "Engineering Purpose of Compression Springs",
+          content: "In clutch damper and Dual Mass Flywheel (DMF) systems, the compression springs within the spring pack do NOT function as axial load-bearing elements. Their core purpose is to provide controlled torsional compliance and vibration isolation between the engine and transmission. Although standard helical compression springs are used, from an engineering design, analysis, and validation perspective, this system is fundamentally a torsional spring system."
+        },
         {
           title: "The Multi-Stage Spring Pack Concept",
           content: "Spring packs are complex assemblies found in automotive powertrains and industrial couplings. They use multiple helical springs arranged circumferentially to provide a staged torque-angle response, critical for isolating engine vibrations."
@@ -924,6 +928,10 @@ const seoContent: Record<string, SeoData> = {
     zh: {
       h1: "离合器弹簧包 (Spring Pack) 工程设计与分析",
       sections: [
+        {
+          title: "压缩弹簧的工程作用说明",
+          content: "在离合器减振器及双质量飞轮（DMF）系统中，弹簧包内的压缩弹簧并非作为轴向承载元件使用。其核心作用是：在发动机与变速器之间提供可控的扭转柔度与振动隔离能力。尽管系统中使用的是标准螺旋压簧，但从工程设计、分析与验证角度，该系统本质上是一个扭转弹簧系统。"
+        },
         {
           title: "多级弹簧包系统概念",
           content: "弹簧包系统广泛应用于汽车传动系统（如离合器从动盘、双质量飞轮）和工业联轴器。通过在圆周方向布置多组螺旋弹簧，实现分段的扭矩-转座响应，有效隔离发动机振动。"

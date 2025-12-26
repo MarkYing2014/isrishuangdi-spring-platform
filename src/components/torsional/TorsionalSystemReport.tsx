@@ -308,18 +308,6 @@ export function TorsionalSystemReport({
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-               {/* Engineering Note / 工程说明 */}
-               <div className="px-6 py-4 bg-blue-50/50 border-b text-xs text-slate-600 space-y-2">
-                 <p className="font-bold text-slate-700">
-                   {isZh ? "📘 工程说明" : "📘 Engineering Note"}
-                 </p>
-                 <p className="leading-relaxed">
-                   {isZh 
-                     ? "在离合器减振器及双质量飞轮（DMF）系统中，弹簧包内的压缩弹簧并非作为轴向承载元件使用。其核心作用是：在发动机与变速器之间提供可控的扭转柔度与振动隔离能力。尽管系统中使用的是标准螺旋压簧，但从工程设计、分析与验证角度，该系统本质上是一个扭转弹簧系统。"
-                     : "In clutch damper and Dual Mass Flywheel (DMF) systems, the compression springs within the spring pack do NOT function as axial load-bearing elements. Their core purpose is to provide controlled torsional compliance and vibration isolation between the engine and transmission. Although standard helical compression springs are used, from an engineering design, analysis, and validation perspective, this system is fundamentally a torsional spring system."
-                   }
-                 </p>
-               </div>
                <div className="grid grid-cols-2 lg:grid-cols-4 border-b text-[11px] font-mono text-slate-500 uppercase">
                   <div className="p-4 border-r">
                     <p className="opacity-60 mb-1">{isZh ? "弹簧组数" : "Groups"}</p>
