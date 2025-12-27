@@ -382,11 +382,22 @@ export function buildDieSpringGeometryFixedFrame(params: {
   // Closed zone angle (per end)
   const thetaClosed = 2 * Math.PI * closedTurnsPerEnd;
 
-  // Active zone pitch: distribute remaining height over active turns
-  // seatHeight = height occupied by closed coils (approximately wire thickness)
+  // Active zone pitch: For ISO 10243 die springs, coils are TIGHTLY wound
+  // Real die springs have pitch ≈ wire thickness (1.05 to 1.15 × t)
+  // This means coils are nearly touching with only small gap for operation
+  // 
+  // Formula: pActive = wire_t × pitchFactor where pitchFactor is 1.05~1.15
+  // This differs from open compression springs which use (L - seatHeight) / Na
+  //
+  // The free length L is NOT used to calculate pitch for die springs!
+  // Instead, L is the result of: L = pActive × Nt (approximately)
+
+  // Use industry-standard pitch factor for ISO 10243 die springs
+  const ISO_10243_PITCH_FACTOR = 1.08;  // Tight wound: 8% gap between coils
   const seatHeight = wire_t * scale * 0.9;  // closed coils occupy ~0.9t each
-  const activeHeight = Math.max(0, L - 2 * seatHeight);
-  const pActive = activeTurns > 0 ? activeHeight / activeTurns : L / Nt;
+  const pActive = doGrind
+    ? wire_t * scale * ISO_10243_PITCH_FACTOR  // Tightly wound per ISO 10243
+    : freeLength * scale / Nt;  // Open springs use uniform distribution
 
   // Smoothstep function for smooth transition
   const smoothstep = (edge0: number, edge1: number, x: number): number => {
