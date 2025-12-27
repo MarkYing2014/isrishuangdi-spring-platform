@@ -1,7 +1,7 @@
 
 import { rotationToStrokeMm } from "./mapping";
 import { TorsionalStage, StageCurve, SystemCurve, StageSafeResult, AuditStatus } from "./types";
-import { computeAppliedStrokeCap } from "./limits";
+import { computeStageLimits } from "./limits";
 import { assertFinitePositive, assertMetricDieSpringSpec } from "./units";
 
 export function computeStageSafe(stage: TorsionalStage): StageSafeResult {
@@ -14,7 +14,7 @@ export function computeStageSafe(stage: TorsionalStage): StageSafeResult {
     assertFinitePositive("stage.pack.count", stage.pack.count);
     assertMetricDieSpringSpec(stage.pack.spec);
 
-    const cap = computeAppliedStrokeCap(
+    const cap = computeStageLimits(
         stage.pack.spec,
         stage.geometry.slotTravelMm,
         stage.pack.lifeClass,
@@ -46,9 +46,36 @@ export function generateStageCurve(stage: TorsionalStage, thetaMaxDeg: number, s
 
 export function generateSystemCurve(stages: TorsionalStage[], steps = 80, thetaOperatingDeg?: number): SystemCurve {
     const safes = stages.map(computeStageSafe);
+    // Find Governing Stage for SAFE limit (Life OR Physical)
     const governingStage = safes.reduce((a, b) => (b.thetaSafeDeg < a.thetaSafeDeg ? b : a));
 
+    // Find Hard Limit (Physical only)
+    // We need thetaHard per stage from computeStageSafe? 
+    // computeStageSafe currently only returns thetaSafeDeg which is limitThetaDeg from governing.
+    // I need to update StageSafeResult to include thetaHardDeg too. 
+    // And computeStageSafe needs to populate it.
+
+    // Instead of fixing type generically right now (might break others), let's calculate it locally or assume implicit.
+    // Actually, I can use computeStageLimits inside the loop if I want, OR update StageSafeResult type.
+    // Let's check types.ts... it has StageSafeResult. It has hardLimitStrokeMm.
+    // I can convert hardLimitStrokeMm to deg.
+
     const thetaSafeSystemDeg = governingStage.thetaSafeDeg;
+
+    // Calculate System Hard Stop (min of physical stops)
+    const thetaHardSystemDeg = Math.min(...safes.map(s =>
+    // Need mapping back to degrees for hard limit
+    // s.hardLimitStrokeMm is stroke.
+    // We need radius.
+    // stages array has radius. Match by index/ID.
+    {
+        const st = stages.find(st => st.stageId === s.stageId)!;
+        const R = st.geometry.effectiveRadiusMm;
+        // map s.hardLimitStrokeMm to deg
+        // stroke = deg * R * PI/180 =>  deg = stroke / R * 180/PI
+        return (s.hardLimitStrokeMm / R) * (180 / Math.PI);
+    }
+    ));
     const points = Array.from({ length: steps + 1 }, (_, i) => {
         const thetaDeg = (thetaSafeSystemDeg * i) / steps;
 
@@ -111,6 +138,8 @@ export function generateSystemCurve(stages: TorsionalStage[], steps = 80, thetaO
     return {
         points,
         thetaSafeSystemDeg,
+        thetaHardSystemDeg,
+        thetaCustomerDeg: thetaOperatingDeg,
         governingStageId: governingStage.stageId,
         governing: governingStage.governing,
         systemResult,

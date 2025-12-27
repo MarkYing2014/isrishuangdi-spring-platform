@@ -4,6 +4,21 @@
  * Target: Multi-group circumferential spring layout
  */
 
+export type OperatingSource = "DRAWING" | "CUSTOMER_SPEC" | "ASSUMED" | "NOT_PROVIDED";
+
+export type GoverningCode =
+    | "LIFE_LIMIT"
+    | "SOLID_HEIGHT"
+    | "SLOT_TRAVEL"
+    | "MAX_STROKE"
+    | "SYSTEM_STOP";
+
+export interface GoverningMeta {
+    governingStageId: string;
+    governingCode: GoverningCode;
+    governingStrokeMm: number;
+}
+
 export interface TorsionalSpringGroup {
     id: string;
     name?: string;
@@ -54,7 +69,7 @@ export interface TorsionalSpringSystemDesign {
 
     // Customer Operating Requirement
     thetaOperatingCustomerDeg?: number;
-    thetaOperatingSource?: 'DRAWING' | 'CUSTOMER_SPEC' | 'ASSUMED' | 'NOT_PROVIDED';
+    thetaOperatingSource?: OperatingSource;
     assumptions?: string[];
 
     // Optional inertia (V2)
@@ -102,5 +117,12 @@ export interface TorsionalSystemResult {
     totalStiffness: number; // [Nm/deg]
     thetaStop: number;      // System-wide stop angle [deg]
     isPastStop: boolean;    // If referenceAngle >= thetaStop
+
+    // Phase 10: Audit Metadata
+    thetaSafeSystemDeg: number; // life/durability safe (governed by LIFE_LIMIT or physical if lower)
+    thetaHardSystemDeg: number; // physical hard stop (solid/slot/stop)
+    thetaCustomerDeg?: number;  // echo input requirement if provided
+    governing: GoverningMeta;
+
     warnings: string[];
 }

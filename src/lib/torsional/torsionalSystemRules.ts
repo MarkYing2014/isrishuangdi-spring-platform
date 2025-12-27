@@ -140,6 +140,66 @@ export function buildTorsionalSystemDesignRuleReport(
         });
     }
 
+    // 4. Phase 10: Operating Source & Safety Margin Audit
+    // Logic: thetaCustomer <= 0.8 * thetaSafe -> PASS
+    //        0.8 * thetaSafe < thetaCustomer <= thetaSafe -> WARN
+    //        thetaCustomer > thetaSafe -> FAIL
+
+    // Check if we have valid inputs for audit
+    const hasAuditInputs = design.thetaOperatingSource &&
+        design.thetaOperatingSource !== "NOT_PROVIDED" &&
+        design.thetaOperatingCustomerDeg !== undefined &&
+        design.thetaOperatingCustomerDeg > 0;
+
+    if (!hasAuditInputs) {
+        // Missing audit inputs = INFO
+        findings.push({
+            id: "audit_source_missing",
+            level: "info", // This should result in overall INFO status if no errors
+            titleEn: "Audit Capability Only",
+            titleZh: "仅供能力审计",
+            detailEn: "Operating range source not provided. System limits (Safe/Hard) are displayed for reference usage capability only.",
+            detailZh: "未提供工况来源。系统极限（安全/硬停）仅作能力参考显示。",
+        });
+    } else if (result) {
+        const thetaReq = design.thetaOperatingCustomerDeg!;
+        // Use the calculated system safe limit
+        const thetaSafe = result.thetaSafeSystemDeg;
+
+        // 80% Threshold Rule (P0 Requirement)
+        const safetyRatio = thetaReq / thetaSafe;
+
+        if (safetyRatio > 1.0) {
+            findings.push({
+                id: "safety_limit_exceeded",
+                level: "error",
+                titleEn: "Safety Limit Exceeded",
+                titleZh: "超出安全极限",
+                detailEn: `Customer requirement (${thetaReq.toFixed(1)}°) exceeds system safe limit (${thetaSafe.toFixed(1)}°). Governed by: ${result.governing.governingCode}.`,
+                detailZh: `客户要求 (${thetaReq.toFixed(1)}°) 超过系统安全极限 (${thetaSafe.toFixed(1)}°)。受限于：${result.governing.governingCode}。`,
+            });
+        } else if (safetyRatio > 0.8) {
+            findings.push({
+                id: "safety_margin_low",
+                level: "warning",
+                titleEn: "Low Safety Margin",
+                titleZh: "安全余量不足",
+                detailEn: `Operating at ${(safetyRatio * 100).toFixed(0)}% of safe limit. Recommended max: 80%. (${thetaReq.toFixed(1)}° / ${thetaSafe.toFixed(1)}°)`,
+                detailZh: `运行在安全极限的 ${(safetyRatio * 100).toFixed(0)}%。建议最大：80%。(${thetaReq.toFixed(1)}° / ${thetaSafe.toFixed(1)}°)`,
+            });
+        } else {
+            // Explicit PASS finding for audit log
+            findings.push({
+                id: "safety_margin_ok",
+                level: "pass",     // Make sure "pass" is supported or ignored by aggregator. Usually assumed implicit, but good for logs.
+                titleEn: "Safety Margin OK",
+                titleZh: "安全余量合格",
+                detailEn: `Operating at ${(safetyRatio * 100).toFixed(0)}% of safe limit (≤ 80%).`,
+                detailZh: `运行在安全极限的 ${(safetyRatio * 100).toFixed(0)}% (≤ 80%)。`,
+            } as any); // cast if 'pass' not strictly in DesignRuleFinding level type yet
+        }
+    }
+
     return {
         summary: { status: summarizeRuleStatus(findings) },
         metrics,

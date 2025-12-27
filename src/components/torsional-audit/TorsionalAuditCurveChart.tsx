@@ -1,15 +1,27 @@
 import React from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { SystemCurve } from "@/lib/torsional/types";
-
-interface TorsionalAuditCurveChartProps {
-  systemCurve: SystemCurve;
-  operatingTheta?: number;
-  playheadTheta: number;
+// Simplified interface to avoid dependency on full SystemCurve which has audit fields
+interface ChartSystemCurve {
+    points: { thetaDeg: number; torqueNmm: number }[];
+    thetaSafeSystemDeg: number;
 }
 
-export function TorsionalAuditCurveChart({ systemCurve, operatingTheta, playheadTheta }: TorsionalAuditCurveChartProps) {
+interface TorsionalAuditCurveChartProps {
+  systemCurve: ChartSystemCurve;
+  operatingTheta?: number;
+  playheadTheta: number;
+  thetaSafeLife?: number;
+  thetaPhysicalStop?: number;
+}
+
+export function TorsionalAuditCurveChart({ 
+    systemCurve, 
+    operatingTheta, 
+    playheadTheta, 
+    thetaSafeLife, 
+    thetaPhysicalStop 
+}: TorsionalAuditCurveChartProps) {
   const { points, thetaSafeSystemDeg } = systemCurve;
 
   // Prepare data for Recharts
@@ -18,8 +30,15 @@ export function TorsionalAuditCurveChart({ systemCurve, operatingTheta, playhead
     torque: p.torqueNmm,
   }));
 
-  const formatTorque = (val: number) => (val / 1000).toFixed(2); // Show in Nm if preferred, but checklist says Nmm. Let's stick to Nmm.
   const formatTorqueNmm = (val: number) => val.toFixed(1);
+
+  // Determine X-Axis Max
+  const maxTheta = Math.max(
+    thetaSafeSystemDeg,
+    operatingTheta || 0,
+    thetaSafeLife || 0,
+    thetaPhysicalStop || 0
+  ) * 1.05;
 
   return (
     <Card className="border-slate-200 shadow-sm overflow-hidden bg-white/50 backdrop-blur-sm">
@@ -31,6 +50,18 @@ export function TorsionalAuditCurveChart({ systemCurve, operatingTheta, playhead
                 <div className="w-2 h-2 bg-blue-600 rounded-full" />
                 <span className="text-slate-500 uppercase font-medium">Torque (T)</span>
              </div>
+             {thetaSafeLife && (
+                 <div className="flex items-center gap-1">
+                    <div className="w-2 h-0.5 bg-emerald-500 border-dashed border-t border-emerald-500" />
+                    <span className="text-emerald-600 uppercase font-medium">Safe (Life)</span>
+                 </div>
+             )}
+            {thetaPhysicalStop && (
+                 <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-rose-600 rounded-sm" />
+                    <span className="text-rose-600 uppercase font-medium">Hard Stop</span>
+                 </div>
+             )}
           </div>
         </div>
       </CardHeader>
@@ -42,7 +73,7 @@ export function TorsionalAuditCurveChart({ systemCurve, operatingTheta, playhead
               <XAxis 
                 dataKey="theta" 
                 type="number" 
-                domain={[0, Math.max(thetaSafeSystemDeg * 1.05, operatingTheta ? operatingTheta * 1.05 : 0)]} 
+                domain={[0, maxTheta]} 
                 tick={{ fontSize: 10, fill: '#64748b' }}
                 label={{ value: 'Angle θ (°)', position: 'insideBottomRight', offset: -5, fontSize: 10, fill: '#64748b' }}
                 stroke="#cbd5e1"
@@ -69,61 +100,65 @@ export function TorsionalAuditCurveChart({ systemCurve, operatingTheta, playhead
                 animationDuration={500}
               />
 
-              {/* Hard Safety Limit Marker */}
-              <ReferenceLine 
-                x={thetaSafeSystemDeg} 
-                stroke="#ef4444" 
-                strokeDasharray="4 4" 
-                strokeWidth={1.5}
-                label={{ 
-                    value: 'LIMIT (瓶颈)', 
-                    position: 'top', 
-                    fill: '#ef4444', 
-                    fontSize: 10, 
-                    fontWeight: 'bold'
-                }} 
-              />
-
-              {/* Customer Operating Requirement */}
-              {operatingTheta !== undefined && operatingTheta > 0 ? (
+              {/* 1. Safe Life Limit (θ_safe) - Green Dashed */}
+              {thetaSafeLife !== undefined && (
                 <ReferenceLine 
-                    x={operatingTheta} 
-                    stroke="#64748b" 
-                    strokeDasharray="6 6" 
-                    strokeWidth={1}
+                    x={thetaSafeLife} 
+                    stroke="#10b981" 
+                    strokeDasharray="5 5" 
+                    strokeWidth={1.5}
                     label={{ 
-                        value: 'REQ (工况)', 
-                        position: 'top', 
-                        fill: '#475569', 
-                        fontSize: 10, 
-                        fontWeight: 'bold' 
-                    }} 
-                />
-              ) : (
-                <ReferenceLine 
-                    x={0} 
-                    stroke="transparent"
-                    label={{ 
-                        value: 'Operating range Not Provided by Customer (未提供工况范围)', 
-                        position: 'insideTopLeft', 
-                        fill: '#94a3b8', 
+                        value: 'θ_safe (Life)', 
+                        position: 'insideTopRight', 
+                        fill: '#059669', 
                         fontSize: 9, 
-                        fontWeight: 'medium',
-                        dx: 10,
-                        dy: 40
+                        fontWeight: 'bold',
+                        dy: -10
                     }} 
                 />
               )}
 
+              {/* 2. Physical Hard Stop (θ_hard) - Red Solid */}
+              {thetaPhysicalStop !== undefined && (
+                <ReferenceLine 
+                    x={thetaPhysicalStop} 
+                    stroke="#be123c" 
+                    strokeWidth={2}
+                    label={{ 
+                        value: 'θ_hard (Physical)', 
+                        position: 'top', 
+                        fill: '#be123c', 
+                        fontSize: 9, 
+                        fontWeight: 'bold'
+                    }} 
+                />
+              )}
+
+              {/* 3. Customer Operating Requirement (θ_customer) - Blue Dotted */}
+              {operatingTheta !== undefined && operatingTheta > 0 ? (
+                <ReferenceLine 
+                    x={operatingTheta} 
+                    stroke="#3b82f6" 
+                    strokeDasharray="2 4" 
+                    strokeWidth={1.5}
+                    label={{ 
+                        value: 'θ_customer', 
+                        position: 'insideBottomRight', 
+                        fill: '#2563eb', 
+                        fontSize: 9, 
+                        fontWeight: 'bold',
+                        dy: -10
+                    }} 
+                />
+              ) : null}
+
               {/* Playhead Marker */}
               <ReferenceLine 
                 x={playheadTheta} 
-                stroke="#10b981" 
-                strokeWidth={2}
+                stroke="#64748b" 
+                strokeWidth={1}
                 label={{ 
-                    value: 'θ', 
                     position: 'insideTopLeft', 
-                    fill: '#059669', 
                     fontSize: 12, 
                     fontWeight: 'bold' 
                 }} 
@@ -135,10 +170,10 @@ export function TorsionalAuditCurveChart({ systemCurve, operatingTheta, playhead
         <div className="mt-4 flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
              <div className="flex flex-col">
                 <span className="text-[9px] text-slate-400 uppercase font-bold">Current θ</span>
-                <span className="text-xs font-mono font-bold text-emerald-600">{playheadTheta.toFixed(2)}°</span>
+                <span className="text-xs font-mono font-bold text-slate-700">{playheadTheta.toFixed(2)}°</span>
              </div>
              <div className="text-[9px] text-slate-400 italic max-w-[200px] text-right">
-                * Traceable torque projection: T = Σ(n·k·R²·θ_rad). Derived from customer geometry.
+                * Layered Limits: Life (Safe) vs Physical (Hard) vs Customer (Req)
              </div>
         </div>
       </CardContent>

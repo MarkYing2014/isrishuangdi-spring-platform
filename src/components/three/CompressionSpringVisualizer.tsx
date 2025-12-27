@@ -416,11 +416,7 @@ export function CompressionSpringVisualizer({ previewStrokeMm }: { previewStroke
           <div className="h-3 w-3 rounded-full" style={{ backgroundColor: END_CAP_COLOR }} />
           <span>并紧圈</span>
         </div>
-        {isAtSolidHeight && (
-          <div className="mt-1 text-amber-600 font-medium">
-            ⚠ 已达固体高度
-          </div>
-        )}
+
       </div>
 
       {/* Status overlay - uses technical symbols (international) */}

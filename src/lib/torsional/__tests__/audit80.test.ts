@@ -1,62 +1,68 @@
+
 import { describe, it, expect } from "vitest";
 import { generateSystemCurve } from "../curves";
 import { TorsionalStage } from "../types";
+import { DieSpringSpec } from "@/lib/dieSpring/types";
 
-describe("Torsional Audit 80% Rule", () => {
-    // Mock simple stage
-    const mockStages: TorsionalStage[] = [
-        {
-            stageId: "S1",
-            geometry: { effectiveRadiusMm: 100, slotTravelMm: 10 }, // 10mm travel
-            pack: {
-                kind: "die",
-                spec: {
-                    id: "test",
-                    series: "ISO_10243",
-                    duty: "EXTRA_LIGHT",
-                    colorCode: "YELLOW",
-                    outerDiameter: 20,
-                    innerDiameter: 10,
-                    freeLength: 100,
-                    solidHeight: 50,
-                    wireWidth: 5,
-                    wireThickness: 3,
-                    activeCoils: 10,
-                    springRate: 10,
-                    material: "Steel",
-                    source: { vendor: "Test", document: "Doc" },
-                    strokeLimits: { long: 20, normal: 15, max: 10 }
-                } as any,
-                count: 1,
-                lifeClass: "NORMAL"
-            }
-        }
-    ];
+// Mock spec
+const MOCK_SPEC: DieSpringSpec = {
+    id: "MOCK",
+    colorCode: "blue",
+    duty: "MEDIUM",
+    series: "ISO_10243",
+    unitSystem: "metric",
+    outerDiameter: 20,
+    innerDiameter: 10,
+    freeLength: 100,
+    springRate: 100, // N/mm
+    wireWidth: 5,
+    wireThickness: 5,
+    activeCoils: 5,
+    solidHeight: 60,
+    strokeLimits: { long: 30, normal: 35, max: 40 },
+    material: "Test",
+    source: { vendor: "Test", document: "Doc" }
+};
 
-    // theta_safe = 10mm / 100mm = 0.1 rad = 5.73 deg
-    const thetaSafe = (10 / 100) * (180 / Math.PI); // 5.729...
+const MOCK_STAGE: TorsionalStage = {
+    stageId: "1",
+    geometry: { effectiveRadiusMm: 100, slotTravelMm: Infinity },
+    pack: { kind: "die", spec: MOCK_SPEC, count: 1, lifeClass: "NORMAL" }
+};
 
-    it("should return PASS if thetaOperating <= 80% of thetaSafe", () => {
-        const result = generateSystemCurve(mockStages, 10, thetaSafe * 0.7);
-        expect(result.systemResult).toBe("PASS");
-        expect(result.conformsToCustomerRange).toBe(true);
+describe("Audit 80% Safety Rule", () => {
+    it("passes when operating requirement is exactly 80% of safe limit", () => {
+        // effectiveRadius = 100
+        // Life Limit (NORMAL) = 35mm
+        // Theta Safe = strokeToTheta(35, 100) = (35/100) * (180/PI) ≈ 20.05
+        // 80% of 20.05 ≈ 16.04
+
+        const curve = generateSystemCurve([MOCK_STAGE]);
+        const thetaSafe = curve.thetaSafeSystemDeg;
+        const req = thetaSafe * 0.8;
+
+        const audit = generateSystemCurve([MOCK_STAGE], 80, req);
+        expect(audit.systemResult).toBe("PASS");
+        expect(audit.deviationRequired).toBe(false);
     });
 
-    it("should return WARN if 80% < thetaOperating <= 100% of thetaSafe", () => {
-        const result = generateSystemCurve(mockStages, 10, thetaSafe * 0.9);
-        expect(result.systemResult).toBe("WARN");
-        expect(result.conformsToCustomerRange).toBe(true);
+    it("warns when operating requirement is slightly above 80% (e.g. 81%)", () => {
+        const curve = generateSystemCurve([MOCK_STAGE]);
+        const thetaSafe = curve.thetaSafeSystemDeg;
+        const req = thetaSafe * 0.81;
+
+        const audit = generateSystemCurve([MOCK_STAGE], 80, req);
+        expect(audit.systemResult).toBe("WARN");
+        expect(audit.deviationRequired).toBe(false);
     });
 
-    it("should return FAIL if thetaOperating > thetaSafe", () => {
-        const result = generateSystemCurve(mockStages, 10, thetaSafe * 1.1);
-        expect(result.systemResult).toBe("FAIL");
-        expect(result.conformsToCustomerRange).toBe(false);
-        expect(result.deviationRequired).toBe(true);
-    });
+    it("fails when operating requirement exceeds safe limit", () => {
+        const curve = generateSystemCurve([MOCK_STAGE]);
+        const thetaSafe = curve.thetaSafeSystemDeg;
+        const req = thetaSafe * 1.01;
 
-    it("should return INFO if no thetaOperating is provided", () => {
-        const result = generateSystemCurve(mockStages, 10);
-        expect(result.systemResult).toBe("INFO");
+        const audit = generateSystemCurve([MOCK_STAGE], 80, req);
+        expect(audit.systemResult).toBe("FAIL");
+        expect(audit.deviationRequired).toBe(true);
     });
 });

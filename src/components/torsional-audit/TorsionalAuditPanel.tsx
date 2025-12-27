@@ -120,6 +120,8 @@ export function TorsionalAuditPanel({ analysis, onPlayheadChange }: TorsionalAud
                 systemCurve={systemCurve} 
                 operatingTheta={operatingRequirement?.angleDeg}
                 playheadTheta={playheadTheta}
+                thetaSafeLife={systemCurve.thetaSafeSystemDeg}
+                thetaPhysicalStop={systemCurve.thetaHardSystemDeg}
             />
             
             <TorsionalAuditPlayController 

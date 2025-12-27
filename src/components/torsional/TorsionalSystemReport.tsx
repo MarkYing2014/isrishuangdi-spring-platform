@@ -50,6 +50,7 @@ import {
 import { buildTorsionalSystemDesignRuleReport } from "@/lib/torsional/torsionalSystemRules";
 import { auditStageTransitions, type StageTransitionAuditResult, type TransitionSeverity } from "@/lib/torsional/torsionalStageAudit";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
+import { TorsionalAuditCurveChart } from "@/components/torsional-audit/TorsionalAuditCurveChart";
 
 /**
  * ReportHeader
@@ -74,6 +75,11 @@ function ReportHeader({ design }: { design: TorsionalSpringSystemDesign }) {
         <div className="flex gap-2">
           <Badge className="bg-blue-600 border-0 hover:bg-blue-700 text-[10px] uppercase font-bold px-2 py-0.5">OEM Engineering</Badge>
           <Badge variant="outline" className="text-white border-slate-700 text-[10px] uppercase font-bold px-2 py-0.5 tracking-wider">Policy: V1 LOCKED</Badge>
+          {design.thetaOperatingSource && (
+              <Badge variant="outline" className="bg-amber-500/20 text-amber-300 border-amber-500/50 text-[10px] uppercase font-bold px-2 py-0.5">
+                  Source: {design.thetaOperatingSource}
+              </Badge>
+          )}
         </div>
       </div>
       <div className="px-6 py-3 bg-slate-50 border-b flex items-center gap-4 overflow-x-auto whitespace-nowrap scrollbar-hide">
@@ -415,6 +421,12 @@ export function TorsionalSystemReport({
           value={maxStressGroup?.groupId.toUpperCase() || "N/A"} 
           subtext="Highest stress utilization"
         />
+        <KPICard 
+           label="GOVERNING LIMIT"
+           value={result.governing.governingCode}
+           subtext={`Stage ${result.governing.governingStageId} @ ${result.governing.governingStrokeMm.toFixed(1)}mm`}
+           status={result.governing.governingCode === "LIFE_LIMIT" ? "warning" : result.governing.governingCode === "SYSTEM_STOP" ? "default" : "default"}
+        />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
@@ -519,29 +531,20 @@ export function TorsionalSystemReport({
                   Torque–Angle Performance
                 </CardTitle>
               </CardHeader>
-              <CardContent className="h-[350px] p-6">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={result.curves} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                    <XAxis 
-                      dataKey="theta" 
-                      type="number" 
-                      domain={[0, 'auto']} 
-                      label={{ value: 'Angle (deg)', position: 'insideBottomRight', offset: -5, fontSize: 10 }}
-                      fontSize={10}
-                    />
-                    <YAxis fontSize={10} axisLine={false} tickLine={false} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '11px' }}
-                      itemStyle={{ padding: '0px' }}
-                    />
-                    <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
-                    <Line type="monotone" dataKey="torqueLoad" stroke="#3b82f6" strokeWidth={3} dot={false} name="Loading T(θ)" />
-                    <Line type="monotone" dataKey="torqueUnload" stroke="#94a3b8" strokeWidth={2} dot={false} strokeDasharray="5 5" name="Unloading" />
-                    <ReferenceLine x={design.referenceAngle} stroke="#ef4444" strokeDasharray="3 3" label={{ position: 'top', value: 'Work', fill: '#ef4444', fontSize: 10 }} />
-                    <ReferenceLine x={result.thetaStop} stroke="#ef4444" strokeWidth={2} label={{ position: 'insideTopLeft', value: 'SYSTEM STOP', fill: '#ef4444', fontSize: 10, fontWeight: 'bold' }} />
-                  </LineChart>
-                </ResponsiveContainer>
+              <CardContent className="h-[350px] p-0 overflow-hidden">
+                <TorsionalAuditCurveChart 
+                    systemCurve={{
+                        points: result.curves.map(c => ({ 
+                            thetaDeg: c.theta, 
+                            torqueNmm: c.torqueLoad 
+                        })),
+                        thetaSafeSystemDeg: result.thetaSafeSystemDeg // Now exact
+                    }}
+                    playheadTheta={design.referenceAngle}
+                    operatingTheta={design.thetaOperatingCustomerDeg}
+                    thetaPhysicalStop={result.thetaHardSystemDeg}
+                    thetaSafeLife={result.thetaSafeSystemDeg} // Use exact safe limit
+                />
               </CardContent>
             </Card>
 

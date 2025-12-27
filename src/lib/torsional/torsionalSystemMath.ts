@@ -21,25 +21,47 @@ export function calculateTorsionalSystem(
     const { groups, frictionTorque, referenceAngle } = design;
     const policy = TORSIONAL_SYSTEM_POLICY_V1;
 
-    // 1. Calculate individual group properties
+    // 1. Calculate individual group properties & limits (Hard vs Safe)
     const groupProps = groups.map(g => {
-        // Equivalent stiffness Kθ,i = n * k * R^2 [N*mm/rad^2 ? No, units check]
-        // k is N/mm, R is mm. k*R^2 is (N/mm) * mm^2 = N*mm.
-        // This T = Kθ * Δθ(rad). 
-        // If we want Nm/deg:
-        // T [Nm] = (k [N/mm] * R^2 [mm^2] * Δθ [deg] * (PI/180)) / 1000
-        // Kθ [Nm/deg] = (k * R^2 * PI/180) / 1000
+        // Stiffness Calculation
         const K_theta_deg = (g.k * Math.pow(g.R, 2) * Math.PI / 180) / 1000;
 
-        // Stop angle in degrees
+        // Physical Hard Stop
         const theta_range = (g.L_free - g.L_solid - g.clearance) / g.R * (180 / Math.PI);
-        const theta_stop_i = g.theta_start + theta_range;
+        const theta_hard_i = g.theta_start + theta_range;
+
+        // Life Limit (Safe Theta)
+        // Reverse calc: Stress = Scale * (theta - theta_start)
+        // Scale = Kw * (8 * k * R * Dm) / (pi * d^3) * (PI/180 for deg)
+        // Actually, F = k * x = k * R * (theta-start)_rad
+        // Stress = Kw * 8 * (k * R * (theta-start)_rad) * Dm / (pi*d^3)
+
+        const C = g.Dm / g.d;
+        const Kw = (4 * C - 1) / (4 * C - 4) + 0.615 / C;
+        // Stress per degree of engagement:
+        const stressPerDeg = (Kw * 8 * g.k * g.R * g.Dm * (Math.PI / 180)) / (Math.PI * Math.pow(g.d, 3));
+
+        // Allowable Stress
+        const material = materials?.[g.materialId || ""] || SPRING_MATERIALS.find(m => m.id === g.materialId);
+        let sy = material?.tensileStrength ? material.tensileStrength * policy.fallbackYieldRatio : 0;
+        if (sy === 0 && material?.allowShearStatic) sy = material.allowShearStatic / 0.65;
+
+        // Limit: allowable clamp
+        const tau_allow = Math.max(policy.allowableClampMin, Math.min(policy.allowableClampMax, policy.allowableStressRatio * sy));
+
+        // Theta Safe: when Stress <= tau_allow
+        // stressPerDeg * (theta_life - theta_start) = tau_allow
+        const delta_theta_life = tau_allow / (stressPerDeg || 1); // avoid div0
+        const theta_life_i = g.theta_start + delta_theta_life;
 
         return {
             ...g,
             K_theta_deg,
-            theta_stop_i,
-            theta_range
+            theta_hard_i, // was theta_stop_i
+            theta_life_i,
+            theta_range,
+            sy,
+            tau_allow
         };
     });
 
@@ -90,22 +112,56 @@ export function calculateTorsionalSystem(
         }
     });
 
-    // 3. Identify System Stop Angle
-    const systemStopTheta = groupProps.length > 0
-        ? Math.min(...groupProps.map(gp => gp.theta_stop_i))
+    // 3. Identify System Limits (Phase 10: Layered)
+
+    // Hard Limit: Minimum of all physical stops
+    const thetaHardSystemDeg = groupProps.length > 0
+        ? Math.min(...groupProps.map(gp => gp.theta_hard_i))
         : 0;
+
+    // Safe Limit: Minimum of Life Limits AND Hard Limits
+    // (A system cannot be safer than its hard stop)
+    const minLifeTheta = groupProps.length > 0
+        ? Math.min(...groupProps.map(gp => gp.theta_life_i))
+        : 0;
+
+    const thetaSafeSystemDeg = Math.min(minLifeTheta, thetaHardSystemDeg);
+
+    // Governing Logic
+    let governingStageId = "N/A";
+    let governingCode: "LIFE_LIMIT" | "SOLID_HEIGHT" | "SYSTEM_STOP" = "SYSTEM_STOP";
+    let governingStrokeMm = 0; // approximate at impact
+
+    // Find who caused the safe limit
+    if (thetaSafeSystemDeg === minLifeTheta && minLifeTheta < thetaHardSystemDeg) {
+        // Governed by LIFE
+        const limiter = groupProps.find(gp => Math.abs(gp.theta_life_i - minLifeTheta) < 0.001);
+        if (limiter) {
+            governingStageId = limiter.id;
+            governingCode = "LIFE_LIMIT";
+            governingStrokeMm = (limiter.theta_life_i - limiter.theta_start) * limiter.R * (Math.PI / 180);
+        }
+    } else {
+        // Governed by HARD STOP (Solid Height / System Stop)
+        const limiter = groupProps.find(gp => Math.abs(gp.theta_hard_i - thetaHardSystemDeg) < 0.001);
+        if (limiter) {
+            governingStageId = limiter.id;
+            governingCode = "SOLID_HEIGHT"; // or SYSTEM_STOP, practically synonymous for spring packs
+            governingStrokeMm = (limiter.theta_hard_i - limiter.theta_start) * limiter.R * (Math.PI / 180);
+        }
+    }
 
     // 3. Generate Curves
     const curves: TorsionalCurvePoint[] = [];
     const samples = policy.defaultSamples;
-    const maxTheta = Math.max(systemStopTheta * 1.2, referenceAngle * 1.2, 10);
+    const maxTheta = Math.max(thetaHardSystemDeg * 1.2, referenceAngle * 1.2, 10);
 
     // Pre-calculate full system nominal stiffness (sum of all enabled groups)
     const fullNominalK = groupProps.reduce((sum, gp) => gp.enabled ? sum + gp.n * gp.K_theta_deg : sum, 0);
 
     for (let i = 0; i <= samples; i++) {
         const theta = (maxTheta * i) / samples;
-        const isPastStop = theta >= systemStopTheta;
+        const isPastStop = theta >= thetaHardSystemDeg;
 
         let totalK = 0;
         let totalTorqueLoad = 0;
@@ -116,7 +172,7 @@ export function calculateTorsionalSystem(
 
             // Group is active if theta >= theta_start AND it hasn't personal-stopped
             // But for the system perspective, we use systemStop as the primary limit.
-            const effectiveTheta = Math.min(theta, systemStopTheta, gp.theta_stop_i);
+            const effectiveTheta = Math.min(theta, thetaHardSystemDeg, gp.theta_hard_i);
 
             if (effectiveTheta >= gp.theta_start) {
                 activeGroups.push(gp.id);
@@ -127,7 +183,7 @@ export function calculateTorsionalSystem(
 
         // Handle Rigid Stop
         if (isPastStop) {
-            const deltaTheta = theta - systemStopTheta;
+            const deltaTheta = theta - thetaHardSystemDeg;
             const rigidK = fullNominalK * policy.stopMultiplier;
             totalTorqueLoad += rigidK * deltaTheta;
             totalK = rigidK;
@@ -153,11 +209,11 @@ export function calculateTorsionalSystem(
     // 4. Calculate exact results at referenceAngle for summary
     let exactK = 0;
     let exactTorqueLoad = 0;
-    const isPastStopRef = referenceAngle >= systemStopTheta;
+    const isPastStopRef = referenceAngle >= thetaHardSystemDeg;
 
     groupProps.forEach(gp => {
         if (!gp.enabled) return;
-        const effectiveTheta = Math.min(referenceAngle, systemStopTheta, gp.theta_stop_i);
+        const effectiveTheta = Math.min(referenceAngle, thetaHardSystemDeg, gp.theta_hard_i);
         if (effectiveTheta >= gp.theta_start) {
             exactK += gp.K_theta_deg * gp.n;
             exactTorqueLoad += gp.K_theta_deg * gp.n * (effectiveTheta - gp.theta_start);
@@ -165,7 +221,7 @@ export function calculateTorsionalSystem(
     });
 
     if (isPastStopRef) {
-        const deltaTheta = referenceAngle - systemStopTheta;
+        const deltaTheta = referenceAngle - thetaHardSystemDeg;
         const rigidK = fullNominalK * policy.stopMultiplier;
         exactTorqueLoad += rigidK * deltaTheta;
         exactK = rigidK;
@@ -181,9 +237,9 @@ export function calculateTorsionalSystem(
         let f_per = 0;
         let stress = 0;
         let utilization = 0;
-        const isStopping = referenceAngle >= gp.theta_stop_i;
+        const isStopping = referenceAngle >= gp.theta_hard_i;
 
-        const effectiveTheta = Math.min(referenceAngle, systemStopTheta, gp.theta_stop_i);
+        const effectiveTheta = Math.min(referenceAngle, thetaHardSystemDeg, gp.theta_hard_i);
         let springDeltaX = 0;
 
         if (gp.enabled && effectiveTheta >= gp.theta_start) {
@@ -192,7 +248,7 @@ export function calculateTorsionalSystem(
             // Group torque contribution (load balanced)
             const groupNominalK = gp.K_theta_deg * gp.n;
             const totalNominalKAtRef = groupProps.reduce((sum, g) =>
-                (g.enabled && Math.min(referenceAngle, systemStopTheta, g.theta_stop_i) >= g.theta_start)
+                (g.enabled && Math.min(referenceAngle, thetaHardSystemDeg, g.theta_hard_i) >= g.theta_start)
                     ? sum + g.K_theta_deg * g.n
                     : sum, 0
             );
@@ -242,8 +298,19 @@ export function calculateTorsionalSystem(
             unload: exactTorqueUnload
         },
         totalStiffness: exactK,
-        thetaStop: systemStopTheta,
+        thetaStop: thetaHardSystemDeg,
         isPastStop: isPastStopRef,
+
+        // Phase 10: Audit Metadata (Correctly Calculated)
+        thetaSafeSystemDeg,
+        thetaHardSystemDeg,
+        thetaCustomerDeg: design.thetaOperatingCustomerDeg,
+        governing: {
+            governingStageId,
+            governingCode: governingCode as any,
+            governingStrokeMm
+        },
+
         warnings
     };
 }

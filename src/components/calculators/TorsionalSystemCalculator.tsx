@@ -14,6 +14,7 @@ import {
   TorsionalSpringSystemDesign, 
   TorsionalSpringGroup 
 } from "@/lib/torsional/torsionalSystemTypes";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   calculateTorsionalSystem 
 } from "@/lib/torsional/torsionalSystemMath";
@@ -229,6 +230,61 @@ export function TorsionalSystemCalculator() {
                             <Label className="text-[10px] font-black text-slate-500 uppercase text-blue-600">Work Angle (deg)</Label>
                             <NumericInput value={design.referenceAngle} onChange={v => setDesign({ ...design, referenceAngle: v ?? 0 })} className="h-8 font-mono border-blue-500" />
                         </div>
+                    </div>
+
+                    <div className="pt-3 border-t">
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1">
+                                Operating Source
+                                <Info className="w-3 h-3 text-slate-400" />
+                            </Label>
+                            <Select 
+                                value={design.thetaOperatingSource || "NOT_PROVIDED"}
+                                onValueChange={(v) => setDesign({ ...design, thetaOperatingSource: v as any })}
+                            >
+                                <SelectTrigger className="h-8 text-xs font-mono">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="NOT_PROVIDED">NOT PROVIDED</SelectItem>
+                                    <SelectItem value="DRAWING">DRAWING</SelectItem>
+                                    <SelectItem value="CUSTOMER_SPEC">CUSTOMER_SPEC</SelectItem>
+                                    <SelectItem value="ASSUMED">ASSUMED</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    
+                    <div className="pt-3 border-t grid grid-cols-2 gap-4">
+                         <div className="col-span-2 space-y-1.5">
+                             <Label className="text-[9px] font-black text-slate-400 uppercase">Customer Drawing #</Label>
+                             <input 
+                                type="text" 
+                                value={design.customerDrawingNumber || ""} 
+                                onChange={e => setDesign({ ...design, customerDrawingNumber: e.target.value })} 
+                                className="flex h-8 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-xs shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+                                placeholder="e.g. DWG-2025-X01"
+                             />
+                         </div>
+                         <div className="space-y-1.5">
+                             <Label className="text-[9px] font-black text-slate-400 uppercase">Revision</Label>
+                             <input 
+                                type="text" 
+                                value={design.customerDrawingRevision || ""} 
+                                onChange={e => setDesign({ ...design, customerDrawingRevision: e.target.value })} 
+                                className="flex h-8 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-xs shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+                                placeholder="A.1"
+                             />
+                         </div>
+                         <div className="space-y-1.5">
+                             <Label className="text-[9px] font-black text-slate-400 uppercase">Req Angle (°)</Label>
+                             <NumericInput 
+                                value={design.thetaOperatingCustomerDeg} 
+                                onChange={v => setDesign({ ...design, thetaOperatingCustomerDeg: v ?? 0 })} 
+                                disabled={!design.thetaOperatingSource || design.thetaOperatingSource === "NOT_PROVIDED"}
+                                className="h-8 text-xs font-mono" 
+                             />
+                         </div>
                     </div>
 
                     <div className="pt-3 border-t grid grid-cols-2 gap-4">

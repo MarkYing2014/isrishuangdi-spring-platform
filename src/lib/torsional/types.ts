@@ -24,7 +24,8 @@ export type GoverningCode =
     | "LIFE_LIMIT"
     | "MAX_STROKE"
     | "SOLID_HEIGHT"
-    | "SLOT_TRAVEL";
+    | "SLOT_TRAVEL"
+    | "SYSTEM_STOP";
 
 export interface GoverningLimit {
     code: GoverningCode;
@@ -58,6 +59,9 @@ export type AuditStatus = "PASS" | "WARN" | "FAIL" | "INFO";
 export interface SystemCurve {
     points: CurvePoint[];
     thetaSafeSystemDeg: number;
+    thetaHardSystemDeg: number;
+    thetaCustomerDeg?: number; // Phase 10 Audit
+
     governingStageId: string;
     governing: GoverningLimit;
 
