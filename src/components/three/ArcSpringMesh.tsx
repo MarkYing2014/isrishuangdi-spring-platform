@@ -70,6 +70,12 @@ export interface ArcSpringMeshProps {
   n: number;
   r: number;
   alpha0Deg: number;
+  // Standard Stroke Model Props
+  previewStrokeMm?: number;
+  alphaFreeDeg?: number;
+  alphaSolidDeg?: number;
+  arcRadiusMm?: number;
+  
   deadCoilsStart?: number;
   deadCoilsEnd?: number;
   deadTightnessK?: number;
@@ -90,6 +96,10 @@ export function ArcSpringMesh({
   n,
   r,
   alpha0Deg,
+  previewStrokeMm,
+  alphaFreeDeg,
+  alphaSolidDeg,
+  arcRadiusMm,
   deadCoilsStart = 0,
   deadCoilsEnd = 0,
   deadTightnessK = 0,
@@ -103,9 +113,31 @@ export function ArcSpringMesh({
   wireframe = false,
   showCenterline = false,
 }: ArcSpringMeshProps) {
+  // 1. Engineering Sweep Angle Mapping (Stroke Model)
+  const currentAlphaDeg = useMemo(() => {
+    // If no preview stroke, use alpha0Deg (Free Angle)
+    if (previewStrokeMm === undefined || previewStrokeMm === null) {
+      return alpha0Deg;
+    }
+
+    // Terminology alignment
+    const alphaFree = alphaFreeDeg ?? alpha0Deg;
+    const alphaSolid = alphaSolidDeg ?? 0;
+    const radius = arcRadiusMm ?? r;
+
+    // Guard against r=0 or invalid sweep
+    if (radius <= 0) return alpha0Deg;
+
+    // Δα = (stroke / radius) * (180 / π)
+    const deltaAlphaDeg = (previewStrokeMm / radius) * (180 / Math.PI);
+
+    // Current α = clamp(Free - Δα, Solid, Free)
+    return Math.max(alphaSolid, Math.min(alphaFree, alphaFree - deltaAlphaDeg));
+  }, [previewStrokeMm, alpha0Deg, alphaFreeDeg, alphaSolidDeg, arcRadiusMm, r]);
+
   const params: ArcSpringGeometryParams = useMemo(
-    () => ({ d, D, n, r, alpha0Deg }),
-    [d, D, n, r, alpha0Deg]
+    () => ({ d, D, n, r, alpha0Deg: currentAlphaDeg }),
+    [d, D, n, r, currentAlphaDeg]
   );
 
   const validation = useMemo(() => validateArcSpringGeometry(params), [params]);
@@ -218,6 +250,12 @@ export interface ArcSpringVisualizerProps {
   n?: number;
   r?: number;
   alpha0Deg?: number;
+  // Standard Stroke Model Props
+  previewStrokeMm?: number;
+  alphaFreeDeg?: number;
+  alphaSolidDeg?: number;
+  arcRadiusMm?: number;
+
   useDeadCoils?: boolean;
   deadCoilsPerEnd?: number;
   deadCoilsStart?: number;
@@ -238,6 +276,10 @@ type ArcSpringSceneProps = {
   n: number;
   r: number;
   alpha0Deg: number;
+  previewStrokeMm?: number;
+  alphaFreeDeg?: number;
+  alphaSolidDeg?: number;
+  arcRadiusMm?: number;
   useDeadCoils: boolean;
   deadCoilsPerEnd: number;
   deadCoilsStart?: number;
@@ -258,6 +300,10 @@ function ArcSpringScene({
   n,
   r,
   alpha0Deg,
+  previewStrokeMm,
+  alphaFreeDeg,
+  alphaSolidDeg,
+  arcRadiusMm,
   useDeadCoils,
   deadCoilsPerEnd,
   deadCoilsStart,
@@ -288,6 +334,10 @@ function ArcSpringScene({
           n={n}
           r={r}
           alpha0Deg={alpha0Deg}
+          previewStrokeMm={previewStrokeMm}
+          alphaFreeDeg={alphaFreeDeg}
+          alphaSolidDeg={alphaSolidDeg}
+          arcRadiusMm={arcRadiusMm}
           deadCoilsStart={useDeadCoils ? (deadCoilsStart ?? deadCoilsPerEnd) : 0}
           deadCoilsEnd={useDeadCoils ? (deadCoilsEnd ?? deadCoilsPerEnd) : 0}
           deadTightnessK={useDeadCoils ? deadTightnessK : 0}
@@ -311,6 +361,10 @@ export function ArcSpringVisualizer({
   n = 6,
   r = 80,
   alpha0Deg = 120,
+  previewStrokeMm,
+  alphaFreeDeg,
+  alphaSolidDeg,
+  arcRadiusMm,
   useDeadCoils = false,
   deadCoilsPerEnd = 1,
   deadCoilsStart,
@@ -332,6 +386,10 @@ export function ArcSpringVisualizer({
         n={n}
         r={r}
         alpha0Deg={alpha0Deg}
+        previewStrokeMm={previewStrokeMm}
+        alphaFreeDeg={alphaFreeDeg}
+        alphaSolidDeg={alphaSolidDeg}
+        arcRadiusMm={arcRadiusMm}
         deadCoilsPerEnd={Math.max(0, deadCoilsPerEnd)}
         useDeadCoils={useDeadCoils}
         deadCoilsStart={deadCoilsStart}

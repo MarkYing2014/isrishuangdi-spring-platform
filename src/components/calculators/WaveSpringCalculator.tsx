@@ -97,6 +97,30 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
   // Mode state (for future use)
   const [mode, setMode] = useState<WaveSpringMode>("loadAtWorkingHeight");
 
+  // Guardrail: Clamp working height to free height and Solid Height
+  useEffect(() => {
+    // Basic Hw <= Hf
+    if (workingHeight_Hw > freeHeight_Hf) {
+      setWorkingHeight(freeHeight_Hf);
+    }
+
+    // Advanced: Hw >= Solid Height (Nt * t)
+    const solidHeight = turns_Nt * thickness_t;
+    if (workingHeight_Hw < solidHeight && solidHeight > 0) {
+       // Ideally clamp to solid height (or slight margin above)
+       setWorkingHeight(solidHeight);
+    }
+  }, [freeHeight_Hf, workingHeight_Hw, turns_Nt, thickness_t]);
+
+  // Guardrail: Radial Wall Sanity (OD >= ID + 2*b)
+  useEffect(() => {
+    const minOD = id + 2 * radialWall_b;
+    if (od < minOD && radialWall_b > 0) {
+      // If OD is too small for the ID + 2b, push OD out
+      setOd(minOD);
+    }
+  }, [id, od, radialWall_b]);
+
   // Global store for hydration
   const storedGeometry = useSpringDesignStore(state => state.geometry);
 
@@ -397,9 +421,13 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
                     <Label>{isZh ? "工作高度 Hw (mm)" : "Working Height Hw (mm)"}</Label>
                     <NumericInput
                       value={workingHeight_Hw}
-                      onChange={(v) => setWorkingHeight(v ?? 0)}
+                      onChange={(v) => {
+                        const val = v ?? 0;
+                        setWorkingHeight(Math.min(val, freeHeight_Hf));
+                      }}
                       step={0.1}
                       min={0}
+                      max={freeHeight_Hf}
                     />
                   </div>
                 </div>

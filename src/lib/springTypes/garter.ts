@@ -59,6 +59,12 @@ export interface GarterSpringDesign extends SpringDesignBase {
      * Installed Ring Diameter (mm) - Diameter when installed on the shaft/lip.
      */
     ringInstalledDiameter?: number;
+
+    /** Groove Width (mm) - Optional for clearance check */
+    grooveWidth?: number;
+
+    /** Groove Depth (mm) - Optional for clearance check */
+    grooveDepth?: number;
 }
 
 /**

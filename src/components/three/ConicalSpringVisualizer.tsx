@@ -362,10 +362,14 @@ function StatusDisplay() {
   );
 }
 
+export interface ConicalSpringVisualizerProps {
+  hideControls?: boolean;
+}
+
 /**
  * Main visualizer component with Canvas
  */
-export function ConicalSpringVisualizer() {
+export function ConicalSpringVisualizer(props: ConicalSpringVisualizerProps) {
   const { mode, design, maxDeflection, setDeflection } = useSpringSimulationStore();
   const controlsRef = useRef<any>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
@@ -498,28 +502,30 @@ export function ConicalSpringVisualizer() {
         <gridHelper args={[80, 16, previewTheme.grid.major, previewTheme.grid.minor]} position={[0, -2, 0]} />
       </Canvas>
       
-      {/* Animation control - top center */}
-      <div className="absolute top-2 left-1/2 -translate-x-1/2">
-        <Button
-          variant={isAnimating ? "default" : "secondary"}
-          size="sm"
-          className="h-8 px-3 text-xs gap-1"
-          onClick={toggleAnimation}
-          title={isAnimating ? "暂停动画 / Pause" : "播放动画 / Play"}
-        >
-          {isAnimating ? (
-            <>
-              <Pause className="h-3 w-3" />
-              暂停
-            </>
-          ) : (
-            <>
-              <Play className="h-3 w-3" />
-              播放
-            </>
-          )}
-        </Button>
-      </div>
+      {/* Animation control - top center (Hidden if external controls active) */}
+      {!props.hideControls && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2">
+          <Button
+            variant={isAnimating ? "default" : "secondary"}
+            size="sm"
+            className="h-8 px-3 text-xs gap-1"
+            onClick={toggleAnimation}
+            title={isAnimating ? "暂停动画 / Pause" : "播放动画 / Play"}
+          >
+            {isAnimating ? (
+              <>
+                <Pause className="h-3 w-3" />
+                暂停
+              </>
+            ) : (
+              <>
+                <Play className="h-3 w-3" />
+                播放
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* View selector - bottom left */}
       <div className="absolute bottom-2 left-2 flex gap-1">

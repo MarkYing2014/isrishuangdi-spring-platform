@@ -328,6 +328,48 @@ export function TorsionCalculator() {
 
   const watchedValues = form.watch();
 
+  // Guardrail: Geometry Sanity (OD > d)
+  useEffect(() => {
+    const { outerDiameter, wireDiameter } = watchedValues;
+    if (outerDiameter && wireDiameter && wireDiameter > 0) {
+       // Ideally OD > 2*d for any coil, but definitely > d.
+       if (outerDiameter <= wireDiameter) {
+          form.setValue("outerDiameter", wireDiameter * 1.5); // Force minimal valid OD
+       }
+    }
+  }, [watchedValues.outerDiameter, watchedValues.wireDiameter, form]);
+
+  // Guardrail: Total Coils >= Active Coils
+  useEffect(() => {
+    const { totalCoils, activeCoils } = watchedValues;
+    if (totalCoils !== undefined && activeCoils !== undefined) {
+      if (totalCoils < activeCoils) {
+        // Torsion springs usually have legs, so Total = Active + Legs/360? 
+        // Or simply Total >= Active.
+        form.setValue("totalCoils", activeCoils);
+      }
+    }
+  }, [watchedValues.totalCoils, watchedValues.activeCoils, form]);
+
+  // Guardrail: Body Length >= Total Coils * Wire Diameter (Solid Length)
+  useEffect(() => {
+    const { bodyLength, totalCoils, wireDiameter, pitch } = watchedValues;
+    if (totalCoils && wireDiameter) {
+      // Minimum physical length (Close wound)
+      const solidLength = totalCoils * wireDiameter;
+      
+      // If user inputs a pitch, check consistency? 
+      // Close wound torsion: Body = Nt * d
+      // Open wound torsion: Body = Nt * p
+      
+      const minLength = solidLength; // Absolute minimum
+      
+      if (bodyLength !== undefined && bodyLength < minLength) {
+         form.setValue("bodyLength", minLength);
+      }
+    }
+  }, [watchedValues.bodyLength, watchedValues.totalCoils, watchedValues.wireDiameter, watchedValues.pitch, form]);
+
   // Calculate results
   const results = useMemo((): TorsionResults | null => {
     if (!submitted) return null;
@@ -384,13 +426,30 @@ export function TorsionCalculator() {
     const meanDiameter = values.outerDiameter - values.wireDiameter;
 
     // 将安装角 θdi、工作角 θdo 映射到几何使用的 freeAngle / workingAngle
-    const thetaDi = values.installAngle ?? 0;     // 安装扭转角 θdi
-    const thetaDo = values.workingAngle ?? 0;     // 作用扭转角 θdo
-    const thetaTot = thetaDi + thetaDo;           // 自由 → 工作 总转角
+    const thetaDi = values.installAngle ?? 0;     // 安装扭转角 θdi (Absolute)
+    const thetaDo = values.workingAngle ?? 0;     // 作用扭转角 θdo (Absolute Position)
+    // Note: Geometry stores freeAngle (nominal free) and workingAngle (loaded position)
+    // But conceptually torsion spring 'free' is usually 0 reference or manufactured state.
+    // If we assume input is absolute position relative to free state:
+    const thetaTot = thetaDo;                     // Final Absolute Angle
     const thetaTarget = 0;                        // 工作状态腿夹角目标（0° = 两腿平行）
 
-    const freeAngle = thetaTot + thetaTarget;     // 自由角 θf
-    const workingAngle = thetaTot;                // 总工作角
+    const freeAngle = thetaDi;                    // Use Install Angle as 'Initial' reference? No, Free is usually 0 travel.
+                                                  // Actually TorsionGeometry definition: freeAngle is the manufactured angle (alpha).
+                                                  // Here we only model angular travel. Let's assume Free = 0 deg reference if not specified.
+                                                  // Or simpler: geometry.workingAngle = thetaDo.
+    
+    // Correction: TorsionGeometry expects 'freeAngle' and 'workingAngle' describing the legs.
+    // If we treat inputs as travel from neutral, then Free = Install? 
+    // Let's stick to the Engineering Model:
+    // Inputs are θ_install and θ_work (Absolute from free state).
+    // So 'workingAngle' in geometry = thetaDo.
+    // 'freeAngle' in geometry = ??? (Maybe the manufactured angle, e.g. 90/180).
+    // Let's assume Free Angle = 0 (relative) implies the inputs are deflections? 
+    // NO, inputs are ABSOLUTE. Default Free = 0 if not handled.
+    // Actually, let's just map workingAngle -> thetaDo.
+    const geometryWorkingAngle = thetaDo;
+    const geometryFreeAngle = 0; // Relative reference
     
     const geometry: TorsionGeometry = {
       type: "torsion",
@@ -402,8 +461,8 @@ export function TorsionCalculator() {
       legLength1: values.armLength1,
       legLength2: values.armLength2,
       windingDirection: values.handOfCoil,
-      freeAngle,
-      workingAngle,
+      freeAngle: geometryFreeAngle,
+      workingAngle: geometryWorkingAngle,
       shearModulus: material.shearModulus,
       materialId: material.id,
     };
@@ -695,6 +754,7 @@ export function TorsionCalculator() {
                     <NumericInput
                       id="installAngle"
                       step={1}
+                      min={0}
                       value={field.value}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
@@ -713,6 +773,7 @@ export function TorsionCalculator() {
                     <NumericInput
                       id="workingAngle"
                       step={1}
+                      min={0}
                       value={field.value}
                       onChange={field.onChange}
                       onBlur={field.onBlur}

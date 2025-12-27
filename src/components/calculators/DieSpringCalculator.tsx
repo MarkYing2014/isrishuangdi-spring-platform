@@ -144,6 +144,13 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
   const [duty, setDuty] = useState<DieSpringDuty>(defaultSample.type === "blue" ? "MD" : defaultSample.type === "red" ? "HD" : "LD");
   const [currentHeight_mm, setCurrentHeight] = useState(defaultSample.freeLength - defaultSample.deflection);
 
+  // Clamp current height if free length decreases below it
+  useEffect(() => {
+    if (currentHeight_mm > freeLength_mm) {
+      setCurrentHeight(freeLength_mm);
+    }
+  }, [freeLength_mm, currentHeight_mm]);
+
   // Operating conditions
   const [temperature_C, setTemperature] = useState<number | undefined>(undefined);
   const [holeDiameter_mm, setHoleDiameter] = useState<number | undefined>(defaultSample.holeDiameter);
@@ -487,6 +494,7 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                           endStyle="closed_ground"
                           springColor={getDieSpringColorHex(catalogSelection.spec)}
                           duty={catalogSelection.spec.duty}
+                          deflection={appliedStroke}
                         />
                       ) : (
                         <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">
@@ -683,7 +691,11 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                       <Label>{isZh ? "当前高度 H (mm)" : "Current Height H (mm)"}</Label>
                       <NumericInput
                         value={currentHeight_mm}
-                        onChange={(v) => setCurrentHeight(v ?? 0)}
+                        onChange={(v) => {
+                          const val = v ?? 0;
+                          // Strict clamp on input
+                          setCurrentHeight(Math.min(val, freeLength_mm));
+                        }}
                         step={1}
                         min={result.solidHeight_mm || 0}
                         max={freeLength_mm}

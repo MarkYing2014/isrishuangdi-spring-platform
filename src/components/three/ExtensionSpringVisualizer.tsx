@@ -42,9 +42,10 @@ const HOOK_COLOR = previewTheme.material.endCap.color; // Silver for hooks
  * - Hook geometry at both ends
  * - Dynamic extension animation
  */
-function AnimatedExtensionSpring() {
+function AnimatedExtensionSpring({ previewStrokeMm }: { previewStrokeMm?: number }) {
   const design = useSpringSimulationStore((state) => state.design);
-  const currentDeflection = useSpringSimulationStore((state) => state.currentDeflection);
+  const storeDeflection = useSpringSimulationStore((state) => state.currentDeflection);
+  const currentDeflection = previewStrokeMm ?? storeDeflection;
 
   // FEA store state for coloring
   const feaResult = useFeaStore((s) => s.feaResult);
@@ -280,7 +281,7 @@ function CameraController({
 /**
  * Complete extension spring visualizer with Canvas and controls
  */
-export function ExtensionSpringVisualizer() {
+export function ExtensionSpringVisualizer({ previewStrokeMm }: { previewStrokeMm?: number }) {
   const { design, currentDeflection, currentLoad, currentStiffness, initialTension } = useSpringSimulationStore();
   const extensionDesign = design?.type === "extension" ? design as ExtensionDesignMeta : null;
   const controlsRef = useRef<any>(null);
@@ -316,7 +317,7 @@ export function ExtensionSpringVisualizer() {
         <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
         <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
         
-        <AnimatedExtensionSpring />
+        <AnimatedExtensionSpring previewStrokeMm={previewStrokeMm} />
         
         <OrbitControls 
           ref={controlsRef}

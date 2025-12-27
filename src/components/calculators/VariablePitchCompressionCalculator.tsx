@@ -216,6 +216,13 @@ export function VariablePitchCompressionCalculator() {
 
   const deflectionUsed = mode === "load" ? computedDeflection ?? 0 : deflection;
 
+  // Auto-correct deflection if freeLength drops below it
+  useEffect(() => {
+    if (freeLength !== undefined && deflection > freeLength) {
+       setDeflection(freeLength);
+    }
+  }, [freeLength, deflection, setDeflection]);
+
   const designRuleReport = useMemo(() => {
     return buildVariablePitchCompressionDesignRuleReport({
       wireDiameter,
@@ -670,7 +677,12 @@ export function VariablePitchCompressionCalculator() {
                       step={0.1}
                       min={0}
                       value={deflection}
-                      onChange={(v) => setDeflection(v ?? 0)}
+                      onChange={(v) => {
+                         const val = v ?? 0;
+                         // Clamp deflection to freeLength (Length >= 0)
+                         const fl = freeLength ?? Number.MAX_SAFE_INTEGER;
+                         setDeflection(Math.min(val, fl));
+                      }}
                     />
                   </TabsContent>
                   <TabsContent value="load" className="mt-3 space-y-2">

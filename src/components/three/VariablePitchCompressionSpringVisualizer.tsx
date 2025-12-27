@@ -67,6 +67,8 @@ export type VariablePitchCompressionSpringVisualizerProps = {
   stressUtilization?: number;
   stressBeta?: number;
   springRate?: number; // For status overlay
+  /** Override deflection for animation */
+  previewStrokeMm?: number;
 };
 
 function lerp(a: number, b: number, t: number) {
@@ -135,6 +137,7 @@ function SpringMesh({
   freeLength,
   segments,
   deflection,
+  previewStrokeMm,
   showStressColors,
   stressUtilization,
   stressBeta,
@@ -167,6 +170,7 @@ function SpringMesh({
         tubeSegmentsPerTurn: 28,
         closingTurns: 1.5,
         contactGapRatio: 0.01,
+        smoothAnimation: !!previewStrokeMm,
       }
     );
     if (showStressColors) {
@@ -299,7 +303,8 @@ function SpringMesh({
 export function VariablePitchCompressionSpringVisualizer(
   props: VariablePitchCompressionSpringVisualizerProps
 ) {
-  const { showStressColors } = props;
+  const { showStressColors, deflection: initialDeflection, previewStrokeMm } = props;
+  const deflection = previewStrokeMm ?? initialDeflection;
   const [mounted, setMounted] = useState(false);
   const controlsRef = useRef<any>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
@@ -334,7 +339,7 @@ export function VariablePitchCompressionSpringVisualizer(
           {/* Rotate the spring to be vertical if generator uses XY plane, or stay if it uses Z up.
               Variable pitch generator usually produces Z-up geometry.
           */}
-          <SpringMesh {...props} />
+          <SpringMesh {...props} deflection={deflection} />
 
           <gridHelper 
             args={[200, 20, previewTheme.grid.major, previewTheme.grid.minor]} 
@@ -447,6 +452,24 @@ export function VariablePitchCompressionSpringVisualizer(
                 <span className="font-medium">{props.springRate.toFixed(2)} N/mm</span>
             </div>
           )}
+          <div className="border-t border-slate-200 pt-1 mt-1">
+             <div className="flex justify-between gap-4">
+               <span className="text-slate-500">Defl:</span>
+               <span className="font-medium text-blue-600">{deflection.toFixed(1)} mm</span>
+             </div>
+             {props.springRate !== undefined && (
+               <div className="flex justify-between gap-4">
+                 <span className="text-slate-500">Load:</span>
+                 <span className="font-medium text-green-600">{(deflection * props.springRate).toFixed(1)} N</span>
+               </div>
+             )}
+              {props.freeLength && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-slate-500">Len:</span>
+                  <span className="font-medium">{(props.freeLength - deflection).toFixed(1)} mm</span>
+                </div>
+              )}
+           </div>
         </div>
       </div>
     </div>

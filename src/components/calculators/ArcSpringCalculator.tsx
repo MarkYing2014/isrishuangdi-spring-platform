@@ -46,17 +46,10 @@ import {
   ReferenceLine,
 } from "recharts";
 
-const ArcSpringVisualizer = dynamic(
-  () => import("@/components/three/ArcSpringMesh").then((mod) => mod.ArcSpringVisualizer),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-full w-full flex items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-400">
-        Loading 3D...
-      </div>
-    ),
-  }
-);
+import { Calculator3DPreview } from "@/components/calculators/Calculator3DPreview";
+
+// Remove old ArcSpringVisualizer dynamic import as it's now wrapped in Calculator3DPreview
+
 
 interface NumberInputProps {
   label: string;
@@ -628,14 +621,31 @@ export function ArcSpringCalculator() {
                   ref={setFieldRef("r")}
                   className={highlightField === "r" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
                 >
-                  <SliderNumberInput
-                    label={isZh ? "工作半径 r" : "Working Radius r"}
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Label className="text-xs font-medium text-muted-foreground/80">
+                      {isZh ? "工作半径 r" : "Working Radius r"} (mm)
+                    </Label>
+                    <span title={isZh ? "用于行程映射的半径: s = r · Δα" : "Arc radius used for stroke mapping: s = r · Δα"}>
+                      <HelpCircle 
+                        className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" 
+                      />
+                    </span>
+                  </div>
+                  <NumericInput
                     value={input.r}
-                    onChange={(v) => updateInput("r", v)}
-                    unit="mm"
+                    onChange={(v) => updateInput("r", v ?? 0)}
                     min={10}
                     max={200}
                     step={0.1}
+                    className="h-9 w-full arc-no-spinner mb-2"
+                  />
+                  <Slider
+                    value={[input.r]}
+                    min={10}
+                    max={200}
+                    step={0.1}
+                    onValueChange={(v) => updateInput("r", v[0] ?? 0)}
+                    className="py-1"
                   />
                 </div>
                 <div
@@ -1045,24 +1055,12 @@ export function ArcSpringCalculator() {
                 </div>
               </div>
               <div className="h-[360px] rounded-lg overflow-hidden bg-slate-50">
-                <ArcSpringVisualizer
-                  d={input.d}
-                  D={input.D}
-                  n={input.n}
-                  r={input.r}
-                  alpha0Deg={input.alpha0}
-                  useDeadCoils={showDeadCoils}
-                  deadCoilsPerEnd={symmetricDeadCoils ? deadCoilsPerEnd : undefined}
-                  deadCoilsStart={symmetricDeadCoils ? undefined : deadCoilsLeft}
-                  deadCoilsEnd={symmetricDeadCoils ? undefined : deadCoilsRight}
-                  deadTightnessK={deadTightnessK}
-                  deadTightnessSigma={deadTightnessSigma}
-                  colorMode={showStressColors ? "approx_stress" : "solid"}
-                  approxTauMax={isFinite(result.tauMax) ? result.tauMax : undefined}
-                  approxStressBeta={stressBeta}
-                  autoRotate={false}
-                  wireframe={false}
-                  showCenterline={false}
+                <Calculator3DPreview
+                  expectedType="arc"
+                  showStressColors={showStressColors}
+                  stressUtilization={unifiedAudit?.audits.stress.stressRatio}
+                  stressBeta={stressBeta}
+                  heightClassName="h-full"
                 />
               </div>
               <div className="mt-2 text-xs text-muted-foreground">

@@ -238,8 +238,52 @@ export function ExtensionCalculator() {
     }
   };
 
-  // Watch form values for URL generation and live preview
+  // Watch form values for validation
   const watchedValues = form.watch();
+
+  // Guardrail: Geometry Sanity (OD > 2*d) - similar to Compression
+  useEffect(() => {
+    const { outerDiameter, wireDiameter } = watchedValues;
+    if (outerDiameter && wireDiameter && wireDiameter > 0) {
+       // Ideally OD > 2*d (Index > 1). If OD <= d, it's impossible.
+       if (outerDiameter <= wireDiameter) {
+          // Push OD to be at least slightly larger than d
+          form.setValue("outerDiameter", wireDiameter * 2.2); // Force Index 1.2 minimum
+       }
+    }
+  }, [watchedValues.outerDiameter, watchedValues.wireDiameter, form]);
+
+  // Guardrail: Body Length >= Active Coils * Wire Diameter
+  useEffect(() => {
+    const { bodyLength, activeCoils, wireDiameter } = watchedValues;
+    if (activeCoils && wireDiameter) {
+      const minBodyLength = activeCoils * wireDiameter;
+      // If user sets explicit body length, ensure it's not physically compressed beyond solid
+      // Extension springs are usually close wound (Body = Na * d) or loose wound (Body > Na * d)
+      // They cannot be SHORTER than solid height.
+      if (bodyLength !== undefined && bodyLength < minBodyLength) {
+        // Clamp to solid body length
+        form.setValue("bodyLength", minBodyLength);
+      }
+    }
+  }, [watchedValues.bodyLength, watchedValues.activeCoils, watchedValues.wireDiameter, form]);
+
+  // Guardrail: Free Length Inside Hooks >= Body Length
+  useEffect(() => {
+    const { freeLengthInsideHooks, bodyLength, activeCoils, wireDiameter } = watchedValues;
+    
+    // Determine effective body length to check against
+    const effectiveBodyLength = bodyLength || (activeCoils && wireDiameter ? activeCoils * wireDiameter : 0);
+
+    if (freeLengthInsideHooks !== undefined && effectiveBodyLength > 0) {
+       // Hooks must add SOME length, or at least L_free >= L_body
+       // Actually, typically L_free = L_body + 2 * (ID_hook or similar).
+       // Strict physical limit: L_free cannot be less than L_body.
+       if (freeLengthInsideHooks < effectiveBodyLength) {
+         form.setValue("freeLengthInsideHooks", effectiveBodyLength);
+       }
+    }
+  }, [watchedValues.freeLengthInsideHooks, watchedValues.bodyLength, watchedValues.activeCoils, watchedValues.wireDiameter, form]);
 
   // Live preview: auto-update store when form values change (debounced)
   useEffect(() => {
@@ -580,6 +624,7 @@ export function ExtensionCalculator() {
                   <NumericInput
                     id="workingDeflection"
                     step={0.1}
+                    min={0}
                     value={field.value}
                     onChange={field.onChange}
                     onBlur={field.onBlur}

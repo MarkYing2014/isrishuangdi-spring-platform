@@ -36,9 +36,11 @@ export interface DieSpringMeshProps {
   color?: string;
   /** Duty rating for color (LD/MD/HD/XHD) or string for new classes */
   duty?: DieSpringDuty | string;
-  /** Risk value 0~1+ for emissive glow */
+  /** Deflection (mm) - compression amount */
+  deflection?: number;
+  /** Risk factor (0-1+) for emissive glow */
   risk?: number;
-  /** Show wireframe */
+  /** Show wireframe (default: false) */
   wireframe?: boolean;
 }
 
@@ -48,6 +50,7 @@ export function DieSpringMesh({
   wireWidth,
   coils,
   freeLength,
+  deflection = 0,
   endStyle = "closed_ground",
   endGrindTurns = 0.25,
   scale = 0.05,
@@ -68,23 +71,27 @@ export function DieSpringMesh({
   // Calculate mean diameter: Dm = OD - t
   const meanDiameter = outerDiameter - wireThickness;
 
+  // Calculate current length based on deflection
+  const currentLength = Math.max(wireThickness * coils, freeLength - deflection);
+
   // Build geometry
   const geometry = useMemo(() => {
-    if (meanDiameter <= 0 || coils <= 0 || freeLength <= 0) {
+    if (meanDiameter <= 0 || coils <= 0 || currentLength <= 0) {
       return new THREE.BufferGeometry();
     }
 
     return buildDieSpringGeometry({
       meanDiameter,
       coils,
-      freeLength,
+      // Use current compressed length
+      freeLength: currentLength,
       wire_b: wireWidth,
       wire_t: wireThickness,
       scale,
       endStyle,
       endGrindTurns,
     });
-  }, [meanDiameter, coils, freeLength, wireWidth, wireThickness, scale, endStyle, endGrindTurns]);
+  }, [meanDiameter, coils, currentLength, wireWidth, wireThickness, scale, endStyle, endGrindTurns]);
 
   // Center the geometry
   const centeredGeometry = useMemo(() => {
@@ -93,6 +100,14 @@ export function DieSpringMesh({
     if (geom.boundingBox) {
       const center = new THREE.Vector3();
       geom.boundingBox.getCenter(center);
+      // We want to keep the bottom at Z=0 (or whatever the builder does)
+      // Usually builder starts at 0.
+      // If we center Y (height), the spring moves up/down as it compresses.
+      // Better to align bottom to 0? 
+      // The original code centered EVERYTHING.
+      // geom.translate(-center.x, -center.y, -center.z);
+      
+      // If we keep original centering, it shrinks towards center.
       geom.translate(-center.x, -center.y, -center.z);
     }
     return geom;

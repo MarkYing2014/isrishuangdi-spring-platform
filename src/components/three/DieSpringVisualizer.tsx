@@ -89,6 +89,8 @@ export interface DieSpringVisualizerProps {
   // New props for status overlay
   springRate?: number;
   solidHeight?: number;
+  /** Current deflection (mm) */
+  deflection?: number;
 }
 
 export function DieSpringVisualizer({
@@ -106,6 +108,7 @@ export function DieSpringVisualizer({
   springColor,
   springRate,
   solidHeight,
+  deflection = 0,
 }: DieSpringVisualizerProps) {
   // Calculate scale based on geometry size
   const maxDim = Math.max(outerDiameter, freeLength);
@@ -145,6 +148,7 @@ export function DieSpringVisualizer({
             wireWidth={wireWidth}
             coils={coils}
             freeLength={freeLength}
+            deflection={deflection}
             endStyle={endStyle}
             endGrindTurns={endGrindTurns}
             scale={scale}
@@ -250,12 +254,28 @@ export function DieSpringVisualizer({
                 <span className="font-medium">{solidHeight.toFixed(1)} mm</span>
             </div>
           )}
-          {springRate !== undefined && (
+           {springRate !== undefined && (
              <div className="flex justify-between gap-4">
                 <span className="text-slate-500">R:</span>
                 <span className="font-medium">{springRate.toFixed(1)} N/mm</span>
             </div>
-          )}
+           )}
+           <div className="border-t border-slate-200 pt-1 mt-1">
+             <div className="flex justify-between gap-4">
+               <span className="text-slate-500">Defl:</span>
+               <span className="font-medium text-blue-600">{deflection.toFixed(1)} mm</span>
+             </div>
+             {springRate !== undefined && (
+               <div className="flex justify-between gap-4">
+                 <span className="text-slate-500">Load:</span>
+                 <span className="font-medium text-green-600">{(deflection * springRate).toFixed(1)} N</span>
+               </div>
+             )}
+              <div className="flex justify-between gap-4">
+                 <span className="text-slate-500">Len:</span>
+                 <span className="font-medium">{(freeLength - deflection).toFixed(1)} mm</span>
+               </div>
+           </div>
         </div>
       </div>
     </div>

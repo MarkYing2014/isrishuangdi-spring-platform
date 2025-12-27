@@ -52,6 +52,9 @@ const formSchema = z.object({
   ringFreeDiameter: z.coerce.number().positive(),
   ringInstalledDiameter: z.coerce.number().positive(),
   
+  grooveWidth: z.coerce.number().optional(),
+  grooveDepth: z.coerce.number().optional(),
+  
   jointType: z.enum(["hook", "screw", "loop"]),
   // jointFactor locked by policy
   
@@ -96,6 +99,16 @@ export function GarterSpringCalculator() {
       shearModulus: lastGeometry?.shearModulus ?? initialMaterial.shearModulus,
     },
   });
+
+  const watchValues = form.watch(); // Moved up for useEffect access
+
+  // Guardrail: Extension garter must be in tension (D_inst >= D_free)
+  useEffect(() => {
+    // If D_inst < D_free, clamp D_inst to D_free (zero tension)
+    if (watchValues.ringInstalledDiameter < watchValues.ringFreeDiameter) {
+      form.setValue("ringInstalledDiameter", watchValues.ringFreeDiameter);
+    }
+  }, [watchValues.ringFreeDiameter, watchValues.ringInstalledDiameter, form]);
 
   // Material Change
   const handleMaterialChange = (material: SpringMaterial) => {
@@ -251,7 +264,7 @@ export function GarterSpringCalculator() {
     }
   };
 
-  const watchValues = form.watch();
+  // const watchValues = form.watch(); // Moved up
 
   const designRuleReport = useMemo(() => {
     const geo: GarterSpringDesign = {
@@ -266,6 +279,8 @@ export function GarterSpringCalculator() {
         jointType: watchValues.jointType as GarterJointType,
         jointFactor: getDefaultJointFactor(watchValues.jointType as GarterJointType),
         shearModulus: watchValues.shearModulus,
+        grooveWidth: watchValues.grooveWidth,
+        grooveDepth: watchValues.grooveDepth,
     };
     return buildGarterSpringDesignRuleReport(geo, result);
   }, [watchValues, result]);
@@ -349,6 +364,28 @@ export function GarterSpringCalculator() {
                         render={({ field }) => <NumericInput {...field} step={1} />}
                     />
                     <p className="text-xs text-muted-foreground">Length of spring body before joining / 连接前的本体长度</p>
+                </div>
+            </div>
+
+            <div className="border-t pt-4 mt-4">
+                <Label className="text-base font-semibold">Groove Dimensions (Optional) / 沟槽尺寸</Label>
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                    <div className="space-y-2">
+                         <Label>Groove Width (mm)</Label>
+                         <Controller
+                            control={form.control}
+                            name="grooveWidth"
+                            render={({ field }) => <NumericInput {...field} step={0.1} min={0} placeholder="Optional" />}
+                         />
+                    </div>
+                    <div className="space-y-2">
+                         <Label>Groove Depth (mm)</Label>
+                         <Controller
+                            control={form.control}
+                            name="grooveDepth"
+                            render={({ field }) => <NumericInput {...field} step={0.1} min={0} placeholder="Optional" />}
+                         />
+                    </div>
                 </div>
             </div>
 

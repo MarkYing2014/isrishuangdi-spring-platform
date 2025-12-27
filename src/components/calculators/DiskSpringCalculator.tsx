@@ -58,6 +58,27 @@ export function DiskSpringCalculator() {
 
   const [showStressColors, setShowStressColors] = useState(true);
 
+  // Guardrail: Clamp deflections to max possible (h0 * nS)
+  useEffect(() => {
+    const maxSolid = Math.max(0, freeConeHeight * seriesCount);
+    // Auto-correct if inputs exceed physical limit
+    if (sPreload > maxSolid) setSPreload(maxSolid);
+    if (sOperating > maxSolid) setSOperating(maxSolid);
+    if (sMax > maxSolid) setSMax(maxSolid);
+  }, [freeConeHeight, seriesCount, sPreload, sOperating, sMax]);
+
+  // Guardrail: Geometry Sanity (De > Di) and Integer Stacks
+  useEffect(() => {
+    // 1. OD/ID
+    if (outerDiameter <= innerDiameter && innerDiameter > 0) {
+      setOuterDiameter(innerDiameter * 2); // Default to D/d = 2
+    }
+
+    // 2. Integer Stacks
+    if (!Number.isInteger(parallelCount)) setParallelCount(Math.round(parallelCount) || 1);
+    if (!Number.isInteger(seriesCount)) setSeriesCount(Math.round(seriesCount) || 1);
+  }, [outerDiameter, innerDiameter, parallelCount, seriesCount]);
+
   // --- Calculation ---
   const input = useMemo(() => ({
     type: "disk" as const,
@@ -257,17 +278,38 @@ export function DiskSpringCalculator() {
              <div className="space-y-3">
                 <div className="flex items-center gap-4">
                   <div className="w-1/3 text-sm text-muted-foreground font-mono">Preload s1</div>
-                  <NumericInput value={sPreload} onChange={(v) => setSPreload(v ?? 0)} className="flex-1" />
+                  <NumericInput 
+                    value={sPreload} 
+                    onChange={(v) => {
+                       const max = freeConeHeight * seriesCount;
+                       setSPreload(Math.min(v ?? 0, max));
+                    }} 
+                    className="flex-1" 
+                  />
                   <span className="text-xs">mm</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="w-1/3 text-sm text-muted-foreground font-mono font-medium">Work s2</div>
-                  <NumericInput value={sOperating} onChange={(v) => setSOperating(v ?? 0)} className="flex-1" />
+                  <NumericInput 
+                    value={sOperating} 
+                    onChange={(v) => {
+                       const max = freeConeHeight * seriesCount;
+                       setSOperating(Math.min(v ?? 0, max));
+                    }} 
+                    className="flex-1" 
+                  />
                   <span className="text-xs font-semibold">mm</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="w-1/3 text-sm text-muted-foreground font-mono">Max s3</div>
-                  <NumericInput value={sMax} onChange={(v) => setSMax(v ?? 0)} className="flex-1" />
+                  <NumericInput 
+                     value={sMax} 
+                     onChange={(v) => {
+                        const max = freeConeHeight * seriesCount;
+                        setSMax(Math.min(v ?? 0, max));
+                     }} 
+                     className="flex-1" 
+                  />
                   <span className="text-xs">mm</span>
                 </div>
              </div>

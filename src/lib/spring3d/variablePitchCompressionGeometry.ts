@@ -22,6 +22,7 @@ export type VariablePitchCompressionGeometryOptions = {
   tubeSegmentsPerTurn?: number;
   closingTurns?: number;
   contactGapRatio?: number;
+  smoothAnimation?: boolean;
 };
 
 export type VariablePitchCompressionCenterline = {
@@ -89,56 +90,84 @@ export function buildVariablePitchCompressionCenterline(
 
   type TurnBlock =
     | {
-        kind: "active";
-        turns: number;
-        pitch: number;
-      }
+      kind: "active";
+      turns: number;
+      pitch: number;
+    }
     | {
-        kind: "solid";
-        turns: number;
-        pitch: number;
-      }
+      kind: "solid";
+      turns: number;
+      pitch: number;
+    }
     | {
-        kind: "partial";
-        turns: number;
-        pitch: number;
-        // 0..1, how much of this partial turn is solid at the end
-        solidFraction: number;
-      };
+      kind: "partial";
+      turns: number;
+      pitch: number;
+      // 0..1, how much of this partial turn is solid at the end
+      solidFraction: number;
+    };
 
   const blocks: TurnBlock[] = [];
 
-  for (let i = 0; i < bottomDead; i++) {
-    const t = closingTurns > 0 ? Math.min(1, (bottomDead - i) / closingTurns) : 1;
-    const pitch = lerp(firstActivePitch, d, t);
-    // End turns are typically squared/closed; treat as solid for geometry.
-    blocks.push({ kind: "solid", turns: 1, pitch });
-  }
+  if (opts.smoothAnimation) {
+    // --- Smooth Animation Mode: Linear interpolation of pitch across all coils ---
+    const totalMaxGap = params.segments.reduce((acc, s) => acc + Math.max(0, s.pitch - d) * s.coils, 0);
+    const ratio = totalMaxGap > 0 ? Math.min(1, params.deflection / totalMaxGap) : 0;
+    const scale = 1 - ratio;
 
-  for (const st of segmentStates) {
-    const turns = Math.max(0, st.coils);
-    const pitch = clampFinite(st.pitch, d);
-    const solidCoils = Math.max(0, Math.min(turns, st.solidCoils));
-    const solidTurns = Math.floor(solidCoils + 1e-9);
-    const partial = solidCoils - solidTurns;
-    const activeTurns = Math.max(0, turns - solidTurns - partial);
+    for (let i = 0; i < bottomDead; i++) {
+      const t = closingTurns > 0 ? Math.min(1, (bottomDead - i) / closingTurns) : 1;
+      const basePitch = lerp(firstActivePitch, d, t);
+      // Even end turns compress slightly in smooth mode if they have pitch > d
+      const pitch = d + (basePitch - d) * scale;
+      blocks.push({ kind: "solid", turns: 1, pitch });
+    }
 
-    if (solidTurns > 0) {
-      blocks.push({ kind: "solid", turns: solidTurns, pitch });
+    for (const s of params.segments) {
+      const pitch = d + (s.pitch - d) * scale;
+      blocks.push({ kind: "active", turns: s.coils, pitch });
     }
-    if (partial > 1e-9) {
-      // A fractional solid coil: transition within this portion from active spacing to solid.
-      blocks.push({ kind: "partial", turns: partial, pitch, solidFraction: partial });
-    }
-    if (activeTurns > 1e-9) {
-      blocks.push({ kind: "active", turns: activeTurns, pitch });
-    }
-  }
 
-  for (let i = 0; i < topDead; i++) {
-    const t = closingTurns > 0 ? Math.min(1, (i + 1) / closingTurns) : 1;
-    const pitch = lerp(lastActivePitch, d, t);
-    blocks.push({ kind: "solid", turns: 1, pitch });
+    for (let i = 0; i < topDead; i++) {
+      const t = closingTurns > 0 ? Math.min(1, (i + 1) / closingTurns) : 1;
+      const basePitch = lerp(lastActivePitch, d, t);
+      const pitch = d + (basePitch - d) * scale;
+      blocks.push({ kind: "solid", turns: 1, pitch });
+    }
+  } else {
+    // --- Standard Mode: Physical segment closure (coil-by-coil) ---
+    for (let i = 0; i < bottomDead; i++) {
+      const t = closingTurns > 0 ? Math.min(1, (bottomDead - i) / closingTurns) : 1;
+      const pitch = lerp(firstActivePitch, d, t);
+      // End turns are typically squared/closed; treat as solid for geometry.
+      blocks.push({ kind: "solid", turns: 1, pitch });
+    }
+
+    for (const st of segmentStates) {
+      const turns = Math.max(0, st.coils);
+      const pitch = clampFinite(st.pitch, d);
+      const solidCoils = Math.max(0, Math.min(turns, st.solidCoils));
+      const solidTurns = Math.floor(solidCoils + 1e-9);
+      const partial = solidCoils - solidTurns;
+      const activeTurns = Math.max(0, turns - solidTurns - partial);
+
+      if (solidTurns > 0) {
+        blocks.push({ kind: "solid", turns: solidTurns, pitch });
+      }
+      if (partial > 1e-9) {
+        // A fractional solid coil: transition within this portion from active spacing to solid.
+        blocks.push({ kind: "partial", turns: partial, pitch, solidFraction: partial });
+      }
+      if (activeTurns > 1e-9) {
+        blocks.push({ kind: "active", turns: activeTurns, pitch });
+      }
+    }
+
+    for (let i = 0; i < topDead; i++) {
+      const t = closingTurns > 0 ? Math.min(1, (i + 1) / closingTurns) : 1;
+      const pitch = lerp(lastActivePitch, d, t);
+      blocks.push({ kind: "solid", turns: 1, pitch });
+    }
   }
 
   let globalTurn = 0;

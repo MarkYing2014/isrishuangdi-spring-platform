@@ -72,9 +72,10 @@ function CameraController({
  * - Straight or bent legs
  * - Dynamic angle animation
  */
-function AnimatedTorsionSpring() {
+function AnimatedTorsionSpring({ previewStrokeMm }: { previewStrokeMm?: number }) {
   const design = useSpringSimulationStore((state) => state.design);
-  const currentDeflection = useSpringSimulationStore((state) => state.currentDeflection);
+  const storeDeflection = useSpringSimulationStore((state) => state.currentDeflection);
+  const currentDeflection = previewStrokeMm ?? storeDeflection;
   
   // FEA store state for coloring
   const feaResult = useFeaStore((s) => s.feaResult);
@@ -180,16 +181,16 @@ function AnimatedTorsionSpring() {
   return (
     <group rotation={[Math.PI / 2, 0, 0]}>
       {/* Main spring body - key forces re-render when FEA mode changes */}
-      <mesh key={`spring-${isFeaMode}-${colorMode}`} geometry={bodyGeometry} material={bodyMaterial} rotation={[0, 0, THREE.MathUtils.degToRad(-currentDeflection / 2)]} />
+      <mesh key={`spring-${isFeaMode}-${colorMode}`} geometry={bodyGeometry} material={bodyMaterial} />
       
       {/* Leg 1 */}
       {leg1Geometry && (
-        <mesh geometry={leg1Geometry} material={legMaterial} rotation={[0, 0, THREE.MathUtils.degToRad(-currentDeflection / 2)]} />
+        <mesh geometry={leg1Geometry} material={legMaterial} />
       )}
       
       {/* Leg 2 */}
       {leg2Geometry && (
-        <mesh geometry={leg2Geometry} material={legMaterial} rotation={[0, 0, THREE.MathUtils.degToRad(-currentDeflection / 2)]} />
+        <mesh geometry={leg2Geometry} material={legMaterial} />
       )}
       
       {/* Center axis indicator */}
@@ -298,7 +299,7 @@ function TorsionMaxStressMarker({
 /**
  * Complete torsion spring visualizer with Canvas and controls
  */
-export function TorsionSpringVisualizer() {
+export function TorsionSpringVisualizer({ previewStrokeMm }: { previewStrokeMm?: number }) {
   const { design, currentDeflection, currentLoad, currentStiffness } = useSpringSimulationStore();
   const torsionDesign = design?.type === "torsion" ? design as TorsionDesignMeta : null;
   const controlsRef = useRef<any>(null);
@@ -333,7 +334,7 @@ export function TorsionSpringVisualizer() {
         <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
         <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
         
-        <AnimatedTorsionSpring />
+        <AnimatedTorsionSpring previewStrokeMm={previewStrokeMm} />
         
         <OrbitControls 
           ref={controlsRef}

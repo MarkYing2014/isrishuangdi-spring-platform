@@ -31,37 +31,64 @@ function auditStrokeVsLifeLimit(
     installation: DieSpringInstallation
 ): DieSpringAuditFinding | null {
     const limit = getStrokeLimitForLifeClass(spec.strokeLimits, installation.lifeClass);
-    const { appliedStroke, lifeClass } = installation;
+    const { appliedStroke, preloadStroke = 0, lifeClass } = installation;
+    const totalStroke = appliedStroke + preloadStroke;
 
-    if (appliedStroke > limit) {
+    if (totalStroke > limit) {
         return {
             ruleId: "STROKE_LIFE_EXCEEDED",
             rule: "Stroke vs Life Limit",
             status: "FAIL",
             message: {
-                en: `Applied stroke (${appliedStroke.toFixed(1)} mm) exceeds ${lifeClass} life limit (${limit.toFixed(1)} mm)`,
-                zh: `实际行程 (${appliedStroke.toFixed(1)} mm) 超过 ${LIFE_CLASS_INFO[lifeClass].name.zh} 寿命限制 (${limit.toFixed(1)} mm)`,
+                en: `Total stroke (Applied ${appliedStroke.toFixed(1)} + Preload ${preloadStroke.toFixed(1)}) exceeds ${lifeClass} life limit (${limit.toFixed(1)} mm)`,
+                zh: `总行程 (应用 ${appliedStroke.toFixed(1)} + 预压 ${preloadStroke.toFixed(1)}) 超过 ${LIFE_CLASS_INFO[lifeClass].name.zh} 寿命限制 (${limit.toFixed(1)} mm)`,
             },
-            value: appliedStroke,
+            value: totalStroke,
             limit,
         };
     }
 
     // Warning at 80% of limit
-    if (appliedStroke > limit * 0.8) {
+    if (totalStroke > limit * 0.8) {
         return {
             ruleId: "STROKE_LIFE_WARNING",
             rule: "Stroke vs Life Limit",
             status: "WARN",
             message: {
-                en: `Applied stroke at ${((appliedStroke / limit) * 100).toFixed(0)}% of ${lifeClass} life limit`,
-                zh: `实际行程达到 ${LIFE_CLASS_INFO[lifeClass].name.zh} 寿命限制的 ${((appliedStroke / limit) * 100).toFixed(0)}%`,
+                en: `Total stroke at ${((totalStroke / limit) * 100).toFixed(0)}% of ${lifeClass} life limit`,
+                zh: `总行程达到 ${LIFE_CLASS_INFO[lifeClass].name.zh} 寿命限制的 ${((totalStroke / limit) * 100).toFixed(0)}%`,
             },
-            value: appliedStroke,
+            value: totalStroke,
             limit,
         };
     }
 
+    return null;
+}
+
+/**
+ * Rule: Catalog Data Integrity
+ * FAIL - if the catalog specified max stroke is physically impossible
+ */
+function auditCatalogIntegrity(
+    spec: DieSpringSpec,
+    _installation: DieSpringInstallation
+): DieSpringAuditFinding | null {
+    const maxPhysical = getMaxPhysicalStroke(spec);
+    // Tolerance: 0.1mm for rounding errors
+    if (spec.strokeLimits.max > maxPhysical + 0.1) {
+        return {
+            ruleId: "CATALOG_INTEGRITY_FAIL",
+            rule: "Catalog Data Integrity",
+            status: "FAIL",
+            message: {
+                en: `Catalog Data Error: Max stroke (${spec.strokeLimits.max}mm) > Physical limit (${maxPhysical.toFixed(1)}mm)`,
+                zh: `目录数据错误：最大行程 (${spec.strokeLimits.max}mm) > 物理极限 (${maxPhysical.toFixed(1)}mm)`,
+            },
+            value: spec.strokeLimits.max,
+            limit: maxPhysical,
+        };
+    }
     return null;
 }
 
@@ -325,6 +352,7 @@ export function auditDieSpring(
         auditRodClearance,
         auditBucklingRisk,
         auditPreload,
+        auditCatalogIntegrity,
     ];
 
     for (const rule of rules) {

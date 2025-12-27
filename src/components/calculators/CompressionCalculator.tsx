@@ -210,6 +210,45 @@ export function CompressionCalculator() {
     }
   }, [lastCompressionGeometry, lastCompressionAnalysis, form, initialMaterial]);
 
+  // Guardrail: Ensure deflection <= freeLength if freeLength changes, AND check solid height
+  const freeLength = form.watch("freeLength");
+  const deflection = form.watch("deflection");
+  const totalCoils = form.watch("totalCoils");
+  const wireDiameter = form.watch("wireDiameter");
+  const meanDiameter = form.watch("meanDiameter");
+
+  // solid height calculation (Nt * d) - simplified
+  const solidHeight = (totalCoils || 0) * (wireDiameter || 0);
+
+  useEffect(() => {
+    if (freeLength !== undefined) {
+      // 1. Basic length check: Deflection <= Free Length
+      if (deflection > freeLength) {
+         form.setValue("deflection", freeLength);
+         return;
+      }
+      
+      // 2. Solid Height Check: Deflection <= Free Length - Solid Height
+      // We reserve a tiny margin (e.g. 0.1mm) to prevent perfect coil bind if possible, 
+      // but strictly speaking, it just can't exceed L0 - Hs.
+      const maxDeflection = Math.max(0, freeLength - solidHeight);
+      
+      // Only clamp if we have valid non-zero inputs to avoid seizing up while typing
+      if (solidHeight > 0 && freeLength > solidHeight && deflection > maxDeflection) {
+         form.setValue("deflection", maxDeflection);
+      }
+    }
+  }, [freeLength, deflection, solidHeight, form]);
+
+  // Guardrail: Geometry Sanity (Dm > d)
+  useEffect(() => {
+    if (wireDiameter > 0 && meanDiameter <= wireDiameter) {
+       // Auto-push Dm to be valid (e.g. index 3 minimum ideally, but at least > d)
+       // Let's just enforce Dm > d for physics, index violation warn separately.
+       form.setValue("meanDiameter", wireDiameter * 1.1);
+    }
+  }, [wireDiameter, meanDiameter, form]);
+
   // Initialize router
   const router = useRouter();
 
@@ -248,7 +287,10 @@ export function CompressionCalculator() {
   }, [result, form]);
 
   // Watch form values for URL generation
-  const watchedValues = form.watch();
+  // Watch form values for URL generation
+  const watchedValues = {
+      wireDiameter, meanDiameter, activeCoils: form.watch("activeCoils"), freeLength, deflection, totalCoils
+  };
 
   const analysisUrl = useMemo(() => {
     const params = new URLSearchParams({
@@ -616,15 +658,22 @@ export function CompressionCalculator() {
               <Controller
                 control={form.control}
                 name="deflection"
-                render={({ field }) => (
-                  <NumericInput
-                    id="deflection"
-                    step={0.1}
-                    value={field.value}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                  />
-                )}
+                render={({ field }) => {
+                  const freeLength = form.getValues("freeLength") ?? Number.MAX_SAFE_INTEGER;
+                  return (
+                    <NumericInput
+                      id="deflection"
+                      step={0.1}
+                      value={field.value}
+                      onChange={(v) => {
+                         // Clamp deflection to freeLength (Length >= 0)
+                         const val = v ?? 0;
+                         field.onChange(Math.min(val, freeLength));
+                      }}
+                      onBlur={field.onBlur}
+                    />
+                  );
+                }}
               />
               {form.formState.errors.deflection && (
                 <p className="text-sm text-red-500">{form.formState.errors.deflection.message}</p>
@@ -1137,7 +1186,7 @@ export function CompressionCalculator() {
                   activeCoils: watchedValues.activeCoils ?? 8,
                   totalCoils: watchedValues.totalCoils ?? 10,
                   freeLength: watchedValues.freeLength ?? 50,
-                  shearModulus: watchedValues.shearModulus ?? 79300,
+                  shearModulus: 79300, // Default to steel if not watched
                 }}
               />
             </div>

@@ -75,9 +75,10 @@ function CameraController({
  * - Clipping planes for ground ends
  * - Dynamic compression animation
  */
-function AnimatedCompressionSpring() {
+function AnimatedCompressionSpring({ previewStrokeMm }: { previewStrokeMm?: number }) {
   const design = useSpringSimulationStore((state) => state.design);
-  const currentDeflection = useSpringSimulationStore((state) => state.currentDeflection);
+  const storeDeflection = useSpringSimulationStore((state) => state.currentDeflection);
+  const currentDeflection = previewStrokeMm ?? storeDeflection;
   const currentStiffness = useSpringSimulationStore((state) => state.currentStiffness);
 
   // FEA store state for coloring
@@ -301,7 +302,7 @@ function MaxStressMarker({
  * Complete compression spring visualizer with Canvas and controls
  * Matches ConicalSpringVisualizer styling for consistency
  */
-export function CompressionSpringVisualizer() {
+export function CompressionSpringVisualizer({ previewStrokeMm }: { previewStrokeMm?: number }) {
   const { design, currentDeflection, currentLoad, currentStiffness } = useSpringSimulationStore();
   const compressionDesign = design?.type === "compression" ? design as CompressionDesignMeta : null;
 
@@ -344,7 +345,7 @@ export function CompressionSpringVisualizer() {
         <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
         <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
         
-        <AnimatedCompressionSpring />
+        <AnimatedCompressionSpring previewStrokeMm={previewStrokeMm} />
         
         <OrbitControls 
           ref={controlsRef}

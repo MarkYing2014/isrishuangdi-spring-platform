@@ -151,6 +151,36 @@ export function buildGarterSpringDesignRuleReport(
         });
     }
 
+    // 5. Groove Fit (if inputs provided)
+    // extend geometry type in local scope or assume it comes through via casting/extension
+    const g = geometry as any;
+    if (g.grooveWidth && g.grooveWidth > 0 && wireDiameter > 0) {
+        if (g.grooveWidth < wireDiameter + 0.1) {
+            findings.push({
+                id: "garter.rules.groove_width_tight",
+                level: "error",
+                titleEn: "Groove width interference",
+                titleZh: "沟槽宽度干涉",
+                detailEn: `Groove width (${g.grooveWidth}mm) is too tight for wire (${wireDiameter}mm). Recommend > ${wireDiameter + 0.2}mm.`,
+                detailZh: `沟槽宽度 (${g.grooveWidth}mm) 小于线径 (${wireDiameter}mm)。建议 > ${wireDiameter + 0.2}mm。`,
+            });
+        }
+    }
+    if (g.grooveDepth && g.grooveDepth > 0 && wireDiameter > 0) {
+        // Depth usually needs to accommodate the spring fully or partially depending on design.
+        // Assuming depth >= wireDia (fully seated) is a safe simple check.
+        if (g.grooveDepth < wireDiameter) {
+            findings.push({
+                id: "garter.rules.groove_depth_shallow",
+                level: "warning",
+                titleEn: "Shallow groove",
+                titleZh: "沟槽过浅",
+                detailEn: `Groove depth (${g.grooveDepth}mm) < Wire Dia (${wireDiameter}mm). Spring may sit proud of surface.`,
+                detailZh: `沟槽深度 (${g.grooveDepth}mm) < 线径 (${wireDiameter}mm)。弹簧可能会突出表面。`,
+            });
+        }
+    }
+
     // 5. Stress Ratio (if result is available)
     if (result) {
         const stressRatio = result.stressRatio;

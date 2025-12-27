@@ -111,7 +111,7 @@ export function EngineeringAuditCard({ audit, governingVariable }: EngineeringAu
             <div className="mt-6 h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
                 <div 
                     className={`h-full rounded-full transition-all duration-1000 ${getProgressColor(audit.status)}`} 
-                    style={{ width: `${Math.min(audit.summary.criticalRatio, 100)}%` }} 
+                    style={{ width: `${Math.min(audit.summary.criticalRatio, 100).toFixed(4)}%` }} 
                 />
             </div>
         </div>
@@ -168,7 +168,7 @@ export function EngineeringAuditCard({ audit, governingVariable }: EngineeringAu
                     <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
                         <div 
                             className={`h-full ${getProgressColor(audit.audits.stress.status)}`}
-                            style={{ width: `${Math.min(audit.audits.stress.stressRatio, 100)}%` }}
+                            style={{ width: `${Math.min(audit.audits.stress.stressRatio, 100).toFixed(4)}%` }}
                         />
                     </div>
                     <span className="text-[10px] font-black font-mono w-10 text-right">{audit.audits.stress.stressRatio.toFixed(1)}%</span>

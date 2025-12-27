@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronDown, AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ChevronDown, AlertCircle, AlertTriangle, CheckCircle2, Play, Pause } from "lucide-react";
 import { SuspensionSpringVisualizer } from "@/components/three/SuspensionSpringVisualizer";
 import { buildPipelineUrl } from "@/lib/pipeline/springPipelines";
 import {
@@ -106,6 +106,53 @@ export function SuspensionSpringCalculator() {
 
   const [currentDeflection, setCurrentDeflection] = useState(0);
   const [loadcaseMode, setLoadcaseMode] = useState<LoadcaseMode>("ride");
+
+  // Animation State
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [previewStrokeMm, setPreviewStrokeMm] = useState(0);
+  const animationRef = React.useRef<number | null>(null);
+  const lastTimeRef = React.useRef<number>(0);
+
+  const toggleAnimation = () => {
+    if (isAnimating) {
+      setIsAnimating(false);
+      setPreviewStrokeMm(0);
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    } else {
+      setIsAnimating(true);
+      setPreviewStrokeMm(0); // Start from 0
+      lastTimeRef.current = performance.now();
+    }
+  };
+
+  React.useEffect(() => {
+    if (!isAnimating) {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      return;
+    }
+
+    const animate = (currentTime: number) => {
+      const dt = currentTime - lastTimeRef.current;
+      lastTimeRef.current = currentTime;
+
+      const duration = 2000; // 2s full compression
+      const speed = bumpTravel / duration; // mm/ms
+      
+      setPreviewStrokeMm((prev) => {
+          const next = prev + speed * dt;
+          if (next >= bumpTravel) {
+              return 0; // Loop
+          }
+          return next;
+      });
+      animationRef.current = requestAnimationFrame(animate);
+    };
+    
+    animationRef.current = requestAnimationFrame(animate);
+    return () => {
+       if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, [isAnimating, bumpTravel]);
 
   const meanDiameter = od - wireDiameter;
   const totalCoils = activeCoils + 2;
@@ -703,7 +750,18 @@ export function SuspensionSpringCalculator() {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center justify-between">
               3D 预览
-              {getStatusBadge()}
+              <div className="flex items-center gap-2">
+                 <Button
+                    variant={isAnimating ? "destructive" : "default"}
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={toggleAnimation}
+                  >
+                    {isAnimating ? <Pause className="h-3 w-3 mr-1" /> : <Play className="h-3 w-3 mr-1" />}
+                    {isAnimating ? "Stop" : "Play"}
+                  </Button>
+                  {getStatusBadge()}
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -715,7 +773,7 @@ export function SuspensionSpringCalculator() {
                   activeCoils={activeCoils}
                   totalCoils={totalCoils}
                   freeLength={freeLength}
-                  currentDeflection={currentDeflection}
+                  currentDeflection={isAnimating ? previewStrokeMm : currentDeflection}
                   stressRatio={currentStressRatio}
                   solidHeight={result.derived.solidHeight_Hs_mm}
                   currentLoad={currentLoad}
