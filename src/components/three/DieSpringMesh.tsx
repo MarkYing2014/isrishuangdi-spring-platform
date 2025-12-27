@@ -34,8 +34,8 @@ export interface DieSpringMeshProps {
   scale?: number;
   /** Mesh color (overrides duty color if provided) */
   color?: string;
-  /** Duty rating for color (LD/MD/HD/XHD) */
-  duty?: DieSpringDuty;
+  /** Duty rating for color (LD/MD/HD/XHD) or string for new classes */
+  duty?: DieSpringDuty | string;
   /** Risk value 0~1+ for emissive glow */
   risk?: number;
   /** Show wireframe */
@@ -56,8 +56,9 @@ export function DieSpringMesh({
   risk = 0,
   wireframe = false,
 }: DieSpringMeshProps) {
-  // Determine base color: explicit color > duty color > default
-  const baseColor = color ?? (duty ? DUTY_COLORS[duty] : "#4a90d9");
+  // Determine base color: explicit color > duty color (if valid legacy duty) > default
+  const legacyColor = (duty && duty in DUTY_COLORS) ? DUTY_COLORS[duty as DieSpringDuty] : undefined;
+  const baseColor = color ?? legacyColor ?? "#4a90d9";
   
   // Get risk-based emissive properties
   const { color: emissiveColor, intensity: emissiveIntensity } = useMemo(

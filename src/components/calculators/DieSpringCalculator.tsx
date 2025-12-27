@@ -13,6 +13,7 @@
 "use client";
 
 import { useMemo, useState, useCallback, lazy, Suspense, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/components/language-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,10 +60,16 @@ import {
   auditDieSpring,
   computeDieSpringLoad,
   LIFE_CLASS_INFO,
+  getDieSpringColorHex,
 } from "@/lib/dieSpring";
 import { getDefaultDieSpringSample } from "@/lib/springPresets";
 import { buildDieSpringDesignRuleReport } from "@/lib/designRules/dieSpringRules";
 import { buildDieSpringRiskRadar } from "@/lib/riskRadar/builders";
+
+const DieSpringVisualizer = dynamic(
+  () => import("@/components/three/DieSpringVisualizer").then((mod) => mod.DieSpringVisualizer),
+  { ssr: false }
+);
 
 // New catalog UI components
 import { DieSpringSelector, type DieSpringSelection } from "@/components/dieSpring/DieSpringSelector";
@@ -383,79 +390,117 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
         </CardHeader>
         <CardContent className="space-y-6">
           {/* === CATALOG MODE === */}
+          {/* === CATALOG MODE === */}
           {mode === "catalog" && (
-            <div className="space-y-4 p-4 rounded-lg border bg-muted/30">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                📋 {isZh ? "ISO 10243 目录选择" : "ISO 10243 Catalog Selection"}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left Column: Selection & Calculation */}
+              <div className="space-y-4 p-4 rounded-lg border bg-muted/30 h-fit">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  📋 {isZh ? "ISO 10243 目录选择" : "ISO 10243 Catalog Selection"}
+                  {catalogSelection.spec && (
+                    <DieSpringLifeBadge
+                      auditResult={catalogAuditResult}
+                      lifeClass={catalogSelection.lifeClass}
+                      spec={catalogSelection.spec}
+                      appliedStroke={appliedStroke}
+                      isZh={isZh}
+                      size="sm"
+                    />
+                  )}
+                </h3>
+                <DieSpringSelector
+                  value={catalogSelection}
+                  onChange={setCatalogSelection}
+                  isZh={isZh}
+                />
+                {/* Stroke input and bar for catalog mode */}
                 {catalogSelection.spec && (
-                  <DieSpringLifeBadge
-                    auditResult={catalogAuditResult}
-                    lifeClass={catalogSelection.lifeClass}
-                    spec={catalogSelection.spec}
-                    appliedStroke={appliedStroke}
-                    isZh={isZh}
-                    size="sm"
-                  />
-                )}
-              </h3>
-              <DieSpringSelector
-                value={catalogSelection}
-                onChange={setCatalogSelection}
-                isZh={isZh}
-              />
-              {/* Stroke input and bar for catalog mode */}
-              {catalogSelection.spec && (
-                <div className="space-y-3 pt-2 border-t">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <Label>{isZh ? "应用行程 (mm)" : "Applied Stroke (mm)"}</Label>
-                      <NumericInput
-                        value={appliedStroke}
-                        onChange={(v) => setAppliedStroke(v ?? 0)}
-                        step={0.5}
-                        min={0}
-                        max={catalogSelection.spec.freeLength - catalogSelection.spec.solidHeight}
+                  <div className="space-y-3 pt-2 border-t">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label>{isZh ? "应用行程 (mm)" : "Applied Stroke (mm)"}</Label>
+                        <NumericInput
+                          value={appliedStroke}
+                          onChange={(v) => setAppliedStroke(v ?? 0)}
+                          step={0.5}
+                          min={0}
+                          max={catalogSelection.spec.freeLength - catalogSelection.spec.solidHeight}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>{isZh ? "计算载荷" : "Calculated Load"}</Label>
+                        <div className="h-9 flex items-center px-3 rounded-md border bg-muted/50 font-mono">
+                          {catalogLoadResult?.force.toFixed(1) ?? "—"} N
+                        </div>
+                      </div>
+                    </div>
+                    <div className="pt-2">
+                      <Label className="text-xs">{isZh ? "行程指示器" : "Stroke Indicator"}</Label>
+                      <DieSpringStrokeBar
+                        spec={catalogSelection.spec}
+                        appliedStroke={appliedStroke}
+                        lifeClass={catalogSelection.lifeClass}
+                        isZh={isZh}
+                        height={28}
+                        className="mt-2"
                       />
                     </div>
-                    <div className="space-y-1">
-                      <Label>{isZh ? "计算载荷" : "Calculated Load"}</Label>
-                      <div className="h-9 flex items-center px-3 rounded-md border bg-muted/50 font-mono">
-                        {catalogLoadResult?.force.toFixed(1) ?? "—"} N
+                    {/* Catalog spec display */}
+                    <div className="grid grid-cols-4 gap-2 text-xs mt-4 p-2 rounded bg-muted/50">
+                      <div>
+                        <span className="text-muted-foreground">{isZh ? "外径" : "OD"}</span>
+                        <div className="font-mono">{catalogSelection.spec.outerDiameter} mm</div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">{isZh ? "自由长度" : "L0"}</span>
+                        <div className="font-mono">{catalogSelection.spec.freeLength} mm</div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">{isZh ? "刚度" : "Rate"}</span>
+                        <div className="font-mono">{catalogSelection.spec.springRate} N/mm</div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">{isZh ? "固高" : "Hs"}</span>
+                        <div className="font-mono">{catalogSelection.spec.solidHeight} mm</div>
                       </div>
                     </div>
                   </div>
-                  <div className="pt-2">
-                    <Label className="text-xs">{isZh ? "行程指示器" : "Stroke Indicator"}</Label>
-                    <DieSpringStrokeBar
-                      spec={catalogSelection.spec}
-                      appliedStroke={appliedStroke}
-                      lifeClass={catalogSelection.lifeClass}
-                      isZh={isZh}
-                      height={28}
-                      className="mt-2"
-                    />
-                  </div>
-                  {/* Catalog spec display */}
-                  <div className="grid grid-cols-4 gap-2 text-xs mt-4 p-2 rounded bg-muted/50">
-                    <div>
-                      <span className="text-muted-foreground">{isZh ? "外径" : "OD"}</span>
-                      <div className="font-mono">{catalogSelection.spec.outerDiameter} mm</div>
+                )}
+              </div>
+
+              {/* Right Column: 3D Preview */}
+              <div className="space-y-4">
+                 <div className="space-y-2">
+                    <h3 className="text-sm font-medium">
+                      {isZh ? "3D 预览 (标准模型)" : "3D Preview (Standard Model)"}
+                    </h3>
+                    <div className="h-[400px] rounded-lg border bg-slate-50 overflow-hidden">
+                      {catalogSelection.spec ? (
+                        <DieSpringVisualizer
+                          outerDiameter={catalogSelection.spec.outerDiameter}
+                          wireThickness={catalogSelection.spec.wireThickness}
+                          wireWidth={catalogSelection.spec.wireWidth}
+                          coils={catalogSelection.spec.activeCoils + 2} // Total vs Active
+                          freeLength={catalogSelection.spec.freeLength}
+                          solidHeight={catalogSelection.spec.solidHeight}
+                          springRate={catalogSelection.spec.springRate}
+                          endStyle="closed_ground"
+                          springColor={getDieSpringColorHex(catalogSelection.spec)}
+                          duty={catalogSelection.spec.duty}
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-muted-foreground text-sm">
+                          {isZh ? "请从目录选择弹簧" : "Please select a spring from catalog"}
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">{isZh ? "自由长度" : "L0"}</span>
-                      <div className="font-mono">{catalogSelection.spec.freeLength} mm</div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">{isZh ? "刚度" : "Rate"}</span>
-                      <div className="font-mono">{catalogSelection.spec.springRate} N/mm</div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">{isZh ? "固高" : "Hs"}</span>
-                      <div className="font-mono">{catalogSelection.spec.solidHeight} mm</div>
-                    </div>
-                  </div>
-                </div>
-              )}
+                     {catalogSelection.series === "ISO_D_LINE" && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        * {isZh ? "D型线截面近似显示为矩形" : "D-shape wire rendered as rectangular approximation"}
+                      </p>
+                    )}
+                 </div>
+              </div>
             </div>
           )}
 

@@ -32,8 +32,22 @@ export type UnitSystem = "metric" | "imperial";
  */
 export type DieSpringSeries =
   | "ISO_10243"
+  | "JIS_B5012"
+  | "US_INCH"
+  | "ISO_D_LINE"
   | "Raymond_Metric"
   | "Raymond_Imperial";
+
+/**
+ * Series-specific duty definition
+ * Defines available duties and their colors for a specific standard.
+ */
+export interface SeriesDutyDefinition {
+  dutyId: string;
+  displayName: { en: string; zh: string };
+  colorCode: string;
+  legacyDuty?: DieSpringDutyClass; // Mapping to core logic duties
+}
 
 /**
  * Display information for each series
@@ -42,6 +56,7 @@ export const SERIES_INFO: Record<DieSpringSeries, {
   name: { en: string; zh: string };
   description: { en: string; zh: string };
   unitSystem: UnitSystem;
+  supportedDuties: SeriesDutyDefinition[];
 }> = {
   ISO_10243: {
     name: { en: "ISO 10243", zh: "ISO 10243" },
@@ -49,7 +64,56 @@ export const SERIES_INFO: Record<DieSpringSeries, {
       en: "International standard for die springs",
       zh: "模具弹簧国际标准"
     },
-    unitSystem: "metric"
+    unitSystem: "metric",
+    supportedDuties: [
+      { dutyId: "ISO_LIGHT", displayName: { en: "Light Duty", zh: "轻载" }, colorCode: "green", legacyDuty: "LIGHT" },
+      { dutyId: "ISO_MEDIUM", displayName: { en: "Medium Duty", zh: "中载" }, colorCode: "blue", legacyDuty: "MEDIUM" },
+      { dutyId: "ISO_HEAVY", displayName: { en: "Heavy Duty", zh: "重载" }, colorCode: "red", legacyDuty: "HEAVY" },
+      { dutyId: "ISO_EXTRA_HEAVY", displayName: { en: "Extra Heavy Duty", zh: "超重载" }, colorCode: "yellow", legacyDuty: "EXTRA_HEAVY" }
+    ]
+  },
+  JIS_B5012: {
+    name: { en: "JIS B 5012", zh: "JIS B 5012" },
+    description: {
+      en: "Japanese Industrial Standard",
+      zh: "日本工业标准"
+    },
+    unitSystem: "metric",
+    supportedDuties: [
+      { dutyId: "JIS_TF", displayName: { en: "Extra Light Load (Yellow)", zh: "极轻载 (黄)" }, colorCode: "yellow", legacyDuty: "LIGHT" },
+      { dutyId: "JIS_TL", displayName: { en: "Light Load (Blue)", zh: "轻载 (蓝)" }, colorCode: "blue", legacyDuty: "MEDIUM" },
+      { dutyId: "JIS_TM", displayName: { en: "Medium Load (Red)", zh: "中载 (红)" }, colorCode: "red", legacyDuty: "HEAVY" },
+      { dutyId: "JIS_TH", displayName: { en: "Heavy Load (Green)", zh: "重载 (绿)" }, colorCode: "green", legacyDuty: "EXTRA_HEAVY" },
+      { dutyId: "JIS_TB", displayName: { en: "Extra Heavy Load (Brown)", zh: "超重载 (褐)" }, colorCode: "brown", legacyDuty: "SUPER_HEAVY" }
+    ]
+  },
+  US_INCH: {
+    name: { en: "US Standard Inch", zh: "美制英标" },
+    description: {
+      en: "Raymond/US Inch Series (Blue=Medium...)",
+      zh: "Raymond 英制系列 (蓝=中载...)"
+    },
+    unitSystem: "imperial",
+    supportedDuties: [
+      { dutyId: "US_MEDIUM", displayName: { en: "Medium Duty (Blue)", zh: "中载 (蓝)" }, colorCode: "blue", legacyDuty: "MEDIUM" },
+      { dutyId: "US_MED_HEAVY", displayName: { en: "Medium-Heavy (Red)", zh: "中重载 (红)" }, colorCode: "red", legacyDuty: "HEAVY" },
+      { dutyId: "US_HEAVY", displayName: { en: "Heavy Duty (Gold)", zh: "重载 (金)" }, colorCode: "gold", legacyDuty: "EXTRA_HEAVY" },
+      { dutyId: "US_EXTRA_HEAVY", displayName: { en: "Extra Heavy (Green)", zh: "超重载 (绿)" }, colorCode: "green", legacyDuty: "SUPER_HEAVY" }
+    ]
+  },
+  ISO_D_LINE: {
+    name: { en: "ISO D-Line", zh: "ISO D型线" },
+    description: {
+      en: "ISO 10243 with D-shaped wire section",
+      zh: "D型截面 ISO 10243 系列"
+    },
+    unitSystem: "metric",
+    supportedDuties: [
+      { dutyId: "ISO_D_MEDIUM", displayName: { en: "Medium Duty (Blue)", zh: "中载 (蓝)" }, colorCode: "blue", legacyDuty: "MEDIUM" },
+      { dutyId: "ISO_D_HEAVY", displayName: { en: "Heavy Duty (Red)", zh: "重载 (红)" }, colorCode: "red", legacyDuty: "HEAVY" },
+      { dutyId: "ISO_D_EXTRA_HEAVY", displayName: { en: "Extra Heavy (Yellow)", zh: "超重载 (黄)" }, colorCode: "yellow", legacyDuty: "EXTRA_HEAVY" },
+      { dutyId: "ISO_D_ULTRA_HEAVY", displayName: { en: "Ultra Heavy (Silver)", zh: "极重载 (银)" }, colorCode: "silver", legacyDuty: "SUPER_HEAVY" }
+    ]
   },
   Raymond_Metric: {
     name: { en: "Raymond Metric", zh: "Raymond 公制" },
@@ -57,7 +121,8 @@ export const SERIES_INFO: Record<DieSpringSeries, {
       en: "Raymond/ASRaymond metric catalog",
       zh: "Raymond/ASRaymond 公制目录"
     },
-    unitSystem: "metric"
+    unitSystem: "metric",
+    supportedDuties: [] // Placeholder
   },
   Raymond_Imperial: {
     name: { en: "Raymond Imperial", zh: "Raymond 英制" },
@@ -65,7 +130,8 @@ export const SERIES_INFO: Record<DieSpringSeries, {
       en: "Raymond/ASRaymond inch catalog",
       zh: "Raymond/ASRaymond 英制目录"
     },
-    unitSystem: "imperial"
+    unitSystem: "imperial",
+    supportedDuties: [] // Placeholder
   }
 };
 
@@ -74,19 +140,16 @@ export const SERIES_INFO: Record<DieSpringSeries, {
 // ============================================================================
 
 /**
- * Die spring duty rating / load class.
- * Color coding is series-specific, NOT hard-coded to duty.
- * 
- * Load capacity order: LIGHT < MEDIUM < HEAVY < EXTRA_HEAVY
- * 
- * Note: This is the NEW catalog-based duty type.
- * Legacy code uses DieSpringDuty from riskModel.ts ("LD"|"MD"|"HD"|"XHD").
+ * Die Spring Duty Class
+ * Used for relative load comparison and logic mapping.
+ * Colors are now determined by series, not this type directly.
  */
 export type DieSpringDutyClass =
   | "LIGHT"
   | "MEDIUM"
   | "HEAVY"
-  | "EXTRA_HEAVY";
+  | "EXTRA_HEAVY"
+  | "SUPER_HEAVY";
 
 /**
  * Duty display information
@@ -115,6 +178,11 @@ export const DUTY_CLASS_INFO: Record<DieSpringDutyClass, {
     name: { en: "Extra Heavy Duty", zh: "超重载" },
     abbreviation: "XHD",
     loadFactor: 1.8
+  },
+  SUPER_HEAVY: {
+    name: { en: "Super Heavy Duty", zh: "极重载" },
+    abbreviation: "SHD",
+    loadFactor: 2.2
   }
 };
 
@@ -202,6 +270,10 @@ export interface CatalogSource {
   revisionDate?: string;
   /** Page reference in document */
   page?: string;
+  /** Origin of data (Standard Table vs Generated) */
+  origin?: "standard_table" | "generated" | "vendor_catalog";
+  /** Method of derivation */
+  basis?: "normative" | "ratio_based" | "measured";
 }
 
 // ============================================================================
@@ -218,7 +290,8 @@ export type DieSpringColorCode =
   | "red"     // Typically: Heavy Load (ISO), Heavy (Raymond)
   | "yellow"  // Typically: Extra Heavy Load (ISO)
   | "brown"   // Typically: Extra Heavy (Raymond Imperial)
-  | "gold";   // Alternative Extra Heavy
+  | "gold"    // Alternative Extra Heavy
+  | "silver"; // ISO D-Line Ultra Heavy
 
 /**
  * Color hex values for rendering
@@ -229,7 +302,8 @@ export const COLOR_HEX: Record<DieSpringColorCode, string> = {
   red: "#ef4444",
   yellow: "#eab308",
   brown: "#92400e",
-  gold: "#d97706"
+  gold: "#d97706",
+  silver: "#94a3b8" // Slate-400
 };
 
 // ============================================================================

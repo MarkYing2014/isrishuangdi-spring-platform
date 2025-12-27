@@ -36,6 +36,7 @@ const ISO_COLOR_MAP: Record<DieSpringDutyClass, DieSpringColorCode> = {
     MEDIUM: "blue",
     HEAVY: "red",
     EXTRA_HEAVY: "yellow",
+    SUPER_HEAVY: "yellow", // Placeholder for type safety (ISO 10243 stops at XHD)
 };
 
 /**
@@ -747,9 +748,182 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
 /**
  * Complete die spring catalog (all series)
  */
+// ============================================================================
+// CATALOG GENERATION SYSTEMS
+// ============================================================================
+
+interface GenSeriesDef {
+    duty: DieSpringDutyClass;
+    color: DieSpringColorCode;
+    suffix: string;
+    factor: number; // k = factor * OD / L0
+    deflectionLimit: number; // % of L0
+}
+
+function generateCatalog(
+    series: DieSpringSeries,
+    unitSystem: "metric" | "imperial",
+    defs: GenSeriesDef[],
+    sizes: { od: number; id: number; lengths: number[] }[],
+    docRef: string
+): DieSpringSpec[] {
+    const specs: DieSpringSpec[] = [];
+
+    for (const size of sizes) {
+        for (const len of size.lengths) {
+            for (const def of defs) {
+                // ID generation
+                let idStr = "";
+                if (unitSystem === "imperial") {
+                    // OD 25.4 (1.0") -> 100
+                    const odInch = Math.round(size.od / 25.4 * 100);
+                    const lenInch = Math.round(len / 25.4 * 100);
+                    idStr = `US-${odInch}-${lenInch}-${def.suffix}`;
+                } else {
+                    const prefix = series === "JIS_B5012" ? "JIS" : "ISOD";
+                    idStr = `${prefix}-${size.od}x${len}-${def.suffix}`;
+                }
+
+                // Rate calculation: k = (Factor * OD) / L0
+                const k = (def.factor * size.od) / len;
+
+                // Geometry approximations
+                const shRatio = 0.3 + (def.factor / 1000);
+                // Ensure solid height leaves room for max stroke (with 2% buffer)
+                const maxAllowedSH = len * (1 - (def.deflectionLimit / 100) - 0.02);
+                const solidHeight = Math.min(len * Math.min(0.8, shRatio), maxAllowedSH);
+
+                const wireW = size.od * 0.25;
+                const wireT = size.od * 0.15;
+
+                specs.push({
+                    id: idStr,
+                    series,
+                    duty: def.duty,
+                    unitSystem,
+                    outerDiameter: size.od,
+                    innerDiameter: size.id,
+                    freeLength: len,
+                    wireWidth: Number(wireW.toFixed(1)),
+                    wireThickness: Number(wireT.toFixed(1)),
+                    solidHeight: Number(solidHeight.toFixed(1)),
+                    activeCoils: 8,
+                    springRate: Number(k.toFixed(1)),
+                    strokeLimits: isoStrokeLimits(len * (def.deflectionLimit / 100)),
+                    colorCode: def.color,
+                    material: "Chrome Alloy Steel",
+                    source: {
+                        vendor: "Generated",
+                        document: docRef,
+                        page: "Standard Table",
+                        origin: "generated",
+                        basis: "ratio_based"
+                    },
+                });
+            }
+        }
+    }
+    return specs;
+}
+
+// ============================================================================
+// JIS B 5012 CATALOG
+// ============================================================================
+
+export const JIS_B5012_CATALOG: DieSpringSpec[] = generateCatalog(
+    "JIS_B5012",
+    "metric",
+    [
+        { duty: "LIGHT", color: "yellow", suffix: "TF", factor: 60, deflectionLimit: 40 }, // Extra Light
+        { duty: "MEDIUM", color: "blue", suffix: "TL", factor: 120, deflectionLimit: 32 }, // Light
+        { duty: "HEAVY", color: "red", suffix: "TM", factor: 240, deflectionLimit: 25.6 }, // Medium
+        { duty: "EXTRA_HEAVY", color: "green", suffix: "TH", factor: 360, deflectionLimit: 19.2 }, // Heavy
+        { duty: "SUPER_HEAVY", color: "brown", suffix: "TB", factor: 480, deflectionLimit: 16 }, // Extra Heavy
+    ],
+    [
+        { od: 10, id: 5, lengths: [25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80] },
+        { od: 12, id: 6, lengths: [25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100] },
+        { od: 16, id: 8, lengths: [25, 30, 35, 40, 50, 60, 70, 80, 90, 100, 125] },
+        { od: 20, id: 10, lengths: [25, 30, 35, 40, 50, 60, 70, 80, 90, 100, 125, 150] },
+        { od: 25, id: 12.5, lengths: [25, 30, 35, 40, 50, 60, 70, 80, 90, 100, 125, 150, 175, 200] },
+        { od: 30, id: 15, lengths: [30, 35, 40, 50, 60, 70, 80, 90, 100, 125, 150, 175, 200] },
+        { od: 40, id: 20, lengths: [40, 50, 60, 70, 80, 90, 100, 125, 150, 175, 200, 250, 300] },
+        { od: 50, id: 25, lengths: [50, 60, 70, 80, 90, 100, 125, 150, 175, 200, 250, 300] },
+        { od: 60, id: 30, lengths: [60, 70, 80, 90, 100, 125, 150, 175, 200, 250, 300] },
+    ],
+    "JIS B 5012 Standard"
+);
+
+// ============================================================================
+// US STANDARD INCH CATALOG (Sample)
+// Raymond / US Standard
+// ============================================================================
+
+const INCH_25_4 = 25.4;
+const INCH_SIZES = [
+    { od: 0.375, id: 0.187, lengths: [1, 1.25, 1.5, 1.75, 2, 2.5, 3, 12] },
+    { od: 0.5, id: 0.25, lengths: [1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4, 12] },
+    { od: 0.625, id: 0.312, lengths: [1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4, 5, 12] },
+    { od: 0.75, id: 0.375, lengths: [1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4, 5, 6, 12] },
+    { od: 1.0, id: 0.5, lengths: [1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 12] },
+    { od: 1.25, id: 0.625, lengths: [1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 10, 12] },
+    { od: 1.5, id: 0.75, lengths: [2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 10, 12] },
+    { od: 2.0, id: 1.0, lengths: [2.5, 3, 3.5, 4, 5, 6, 7, 8, 10, 12] },
+].map(s => ({
+    od: s.od * INCH_25_4,
+    id: s.id * INCH_25_4,
+    lengths: s.lengths.map(l => l * INCH_25_4)
+}));
+
+export const US_INCH_CATALOG: DieSpringSpec[] = generateCatalog(
+    "US_INCH",
+    "imperial",
+    [
+        { duty: "MEDIUM", color: "blue", suffix: "M", factor: 120, deflectionLimit: 37 }, // Med
+        { duty: "HEAVY", color: "red", suffix: "MH", factor: 200, deflectionLimit: 30 }, // Med-Heavy
+        { duty: "EXTRA_HEAVY", color: "gold", suffix: "H", factor: 300, deflectionLimit: 25 }, // Heavy
+        { duty: "SUPER_HEAVY", color: "green", suffix: "EH", factor: 450, deflectionLimit: 20 }, // Ex-Heavy
+    ],
+    INCH_SIZES,
+    "Raymond Inch Standard"
+);
+
+// ============================================================================
+// ISO D-LINE CATALOG (Sample)
+// D-Shaped Wire Section
+// ============================================================================
+
+export const ISO_D_LINE_CATALOG: DieSpringSpec[] = generateCatalog(
+    "ISO_D_LINE",
+    "metric",
+    [
+        { duty: "MEDIUM", color: "blue", suffix: "M", factor: 160, deflectionLimit: 35 },
+        { duty: "HEAVY", color: "red", suffix: "H", factor: 300, deflectionLimit: 30 },
+        { duty: "EXTRA_HEAVY", color: "yellow", suffix: "XH", factor: 500, deflectionLimit: 25 },
+        { duty: "SUPER_HEAVY", color: "silver", suffix: "UH", factor: 700, deflectionLimit: 20 },
+    ],
+    [
+        { od: 10, id: 5, lengths: [25, 32, 38, 44, 51, 64, 76, 305] },
+        { od: 12.5, id: 6.3, lengths: [25, 32, 38, 44, 51, 64, 76, 89, 102, 305] },
+        { od: 16, id: 8, lengths: [25, 32, 38, 44, 51, 64, 76, 89, 102, 115, 305] },
+        { od: 20, id: 10, lengths: [25, 32, 38, 44, 51, 64, 76, 89, 102, 115, 127, 305] },
+        { od: 25, id: 12.5, lengths: [25, 32, 38, 44, 51, 64, 76, 89, 102, 115, 127, 152, 305] },
+        { od: 32, id: 16, lengths: [38, 44, 51, 64, 76, 89, 102, 115, 127, 152, 203, 305] },
+        { od: 40, id: 20, lengths: [51, 64, 76, 89, 102, 115, 127, 152, 178, 203, 305] },
+        { od: 50, id: 25, lengths: [64, 76, 89, 102, 115, 127, 152, 178, 203, 305] },
+        { od: 63, id: 31.5, lengths: [76, 89, 102, 115, 127, 152, 178, 203, 305] },
+    ],
+    "ISO D-Line Standard"
+);
+
+/**
+ * Complete die spring catalog (all series)
+ */
 export const DIE_SPRING_CATALOG: DieSpringSpec[] = [
     ...ISO_10243_CATALOG,
-    // Future: add Raymond_Metric and Raymond_Imperial catalogs here
+    ...JIS_B5012_CATALOG,
+    ...US_INCH_CATALOG,
+    ...ISO_D_LINE_CATALOG,
 ];
 
 // ============================================================================

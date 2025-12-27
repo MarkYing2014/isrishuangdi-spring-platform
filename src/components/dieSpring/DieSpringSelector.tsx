@@ -257,17 +257,20 @@ export function DieSpringSelector({
               <SelectValue placeholder={t.selectDuty} />
             </SelectTrigger>
             <SelectContent>
-              {availableDuties.map((duty) => (
-                <SelectItem key={duty} value={duty}>
-                  <span className="flex items-center gap-2">
-                    <span 
-                      className="w-2 h-2 rounded-full" 
-                      style={{ backgroundColor: COLOR_HEX[getDutyColor(duty)] }}
-                    />
-                    {isZh ? DUTY_CLASS_INFO[duty].name.zh : DUTY_CLASS_INFO[duty].name.en}
-                  </span>
-                </SelectItem>
-              ))}
+              {availableDuties.map((duty) => {
+                const dutyInfo = getSeriesDutyDef(selection.series, duty);
+                return (
+                  <SelectItem key={duty} value={duty}>
+                    <span className="flex items-center gap-2">
+                      <span 
+                        className="w-2 h-2 rounded-full" 
+                        style={{ backgroundColor: COLOR_HEX[dutyInfo.colorCode as DieSpringColorCode] }}
+                      />
+                      {isZh ? dutyInfo.displayName.zh : dutyInfo.displayName.en}
+                    </span>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -379,18 +382,21 @@ export function DieSpringSelector({
               <SelectLabel>
                 {isZh ? "负载等级" : "Load Rating"}
               </SelectLabel>
-              {availableDuties.map((duty) => (
-                <SelectItem key={duty} value={duty}>
-                  <span className="flex items-center gap-2">
-                    <span 
-                      className="w-3 h-3 rounded-full border" 
-                      style={{ backgroundColor: COLOR_HEX[getDutyColor(duty)] }}
-                    />
-                    <span>{isZh ? DUTY_CLASS_INFO[duty].name.zh : DUTY_CLASS_INFO[duty].name.en}</span>
-                    <span className="text-muted-foreground">({DUTY_CLASS_INFO[duty].abbreviation})</span>
-                  </span>
-                </SelectItem>
-              ))}
+              {availableDuties.map((duty) => {
+                const dutyInfo = getSeriesDutyDef(selection.series, duty);
+                return (
+                  <SelectItem key={duty} value={duty}>
+                    <span className="flex items-center gap-2">
+                      <span 
+                        className="w-3 h-3 rounded-full border" 
+                        style={{ backgroundColor: COLOR_HEX[dutyInfo.colorCode as DieSpringColorCode] }}
+                      />
+                      <span>{isZh ? dutyInfo.displayName.zh : dutyInfo.displayName.en}</span>
+                      <span className="text-muted-foreground">({DUTY_CLASS_INFO[duty].abbreviation})</span>
+                    </span>
+                  </SelectItem>
+                );
+              })}
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -446,16 +452,24 @@ export function DieSpringSelector({
 // HELPERS
 // ============================================================================
 
+import { DieSpringColorCode } from "@/lib/dieSpring/types";
+
 /**
- * Map DieSpringDutyClass to color code
+ * Get series-specific duty definition (color, name)
  */
-function getDutyColor(duty: DieSpringDutyClass): "green" | "blue" | "red" | "yellow" {
-  switch (duty) {
-    case "LIGHT": return "green";
-    case "MEDIUM": return "blue";
-    case "HEAVY": return "red";
-    case "EXTRA_HEAVY": return "yellow";
-  }
+function getSeriesDutyDef(series: DieSpringSeries, duty: DieSpringDutyClass) {
+  const supported = SERIES_INFO[series].supportedDuties;
+  
+  // Find mapped logic duty
+  const match = supported.find(d => d.legacyDuty === duty);
+  if (match) return match;
+
+  // Fallback (should not happen if catalog is consistent)
+  return {
+    dutyId: duty,
+    displayName: DUTY_CLASS_INFO[duty]?.name ?? { en: duty, zh: duty },
+    colorCode: "green" // Safe fallback
+  };
 }
 
 export default DieSpringSelector;

@@ -137,64 +137,84 @@ export function createMultiStageDieSpringSystem(
 }
 
 // ============================================================================
-// ANALYSIS HELPERS
+// ANALYSIS HELPERS (Phase 7 Integrated)
 // ============================================================================
 
-export interface DieSpringStageAnalysis {
-    /** Stage number */
-    stage: number;
-    /** Torsional stiffness contribution (Nm/rad) */
-    stiffness: number;
-    /** Maximum angular deflection for life class (degrees) */
-    maxAngle: number;
-    /** Maximum torque capacity (Nm) */
-    maxTorque: number;
-    /** Force per spring at max deflection (N) */
-    maxForcePerSpring: number;
+import {
+    TorsionalStage,
+    generateSystemCurve,
+    generateStageCurve,
+    SystemCurve,
+    StageCurve,
+    StageSafeResult,
+    computeStageSafe,
+    computeStageKthetaNmmPerDeg
+} from "@/lib/torsional";
+
+export interface DieSpringSystemAnalysis {
+    systemCurve: SystemCurve;
+    stageCurves: StageCurve[];
+    stageSafeResults: StageSafeResult[];
+    stageKtheta: number[]; // Nmm/deg
+    simpleAnalysis: {
+        totalStiffness: number; // Nm/rad (legacy compat)
+        systemMaxAngle: number;
+    }
 }
 
 /**
- * Analyze a die spring stage configuration
- * 
- * @param config - Stage configuration
- * @returns Analysis results for the stage
+ * Analyze complete multi-stage system using Phase 7 Physics Engine
  */
-export function analyzeDieSpringStage(config: DieSpringStageConfig): DieSpringStageAnalysis {
-    const { spec, count, installRadius, lifeClass = "NORMAL" } = config;
-
-    const stiffness = calculateTorsionalStiffness(spec, count, installRadius);
-    const maxAngle = calculateMaxAngularDeflection(spec, installRadius, lifeClass);
-    const strokeLimit = getStrokeLimitForLifeClass(spec.strokeLimits, lifeClass);
-    const maxForcePerSpring = spec.springRate * strokeLimit;
-    const maxTorque = (count * maxForcePerSpring * installRadius) / 1000; // Convert to Nm
-
-    return {
-        stage: config.engagementAngle === 0 ? 1 : 2,
-        stiffness,
-        maxAngle,
-        maxTorque,
-        maxForcePerSpring,
-    };
-}
-
-/**
- * Analyze complete multi-stage system
- */
-export function analyzeMultiStageDieSpringSystem(
+export function analyzeDieSpringSystem(
     stages: DieSpringStageConfig[]
-): {
-    stages: DieSpringStageAnalysis[];
-    totalStiffness: number;
-    systemMaxAngle: number;
-} {
-    const stageAnalyses = stages.map(analyzeDieSpringStage);
-    const totalStiffness = stageAnalyses.reduce((sum, s) => sum + s.stiffness, 0);
-    const systemMaxAngle = Math.min(...stageAnalyses.map((s) => s.maxAngle));
+): DieSpringSystemAnalysis {
+    // 1. Map to Torsional Core Types
+    const torsionalStages: TorsionalStage[] = stages.map((s, i) => ({
+        stageId: (i + 1).toString(),
+        geometry: {
+            effectiveRadiusMm: s.installRadius,
+            slotTravelMm: Infinity
+        },
+        pack: {
+            kind: "die",
+            spec: s.spec,
+            count: s.count,
+            lifeClass: s.lifeClass ?? "NORMAL"
+        }
+    }));
+
+    // 2. Compute Core Physics
+    const systemCurve = generateSystemCurve(torsionalStages);
+    const stageSafeResults = torsionalStages.map(computeStageSafe);
+    const stageCurves = torsionalStages.map(s => generateStageCurve(s, systemCurve.thetaSafeSystemDeg));
+
+    // 3. Stiffness & Legacy Compat
+    const stageKtheta = torsionalStages.map(s =>
+        computeStageKthetaNmmPerDeg(s.pack.spec.springRate, s.geometry.effectiveRadiusMm, s.pack.count)
+    );
+
+    const totalStiffnessNmPerRad = torsionalStages.reduce((sum, s) => {
+        // K_theta (Nm/rad) = n * k(N/mm) * R(mm)^2 * 1e-3
+        // Proof: Force(N) = k * x = k * (theta*R). Torque(Nmm) = Force * R.
+        // Torque(Nmm) = k * theta * R^2. 
+        // Torque(Nm) = k * theta * R^2 * 10^-3.
+        // If theta is radians: K(Nm/rad) = k * R^2 * 10^-3.
+        // And multiplied by n count.
+        const k = s.pack.spec.springRate;
+        const R = s.geometry.effectiveRadiusMm;
+        const n = s.pack.count;
+        return sum + (n * k * R * R * 1e-3);
+    }, 0);
 
     return {
-        stages: stageAnalyses,
-        totalStiffness,
-        systemMaxAngle,
+        systemCurve,
+        stageCurves,
+        stageSafeResults,
+        stageKtheta,
+        simpleAnalysis: {
+            totalStiffness: totalStiffnessNmPerRad,
+            systemMaxAngle: systemCurve.thetaSafeSystemDeg
+        }
     };
 }
 
@@ -212,3 +232,4 @@ function getStageColor(stage: 1 | 2 | 3): string {
 }
 
 export default createDieSpringGroup;
+

@@ -75,8 +75,8 @@ export interface DieSpringVisualizerProps {
   endStyle?: DieSpringEndStyleVis;
   /** End grind turns per end */
   endGrindTurns?: number;
-  /** Duty rating for color (LD/MD/HD/XHD) */
-  duty?: DieSpringDuty;
+  /** Duty rating for color (LD/MD/HD/XHD) or string for new classes */
+  duty?: DieSpringDuty | string;
   /** Risk value 0~1+ for emissive glow */
   risk?: number;
   /** Auto rotate */
