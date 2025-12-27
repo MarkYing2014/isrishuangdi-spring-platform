@@ -184,6 +184,10 @@ function StageLegendCard({ design, result }: { design: TorsionalSpringSystemDesi
             stateBadgeClass = "text-slate-400 bg-slate-50 border-slate-200";
           }
 
+          // Calculate stop angle for this group
+          const thetaRange = (group.L_free - group.L_solid - group.clearance) / group.R * (180 / Math.PI);
+          const thetaStop = group.theta_start + thetaRange;
+
           return (
             <div key={group.id} className={`p-3 space-y-1 transition-colors ${isActive ? '' : 'opacity-50'}`}>
               <div className="flex items-center justify-between">
@@ -207,20 +211,21 @@ function StageLegendCard({ design, result }: { design: TorsionalSpringSystemDesi
               <p className="text-[9px] text-slate-500 font-medium leading-tight pl-4 italic">
                 {group.role || "Torsional damping element"}
               </p>
+              {/* OEM System-Level Parameters (not spring geometry) */}
               <div className="flex items-center gap-3 pl-4 pt-1 text-[8px] font-mono text-slate-400">
-                <span>θ: {group.theta_start}°</span>
                 <span>R: {group.R}mm</span>
-                <span>k: {group.k} N/mm</span>
+                <span>θ: {group.theta_start}°~{thetaStop.toFixed(0)}°</span>
+                <span>n: {group.n}</span>
               </div>
             </div>
           );
         })}
       </CardContent>
-      {/* OEM Clarification */}
-      <div className="px-3 py-2 bg-blue-50/50 border-t text-[8px] text-blue-600 leading-relaxed">
-        <strong>{isZh ? "说明：" : "Note:"}</strong> {isZh 
-          ? "Stage 为设计属性（固定颜色），State 为工况属性（随转角变化）。STOP 仅影响该 Stage。"
-          : "Stage = Design Attribute (fixed color). State = Operating status. STOP only affects that specific Stage."
+      {/* OEM Clarification - Same Spring Specs */}
+      <div className="px-3 py-2 bg-amber-50/50 border-t text-[8px] text-amber-700 leading-relaxed">
+        <strong>{isZh ? "工程说明：" : "Engineering Note:"}</strong> {isZh 
+          ? "各 Stage 可采用相同弹簧规格以保证制造一致性。分级扭矩特性由安装半径、介入角度及数量等系统参数决定。"
+          : "Stages may share same spring specs for manufacturing consistency. Staged torque is achieved via system parameters: radius, engagement angle, and count."
         }
       </div>
     </Card>
