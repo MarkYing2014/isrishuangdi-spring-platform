@@ -594,7 +594,22 @@ export function ArcSpringCalculator() {
                       setInput(newInput);
                       setResult(computeArcSpringCurve(newInput));
                       setCalculated(true);
-                      // Scroll to results if needed, but usually visible
+                      // Immediately update store to avoid debounce delay for 3D preview
+                      useSpringDesignStore.setState({
+                        geometry: {
+                          type: "arc",
+                          wireDiameter: newInput.d,
+                          meanDiameter: newInput.D,
+                          coils: newInput.n,
+                          workingRadius: newInput.r,
+                          unloadedAngle: newInput.alpha0,
+                          workingAngle: newInput.alphaWork ?? 0,
+                          solidAngle: newInput.alphaC,
+                          materialId: newInput.materialKey === "CUSTOM" ? undefined : newInput.materialKey as any,
+                        },
+                        springType: "arc",
+                        hasValidDesign: true,
+                      });
                     }}
                   >
                     {isZh ? sample.nameZh : sample.nameEn}
@@ -609,6 +624,22 @@ export function ArcSpringCalculator() {
                       setInput(def);
                       setResult(computeArcSpringCurve(def));
                       setCalculated(true);
+                      // Immediately update store to avoid debounce delay for 3D preview
+                      useSpringDesignStore.setState({
+                        geometry: {
+                          type: "arc",
+                          wireDiameter: def.d,
+                          meanDiameter: def.D,
+                          coils: def.n,
+                          workingRadius: def.r,
+                          unloadedAngle: def.alpha0,
+                          workingAngle: def.alphaWork ?? 0,
+                          solidAngle: def.alphaC,
+                          materialId: def.materialKey === "CUSTOM" ? undefined : def.materialKey as any,
+                        },
+                        springType: "arc",
+                        hasValidDesign: true,
+                      });
                     }}
                 >
                     Reset / 重置
