@@ -1,221 +1,259 @@
 /**
- * Die Spring Math Engine (V1)
- * 模具弹簧计算引擎
+ * Die Spring Engineering Math - Catalog-Based Calculations
+ * 模具弹簧工程计算 - 基于目录的计算
  * 
- * Engineering-safe approximations for rectangular wire die springs
+ * ⚠️ All calculations use CATALOG VALUES.
+ * Do NOT recalculate spring rate or stress from geometry.
+ * OEMs expect catalog values, not theoretical overfitting.
+ * 
+ * @module dieSpring/math
  */
 
-import type {
-  DieSpringInput,
-  DieSpringResult,
-  DieSpringMaterialType,
+import {
+  DieSpringSpec,
+  DieSpringInstallation,
+  DieSpringLoadResult,
+  DieSpringLifeClass,
+  StrokeLimits,
+  LIFE_CLASS_INFO,
 } from "./types";
-import { DIE_SPRING_MATERIALS } from "./types";
-import { calculateDeratedLoad } from "./temperatureLoadLoss";
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-/** Steel shear modulus (MPa) */
-const G_STEEL = 79000;
-
-/** Conservative stress factor β for rectangular wire */
-const BETA_CONSERVATIVE = 3.0;
-
-// ============================================================================
-// Validation
-// ============================================================================
-
-export function validateDieSpringInput(input: DieSpringInput): {
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
-} {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-  const g = input.geometry;
-
-  // Basic geometry checks
-  if (g.od_mm <= 0) errors.push("OD must be > 0");
-  if (g.freeLength_mm <= 0) errors.push("Free length must be > 0");
-  if (g.workingLength_mm <= 0) errors.push("Working length must be > 0");
-  if (g.workingLength_mm >= g.freeLength_mm) {
-    errors.push("Working length must be < free length");
-  }
-  if (g.coils <= 0) errors.push("Coils must be > 0");
-  if (g.wire_b_mm <= 0) errors.push("Wire width b must be > 0");
-  if (g.wire_t_mm <= 0) errors.push("Wire thickness t must be > 0");
-
-  // Derived geometry checks
-  const meanDiameter = g.od_mm - g.wire_t_mm;
-  if (meanDiameter <= 0) {
-    errors.push("Mean diameter (OD - t) must be > 0");
-  }
-
-  // Spring index check
-  const springIndex = meanDiameter / g.wire_t_mm;
-  if (springIndex < 3) {
-    warnings.push(`Spring index ${springIndex.toFixed(1)} is very low (< 3)`);
-  } else if (springIndex > 12) {
-    warnings.push(`Spring index ${springIndex.toFixed(1)} is high (> 12)`);
-  }
-
-  // b/t ratio check
-  const btRatio = g.wire_b_mm / g.wire_t_mm;
-  if (btRatio < 1.5) {
-    warnings.push(`b/t ratio ${btRatio.toFixed(2)} is low (< 1.5)`);
-  } else if (btRatio > 4.5) {
-    warnings.push(`b/t ratio ${btRatio.toFixed(2)} is high (> 4.5)`);
-  }
-
-  // Compression ratio check
-  const travel = g.freeLength_mm - g.workingLength_mm;
-  const compressionRatio = travel / g.freeLength_mm;
-  if (compressionRatio > 0.35) {
-    errors.push(`Compression ratio ${(compressionRatio * 100).toFixed(1)}% exceeds 35%`);
-  } else if (compressionRatio > 0.25) {
-    warnings.push(`Compression ratio ${(compressionRatio * 100).toFixed(1)}% is high (> 25%)`);
-  }
-
-  // Temperature check
-  if (input.operating?.temperature_C) {
-    const mat = DIE_SPRING_MATERIALS[input.material];
-    if (input.operating.temperature_C > mat.maxTemperature_C) {
-      errors.push(
-        `Temperature ${input.operating.temperature_C}°C exceeds material limit ${mat.maxTemperature_C}°C`
-      );
-    }
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors,
-    warnings,
-  };
-}
-
-// ============================================================================
-// Core Calculation
+// LOAD CALCULATION
 // ============================================================================
 
 /**
- * Calculate active coils based on end style
+ * Compute load and performance at operating point.
+ * Uses CATALOG spring rate - does NOT recalculate from geometry.
  * 
- * | endStyle       | Na                    |
- * |----------------|----------------------|
- * | open           | Nt (all coils active)|
- * | closed         | Nt - 2               |
- * | closed_ground  | Nt - 2               |
+ * @param spec - Die spring specification from catalog
+ * @param installation - User installation parameters
+ * @returns Load result with force, utilization, and remaining travel
  */
-function getActiveCoils(totalCoils: number, endStyle: string | undefined): number {
-  switch (endStyle) {
-    case "open":
-      return totalCoils;
-    case "closed":
-    case "closed_ground":
-    default:
-      return Math.max(1, totalCoils - 2);
-  }
+export function computeDieSpringLoad(
+  spec: DieSpringSpec,
+  installation: DieSpringInstallation
+): DieSpringLoadResult {
+  const { appliedStroke, lifeClass, preloadStroke = 0 } = installation;
+
+  // Force = k × stroke (catalog spring rate)
+  const force = spec.springRate * appliedStroke;
+  const preloadForce = spec.springRate * preloadStroke;
+
+  // Utilization calculations
+  const lifeLimit = getStrokeLimitForLifeClass(spec.strokeLimits, lifeClass);
+  const utilizationMax = (appliedStroke / spec.strokeLimits.max) * 100;
+  const utilizationLife = (appliedStroke / lifeLimit) * 100;
+
+  // Remaining travel before solid
+  const maxPhysicalStroke = spec.freeLength - spec.solidHeight;
+  const remainingTravel = maxPhysicalStroke - appliedStroke;
+
+  // Working height
+  const workingHeight = spec.freeLength - appliedStroke;
+
+  return {
+    force,
+    preloadForce,
+    stiffness: spec.springRate,
+    utilizationMax,
+    utilizationLife,
+    remainingTravel,
+    workingHeight,
+  };
 }
 
 /**
- * Calculate die spring properties
- * 
- * Formulas (V1 approximate):
- * - d_eq = sqrt(b * t)  -- equivalent wire diameter
- * - k = (G * d_eq^4) / (8 * Dm^3 * Na)  -- spring rate
- * - σ = (P * D) / (b * t * sqrt(b*t)) * β  -- rectangular wire stress
+ * Get stroke limit for a specific life class
  */
-export function calculateDieSpring(input: DieSpringInput): DieSpringResult {
-  const validation = validateDieSpringInput(input);
-  
-  if (!validation.isValid) {
-    return {
-      ok: false,
-      errors: validation.errors,
-      warnings: validation.warnings,
-      travel_mm: 0,
-      springRate_Nmm: 0,
-      loadAtWorking_N: 0,
-      meanDiameter_mm: 0,
-      springIndex: 0,
-      equivalentWireDiameter_mm: 0,
-      stress_MPa: 0,
-      stressRatio: 0,
-      compressionRatio: 0,
-      slendernessRatio: 0,
-      activeCoils: 0,
-      solidHeight_mm: 0,
-    };
-  }
+export function getStrokeLimitForLifeClass(
+  limits: StrokeLimits,
+  lifeClass: DieSpringLifeClass
+): number {
+  const field = LIFE_CLASS_INFO[lifeClass].strokeField;
+  return limits[field];
+}
 
-  const g = input.geometry;
-  const mat = DIE_SPRING_MATERIALS[input.material];
-  const endStyle = g.endStyle ?? "closed_ground";
+// ============================================================================
+// FORCE-BASED SELECTION
+// ============================================================================
 
-  // Geometry calculations
-  const travel_mm = g.freeLength_mm - g.workingLength_mm;
-  const meanDiameter_mm = g.od_mm - g.wire_t_mm;
-  const springIndex = meanDiameter_mm / g.wire_t_mm;
-  const equivalentWireDiameter_mm = Math.sqrt(g.wire_b_mm * g.wire_t_mm);
-  const compressionRatio = travel_mm / g.freeLength_mm;
-  const slendernessRatio = g.freeLength_mm / meanDiameter_mm;
+/**
+ * Calculate required stroke to achieve target force
+ * 
+ * @param spec - Die spring specification
+ * @param targetForce - Required force in N
+ * @returns Required stroke in mm
+ */
+export function calculateRequiredStroke(
+  spec: DieSpringSpec,
+  targetForce: number
+): number {
+  return targetForce / spec.springRate;
+}
 
-  // Active coils based on end style
-  const activeCoils = getActiveCoils(g.coils, endStyle);
+/**
+ * Check if a die spring can provide the required force
+ * within the specified life class stroke limit
+ * 
+ * @param spec - Die spring specification
+ * @param requiredForce - Required force in N
+ * @param lifeClass - Target life class
+ * @returns Whether the spring is suitable
+ */
+export function canProvideForce(
+  spec: DieSpringSpec,
+  requiredForce: number,
+  lifeClass: DieSpringLifeClass
+): boolean {
+  const requiredStroke = calculateRequiredStroke(spec, requiredForce);
+  const strokeLimit = getStrokeLimitForLifeClass(spec.strokeLimits, lifeClass);
+  return requiredStroke <= strokeLimit;
+}
 
-  // Solid height: Hs = Nt * wire_t
-  const solidHeight_mm = g.coils * g.wire_t_mm;
+// ============================================================================
+// GEOMETRY HELPERS (READ-ONLY)
+// ============================================================================
 
-  // Spring rate: k = (G * d_eq^4) / (8 * Dm^3 * Na)
-  const d_eq4 = Math.pow(equivalentWireDiameter_mm, 4);
-  const Dm3 = Math.pow(meanDiameter_mm, 3);
-  const springRate_Nmm = (G_STEEL * d_eq4) / (8 * Dm3 * activeCoils);
+/**
+ * Get mean diameter from catalog spec
+ * Dm = OD - t (wire thickness)
+ */
+export function getMeanDiameter(spec: DieSpringSpec): number {
+  return spec.outerDiameter - spec.wireThickness;
+}
 
-  // Load at working length
-  const loadAtWorking_N = springRate_Nmm * travel_mm;
+/**
+ * Get slenderness ratio for buckling assessment
+ * λ = L0 / OD
+ */
+export function getSlendernessRatio(spec: DieSpringSpec): number {
+  return spec.freeLength / spec.outerDiameter;
+}
 
-  // Stress calculation (rectangular wire)
-  // σ = (P * D) / (b * t * sqrt(b*t)) * β
-  const btProduct = g.wire_b_mm * g.wire_t_mm;
-  const btSqrt = Math.sqrt(btProduct);
-  const stress_MPa = (loadAtWorking_N * meanDiameter_mm) / (btProduct * btSqrt) * BETA_CONSERVATIVE;
+/**
+ * Get maximum physical stroke before solid
+ * s_max_physical = L0 - Hs
+ */
+export function getMaxPhysicalStroke(spec: DieSpringSpec): number {
+  return spec.freeLength - spec.solidHeight;
+}
 
-  // Stress ratio
-  const stressRatio = stress_MPa / mat.yieldStrength_MPa;
+/**
+ * Get the more restrictive stroke limit
+ * Compares catalog max stroke vs physical max stroke
+ */
+export function getEffectiveMaxStroke(spec: DieSpringSpec): number {
+  const physicalMax = getMaxPhysicalStroke(spec);
+  return Math.min(spec.strokeLimits.max, physicalMax);
+}
 
-  // Temperature derating
-  let tempLoadLossPct: number | undefined;
-  let deratedLoad_N: number | undefined;
-  
-  if (input.operating?.temperature_C && input.operating.temperature_C > 20) {
-    const derating = calculateDeratedLoad(
-      loadAtWorking_N,
-      input.material,
-      input.operating.temperature_C
-    );
-    tempLoadLossPct = derating.lossPct;
-    deratedLoad_N = derating.deratedLoad_N;
-  }
+// ============================================================================
+// ENERGY CALCULATION
+// ============================================================================
 
-  return {
-    ok: true,
-    errors: [],
-    warnings: validation.warnings,
-    travel_mm,
-    springRate_Nmm,
-    loadAtWorking_N,
-    meanDiameter_mm,
-    springIndex,
-    equivalentWireDiameter_mm,
-    stress_MPa,
-    stressRatio,
-    compressionRatio,
-    slendernessRatio,
-    tempLoadLossPct,
-    deratedLoad_N,
-    activeCoils,
-    solidHeight_mm,
-  };
+/**
+ * Calculate stored elastic energy at a given stroke
+ * W = 0.5 × k × s²
+ * 
+ * @param spec - Die spring specification
+ * @param stroke - Deflection in mm
+ * @returns Energy in mJ (millijoules)
+ */
+export function calculateEnergy(spec: DieSpringSpec, stroke: number): number {
+  return 0.5 * spec.springRate * stroke * stroke;
+}
+
+/**
+ * Calculate work done between two stroke positions
+ * W = 0.5 × k × (s2² - s1²)
+ * 
+ * @param spec - Die spring specification
+ * @param strokeFrom - Starting stroke in mm
+ * @param strokeTo - Ending stroke in mm
+ * @returns Work in mJ (millijoules)
+ */
+export function calculateWork(
+  spec: DieSpringSpec,
+  strokeFrom: number,
+  strokeTo: number
+): number {
+  return 0.5 * spec.springRate * (strokeTo * strokeTo - strokeFrom * strokeFrom);
+}
+
+// ============================================================================
+// STACK / PARALLEL CONFIGURATION
+// ============================================================================
+
+/**
+ * Calculate effective spring rate for parallel configuration
+ * k_parallel = n × k_single
+ */
+export function parallelSpringRate(spec: DieSpringSpec, count: number): number {
+  return spec.springRate * count;
+}
+
+/**
+ * Calculate effective spring rate for series configuration
+ * k_series = k_single / n
+ */
+export function seriesSpringRate(spec: DieSpringSpec, count: number): number {
+  return spec.springRate / count;
+}
+
+/**
+ * Calculate total free length for series stack
+ */
+export function seriesFreeLength(spec: DieSpringSpec, count: number): number {
+  return spec.freeLength * count;
+}
+
+/**
+ * Calculate total solid height for series stack
+ */
+export function seriesSolidHeight(spec: DieSpringSpec, count: number): number {
+  return spec.solidHeight * count;
+}
+
+// ============================================================================
+// TORSIONAL SYSTEM INTEGRATION
+// ============================================================================
+
+/**
+ * Calculate torsional stiffness contribution for clutch/damper systems
+ * Kθ = n × k × R²
+ * 
+ * @param spec - Die spring specification
+ * @param springCount - Number of springs in the stage
+ * @param installRadius - Installation radius in mm
+ * @returns Torsional stiffness in Nm/rad
+ */
+export function calculateTorsionalStiffness(
+  spec: DieSpringSpec,
+  springCount: number,
+  installRadius: number
+): number {
+  // k is in N/mm, R is in mm, result is in Nmm/rad
+  // Convert to Nm/rad by dividing by 1000
+  const stiffnessNmmPerRad = springCount * spec.springRate * installRadius * installRadius;
+  return stiffnessNmmPerRad / 1000;
+}
+
+/**
+ * Calculate maximum angular deflection for a die spring stage
+ * θ_max = s_max / R (radians)
+ * 
+ * @param spec - Die spring specification
+ * @param installRadius - Installation radius in mm
+ * @param lifeClass - Life class for stroke limit
+ * @returns Maximum angular deflection in degrees
+ */
+export function calculateMaxAngularDeflection(
+  spec: DieSpringSpec,
+  installRadius: number,
+  lifeClass: DieSpringLifeClass
+): number {
+  const strokeLimit = getStrokeLimitForLifeClass(spec.strokeLimits, lifeClass);
+  const radiansMax = strokeLimit / installRadius;
+  return radiansMax * (180 / Math.PI);
 }

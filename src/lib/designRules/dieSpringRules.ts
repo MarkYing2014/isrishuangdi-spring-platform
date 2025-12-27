@@ -11,8 +11,12 @@ import type {
   DesignRuleMetric,
 } from "./types";
 import { summarizeRuleStatus } from "./types";
-import type { DieSpringInput, DieSpringResult } from "@/lib/dieSpring/types";
-import { DIE_SPRING_MATERIALS } from "@/lib/dieSpring/types";
+// Import legacy types from barrel export (maintains backward compatibility)
+import type { DieSpringInput, LegacyDieSpringResult } from "@/lib/dieSpring";
+import { DIE_SPRING_MATERIALS } from "@/lib/dieSpring";
+
+// Alias for backward compatibility
+type DieSpringResult = LegacyDieSpringResult;
 
 // ============================================================================
 // Thresholds
@@ -22,22 +26,22 @@ const DIE_SPRING_THRESHOLDS = {
   // Spring index
   minSpringIndex: 3,
   maxSpringIndex: 12,
-  
+
   // Stress ratio
   warnStressRatio: 0.7,
   maxStressRatio: 0.85,
-  
+
   // b/t ratio
   minBtRatio: 1.5,
   maxBtRatio: 4.5,
-  
+
   // Compression ratio (material-dependent, using conservative values)
   warnCompressionRatio: 0.25,
   maxCompressionRatio: 0.35,
-  
+
   // Buckling (slenderness ratio)
   bucklingRiskRatio: 3.0,
-  
+
   // Temperature load loss
   warnTempLoadLoss: 10,
 
@@ -330,7 +334,7 @@ export function buildDieSpringDesignRuleReport(
   // I1: Hole clearance check
   if (input.operating?.holeDiameter_mm) {
     const holeClearance = input.operating.holeDiameter_mm - g.od_mm;
-    
+
     metrics["holeClearance"] = {
       value: holeClearance.toFixed(2),
       unit: "mm",
@@ -372,7 +376,7 @@ export function buildDieSpringDesignRuleReport(
   if (input.operating?.rodDiameter_mm) {
     const innerDiameter = g.od_mm - 2 * g.wire_b_mm;  // ID = OD - 2*b
     const rodClearance = innerDiameter - input.operating.rodDiameter_mm;
-    
+
     metrics["innerDiameter"] = {
       value: innerDiameter.toFixed(2),
       unit: "mm",
@@ -427,7 +431,7 @@ export function buildDieSpringDesignRuleReport(
     };
 
     const solidMargin = g.workingLength_mm - result.solidHeight_mm;
-    
+
     if (solidMargin < 0) {
       findings.push({
         id: "DIE_I3_SOLID_EXCEED",

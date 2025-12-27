@@ -24,7 +24,7 @@ import { buildWaveSpringDesignRuleReport } from "@/lib/designRules/waveSpringRul
 import { buildDieSpringDesignRuleReport } from "@/lib/designRules/dieSpringRules";
 import { buildDiskSpringDesignRuleReport } from "@/lib/designRules/diskSpringRules";
 import type { WaveSpringInput, WaveSpringResult } from "@/lib/waveSpring/math";
-import type { DieSpringInput, DieSpringResult } from "@/lib/dieSpring/types";
+import type { DieSpringInput, LegacyDieSpringResult as DieSpringResult } from "@/lib/dieSpring";
 
 import type { EngineeringRiskRadar } from "./types";
 import { radarFromDesignRuleReport } from "./fromDesignRules";
