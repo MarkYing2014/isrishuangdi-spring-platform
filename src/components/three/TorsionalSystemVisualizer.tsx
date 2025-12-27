@@ -293,8 +293,6 @@ export function TorsionalSystemVisualizer({
 
            {/* Central Hub Shaft (Axial Z) */}
            <mesh position={[0, 0, 0]}>
-             <cylinderGeometry args={[(design.innerID/2 - 2) * globalScale, (design.innerID/2 - 2) * globalScale, (gapZ + 20), 32]} />
-             {/* Note: default cylinder is Y, rotate to Z */}
              <primitive object={new THREE.CylinderGeometry((design.innerID/2 - 2) * globalScale, (design.innerID/2 - 2) * globalScale, (gapZ + 20), 32).rotateX(Math.PI/2)} attach="geometry" />
              <meshStandardMaterial color="#0f172a" metalness={1} roughness={0} />
            </mesh>
