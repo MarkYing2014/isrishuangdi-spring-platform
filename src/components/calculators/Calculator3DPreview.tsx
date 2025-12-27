@@ -387,6 +387,9 @@ export function Calculator3DPreview({
           deflection={displayStrokeMm}
           springRate={analysis?.springRate}
           previewStrokeMm={isAnimating ? previewStrokeMm : undefined}
+          showStressColors={showStressColors}
+          stressUtilization={stressUtilization}
+          stressBeta={stressBeta}
         />
       );
     }
