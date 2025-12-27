@@ -54,6 +54,7 @@ import {
   DUTY_LABELS,
   DUTY_COLORS,
 } from "@/lib/dieSpring";
+import { getDefaultDieSpringSample } from "@/lib/springPresets";
 import { buildDieSpringDesignRuleReport } from "@/lib/designRules/dieSpringRules";
 import { buildDieSpringRiskRadar } from "@/lib/riskRadar/builders";
 
@@ -89,11 +90,14 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
   const router = useRouter();
   const setDesign = useSpringDesignStore((state) => state.setDesign);
 
-  // Geometry state
-  const [od_mm, setOd] = useState(25);
-  const [freeLength_mm, setFreeLength] = useState(50);
-  const [workingLength_mm, setWorkingLength] = useState(40);
-  const [coils, setCoils] = useState(8);
+  // Get default sample for new users
+  const defaultSample = getDefaultDieSpringSample();
+
+  // Geometry state - use OEM sample data as defaults
+  const [od_mm, setOd] = useState<number>(defaultSample.holeDiameter);
+  const [freeLength_mm, setFreeLength] = useState<number>(defaultSample.freeLength);
+  const [workingLength_mm, setWorkingLength] = useState<number>(defaultSample.freeLength - defaultSample.deflection);
+  const [coils, setCoils] = useState<number>(8);
   const [wire_b_mm, setWireB] = useState(4);
   const [wire_t_mm, setWireT] = useState(2);
   const [endStyle, setEndStyle] = useState<DieSpringEndStyle>("closed_ground");
@@ -101,14 +105,14 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
   // Material state
   const [material, setMaterial] = useState<DieSpringMaterialType>("CHROME_ALLOY");
 
-  // Duty and current height for risk visualization
-  const [duty, setDuty] = useState<DieSpringDuty>("MD");
-  const [currentHeight_mm, setCurrentHeight] = useState(workingLength_mm);
+  // Duty and current height for risk visualization - use preset duty type
+  const [duty, setDuty] = useState<DieSpringDuty>(defaultSample.type === "blue" ? "MD" : defaultSample.type === "red" ? "HD" : "LD");
+  const [currentHeight_mm, setCurrentHeight] = useState(defaultSample.freeLength - defaultSample.deflection);
 
   // Operating conditions
   const [temperature_C, setTemperature] = useState<number | undefined>(undefined);
-  const [holeDiameter_mm, setHoleDiameter] = useState<number | undefined>(undefined);
-  const [rodDiameter_mm, setRodDiameter] = useState<number | undefined>(undefined);
+  const [holeDiameter_mm, setHoleDiameter] = useState<number | undefined>(defaultSample.holeDiameter);
+  const [rodDiameter_mm, setRodDiameter] = useState<number | undefined>(defaultSample.rodDiameter);
 
   // Hydrate from store
   const storedGeometry = useSpringDesignStore(state => state.geometry);

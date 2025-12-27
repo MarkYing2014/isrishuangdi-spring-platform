@@ -35,6 +35,7 @@ import {
   getSpringMaterial,
   type SpringMaterial,
 } from "@/lib/materials/springMaterials";
+import { getDefaultConicalSample } from "@/lib/springPresets";
 import {
   Select,
   SelectContent,
@@ -124,16 +125,19 @@ export function ConicalCalculator() {
     });
   }, [lastConicalGeometry, lastConicalAnalysis]);
 
+  // Get default sample for new users
+  const defaultSample = getDefaultConicalSample();
+  
   const form = useForm<FormValues>({
     defaultValues: {
-      wireDiameter: lastConicalGeometry?.wireDiameter ?? 3.0,
-      largeDiameter: lastConicalGeometry?.largeOuterDiameter ?? 30,
-      smallDiameter: lastConicalGeometry?.smallOuterDiameter ?? 15,
-      activeCoils: lastConicalGeometry?.activeCoils ?? 5,
-      totalCoils: lastConicalGeometry?.totalCoils ?? 7,
-      freeLength: lastConicalGeometry?.freeLength ?? 40,
-      shearModulus: lastConicalGeometry?.shearModulus ?? selectedMaterial.shearModulus ?? 79300,
-      deflection: lastConicalAnalysis?.workingDeflection ?? 15,
+      wireDiameter: lastConicalGeometry?.wireDiameter ?? defaultSample.wireDiameter,
+      largeDiameter: lastConicalGeometry?.largeOuterDiameter ?? defaultSample.largeOuterDiameter,
+      smallDiameter: lastConicalGeometry?.smallOuterDiameter ?? defaultSample.smallOuterDiameter,
+      activeCoils: lastConicalGeometry?.activeCoils ?? defaultSample.activeCoils,
+      totalCoils: lastConicalGeometry?.totalCoils ?? (defaultSample.activeCoils + 2),
+      freeLength: lastConicalGeometry?.freeLength ?? defaultSample.freeLength,
+      shearModulus: lastConicalGeometry?.shearModulus ?? defaultSample.shearModulus,
+      deflection: lastConicalAnalysis?.workingDeflection ?? defaultSample.deflection,
       endType: lastConicalGeometry?.endType ?? "closed_ground",
     },
   });

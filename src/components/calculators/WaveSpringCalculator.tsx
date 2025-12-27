@@ -41,6 +41,7 @@ import {
   type WaveSpringGeometry,
   type WaveSpringMode,
 } from "@/lib/waveSpring/math";
+import { getDefaultWaveSpringSample } from "@/lib/springPresets";
 import { buildWaveSpringDesignRuleReport } from "@/lib/designRules/waveSpringRules";
 import { buildWaveRiskRadar } from "@/lib/riskRadar/builders";
 import { useSpringDesignStore } from "@/lib/stores/springDesignStore";
@@ -75,15 +76,19 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
   const setDesign = useSpringDesignStore((state) => state.setDesign);
   const { language } = useLanguage();
   const isZh = propIsZh ?? (language === "zh");
-  // Geometry state
-  const [id, setId] = useState(20);
-  const [od, setOd] = useState(30);
-  const [thickness_t, setThickness] = useState(0.5);
-  const [radialWall_b, setRadialWall] = useState(4);
-  const [turns_Nt, setTurns] = useState(5);
-  const [wavesPerTurn_Nw, setWavesPerTurn] = useState(3);
-  const [freeHeight_Hf, setFreeHeight] = useState(10);
-  const [workingHeight_Hw, setWorkingHeight] = useState(7.5); // Improved safety from 7.0
+  
+  // Get default sample for new users
+  const defaultSample = getDefaultWaveSpringSample();
+  
+  // Geometry state - use OEM sample data as defaults
+  const [id, setId] = useState<number>(defaultSample.innerDiameter);
+  const [od, setOd] = useState<number>(defaultSample.outerDiameter);
+  const [thickness_t, setThickness] = useState<number>(defaultSample.thickness);
+  const [radialWall_b, setRadialWall] = useState<number>(defaultSample.radialWall);
+  const [turns_Nt, setTurns] = useState<number>(defaultSample.turns);
+  const [wavesPerTurn_Nw, setWavesPerTurn] = useState<number>(defaultSample.wavesPerTurn);
+  const [freeHeight_Hf, setFreeHeight] = useState<number>(defaultSample.freeHeight);
+  const [workingHeight_Hw, setWorkingHeight] = useState<number>(defaultSample.freeHeight - defaultSample.deflection);
 
   // Material state
   const [materialId, setMaterialId] = useState(DEFAULT_WAVE_SPRING_MATERIAL.id);

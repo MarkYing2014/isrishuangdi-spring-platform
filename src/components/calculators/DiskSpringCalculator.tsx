@@ -29,28 +29,32 @@ import { buildPipelineUrl } from "@/lib/pipeline/springPipelines";
 import { computeAxialTravel, diskTravel } from "@/lib/travel/AxialTravelModel";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
+import { getDefaultDiskSpringSample } from "@/lib/springPresets";
 
 const Separator = ({ className }: { className?: string }) => <div className={`h-px bg-slate-200 w-full ${className || "my-1"}`} />;
 
 export function DiskSpringCalculator() {
-  // --- Form State ---
-  const [outerDiameter, setOuterDiameter] = useState(50);
-  const [innerDiameter, setInnerDiameter] = useState(25.4);
-  const [thickness, setThickness] = useState(2.0); // DIN 2093 Series B approx
-  const [freeConeHeight, setFreeConeHeight] = useState(1.6); // DIN 2093 Series B approx
+  // Get default sample for new users (DIN 2093 Series B standard)
+  const defaultSample = getDefaultDiskSpringSample();
+  
+  // --- Form State --- Use OEM sample data as defaults
+  const [outerDiameter, setOuterDiameter] = useState<number>(defaultSample.outerDiameter);
+  const [innerDiameter, setInnerDiameter] = useState<number>(defaultSample.innerDiameter);
+  const [thickness, setThickness] = useState<number>(defaultSample.thickness);
+  const [freeConeHeight, setFreeConeHeight] = useState<number>(defaultSample.coneHeight);
   const [group, setGroup] = useState<"G1" | "G2" | "G3">("G2");
 
-  const [parallelCount, setParallelCount] = useState(1);
-  const [seriesCount, setSeriesCount] = useState(1);
-  const [frictionCoeff, setFrictionCoeff] = useState(0.08);
+  const [parallelCount, setParallelCount] = useState<number>(1);
+  const [seriesCount, setSeriesCount] = useState<number>(1);
+  const [frictionCoeff, setFrictionCoeff] = useState<number>(0.08);
 
-  const [sPreload, setSPreload] = useState(0.5);
-  const [sOperating, setSOperating] = useState(1.2); // ~75% of h0 (1.6)
-  const [sMax, setSMax] = useState(1.6); // Flat
+  const [sPreload, setSPreload] = useState<number>(0.5);
+  const [sOperating, setSOperating] = useState<number>(defaultSample.deflection);
+  const [sMax, setSMax] = useState<number>(defaultSample.coneHeight);
 
-  const [E, setE] = useState(206000);
-  const [nu, setNu] = useState(0.3);
-  const [Sy, setSy] = useState(1400); // 1.4 GPa for key spring steels
+  const [E, setE] = useState<number>(206000);
+  const [nu, setNu] = useState<number>(0.3);
+  const [Sy, setSy] = useState<number>(1400);
 
   const [showStressColors, setShowStressColors] = useState(true);
 
