@@ -34,6 +34,7 @@ import { useSpringDesignStore, type SuspensionGeometry } from "@/lib/stores/spri
 type LoadcaseMode = "preload" | "ride" | "bump";
 
 export function SuspensionSpringCalculator() {
+  const router = useRouter();
   const [wireDiameter, setWireDiameter] = useState(12);
   const [od, setOd] = useState(100);
   const [activeCoils, setActiveCoils] = useState(6);
@@ -963,18 +964,45 @@ export function SuspensionSpringCalculator() {
               className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
               onClick={() => {
                 handleSyncStore();
-                window.location.href = analysisUrl;
+                // Explicit params for redundancy
+                const params = new URLSearchParams({
+                   type: "suspensionSpring",
+                   d: String(wireDiameter),
+                   od: String(od),
+                   Na: String(activeCoils),
+                   Nt: String(totalCoils),
+                   Hf: String(freeLength),
+                   endType,
+                   material: materialPreset,
+                   preload: String(preloadN),
+                   rideLoad: String(rideLoadN),
+                   bumpTravel: String(bumpTravel)
+                });
+                router.push(`/tools/analysis?${params.toString()}`);
               }}
             >
               Send to Engineering Analysis / 发送到工程分析
             </Button>
+            
+            {/* DEBUG: Show Audit Status placeholder if we had unified audit here */}
+            
             <Button 
               variant="outline" 
               className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10"
               disabled={result.errors.length > 0}
               onClick={() => {
                 handleSyncStore();
-                window.location.href = cadExportUrl;
+                const params = new URLSearchParams({
+                   type: "suspensionSpring",
+                   d: String(wireDiameter),
+                   od: String(od),
+                   Na: String(activeCoils),
+                   Nt: String(totalCoils),
+                   Hf: String(freeLength),
+                   endType,
+                   material: materialPreset
+                });
+                router.push(`/tools/cad-export?${params.toString()}`);
               }}
             >
               Export CAD / 导出 CAD

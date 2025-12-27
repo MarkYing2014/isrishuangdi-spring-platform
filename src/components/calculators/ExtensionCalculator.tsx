@@ -706,14 +706,31 @@ export function ExtensionCalculator() {
             </Button>
             */}
             <Button 
-              asChild 
               variant="outline" 
               className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
+              disabled={form.formState.isSubmitting}
+              onClick={form.handleSubmit((values) => {
+                 onSubmit(values); // Force/Sync Store
+                 
+                 const meanDiameter = (values.outerDiameter ?? 20) - (values.wireDiameter ?? 2);
+                 const params = new URLSearchParams({
+                  type: "extension",
+                  d: values.wireDiameter?.toString() ?? "2",
+                  Dm: meanDiameter.toString(),
+                  Na: values.activeCoils?.toString() ?? "10",
+                  Lb: values.bodyLength?.toString() ?? "40",
+                  Fi: values.initialTension?.toString() ?? "5",
+                  dxMin: "0",
+                  dxMax: values.workingDeflection?.toString() ?? "10",
+                  material: selectedMaterial.id,
+                  hookType: values.hookType ?? "machine",
+                });
+                router.push(`/tools/analysis?${params.toString()}`);
+              })}
             >
-              <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
+              Send to Engineering Analysis / 发送到工程分析
             </Button>
             
-            {/* DEBUG: Show Audit Status */}
             <div className="text-xs text-center text-slate-500 mb-2">
                Audit Ready: {String(!!latestAudit)} / Status: {latestAudit?.status ?? "Initializing..."} ({latestAudit?.status === "FAIL" ? "Fail/失败" : "Pass/通过"})
             </div>
@@ -724,7 +741,6 @@ export function ExtensionCalculator() {
               disabled={!latestAudit}
               onClick={() => {
                 try {
-                  // Use local state if available, fallback to store (though local should be set if button is enabled)
                   const geom = latestGeometry || lastExtensionGeometry;
                   const anal = latestAnalysis || lastExtensionAnalysis;
                   const aud = latestAudit || unifiedAudit;
@@ -740,7 +756,6 @@ export function ExtensionCalculator() {
                      return;
                   }
                   
-                  // Confirm validation if Audit Failed
                   if (aud.status === "FAIL") {
                     const proceed = window.confirm(
                       "⚠️ Engineering Audit Failed (Design invalid) / 工程审核未通过（设计无效）。\n\n" +
@@ -749,7 +764,6 @@ export function ExtensionCalculator() {
                     if (!proceed) return;
                   }
                   
-                  // Create Work Order
                   const store = useWorkOrderStore.getState();
                   const wo = store.createWorkOrder({
                     designCode: generateDesignCode(geom),
@@ -788,10 +802,27 @@ export function ExtensionCalculator() {
             <Button 
               variant="outline" 
               className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10" 
-              disabled={!result}
-              onClick={handleNavigateToCad}
+              disabled={form.formState.isSubmitting}
+              onClick={form.handleSubmit((values) => {
+                onSubmit(values); // Force/Sync Store
+                
+                const meanDiameter = (values.outerDiameter ?? 20) - (values.wireDiameter ?? 2);
+                const params = new URLSearchParams({
+                  type: "extension",
+                  d: values.wireDiameter?.toString() ?? "2",
+                  Dm: meanDiameter.toString(),
+                  Na: values.activeCoils?.toString() ?? "10",
+                  Lb: values.bodyLength?.toString() ?? "40",
+                  Fi: values.initialTension?.toString() ?? "5",
+                  material: selectedMaterial.id,
+                  hookType: values.hookType ?? "machine",
+                  // k is read from store on target page
+                  dx: values.workingDeflection?.toString() ?? "10",
+                });
+                router.push(`/tools/cad-export?${params.toString()}`);
+              })}
             >
-              <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
+              Export CAD / 导出 CAD
             </Button>
           </div>
 

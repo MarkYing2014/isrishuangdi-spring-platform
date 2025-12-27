@@ -1,6 +1,6 @@
 
 import { rotationToStrokeMm } from "./mapping";
-import { TorsionalStage, StageCurve, SystemCurve, StageSafeResult } from "./types";
+import { TorsionalStage, StageCurve, SystemCurve, StageSafeResult, AuditStatus } from "./types";
 import { computeAppliedStrokeCap } from "./limits";
 import { assertFinitePositive, assertMetricDieSpringSpec } from "./units";
 
@@ -44,7 +44,7 @@ export function generateStageCurve(stage: TorsionalStage, thetaMaxDeg: number, s
     return { stageId: stage.stageId, points };
 }
 
-export function generateSystemCurve(stages: TorsionalStage[], steps = 80): SystemCurve {
+export function generateSystemCurve(stages: TorsionalStage[], steps = 80, thetaOperatingDeg?: number): SystemCurve {
     const safes = stages.map(computeStageSafe);
     const governingStage = safes.reduce((a, b) => (b.thetaSafeDeg < a.thetaSafeDeg ? b : a));
 
@@ -87,10 +87,34 @@ export function generateSystemCurve(stages: TorsionalStage[], steps = 80): Syste
         return { thetaDeg, torqueNmm: torqueSum };
     });
 
+    // Audit Result Logic (Phase 8 Quality-Ready)
+    let systemResult: AuditStatus = "INFO";
+    let conformsToCustomerRange = true;
+    let deviationRequired = false;
+
+    if (thetaOperatingDeg !== undefined && thetaOperatingDeg > 0) {
+        if (thetaOperatingDeg > thetaSafeSystemDeg) {
+            systemResult = "FAIL";
+            conformsToCustomerRange = false;
+            deviationRequired = true;
+        } else if (thetaOperatingDeg > 0.8 * thetaSafeSystemDeg) {
+            systemResult = "WARN";
+            conformsToCustomerRange = true;
+            deviationRequired = false;
+        } else {
+            systemResult = "PASS";
+            conformsToCustomerRange = true;
+            deviationRequired = false;
+        }
+    }
+
     return {
         points,
         thetaSafeSystemDeg,
         governingStageId: governingStage.stageId,
-        governing: governingStage.governing
+        governing: governingStage.governing,
+        systemResult,
+        conformsToCustomerRange,
+        deviationRequired
     };
 }

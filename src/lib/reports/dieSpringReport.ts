@@ -115,6 +115,20 @@ export interface DieSpringOEMReport {
         auditPassed: boolean;
         signatureBlock: string;
     };
+    torsionalAudit?: {
+        systemResult: "PASS" | "WARN" | "FAIL" | "INFO";
+        thetaSafeSystemDeg: number;
+        thetaOperatingDeg?: number;
+        governingStageId: string;
+        governingLimitCode: string;
+        conformsToCustomerRange: boolean;
+        conformanceStatus: "YES" | "NO" | "NOT_EVALUATED";
+        deviationRequired: boolean;
+        deviationReasonCode?: string;
+        drawingNumber?: string;
+        drawingRevision?: string;
+        assumptions?: string[];
+    };
 }
 
 // ============================================================================
@@ -132,6 +146,8 @@ export interface GenerateDieSpringReportParams {
     customer?: string;
     /** Optional project name */
     project?: string;
+    /** Optional Torsional System Analysis (Phase 8) */
+    torsionalAnalysis?: import("@/lib/dieSpring/torsionalIntegration").DieSpringSystemAnalysis;
 }
 
 /**
@@ -140,7 +156,7 @@ export interface GenerateDieSpringReportParams {
 export function generateDieSpringOEMReport(
     params: GenerateDieSpringReportParams
 ): DieSpringOEMReport {
-    const { spec, installation, isZh = false, customer, project } = params;
+    const { spec, installation, isZh = false, customer, project, torsionalAnalysis } = params;
 
     // Compute load and audit
     const loadResult = computeDieSpringLoad(spec, installation);
@@ -247,6 +263,26 @@ export function generateDieSpringOEMReport(
             : "This report is generated from catalog data. Geometry is locked. Reviewed by: _______________",
     };
 
+    // Build torsional audit section (Phase 8)
+    let torsionalAudit: DieSpringOEMReport["torsionalAudit"] = undefined;
+    if (torsionalAnalysis) {
+        const { systemCurve, customerDrawing, operatingRequirement } = torsionalAnalysis;
+        torsionalAudit = {
+            systemResult: systemCurve.systemResult,
+            thetaSafeSystemDeg: systemCurve.thetaSafeSystemDeg,
+            thetaOperatingDeg: operatingRequirement?.angleDeg,
+            governingStageId: systemCurve.governingStageId,
+            governingLimitCode: systemCurve.governing.code,
+            conformsToCustomerRange: systemCurve.conformsToCustomerRange,
+            conformanceStatus: systemCurve.systemResult === "INFO" ? "NOT_EVALUATED" : (systemCurve.conformsToCustomerRange ? "YES" : "NO"),
+            deviationRequired: systemCurve.deviationRequired,
+            deviationReasonCode: systemCurve.deviationRequired ? systemCurve.governing.code : undefined,
+            drawingNumber: customerDrawing?.number,
+            drawingRevision: customerDrawing?.revision,
+            assumptions: torsionalAnalysis.assumptions
+        };
+    }
+
     return {
         header,
         spec: reportSpec,
@@ -255,6 +291,7 @@ export function generateDieSpringOEMReport(
         geometry,
         audit,
         certification,
+        torsionalAudit
     };
 }
 
@@ -377,6 +414,42 @@ export function generateDieSpringReportHtml(report: DieSpringOEMReport, isZh = f
       </div>
     `).join("")}
   </div>
+
+  ${report.torsionalAudit ? `
+  <div class="section" style="border: 1px solid ${report.torsionalAudit.systemResult === "PASS" ? "#22c55e" : report.torsionalAudit.systemResult === "WARN" ? "#eab308" : report.torsionalAudit.systemResult === "FAIL" ? "#ef4444" : "#64748b"}; padding: 16px; border-radius: 8px; background: #f8fafc;">
+    <h2 style="border:none; margin-top:0;">Torsional System Audit Summary (系统扭矩审计) 
+        <span class="status-badge" style="background:${report.torsionalAudit.systemResult === "PASS" ? "#22c55e" : report.torsionalAudit.systemResult === "WARN" ? "#eab308" : report.torsionalAudit.systemResult === "FAIL" ? "#ef4444" : "#64748b"}">${report.torsionalAudit.systemResult}</span>
+    </h2>
+    <div class="grid">
+      <div class="field"><div class="field-label">Drawing No.</div><div class="field-value">${report.torsionalAudit.drawingNumber || "N/A"}</div></div>
+      <div class="field"><div class="field-label">Revision</div><div class="field-value">${report.torsionalAudit.drawingRevision || "N/A"}</div></div>
+      <div class="field"><div class="field-label">Safe Angle (θ_safe)</div><div class="field-value">${report.torsionalAudit.thetaSafeSystemDeg.toFixed(2)}°</div></div>
+      <div class="field"><div class="field-label">Governing Bottleneck</div><div class="field-value">Stage ${report.torsionalAudit.governingStageId} / ${report.torsionalAudit.governingLimitCode}</div></div>
+      <div class="field"><div class="field-label">Conforms to Range</div><div class="field-value">${report.torsionalAudit.conformanceStatus}</div></div>
+      <div class="field"><div class="field-label">Deviation Required</div><div class="field-value">${report.torsionalAudit.deviationRequired ? "YES" : "NO"}</div></div>
+    </div>
+    ${report.torsionalAudit.assumptions && report.torsionalAudit.assumptions.length > 0 ? `
+    <div style="margin-top:12px; font-size: 11px;">
+        <strong>Assumptions (审计假设)</strong>:
+        <ul style="margin: 4px 0 0 16px; padding: 0;">
+            ${report.torsionalAudit.assumptions.map(a => `<li>${a}</li>`).join("")}
+        </ul>
+    </div>
+    ` : ""}
+    <div style="margin-top:12px; padding: 10px; background: white; border: 1px border-slate-200; border-radius: 6px; font-size: 11px;">
+        <strong style="display:block; margin-bottom:4px; color:#334155; text-transform:uppercase; letter-spacing:0.025em;">Technical Calculations (工程计算基础)</strong>
+        <div style="font-family: monospace; color: #0f172a; margin-bottom: 6px; padding: 6px; background: #f1f5f9; border-radius: 4px;">
+            K_θ (System) = Σ [ k_i × R_i² ]
+        </div>
+        <p style="margin:0; color:#64748b; line-height:1.4;">
+            The torsional stiffness is dominated by the square of the projection radius (R² dominance). Individual stage stroke (s_i) at any system angle (θ) is derived as s_i = θ(rad) × R_i.
+        </p>
+    </div>
+    <div style="margin-top:12px; padding-top:12px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #475569;">
+        <strong>Audit Basis</strong>: stroke = θ(rad) × R. Compliance determined by 80% safety threshold. No design authority performed by manufacturer. This conclusion is deterministic based on provided customer inputs.
+    </div>
+  </div>
+  ` : ""}
 
   <div class="certification">
     <h2>${t.certification}</h2>

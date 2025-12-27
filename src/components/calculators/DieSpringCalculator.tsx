@@ -456,15 +456,36 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                     <div className="grid grid-cols-4 gap-2 text-xs mt-4 p-2 rounded bg-muted/50">
                       <div>
                         <span className="text-muted-foreground">{isZh ? "外径" : "OD"}</span>
-                        <div className="font-mono">{catalogSelection.spec.outerDiameter} mm</div>
+                        <div className="font-mono">
+                          {catalogSelection.spec.outerDiameter} mm
+                          {catalogSelection.series === "US_INCH" && (
+                            <span className="block text-[10px] text-muted-foreground">
+                              ({(catalogSelection.spec.outerDiameter / 25.4).toFixed(3)}")
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <span className="text-muted-foreground">{isZh ? "自由长度" : "L0"}</span>
-                        <div className="font-mono">{catalogSelection.spec.freeLength} mm</div>
+                        <div className="font-mono">
+                          {catalogSelection.spec.freeLength} mm
+                          {catalogSelection.series === "US_INCH" && (
+                            <span className="block text-[10px] text-muted-foreground">
+                              ({(catalogSelection.spec.freeLength / 25.4).toFixed(3)}")
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <span className="text-muted-foreground">{isZh ? "刚度" : "Rate"}</span>
-                        <div className="font-mono">{catalogSelection.spec.springRate} N/mm</div>
+                        <div className="font-mono">
+                          {catalogSelection.spec.springRate} N/mm
+                          {catalogSelection.series === "US_INCH" && (
+                            <span className="block text-[10px] text-muted-foreground">
+                              ({(catalogSelection.spec.springRate * 5.71015).toFixed(1)} lbf/in)
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <span className="text-muted-foreground">{isZh ? "固高" : "Hs"}</span>
@@ -787,17 +808,71 @@ export function DieSpringCalculator({ isZh: propIsZh }: DieSpringCalculatorProps
                   variant="outline"
                   className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10 disabled:opacity-60"
                 >
-                  {isZh ? "发送到工程分析" : "Send to Engineering Analysis"}
+                  {isZh ? "发送到工程分析 / Engineering Analysis" : "Send to Engineering Analysis / 发送到工程分析"}
                 </Button>
+                
+                {/* DEBUG: Show Audit Status - Die Spring logic (risk visualization) acts as audit for now */}
+                {/* Note: Die Spring utilizes 'deflectionRisk' instead of standard AuditEngine in this V2 calculator */}
+                {/* Future: Unify DieSpring with AuditEngine fully */}
+                
                 <Button 
-                  asChild 
+                  type="button"
                   variant="outline" 
-                  className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10"
+                   className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10 disabled:opacity-60"
                   disabled={!result.ok}
+                  onClick={() => {
+                     // Ensure store is synced (handleSendToEngineering essentially does sync)
+                     // Re-use logic or manual sync
+                     const materialInfo = mapDieMaterialToStoreMaterial(material);
+                      const designCode = `DS-${Math.round(od_mm)}-${Math.round(freeLength_mm)}`;
+                      const innerDiameter = Math.max(0, od_mm - 2 * wire_b_mm);
+                  
+                      const dieGeometry: StoreDieSpringGeometry = {
+                        type: "dieSpring",
+                        designCode,
+                        dutyColor,
+                        outerDiameter: od_mm,
+                        innerDiameter,
+                        freeLength: freeLength_mm,
+                        workingLength: workingLength_mm,
+                        totalCoils: coils,
+                        wireWidth: wire_b_mm,
+                        wireThickness: wire_t_mm,
+                        holeDiameter: holeDiameter_mm,
+                        rodDiameter: rodDiameter_mm,
+                        meanDiameter: result.meanDiameter_mm,
+                        solidHeight: result.solidHeight_mm,
+                        materialId: materialInfo.id,
+                      };
+                  
+                      const analysisResult: StoreAnalysisResult = {
+                        springRate: result.springRate_Nmm,
+                        springRateUnit: "N/mm",
+                        workingLoad: result.loadAtWorking_N,
+                        maxLoad: result.deratedLoad_N ?? result.loadAtWorking_N,
+                        shearStress: result.stress_MPa,
+                        maxStress: result.stress_MPa,
+                        springIndex: result.springIndex,
+                        workingDeflection: result.travel_mm,
+                        maxDeflection: result.travel_mm,
+                        solidHeight: result.solidHeight_mm,
+                      };
+                  
+                      setDesign({
+                        springType: "dieSpring",
+                        geometry: dieGeometry,
+                        material: materialInfo,
+                        analysisResult,
+                        meta: {
+                          designCode,
+                          updatedAt: new Date().toISOString(),
+                        },
+                      });
+
+                    router.push(cadExportUrl);
+                  }}
                 >
-                  <a href={cadExportUrl}>
-                    {isZh ? "导出 CAD 模型" : "Export CAD Model"}
-                  </a>
+                    {isZh ? "导出 CAD / Export CAD" : "Export CAD / 导出 CAD"}
                 </Button>
               </div>
             </div>

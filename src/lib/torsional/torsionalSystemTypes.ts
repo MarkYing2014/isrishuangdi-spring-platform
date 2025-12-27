@@ -48,6 +48,15 @@ export interface TorsionalSpringSystemDesign {
     // Reference angle for analysis [deg] (Current work angle)
     referenceAngle: number;
 
+    // Traceability (Quality/Audit Mode)
+    customerDrawingNumber?: string;
+    customerDrawingRevision?: string;
+
+    // Customer Operating Requirement
+    thetaOperatingCustomerDeg?: number;
+    thetaOperatingSource?: 'DRAWING' | 'CUSTOMER_SPEC' | 'ASSUMED' | 'NOT_PROVIDED';
+    assumptions?: string[];
+
     // Optional inertia (V2)
     inertia?: number;
 

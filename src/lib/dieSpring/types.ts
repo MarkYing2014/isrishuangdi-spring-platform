@@ -266,6 +266,8 @@ export interface CatalogSource {
   vendor: string;
   /** Document title or catalog number */
   document: string;
+  /** Specific reference (e.g. Table 1, Section 4.2) */
+  reference?: string;
   /** Revision date or version */
   revisionDate?: string;
   /** Page reference in document */

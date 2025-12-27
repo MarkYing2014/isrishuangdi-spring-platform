@@ -1421,17 +1421,50 @@ export function SpiralTorsionCalculator() {
             <Button 
               variant="outline" 
               className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
-              disabled={!results?.isValid}
-              onClick={() => router.push("/tools/analysis")}
+              disabled={form.formState.isSubmitting}
+              onClick={form.handleSubmit((values) => {
+                 onSubmit(); // Force/Sync Store
+                 
+                 const params = new URLSearchParams({
+                  type: "spiralTorsion",
+                  activeLength: (values.activeLength ?? 500).toString(),
+                  stripWidth: (values.stripWidth ?? 10).toString(),
+                  stripThickness: (values.stripThickness ?? 0.5).toString(),
+                  activeCoils: (values.activeCoils ?? 5).toString(),
+                  innerDiameter: (values.innerDiameter ?? 15).toString(),
+                  outerDiameter: (values.outerDiameter ?? 50).toString(),
+                  preloadAngle: (values.preloadAngle ?? 0).toString(),
+                  maxWorkingAngle: (values.maxWorkingAngle ?? 90).toString(),
+                  material: materialId,
+                });
+                router.push(`/tools/analysis?${params.toString()}`);
+              })}
             >
               Send to Engineering Analysis / 发送到工程分析
             </Button>
             <Button 
               variant="outline" 
               className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10"
-              disabled={!results?.isValid || results?.operatingStatus === "EXCEEDED"}
+              disabled={!results?.isValid || results?.operatingStatus === "EXCEEDED" || form.formState.isSubmitting}
               title={results?.operatingStatus === "EXCEEDED" ? "超出线性范围，载荷曲线不可用" : undefined}
-              onClick={() => router.push("/tools/cad-export")}
+              onClick={form.handleSubmit((values) => {
+                 onSubmit(); // Force/Sync Store
+                 
+                 const params = new URLSearchParams({
+                  type: "spiralTorsion",
+                  activeLength: (values.activeLength ?? 500).toString(),
+                  stripWidth: (values.stripWidth ?? 10).toString(),
+                  stripThickness: (values.stripThickness ?? 0.5).toString(),
+                  activeCoils: (values.activeCoils ?? 5).toString(),
+                  windingDirection: values.windingDirection ?? "cw",
+                  innerEndType: values.innerEndType ?? "fixed",
+                  outerEndType: values.outerEndType ?? "fixed",
+                  material: materialId,
+                  // k is read from store
+                  dx: values.maxWorkingAngle?.toString() ?? "90",
+                });
+                router.push(`/tools/cad-export?${params.toString()}`);
+              })}
             >
               Export CAD / 导出 CAD
               {results?.operatingStatus === "EXCEEDED" && " ⚠️"}

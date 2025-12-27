@@ -1080,11 +1080,27 @@ export function CompressionCalculator() {
             </Button>
             */}
             <Button 
-              asChild 
               variant="outline" 
               className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
+              disabled={form.formState.isSubmitting}
+              onClick={form.handleSubmit((values) => {
+                 // Force refresh store before navigating
+                 onSubmit(values);
+                 
+                 const params = new URLSearchParams({
+                  type: "compression",
+                  d: values.wireDiameter.toString(),
+                  Dm: values.meanDiameter.toString(),
+                  Na: values.activeCoils.toString(),
+                  L0: (values.freeLength ?? 50).toString(),
+                  dxMin: "0",
+                  dxMax: values.deflection.toString(),
+                  material: selectedMaterial.id,
+                });
+                router.push(`/tools/analysis?${params.toString()}`);
+              })}
             >
-              <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
+              Send to Engineering Analysis / 发送到工程分析
             </Button>
             
             <div className="flex justify-center py-2">
@@ -1165,12 +1181,32 @@ export function CompressionCalculator() {
             </Button>
 
             <Button 
-              asChild 
               variant="outline" 
               className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10" 
-              disabled={!result}
+              disabled={form.formState.isSubmitting} // Enable even if result defines null, as we will re-calc
+              onClick={form.handleSubmit((values) => {
+                // 1. Force Calculate & Update Global Store (Option B)
+                // This ensures the CadExportPage sees the *latest* UI values, not stale data.
+                onSubmit(values);
+
+                // 2. Navigate manually
+                // We reconstruct params from current values to ensure URL is also fresh
+                const params = new URLSearchParams({
+                  type: "compression",
+                  d: values.wireDiameter.toString(),
+                  Dm: values.meanDiameter.toString(),
+                  Na: values.activeCoils.toString(),
+                  Nt: values.totalCoils.toString(),
+                  L0: (values.freeLength ?? 50).toString(),
+                  material: selectedMaterial.id,
+                  dx: values.deflection.toString(),
+                  // Note: 'k' might be slightly out of sync in URL if we don't recalculate here, 
+                  // but the Target Page reads from Store (which we just updated), so it will be correct.
+                });
+                router.push(`/tools/cad-export?${params.toString()}`);
+              })}
             >
-              <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
+              Export CAD / 导出 CAD
             </Button>
           </div>
 

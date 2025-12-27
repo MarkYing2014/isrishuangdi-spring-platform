@@ -520,13 +520,27 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
                   {isZh ? "发送到工程分析 / Engineering Analysis" : "Send to Engineering Analysis / 发送到工程分析"}
                 </Button>
                 
+                {/* DEBUG: Show Audit Status */}
+                <div className="text-xs text-center text-slate-500 mb-2">
+                   Audit Ready: {String(!!unifiedAudit)} / Status: {unifiedAudit?.status ?? "Initializing..."} ({unifiedAudit?.status === "FAIL" ? "Fail/失败" : "Pass/通过"})
+                </div>
+
                 <Button
                   type="button"
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
-                  disabled={!unifiedAudit || unifiedAudit.status === "FAIL"}
+                  disabled={!unifiedAudit}
                   onClick={() => {
                     if (!result || !result.isValid || !unifiedAudit) return;
                     
+                    // Confirm validation if Audit Failed
+                    if (unifiedAudit.status === "FAIL") {
+                      const proceed = window.confirm(
+                        "⚠️ Engineering Audit Failed (Design invalid) / 工程审核未通过（设计无效）。\n\n" +
+                        "Are you sure you want to FORCE create a work order? / 确定要强制创建工单吗？"
+                      );
+                      if (!proceed) return;
+                    }
+
                     // Create Work Order
                     const store = useWorkOrderStore.getState();
                     const wo = store.createWorkOrder({
@@ -555,7 +569,7 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
                       audit: unifiedAudit,
                       quantity: 1000,
                       createdBy: "Engineer",
-                      notes: unifiedAudit.status === "WARN" ? "Warning: Engineering audit has warnings. Review required." : undefined
+                      notes: unifiedAudit.status === "WARN" || unifiedAudit.status === "FAIL" ? `[${unifiedAudit.status}] Engineering Audit Issues Override` : undefined
                     });
                     
                     window.location.href = `/manufacturing/workorder/${wo.workOrderId}`;

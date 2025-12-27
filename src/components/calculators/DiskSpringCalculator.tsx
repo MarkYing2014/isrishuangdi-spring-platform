@@ -31,9 +31,12 @@ import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 import { getDefaultDiskSpringSample } from "@/lib/springPresets";
 
+import { useRouter } from "next/navigation";
+
 const Separator = ({ className }: { className?: string }) => <div className={`h-px bg-slate-200 w-full ${className || "my-1"}`} />;
 
 export function DiskSpringCalculator() {
+  const router = useRouter();
   // Get default sample for new users (DIN 2093 Series B standard)
   const defaultSample = getDefaultDiskSpringSample();
   
@@ -417,28 +420,54 @@ export function DiskSpringCalculator() {
           <div className="flex flex-col justify-end gap-3">
              <Button 
                 variant="outline" 
-                className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200"
+                className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
                 onClick={() => {
                    handleSyncStore();
-                   window.location.href = analysisUrl;
+                   // Construct URL params explicitly using current state
+                   const params = new URLSearchParams({
+                      type: "disk",
+                      De: String(outerDiameter),
+                      Di: String(innerDiameter),
+                      t: String(thickness),
+                      h0: String(freeConeHeight),
+                      nP: String(parallelCount),
+                      nS: String(seriesCount),
+                      s_pre: String(sPreload),
+                      s_work: String(sOperating),
+                      s_max: String(sMax),
+                   });
+                   router.push(`/tools/analysis?${params.toString()}`);
                 }}
               >
                 <Send className="h-4 w-4 mr-2" />
                 Engineering Analysis / 工程分析
              </Button>
+             
+             {/* DEBUG: Show Audit Status */}
+            <div className="text-xs text-center text-slate-500 mb-2">
+               Audit Ready: {String(!!unifiedAudit)} / Status: {unifiedAudit?.status ?? "Initializing..."} ({unifiedAudit?.status === "FAIL" ? "Fail/失败" : "Pass/通过"})
+            </div>
 
              <Button
                 type="button"
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
-                disabled={!unifiedAudit || unifiedAudit.status === "FAIL"}
+                disabled={!unifiedAudit}
                 onClick={() => {
                   if (!result || !result.designRules.geometryOk || !unifiedAudit) return;
                   handleSyncStore();
                   
+                  // Confirm validation if Audit Failed
+                  if (unifiedAudit.status === "FAIL") {
+                    const proceed = window.confirm(
+                      "⚠️ Engineering Audit Failed (Design invalid) / 工程审核未通过（设计无效）。\n\n" +
+                      "Are you sure you want to FORCE create a work order? / 确定要强制创建工单吗？"
+                    );
+                    if (!proceed) return;
+                  }
+
                   // Create Work Order
                   const store = useWorkOrderStore.getState();
-                  // We need to re-construct geometry/material if not waiting for handleSyncStore to settle (which updates store asynchronously potentially, but zustand is sync usually)
-                  // However, let's use the input object we have locally to be safe.
+                  // We need to re-construct geometry/material if not waiting for handleSyncStore to settle
                   
                   // Reconstruct material info locally since it's not fully in 'result'
                   const materialInfo = {
@@ -480,10 +509,10 @@ export function DiskSpringCalculator() {
                     audit: unifiedAudit,
                     quantity: 1000,
                     createdBy: "Engineer",
-                    notes: unifiedAudit.status === "WARN" ? "Warning: Engineering audit has warnings. Review required." : undefined
+                    notes: unifiedAudit.status === "WARN" || unifiedAudit.status === "FAIL" ? `[${unifiedAudit.status}] Engineering Audit Issues Override` : undefined
                   });
                   
-                  window.location.href = `/manufacturing/workorder/${wo.workOrderId}`;
+                  router.push(`/manufacturing/workorder/${wo.workOrderId}`);
                 }}
               >
                 <Factory className="w-4 h-4 mr-2" />
@@ -494,7 +523,20 @@ export function DiskSpringCalculator() {
                 disabled={!result.designRules.geometryOk}
                 onClick={() => {
                    handleSyncStore();
-                   window.location.href = "/tools/cad-export?type=disk";
+                   // Construct URL params explicitly using current state parameters
+                   const params = new URLSearchParams({
+                      type: "disk",
+                      De: String(outerDiameter),
+                      Di: String(innerDiameter),
+                      t: String(thickness),
+                      h0: String(freeConeHeight),
+                      nP: String(parallelCount),
+                      nS: String(seriesCount),
+                      s_pre: String(sPreload),
+                      s_work: String(sOperating),
+                      s_max: String(sMax),
+                   });
+                   router.push(`/tools/cad-export?${params.toString()}`);
                 }}
               >
                 Export CAD / 导出 CAD

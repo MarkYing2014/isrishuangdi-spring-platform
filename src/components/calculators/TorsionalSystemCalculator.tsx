@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Activity, Settings2, Info } from "lucide-react";
+import Link from "next/link";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { useLanguage } from "@/components/language-context";
 import { 
@@ -142,6 +143,17 @@ export function TorsionalSystemCalculator() {
                     >
                         <Plus className="w-3 h-3 mr-1" />
                         {isZh ? "添加组" : "Add Group"}
+                    </Button>
+                    <Button 
+                        size="sm" 
+                        variant="outline" 
+                        asChild
+                        className="h-7 text-[10px] font-bold uppercase tracking-widest border-blue-500/50 text-blue-400 hover:bg-blue-500/10 px-2"
+                    >
+                        <Link href={`/tools/torsional-audit?sample=${design.name?.replace(/\s+/g, '_') || 'Custom'}`}>
+                            <Activity className="w-3 h-3 mr-1" />
+                            {isZh ? "工程审计" : "Engineering Audit"}
+                        </Link>
                     </Button>
                     </div>
                 </CardHeader>

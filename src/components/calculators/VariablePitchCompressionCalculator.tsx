@@ -847,17 +847,54 @@ export function VariablePitchCompressionCalculator() {
                   <FileText className="w-4 h-4 mr-1" />
                   Export PDF
                 </Button>
+                
+                 {/* New Engineering Analysis Button for consistency */}
+                 {/* Note: Variable Pitch might not have a dedicated generic analysis page yet? 
+                     Assuming maps to standard or specialized if available. 
+                     For now, let's just make the Export CAD button robust as requested.
+                     Actually, standard analysis page takes `type=variablePitchCompression` if we updated `AnalysisContent`.
+                     Let's add it for consistency.
+                 */}
+                 {/* 
                 <Button
                   size="sm"
                   variant="outline"
-                  asChild
+                  className="border-sky-500/50 text-sky-600 bg-sky-500/10 hover:bg-sky-500/20"
+                  disabled={issues.length > 0}
+                  onClick={() => {
+                     // Store is already synced via useEffect
+                     router.push(`/tools/analysis?type=variablePitchCompression`);
+                  }}
+                >
+                  <Send className="w-4 h-4 mr-1" />
+                  Analysis
+                </Button>
+                */}
+
+                <Button
+                  size="sm"
+                  variant="outline"
                   disabled={issues.length > 0}
                   className="border-violet-500/50 text-violet-600 bg-violet-500/10 hover:bg-violet-500/20"
+                  onClick={() => {
+                     // Explicit navigation with params as backup to store
+                     const params = new URLSearchParams({
+                        type: "variablePitchCompression",
+                        d: String(wireDiameter),
+                        Dm: String(meanDiameter),
+                        Na: String(activeCoils0),
+                        L0: String(freeLength ?? ""),
+                        G: String(shearModulus),
+                        mat: materialId
+                     });
+                     // Use window.location or router? Hook is needed.
+                     // IMPORTANT: VariablePitchCompressionCalculator does NOT have `useRouter` hook yet.
+                     // I need to add it.
+                     window.location.href = `/tools/cad-export?${params.toString()}`; 
+                  }}
                 >
-                  <a href={`/tools/cad-export?type=variablePitchCompression&d=${wireDiameter}&Dm=${meanDiameter}&Na=${activeCoils0}&L0=${freeLength}&G=${shearModulus}&mat=${materialId}`}>
                     <Download className="w-4 h-4 mr-1" />
                     Export CAD
-                  </a>
                 </Button>
               </div>
 

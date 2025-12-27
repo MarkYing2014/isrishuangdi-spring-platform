@@ -522,16 +522,18 @@ export function GarterSpringCalculator() {
         
         {/* Actions */}
         {/* Actions - Styled to match other calculators */}
-        <div className="space-y-3">
+         <div className="space-y-3">
              <Button 
-               asChild 
+               onClick={form.handleSubmit((data) => {
+                  onSubmit(data);
+                  router.push(analysisUrl);
+               })}
                variant="outline" 
                className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
                disabled={!result}
              >
-                <Link href={analysisUrl}>
-                    Engineering Analysis / 工程分析
-                </Link>
+                {/* Manual text since Link wrapper removed */}
+                Engineering Analysis / 工程分析
              </Button>
 
              <Button 
@@ -544,14 +546,16 @@ export function GarterSpringCalculator() {
              </Button>
 
              <Button 
-                  asChild 
+                  onClick={form.handleSubmit((data) => {
+                      onSubmit(data);
+                      router.push(cadUrl);
+                  })}
                   variant="outline" 
                   className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10"
                   disabled={!result}
              >
-                  <Link href={cadUrl}>
-                     Export CAD (DXF/SVG) / 导出 CAD
-                  </Link>
+                  {/* Manual text since Link wrapper removed */}
+                  Export CAD (DXF/SVG) / 导出 CAD
              </Button>
         </div>
 

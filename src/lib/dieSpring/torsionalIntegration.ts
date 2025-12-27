@@ -111,6 +111,8 @@ export interface DieSpringStageConfig {
     lifeClass?: DieSpringLifeClass;
     /** Optional stage name */
     name?: string;
+    /** Optional slot travel limit (mm) */
+    slotTravelMm?: number;
 }
 
 /**
@@ -159,21 +161,35 @@ export interface DieSpringSystemAnalysis {
     simpleAnalysis: {
         totalStiffness: number; // Nm/rad (legacy compat)
         systemMaxAngle: number;
-    }
+    };
+    // Traceability (Phase 8)
+    customerDrawing?: {
+        number: string;
+        revision: string;
+    };
+    operatingRequirement?: {
+        angleDeg: number;
+        source: string;
+    };
+    assumptions?: string[];
 }
 
 /**
- * Analyze complete multi-stage system using Phase 7 Physics Engine
+ * Analyze complete multi-stage system using Phase 7/8 Physics Engine
  */
 export function analyzeDieSpringSystem(
-    stages: DieSpringStageConfig[]
+    stages: DieSpringStageConfig[],
+    thetaOperatingDeg?: number,
+    drawingInfo?: { number: string; revision: string },
+    operatingSource?: string,
+    assumptions?: string[]
 ): DieSpringSystemAnalysis {
     // 1. Map to Torsional Core Types
     const torsionalStages: TorsionalStage[] = stages.map((s, i) => ({
         stageId: (i + 1).toString(),
         geometry: {
             effectiveRadiusMm: s.installRadius,
-            slotTravelMm: Infinity
+            slotTravelMm: s.slotTravelMm ?? Infinity
         },
         pack: {
             kind: "die",
@@ -184,7 +200,7 @@ export function analyzeDieSpringSystem(
     }));
 
     // 2. Compute Core Physics
-    const systemCurve = generateSystemCurve(torsionalStages);
+    const systemCurve = generateSystemCurve(torsionalStages, 80, thetaOperatingDeg);
     const stageSafeResults = torsionalStages.map(computeStageSafe);
     const stageCurves = torsionalStages.map(s => generateStageCurve(s, systemCurve.thetaSafeSystemDeg));
 
@@ -194,12 +210,6 @@ export function analyzeDieSpringSystem(
     );
 
     const totalStiffnessNmPerRad = torsionalStages.reduce((sum, s) => {
-        // K_theta (Nm/rad) = n * k(N/mm) * R(mm)^2 * 1e-3
-        // Proof: Force(N) = k * x = k * (theta*R). Torque(Nmm) = Force * R.
-        // Torque(Nmm) = k * theta * R^2. 
-        // Torque(Nm) = k * theta * R^2 * 10^-3.
-        // If theta is radians: K(Nm/rad) = k * R^2 * 10^-3.
-        // And multiplied by n count.
         const k = s.pack.spec.springRate;
         const R = s.geometry.effectiveRadiusMm;
         const n = s.pack.count;
@@ -214,7 +224,13 @@ export function analyzeDieSpringSystem(
         simpleAnalysis: {
             totalStiffness: totalStiffnessNmPerRad,
             systemMaxAngle: systemCurve.thetaSafeSystemDeg
-        }
+        },
+        customerDrawing: drawingInfo,
+        operatingRequirement: thetaOperatingDeg ? {
+            angleDeg: thetaOperatingDeg,
+            source: operatingSource ?? "CUSTOMER_SPEC"
+        } : undefined,
+        assumptions
     };
 }
 

@@ -75,7 +75,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(6.3),
         colorCode: "green",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-10x25-MD",
@@ -93,7 +93,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(6.3),
         colorCode: "blue",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-10x25-HD",
@@ -111,7 +111,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(6.3),
         colorCode: "red",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-10x25-XHD",
@@ -129,7 +129,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(6.3),
         colorCode: "yellow",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
 
     // ============================================================================
@@ -151,7 +151,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(8.0),
         colorCode: "green",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-12x32-MD",
@@ -169,7 +169,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(8.0),
         colorCode: "blue",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-12x32-HD",
@@ -187,7 +187,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(8.0),
         colorCode: "red",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-12x32-XHD",
@@ -205,7 +205,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(8.0),
         colorCode: "yellow",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
 
     // ============================================================================
@@ -227,7 +227,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(9.5),
         colorCode: "green",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-16x38-MD",
@@ -245,7 +245,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(9.5),
         colorCode: "blue",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-16x38-HD",
@@ -263,7 +263,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(9.5),
         colorCode: "red",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-16x38-XHD",
@@ -281,7 +281,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(9.5),
         colorCode: "yellow",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
 
     // ============================================================================
@@ -303,7 +303,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(12.8),
         colorCode: "green",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-20x51-MD",
@@ -321,7 +321,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(12.8),
         colorCode: "blue",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-20x51-HD",
@@ -339,7 +339,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(12.8),
         colorCode: "red",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-20x51-XHD",
@@ -357,7 +357,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(12.8),
         colorCode: "yellow",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
 
     // ============================================================================
@@ -379,7 +379,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(16.0),
         colorCode: "green",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-25x64-MD",
@@ -397,7 +397,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(16.0),
         colorCode: "blue",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-25x64-HD",
@@ -415,7 +415,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(16.0),
         colorCode: "red",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-25x64-XHD",
@@ -433,7 +433,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(16.0),
         colorCode: "yellow",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
 
     // ============================================================================
@@ -455,7 +455,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(19.0),
         colorCode: "green",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-32x76-MD",
@@ -473,7 +473,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(19.0),
         colorCode: "blue",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-32x76-HD",
@@ -491,7 +491,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(19.0),
         colorCode: "red",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-32x76-XHD",
@@ -509,7 +509,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(19.0),
         colorCode: "yellow",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
 
     // ============================================================================
@@ -531,7 +531,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(22.3),
         colorCode: "green",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-40x89-MD",
@@ -549,7 +549,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(22.3),
         colorCode: "blue",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-40x89-HD",
@@ -567,7 +567,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(22.3),
         colorCode: "red",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-40x89-XHD",
@@ -585,7 +585,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(22.3),
         colorCode: "yellow",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
 
     // ============================================================================
@@ -607,7 +607,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(28.8),
         colorCode: "green",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-50x115-MD",
@@ -625,7 +625,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(28.8),
         colorCode: "blue",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-50x115-HD",
@@ -643,7 +643,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(28.8),
         colorCode: "red",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-50x115-XHD",
@@ -661,7 +661,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(28.8),
         colorCode: "yellow",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
 
     // ============================================================================
@@ -683,7 +683,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(35.0),
         colorCode: "green",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-63x140-MD",
@@ -701,7 +701,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(35.0),
         colorCode: "blue",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-63x140-HD",
@@ -719,7 +719,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(35.0),
         colorCode: "red",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
     {
         id: "ISO-63x140-XHD",
@@ -737,7 +737,7 @@ export const ISO_10243_CATALOG: DieSpringSpec[] = [
         strokeLimits: isoStrokeLimits(35.0),
         colorCode: "yellow",
         material: "Chrome Alloy Steel",
-        source: { vendor: "ISO", document: "ISO 10243:2022", page: "Table 1" },
+        source: { vendor: "ISO", document: "ISO 10243:2022", reference: "Table 1", origin: "standard_table", basis: "normative" },
     },
 ];
 
@@ -765,7 +765,8 @@ function generateCatalog(
     unitSystem: "metric" | "imperial",
     defs: GenSeriesDef[],
     sizes: { od: number; id: number; lengths: number[] }[],
-    docRef: string
+    docRef: string,
+    origin: "standard_table" | "generated" | "vendor_catalog" = "standard_table"
 ): DieSpringSpec[] {
     const specs: DieSpringSpec[] = [];
 
@@ -812,12 +813,13 @@ function generateCatalog(
                     strokeLimits: isoStrokeLimits(len * (def.deflectionLimit / 100)),
                     colorCode: def.color,
                     material: "Chrome Alloy Steel",
+                    // ---- Traceability ----
                     source: {
-                        vendor: "Generated",
-                        document: docRef,
-                        page: "Standard Table",
-                        origin: "generated",
-                        basis: "ratio_based"
+                        vendor: series === "US_INCH" ? "Raymond" : (series === "JIS_B5012" ? "JIS" : "ISO"),
+                        document: series === "US_INCH" ? "US Inch Catalog" : (series === "JIS_B5012" ? "JIS B 5012" : "ISO 10243 D-Line"),
+                        reference: docRef,
+                        origin: origin,
+                        basis: series === "ISO_10243" ? "normative" : "ratio_based"
                     },
                 });
             }

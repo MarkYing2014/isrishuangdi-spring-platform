@@ -962,20 +962,48 @@ export function TorsionCalculator() {
             </Button>
             */}
             <Button 
-              asChild 
               variant="outline" 
               className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
+              disabled={form.formState.isSubmitting}
+              onClick={form.handleSubmit((values) => {
+                 onSubmit(); // Force/Sync Store (onSubmit in Torsion is wrapper, takes no args, reads form.getValues)
+                 
+                 const meanDiameter = (values.outerDiameter ?? 15) - (values.wireDiameter ?? 1.5);
+                 const params = new URLSearchParams({
+                  type: "torsion",
+                  d: (values.wireDiameter ?? 1.5).toString(),
+                  Dm: meanDiameter.toString(),
+                  Na: (values.activeCoils ?? 6).toString(),
+                  L1: (values.armLength1 ?? 25).toString(),
+                  L2: (values.armLength2 ?? 25).toString(),
+                  Lb: (values.bodyLength ?? 10).toString(),
+                  dxMin: (values.installAngle ?? 0).toString(),
+                  dxMax: ((values.installAngle ?? 0) + (values.workingAngle ?? 45)).toString(),
+                  hand: values.handOfCoil ?? "right",
+                  material: materialId,
+                });
+                window.location.href = `/tools/analysis?${params.toString()}`;
+              })}
             >
-              <a href={analysisUrl}>Send to Engineering Analysis / 发送到工程分析</a>
+              Send to Engineering Analysis / 发送到工程分析
             </Button>
             
             <Button
               type="button"
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
-              disabled={!unifiedAudit || unifiedAudit.status === "FAIL"}
+              disabled={!unifiedAudit}
               onClick={() => {
                 if (!lastTorsion || !lastTorsionAnalysis || !unifiedAudit || !selectedMaterial) return;
                 
+                  // Confirm validation if Audit Failed
+                  if (unifiedAudit.status === "FAIL") {
+                    const proceed = window.confirm(
+                      "⚠️ Engineering Audit Failed (Design invalid) / 工程审核未通过（设计无效）。\n\n" +
+                      "Are you sure you want to FORCE create a work order? / 确定要强制创建工单吗？"
+                    );
+                    if (!proceed) return;
+                  }
+
                 // Create Work Order
                 const store = useWorkOrderStore.getState();
                 const wo = store.createWorkOrder({
@@ -996,7 +1024,7 @@ export function TorsionCalculator() {
                   audit: unifiedAudit,
                   quantity: 1000,
                   createdBy: "Engineer",
-                  notes: unifiedAudit.status === "WARN" ? "Warning: Engineering audit has warnings. Review required." : undefined
+                  notes: unifiedAudit.status === "WARN" || unifiedAudit.status === "FAIL" ? `[${unifiedAudit.status}] Engineering Audit Issues Override` : undefined
                 });
                 
                 window.location.href = `/manufacturing/workorder/${wo.workOrderId}`;
@@ -1007,12 +1035,30 @@ export function TorsionCalculator() {
             </Button>
 
             <Button 
-              asChild 
               variant="outline" 
-              className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10" 
-              disabled={!results}
+              className="w-full border- violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10" 
+              disabled={form.formState.isSubmitting}
+              onClick={form.handleSubmit((values) => {
+                 onSubmit(); // Force/Sync Store
+                 
+                 const meanDiameter = (values.outerDiameter ?? 15) - (values.wireDiameter ?? 1.5);
+                 const params = new URLSearchParams({
+                  type: "torsion",
+                  d: (values.wireDiameter ?? 1.5).toString(),
+                  Dm: meanDiameter.toString(),
+                  Na: (values.activeCoils ?? 6).toString(),
+                  L1: (values.armLength1 ?? 25).toString(),
+                  L2: (values.armLength2 ?? 25).toString(),
+                  Lb: (values.bodyLength ?? 10).toString(),
+                  hand: values.handOfCoil ?? "right",
+                  material: materialId,
+                  // k is read from store
+                  dx: (values.workingAngle ?? 45).toString(),
+                });
+                window.location.href = `/tools/cad-export?${params.toString()}`;
+              })}
             >
-              <a href={cadExportUrl}>Export CAD / 导出 CAD</a>
+              Export CAD / 导出 CAD
             </Button>
           </div>
 

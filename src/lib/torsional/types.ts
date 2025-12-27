@@ -53,9 +53,16 @@ export interface StageCurve {
     }>;
 }
 
+export type AuditStatus = "PASS" | "WARN" | "FAIL" | "INFO";
+
 export interface SystemCurve {
     points: CurvePoint[];
     thetaSafeSystemDeg: number;
     governingStageId: string;
     governing: GoverningLimit;
+
+    // Audit Conclusions (Phase 8)
+    systemResult: AuditStatus;
+    conformsToCustomerRange: boolean;
+    deviationRequired: boolean;
 }

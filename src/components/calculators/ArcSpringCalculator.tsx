@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { computeAngles, arcAngles } from "@/lib/angle/AngleModel";
-import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer, Download, BookOpen, HelpCircle, Info, AlertTriangle } from "lucide-react";
+import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer, Download, BookOpen, HelpCircle, Info, AlertTriangle, Factory } from "lucide-react";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
@@ -31,7 +31,8 @@ import {
   printArcSpringReport,
 } from "@/lib/arcSpring";
 import { LanguageText, useLanguage } from "@/components/language-context";
-import { useSpringDesignStore, type ArcGeometry } from "@/lib/stores/springDesignStore";
+import { useSpringDesignStore, type ArcGeometry, generateDesignCode } from "@/lib/stores/springDesignStore";
+import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
 import { useRouter } from "next/navigation";
 import { buildArcSpringDesignRuleReport } from "@/lib/designRules";
 import {
@@ -436,6 +437,68 @@ export function ArcSpringCalculator() {
   }, [result, input, angleDerived, allowableTau]);
 
   const isDual = input.systemMode === "dual_parallel" || input.systemMode === "dual_staged";
+
+  // Work Order Logic
+  const { createWorkOrder } = useWorkOrderStore();
+  const handleCreateWorkOrder = () => {
+    try {
+        if (!result || !calculated) {
+             alert(isZh ? "请先计算设计结果" : "Please calculate the design first.");
+             return;
+        }
+
+        // Confirm validation if Audit/Rule Failed
+        if (hasRuleError) {
+             const proceed = window.confirm(
+                  isZh 
+                  ? "⚠️ 设计规则判定未通过 (Design Invalid)。\n\n确定要强制创建工单吗？"
+                  : "⚠️ Design Rules Failed (Design Level).\n\nAre you sure you want to FORCE create a work order?"
+             );
+             if (!proceed) return;
+        }
+
+        const auditStatus = reportStatusToAuditStatus(designRuleReport.summary.status);
+
+        // Map to WorkOrder
+        const wo = createWorkOrder({
+            designCode: (storedGeometry as any).code || generateDesignCode(storedGeometry as any),
+            quantity: 100,
+            priority: "normal",
+            springType: "arc",
+            geometry: storedGeometry as unknown as ArcGeometry, // Cast for store compatibility
+            material: {
+                id: input.materialKey,
+                name: input.materialKey,
+                shearModulus: input.G_override ?? 80000, // Approximate fallback
+                // other props
+            } as any,
+            analysis: result as any,
+            audit: { 
+                status: auditStatus, 
+                summary: designRuleReport.summary, 
+                audits: {}, // Arc design rules structure is different, passing empty object or findings if compatible
+                findings: designRuleReport.findings, // Pass findings array
+                notes: [] 
+            } as any, 
+            createdBy: "User", // Placeholder
+            notes: auditStatus === "WARN" || auditStatus === "FAIL" 
+                ? `[${auditStatus}] Engineering Audit Issues Override / 工程审核问题强制覆盖` 
+                : undefined
+        });
+
+        const url = `/manufacturing/workorder/${wo.workOrderId}`;
+        router.push(url);
+    } catch(e: any) {
+         console.error("Failed to create work order", e);
+         alert(isZh ? `系统错误：创建工单失败。\n${e?.message}` : `System Error: Failed to create Work Order.\n${e?.message}`);
+    }
+  };
+
+  const reportStatusToAuditStatus = (s: string): "PASS" | "WARN" | "FAIL" => {
+      if (s === "FAIL") return "FAIL";
+      if (s === "review_required" || s === "WARN") return "WARN";
+      return "PASS";
+  };
 
   return (
     <div className="space-y-6">
@@ -1137,10 +1200,11 @@ export function ArcSpringCalculator() {
           <Card>
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
               <CardTitle className="text-base">Results / 计算结果</CardTitle>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap gap-2 justify-end">
                 <Button
                   size="sm"
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  variant="outline"
+                  className="border-sky-500/50 text-sky-600 bg-sky-500/10 hover:bg-sky-500/20"
                   onClick={() => {
                     const params = new URLSearchParams();
                     params.set("type", "arc");
@@ -1152,14 +1216,24 @@ export function ArcSpringCalculator() {
                     params.set("alphaC", input.alphaC.toString());
                     params.set("mat", input.materialKey);
                     if (input.alphaWork) params.set("alphaWork", input.alphaWork.toString());
-                    if (symmetricDeadCoils && deadCoilsPerEnd) params.set("Nt", (input.n + deadCoilsPerEnd * 2).toString());
                     
                     router.push(`/tools/analysis?${params.toString()}`);
                   }}
                 >
                   <Activity className="w-4 h-4 mr-1" />
-                  <LanguageText en="Engineering Analysis" zh="工程分析" />
+                  <LanguageText en="Analysis" zh="工程分析" />
                 </Button>
+
+                <Button 
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white" 
+                  disabled={!calculated || (result.warnings.length > 0 && !isFinite(result.k))}
+                  onClick={handleCreateWorkOrder}
+                >
+                   <Factory className="w-4 h-4 mr-1" />
+                   <LanguageText en="Work Order" zh="生产工单" />
+                </Button>
+
                 <Button
                   size="sm"
                   variant="outline"
@@ -1167,7 +1241,7 @@ export function ArcSpringCalculator() {
                   disabled={!calculated || (result.warnings.length > 0 && !isFinite(result.k))}
                 >
                   <Printer className="w-4 h-4 mr-1" />
-                  <LanguageText en="Print Report" zh="打印报告" />
+                  <LanguageText en="Print" zh="打印" />
                 </Button>
                 <Button
                   size="sm"
@@ -1176,19 +1250,27 @@ export function ArcSpringCalculator() {
                   disabled={!calculated || (result.warnings.length > 0 && !isFinite(result.k))}
                 >
                   <FileText className="w-4 h-4 mr-1" />
-                  <LanguageText en="Export PDF" zh="导出 PDF" />
+                  <LanguageText en="PDF" zh="PDF" />
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  asChild
                   disabled={!calculated || (result.warnings.length > 0 && !isFinite(result.k))}
                   className="border-violet-500/50 text-violet-600 bg-violet-500/10 hover:bg-violet-500/20"
+                  onClick={() => {
+                      const params = new URLSearchParams();
+                      params.set("type", "arcSpring");
+                      params.set("d", input.d.toString());
+                      params.set("D", input.D.toString());
+                      params.set("Na", input.n.toString());
+                      params.set("alpha0", input.alpha0.toString());
+                      params.set("r", input.r.toString());
+                      params.set("mat", input.materialKey);
+                      router.push(`/tools/cad-export?${params.toString()}`);
+                  }}
                 >
-                  <a href={`/tools/cad-export?type=arcSpring&d=${input.d}&D=${input.D}&Na=${input.n}&alpha0=${input.alpha0}&r=${input.r}&mat=${input.materialKey}`}>
                     <Download className="w-4 h-4 mr-1" />
-                    <LanguageText en="Export CAD" zh="导出 CAD" />
-                  </a>
+                    <LanguageText en="CAD" zh="CAD" />
                 </Button>
               </div>
             </CardHeader>

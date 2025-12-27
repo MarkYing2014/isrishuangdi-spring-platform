@@ -1,6 +1,6 @@
-
 import { describe, it, expect } from 'vitest';
 import { DIE_SPRING_CATALOG } from './catalog';
+import { SERIES_INFO, SeriesDutyDefinition } from './types';
 
 describe('Die Spring Catalog QC', () => {
 
@@ -63,6 +63,22 @@ describe('Die Spring Catalog QC', () => {
             .filter(s => generatedSeries.includes(s.series))
             .filter(s => !s.source.origin);
 
+        expect(failures.length).toBe(0);
+    });
+
+    it('QC: Duty ↔ Color consistency by series', () => {
+        const failures = DIE_SPRING_CATALOG.filter(spec => {
+            const series = SERIES_INFO[spec.series];
+            const dutyDef = series.supportedDuties.find((d: SeriesDutyDefinition) => d.legacyDuty === spec.duty);
+            if (!dutyDef) return false; // Some duties might not be mapped yet
+            return spec.colorCode !== dutyDef.colorCode;
+        });
+
+        if (failures.length > 0) {
+            console.error('Duty-Color Mismatch:', failures.map(f =>
+                `${f.id} (Duty: ${f.duty}, Color: ${f.colorCode}, Expected: ${SERIES_INFO[f.series].supportedDuties.find((d: SeriesDutyDefinition) => d.legacyDuty === f.duty)?.colorCode})`
+            ));
+        }
         expect(failures.length).toBe(0);
     });
 });

@@ -45,6 +45,8 @@ import {
 } from "@/components/ui/select";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
+import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
+import { Factory } from "lucide-react";
 
 interface FormValues {
   wireDiameter: number;
@@ -779,25 +781,99 @@ export function ConicalCalculator() {
             <Button 
               variant="outline" 
               className="w-full border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 hover:border-sky-400 hover:text-sky-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-sky-500/10"
-              onClick={() => {
-                const values = form.getValues();
-                const calc = result; // Use current linear result if available
-                saveDesignToStore(values, calc);
-                router.push(analysisUrl);
-              }}
+              disabled={form.formState.isSubmitting}
+              onClick={form.handleSubmit((values) => {
+                 onSubmitLinear(values); // Force recalculation & store update
+                 
+                 const params = new URLSearchParams({
+                  type: "conical",
+                  d: values.wireDiameter?.toString() ?? "3",
+                  D1: values.largeDiameter?.toString() ?? "30",
+                  D2: values.smallDiameter?.toString() ?? "15",
+                  Na: values.activeCoils?.toString() ?? "6",
+                  L0: values.freeLength?.toString() ?? "50",
+                  dxMin: "0",
+                  dxMax: values.deflection?.toString() ?? "15",
+                  material: selectedMaterial.id,
+                });
+                router.push(`/tools/analysis?${params.toString()}`);
+              })}
             >
               Send to Engineering Analysis / 发送到工程分析
             </Button>
+            
+            {/* DEBUG: Show Audit Status */}
+            <div className="text-xs text-center text-slate-500 mb-2">
+               Audit Ready: {String(!!unifiedAudit)} / Status: {unifiedAudit?.status ?? "Initializing..."} ({unifiedAudit?.status === "FAIL" ? "Fail/失败" : "Pass/通过"})
+            </div>
+
+            <Button
+              type="button"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
+              disabled={!unifiedAudit}
+              onClick={() => {
+                if (!lastConicalGeometry || !lastConicalAnalysis || !unifiedAudit) return;
+                
+                  // Confirm validation if Audit Failed
+                  if (unifiedAudit.status === "FAIL") {
+                    const proceed = window.confirm(
+                      "⚠️ Engineering Audit Failed (Design invalid) / 工程审核未通过（设计无效）。\n\n" +
+                      "Are you sure you want to FORCE create a work order? / 确定要强制创建工单吗？"
+                    );
+                    if (!proceed) return;
+                  }
+
+                const store = useWorkOrderStore.getState();
+                const wo = store.createWorkOrder({
+                  designCode: generateDesignCode(lastConicalGeometry),
+                  springType: "conical",
+                  geometry: lastConicalGeometry,
+                  material: {
+                    id: selectedMaterial.id,
+                    name: selectedMaterial.nameEn,
+                    shearModulus: selectedMaterial.shearModulus,
+                    elasticModulus: selectedMaterial.elasticModulus ?? 207000,
+                    density: selectedMaterial.density ?? 7850,
+                    tensileStrength: selectedMaterial.tensileStrength,
+                    surfaceFactor: selectedMaterial.surfaceFactor,
+                    tempFactor: selectedMaterial.tempFactor,
+                  },
+                  analysis: lastConicalAnalysis,
+                  audit: unifiedAudit,
+                  quantity: 1000,
+                  createdBy: "Engineer",
+                  notes: unifiedAudit.status === "WARN" || unifiedAudit.status === "FAIL" ? `[${unifiedAudit.status}] Engineering Audit Issues Override` : undefined
+                });
+                
+                router.push(`/manufacturing/workorder/${wo.workOrderId}`);
+              }}
+            >
+              <Factory className="w-4 h-4 mr-2" />
+              Create Work Order / 创建生产工单
+            </Button>
+
             <Button 
               variant="outline" 
               className="w-full border-violet-500/50 text-violet-400 bg-violet-500/10 hover:bg-violet-500/20 hover:border-violet-400 hover:text-violet-300 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:shadow-violet-500/10" 
-              disabled={!result && !nonlinearResult}
-              onClick={() => {
-                const values = form.getValues();
-                const calc = result;
-                saveDesignToStore(values, calc);
-                router.push(cadExportUrl);
-              }}
+              disabled={form.formState.isSubmitting} // Allow export even if not calc, we will calc
+              onClick={form.handleSubmit((values) => {
+                 onSubmitLinear(values); // Force/Sync Store
+                 
+                 const params = new URLSearchParams({
+                  type: "conical",
+                  d: values.wireDiameter?.toString() ?? "3",
+                  D1: values.largeDiameter?.toString() ?? "30",
+                  D2: values.smallDiameter?.toString() ?? "15",
+                  Na: values.activeCoils?.toString() ?? "6",
+                  Nt: values.totalCoils?.toString() ?? "7",
+                  L0: values.freeLength?.toString() ?? "50",
+                  endType: values.endType ?? "closed_ground",
+                  material: selectedMaterial.id,
+                  // k is read from store
+                  dx: values.deflection?.toString() ?? "15",
+                });
+                router.push(`/tools/cad-export?${params.toString()}`);
+              })}
             >
               Export CAD / 导出 CAD
             </Button>
