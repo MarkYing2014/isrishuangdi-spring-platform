@@ -25,6 +25,9 @@ export * from "./math";
 // Factory Audit (OEM rules)
 export * from "./audit";
 
+// Torsional System Integration
+export * from "./torsionalIntegration";
+
 // =============================================================================
 // LEGACY EXPORTS (for backward compatibility)
 // These exports maintain compatibility with existing DieSpringCalculator.
