@@ -367,9 +367,9 @@ export function buildDieSpringGeometryFixedFrame(params: {
   const doGrind = endStyle === "closed_ground" || endStyle === "closed";
 
   // closedTurnsPerEnd: how many turns at each end have pitch → 0 (closed/dead coils)
-  // Direct parameter: 1.5 turns gives realistic "last coil lies flat" appearance
-  // No indirect mapping - this is the actual number of closed turns per end
-  const closedTurnsPerEnd = doGrind ? 1.5 : 0;
+  // Standard die spring assumption: 1 turn per end is closed/ground.
+  // This aligns with Total = Active + 2 convention.
+  const closedTurnsPerEnd = doGrind ? 1.0 : 0;
 
   // Active turns = total - 2 * closed turns per end
   const activeTurns = Math.max(0.5, Nt - 2 * closedTurnsPerEnd);
@@ -382,22 +382,20 @@ export function buildDieSpringGeometryFixedFrame(params: {
   // Closed zone angle (per end)
   const thetaClosed = 2 * Math.PI * closedTurnsPerEnd;
 
-  // Active zone pitch: For ISO 10243 die springs, coils are TIGHTLY wound
-  // Real die springs have pitch ≈ wire thickness (1.05 to 1.15 × t)
-  // This means coils are nearly touching with only small gap for operation
-  // 
-  // Formula: pActive = wire_t × pitchFactor where pitchFactor is 1.05~1.15
-  // This differs from open compression springs which use (L - seatHeight) / Na
-  //
-  // The free length L is NOT used to calculate pitch for die springs!
-  // Instead, L is the result of: L = pActive × Nt (approximately)
+  // Active zone pitch: Determine based on Free Length to match visual spec
+  // Real die springs at free length have significant gaps.
+  // Formula: H ≈ pActive * (Nt - closedTurnsPerEnd)
+  // So: pActive ≈ freeLength / (Nt - closedTurnsPerEnd)
 
-  // Use industry-standard pitch factor for ISO 10243 die springs
-  const ISO_10243_PITCH_FACTOR = 1.08;  // Tight wound: 8% gap between coils
-  const seatHeight = wire_t * scale * 0.9;  // closed coils occupy ~0.9t each
+  // Calculate based on requested Free Length
+  const targetPitch = (freeLength * scale) / Math.max(1, Nt - closedTurnsPerEnd);
+
+  // Minimum pitch is limited by wire thickness (solid height constraint)
+  const minPitch = wire_t * scale * 1.05; // 5% gap minimum
+
   const pActive = doGrind
-    ? wire_t * scale * ISO_10243_PITCH_FACTOR  // Tightly wound per ISO 10243
-    : freeLength * scale / Nt;  // Open springs use uniform distribution
+    ? Math.max(minPitch, targetPitch)
+    : freeLength * scale / Nt;
 
   // Smoothstep function for smooth transition
   const smoothstep = (edge0: number, edge1: number, x: number): number => {
