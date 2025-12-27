@@ -71,6 +71,65 @@ export type VariablePitchCompressionSpringVisualizerProps = {
   previewStrokeMm?: number;
 };
 
+function clamp(x: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, x));
+}
+
+function animateSegmentsByStrokeProgressive(params: {
+  segments: VariablePitchSegment[];
+  wireDiameter: number;
+  previewStrokeMm: number;
+}) {
+  const { segments, wireDiameter: d, previewStrokeMm } = params;
+
+  // 基础数据
+  const base = segments.map((s, idx) => {
+    const n = Number.isFinite(s.coils) ? Math.max(0, s.coils as number) : 0;
+    const p0 = Number.isFinite(s.pitch) ? Math.max(0, s.pitch as number) : 0;
+    const gap0 = Math.max(0, p0 - d); // pitch<=d => gap=0 => rigid
+    const cap = n * gap0;            // 该段可“闭合”的总行程
+    return { idx, coils: n, pitch0: p0, gap0, cap };
+  });
+
+  const gapTotal = base.reduce((acc, s) => acc + s.cap, 0);
+  if (!(gapTotal > 1e-9)) {
+    return { segmentsAnimated: segments, strokeClamped: 0, gapTotal: 0 };
+  }
+
+  // stroke 限幅
+  let sRem = Math.max(0, Math.min(previewStrokeMm, gapTotal));
+  const closedByIdx = new Map<number, number>(); // 每段闭合掉多少 stroke
+
+  // ✅ 排序：间隙小的先闭合（更真实、更明显）
+  const order = [...base]
+    .filter((x) => x.cap > 0)
+    .sort((a, b) => (a.gap0 - b.gap0) || (a.idx - b.idx));
+
+  for (const seg of order) {
+    if (sRem <= 0) break;
+    const take = Math.min(seg.cap, sRem);
+    closedByIdx.set(seg.idx, take);
+    sRem -= take;
+  }
+
+  const segmentsAnimated: VariablePitchSegment[] = base.map((seg) => {
+    // 该段闭合比例（0..1）
+    const closed = closedByIdx.get(seg.idx) ?? 0;
+    const ratio = seg.cap > 0 ? closed / seg.cap : 0; // 1 => 全闭合到 pitch=d
+
+    // gap 从 gap0 线性收敛到 0
+    const gap2 = seg.gap0 * (1 - ratio);
+    const p2 = d + gap2;
+    return { coils: seg.coils, pitch: p2 };
+  });
+
+  return {
+    segmentsAnimated,
+    strokeClamped: Math.max(0, Math.min(previewStrokeMm, gapTotal)),
+    gapTotal,
+  };
+}
+
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
@@ -127,7 +186,6 @@ function applyStressColors(geometry: THREE.BufferGeometry, utilization: number, 
 
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 }
-
 function SpringMesh({
   wireDiameter,
   meanDiameter,
@@ -152,6 +210,21 @@ function SpringMesh({
     return Number.isFinite(b) ? Math.max(0, Math.min(0.9, b as number)) : 0.25;
   }, [stressBeta]);
 
+  // --- Animation Logic: Gap-Driven Shrink ---
+  const strokeDriver = previewStrokeMm ?? deflection;
+
+  const { segmentsAnimated, strokeClamped, gapTotal } = useMemo(() => {
+    // If no preview stroke, use static segments
+    if (previewStrokeMm === undefined) {
+      return { segmentsAnimated: segments, strokeClamped: strokeDriver, gapTotal: 0 };
+    }
+    return animateSegmentsByStrokeProgressive({
+      segments,
+      wireDiameter,
+      previewStrokeMm: strokeDriver,
+    });
+  }, [previewStrokeMm, strokeDriver, segments, wireDiameter]);
+
   const { geometry, zMin, zMax } = useMemo(() => {
     const res = createVariablePitchCompressionSpringGeometry(
       {
@@ -161,8 +234,8 @@ function SpringMesh({
         activeCoils0,
         totalCoils,
         freeLength,
-        segments,
-        deflection,
+        segments: segmentsAnimated, // ✅ Use animated pitch
+        deflection: strokeClamped,  // ✅ Synced stroke
       },
       {
         pointsPerTurn: 24,
@@ -170,7 +243,7 @@ function SpringMesh({
         tubeSegmentsPerTurn: 28,
         closingTurns: 1.5,
         contactGapRatio: 0.01,
-        smoothAnimation: !!previewStrokeMm,
+        smoothAnimation: previewStrokeMm !== undefined, // ✅ 0 is also animated state
       }
     );
     if (showStressColors) {
@@ -184,8 +257,9 @@ function SpringMesh({
     activeCoils0,
     totalCoils,
     freeLength,
-    segments,
-    deflection,
+    segmentsAnimated,
+    strokeClamped,
+    previewStrokeMm, // ✅ Dependency added
     showStressColors,
     utilization,
     betaUsed,
@@ -316,6 +390,17 @@ export function VariablePitchCompressionSpringVisualizer(
   const handleViewChange = useCallback((view: ViewType) => {
     setCurrentView(view);
   }, []);
+
+  // Calculate gap info for overlay
+  const { gapTotal, strokeClamped } = useMemo(() => {
+    if (previewStrokeMm === undefined) return { gapTotal: 0, strokeClamped: 0 };
+    const r = animateSegmentsByStrokeProgressive({
+      segments: props.segments,
+      wireDiameter: props.wireDiameter,
+      previewStrokeMm,
+    });
+    return { gapTotal: r.gapTotal, strokeClamped: r.strokeClamped };
+  }, [props.segments, props.wireDiameter, previewStrokeMm]);
 
   if (!mounted) return null;
 
@@ -470,6 +555,20 @@ export function VariablePitchCompressionSpringVisualizer(
                 </div>
               )}
            </div>
+
+           {/* Gap Info Overlay */}
+           {previewStrokeMm !== undefined && (
+             <div className="border-t border-slate-200 pt-1 mt-1">
+               <div className="flex justify-between gap-4">
+                 <span className="text-slate-500">GapΣ:</span>
+                 <span className="font-medium">{gapTotal.toFixed(2)} mm</span>
+               </div>
+               <div className="flex justify-between gap-4">
+                 <span className="text-slate-500">Close:</span>
+                 <span className="font-medium">{(gapTotal > 0 ? (strokeClamped / gapTotal * 100) : 0).toFixed(0)}%</span>
+               </div>
+             </div>
+           )}
         </div>
       </div>
     </div>

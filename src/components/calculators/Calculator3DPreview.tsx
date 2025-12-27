@@ -130,8 +130,19 @@ export function Calculator3DPreview({
     
     // 1. Calculate Geometric Limit based on Solid Height (Physical constraint)
     // This is the most reliable "max travel"
-    if (geometry.type === 'compression' || geometry.type === 'conical' || geometry.type === 'dieSpring' || geometry.type === 'variablePitchCompression') {
-       const L0 = (geometry.type === 'dieSpring' || geometry.type === 'variablePitchCompression') ? geometry.freeLength : geometry.freeLength;
+    if (geometry.type === 'variablePitchCompression') {
+        // Calculate exact gap total for playback limit
+        const d = geometry.wireDiameter ?? 0;
+        const segs = geometry.segments ?? [];
+        const gapTotal = segs.reduce((acc: number, s: any) => {
+             const n = s.coils ?? 0;
+             const p = s.pitch ?? 0;
+             const g = Math.max(0, p - d);
+             return acc + n * g;
+        }, 0);
+        limit = gapTotal > 0 ? gapTotal : 0;
+    } else if (geometry.type === 'compression' || geometry.type === 'conical' || geometry.type === 'dieSpring') {
+       const L0 = geometry.freeLength;
        // Estimate solid height if not provided (approximate)
        const Hs = analysis?.solidHeight ?? (geometry.totalCoils ?? geometry.activeCoils ?? 0) * (geometry.wireDiameter ?? 0);
        

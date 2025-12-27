@@ -79,27 +79,27 @@ const initialState: Omit<
   | "removeWorkingPoint"
   | "reset"
 > = {
-  wireDiameter: 3.2,
-  meanDiameter: 24,
+  wireDiameter: 2,
+  meanDiameter: 20,
   shearModulus: 79300,
   activeCoils0: 8,
   totalCoils: 10,
-  freeLength: 50,
+  freeLength: 46,
 
   materialId: "music_wire_a228",
 
   segments: [
-    { coils: 2, pitch: 6 },
-    { coils: 6, pitch: 8 },
+    { coils: 3, pitch: 4 }, // Gap = 4-2 = 2mm
+    { coils: 5, pitch: 9 }, // Gap = 9-2 = 7mm (High visual contrast)
   ],
 
   mode: "deflection",
-  deflection: 10,
+  deflection: 20,
   load: 0,
 
   chartMode: "force",
 
-  workingPoints: [5, 10, 15],
+  workingPoints: [10, 20, 30],
 };
 
 export const useVariablePitchCompressionStore = create<VariablePitchCompressionState>()(

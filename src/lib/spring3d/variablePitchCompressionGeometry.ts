@@ -107,109 +107,145 @@ export function buildVariablePitchCompressionCenterline(
       solidFraction: number;
     };
 
-  const blocks: TurnBlock[] = [];
+  // --- Refactored Deflection Logic: Only Active segments compress ---
 
-  if (opts.smoothAnimation) {
-    // --- Smooth Animation Mode: Linear interpolation of pitch across all coils ---
-    const totalMaxGap = params.segments.reduce((acc, s) => acc + Math.max(0, s.pitch - d) * s.coils, 0);
-    const ratio = totalMaxGap > 0 ? Math.min(1, params.deflection / totalMaxGap) : 0;
-    const scale = 1 - ratio;
+  // --- Refactored Deflection Logic: Only Active segments compress ---
+  const initialBlocks: TurnBlock[] = [];
 
-    for (let i = 0; i < bottomDead; i++) {
-      const t = closingTurns > 0 ? Math.min(1, (bottomDead - i) / closingTurns) : 1;
-      const basePitch = lerp(firstActivePitch, d, t);
-      // Even end turns compress slightly in smooth mode if they have pitch > d
-      const pitch = d + (basePitch - d) * scale;
-      blocks.push({ kind: "solid", turns: 1, pitch });
-    }
+  // Helper to generate tapered rigid blocks (prevents interference kinks)
+  const addTaperedDeadCoils = (
+    numTurns: number,
+    pitchAtDeadEnd: number,
+    pitchAtActiveEnd: number,
+    blocks: TurnBlock[],
+    isBottom: boolean
+  ) => {
+    if (numTurns <= 0) return;
 
-    for (const s of params.segments) {
-      const pitch = d + (s.pitch - d) * scale;
-      blocks.push({ kind: "active", turns: s.coils, pitch });
-    }
+    // Use transition over min(numTurns, closingTurns)
+    const transitionTurns = Math.min(numTurns, closingTurns);
+    const flatTurns = Math.max(0, numTurns - transitionTurns);
 
-    for (let i = 0; i < topDead; i++) {
-      const t = closingTurns > 0 ? Math.min(1, (i + 1) / closingTurns) : 1;
-      const basePitch = lerp(lastActivePitch, d, t);
-      const pitch = d + (basePitch - d) * scale;
-      blocks.push({ kind: "solid", turns: 1, pitch });
-    }
-  } else {
-    // --- Standard Mode: Physical segment closure (coil-by-coil) ---
-    for (let i = 0; i < bottomDead; i++) {
-      const t = closingTurns > 0 ? Math.min(1, (bottomDead - i) / closingTurns) : 1;
-      const pitch = lerp(firstActivePitch, d, t);
-      // End turns are typically squared/closed; treat as solid for geometry.
-      blocks.push({ kind: "solid", turns: 1, pitch });
-    }
+    const segments = Math.ceil(transitionTurns * 4); // 4 steps per turn for smoothness
 
-    for (const st of segmentStates) {
-      const turns = Math.max(0, st.coils);
-      const pitch = clampFinite(st.pitch, d);
-      const solidCoils = Math.max(0, Math.min(turns, st.solidCoils));
-      const solidTurns = Math.floor(solidCoils + 1e-9);
-      const partial = solidCoils - solidTurns;
-      const activeTurns = Math.max(0, turns - solidTurns - partial);
-
-      if (solidTurns > 0) {
-        blocks.push({ kind: "solid", turns: solidTurns, pitch });
+    if (isBottom) {
+      // Bottom: Flat (solid) -> Transition -> Active
+      if (flatTurns > 0) {
+        blocks.push({ kind: "solid", turns: flatTurns, pitch: solidDz });
       }
-      if (partial > 1e-9) {
-        // A fractional solid coil: transition within this portion from active spacing to solid.
-        blocks.push({ kind: "partial", turns: partial, pitch, solidFraction: partial });
+      for (let i = 0; i < segments; i++) {
+        const t = (i + 0.5) / segments; // 0..1
+        // Interpolate pitch from Solid -> Active
+        const p = lerp(pitchAtDeadEnd, pitchAtActiveEnd, t);
+        blocks.push({ kind: "solid", turns: transitionTurns / segments, pitch: p });
       }
-      if (activeTurns > 1e-9) {
-        blocks.push({ kind: "active", turns: activeTurns, pitch });
+    } else {
+      // Top: Active -> Transition -> Flat (solid)
+      for (let i = 0; i < segments; i++) {
+        const t = (i + 0.5) / segments;
+        // Interpolate pitch from Active -> Solid
+        const p = lerp(pitchAtActiveEnd, pitchAtDeadEnd, t);
+        blocks.push({ kind: "solid", turns: transitionTurns / segments, pitch: p });
+      }
+      if (flatTurns > 0) {
+        blocks.push({ kind: "solid", turns: flatTurns, pitch: solidDz });
       }
     }
+  };
 
-    for (let i = 0; i < topDead; i++) {
-      const t = closingTurns > 0 ? Math.min(1, (i + 1) / closingTurns) : 1;
-      const pitch = lerp(lastActivePitch, d, t);
-      blocks.push({ kind: "solid", turns: 1, pitch });
+  // Bottom Dead Coils
+  addTaperedDeadCoils(bottomDead, solidDz, firstActivePitch, initialBlocks, true);
+
+  // Active Segments
+  for (const s of params.segments) {
+    if (s.coils > 0) {
+      initialBlocks.push({ kind: "active", turns: s.coils, pitch: clampFinite(s.pitch, d) });
     }
   }
 
-  let globalTurn = 0;
-  let z = 0;
-  const pts: THREE.Vector3[] = [];
+  // Top Dead Coils
+  addTaperedDeadCoils(topDead, solidDz, lastActivePitch, initialBlocks, false);
 
-  const pushPoint = (theta: number, zVal: number) => {
-    pts.push(new THREE.Vector3(R * Math.cos(theta), R * Math.sin(theta), zVal));
-  };
+  // --- Gap-Driven Logic (Discrete Integration) ---
 
-  pushPoint(0, 0);
+  // 1. Discretize the entire spring into steps
+  // e.g. 24 steps per turn
+  let totalTurns = 0;
+  for (const b of initialBlocks) totalTurns += b.turns;
 
-  for (const block of blocks) {
-    const turns = block.turns;
-    if (!(turns > 0)) continue;
+  const stepsPerTurn = Math.max(12, pointsPerTurn);
+  const totalSteps = Math.ceil(totalTurns * stepsPerTurn);
 
-    const nSteps = Math.max(1, Math.round(turns * pointsPerTurn));
+  // Arrays to store per-step properties
+  const stepGaps: number[] = new Float64Array(totalSteps) as any;
+  const isCompressible: boolean[] = new Array(totalSteps).fill(false);
 
-    for (let step = 1; step <= nSteps; step++) {
-      const u = step / nSteps;
-      const turnPos = globalTurn + u * turns;
+  // Fill initial gaps based on blocks
+  let currentStep = 0;
+  const solidDzPerStep = solidDz / stepsPerTurn;
 
-      const pitchEff = block.pitch;
+  for (const block of initialBlocks) {
+    const blockSteps = Math.round(block.turns * stepsPerTurn);
+    const pitch = block.pitch;
+    // Gap per step = (Pitch - SolidPitch) / stepsPerTurn
+    // Ensure we handle tapered blocks correctly by using average pitch?
+    // Actually, tapered blocks have constant pitch *per block*.
+    const gapPerStep = Math.max(0, (pitch - solidDz) / stepsPerTurn);
 
-      const activeDz = Math.max(d, pitchEff - dzReduction);
-      let dz = activeDz;
-      if (block.kind === "solid") {
-        dz = solidDz;
-      } else if (block.kind === "partial") {
-        // Transition from activeDz to d within the partial portion
-        dz = lerp(Math.max(solidDz, activeDz), solidDz, Math.max(0, Math.min(1, u)));
-      } else {
-        dz = Math.max(solidDz, activeDz);
+    for (let k = 0; k < blockSteps; k++) {
+      if (currentStep >= totalSteps) break;
+      stepGaps[currentStep] = gapPerStep;
+      // Mark as compressible only if it's an ACTIVE block and has a positive gap
+      if (block.kind === "active" && gapPerStep > 1e-9) {
+        isCompressible[currentStep] = true;
       }
-
-      z += dz / nSteps;
-
-      const theta = 2 * Math.PI * turnPos;
-      pushPoint(theta, z);
+      currentStep++;
     }
+  }
 
-    globalTurn += turns;
+  // 2. Distribute Deflection (Proportional Distribution)
+  // Recommended by user logic: distribute stroke proportional to gap size.
+  // This preserves the "shape" of the pitch profile while compressing.
+
+  // Calculate total compressible gap
+  let totalCompressibleGap = 0;
+  for (let i = 0; i < totalSteps; i++) {
+    if (isCompressible[i]) {
+      totalCompressibleGap += stepGaps[i];
+    }
+  }
+
+  // Calculate scaling factor
+  // If total gap is 100mm and deflection is 10mm, new gap = old gap * (90/100) = 0.9
+  // ratio = deflection / total
+  // Clamp ratio to 1.0 to avoid inverting gaps
+  const ratio = totalCompressibleGap > 1e-9
+    ? Math.min(1, params.deflection / totalCompressibleGap)
+    : 0;
+
+  // Apply compression
+  for (let i = 0; i < totalSteps; i++) {
+    if (isCompressible[i]) {
+      stepGaps[i] = Math.max(0, stepGaps[i] * (1 - ratio));
+    }
+  }
+
+  // 3. Integrate Centerline
+  const pts: THREE.Vector3[] = [];
+  let z = 0;
+
+  // Push start point
+  pts.push(new THREE.Vector3(R, 0, 0)); // theta=0
+
+  for (let i = 0; i < totalSteps; i++) {
+    const currentGap = stepGaps[i];
+    const dz = solidDzPerStep + currentGap; // Reconstruct visible height
+    z += dz;
+
+    const turnPos = (i + 1) / stepsPerTurn;
+    const theta = 2 * Math.PI * turnPos;
+
+    pts.push(new THREE.Vector3(R * Math.cos(theta), R * Math.sin(theta), z));
   }
 
   const zMin = pts.reduce((acc, p) => Math.min(acc, p.z), Number.POSITIVE_INFINITY);
