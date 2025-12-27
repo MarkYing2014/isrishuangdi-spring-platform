@@ -29,6 +29,7 @@ import {
   type SpringMaterial,
   getSpringMaterial 
 } from "@/lib/materials/springMaterials";
+import { getDefaultTorsionSample } from "@/lib/springPresets";
 import { LanguageText, useLanguage } from "@/components/language-context";
 import { 
   useSpringDesignStore,
@@ -278,21 +279,23 @@ export function TorsionCalculator() {
   );
   const selectedMaterial = getSpringMaterial(materialId);
 
+  // Get default sample for new users
+  const defaultSample = getDefaultTorsionSample();
+  
   const form = useForm<FormValues>({
     defaultValues: {
-      wireDiameter: lastTorsion?.wireDiameter ?? 2.0,
-      outerDiameter: lastTorsion?.outerDiameter ?? 22,
-      totalCoils: lastTorsion?.activeCoils ?? 12, // Increased for safety
-      activeCoils: lastTorsion?.activeCoils ?? 12, // Increased for safety
-      armLength1: lastTorsion?.legLength1 ?? 50,
-      armLength2: lastTorsion?.legLength2 ?? 50,
+      wireDiameter: lastTorsion?.wireDiameter ?? defaultSample.wireDiameter,
+      outerDiameter: lastTorsion?.outerDiameter ?? (defaultSample.meanDiameter + defaultSample.wireDiameter),
+      totalCoils: lastTorsion?.activeCoils ?? defaultSample.activeCoils,
+      activeCoils: lastTorsion?.activeCoils ?? defaultSample.activeCoils,
+      armLength1: lastTorsion?.legLength1 ?? defaultSample.legLength1,
+      armLength2: lastTorsion?.legLength2 ?? defaultSample.legLength2,
       loadRadius: 50,
       bodyLength: lastTorsion?.bodyLength ?? 25,
-      // 由上次保存的 workingAngle 反推总转角，暂时全部放在 workingAngle，installAngle 保持 0
       installAngle: 0,
-      workingAngle: lastTorsion?.workingAngle ?? 60, // Reduced from 90 to 60 for safety with d=2, Dm=20
+      workingAngle: lastTorsion?.workingAngle ?? defaultSample.workingAngle,
       pitch: 1.5,
-      handOfCoil: lastTorsion?.windingDirection ?? "right",
+      handOfCoil: lastTorsion?.windingDirection ?? defaultSample.windingDirection,
     },
   });
 

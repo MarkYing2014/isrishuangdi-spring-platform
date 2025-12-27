@@ -28,6 +28,7 @@ import {
   getSpringMaterial,
   type SpringMaterial,
 } from "@/lib/materials/springMaterials";
+import { getDefaultExtensionSample } from "@/lib/springPresets";
 import { 
   useSpringDesignStore,
   type ExtensionGeometry,
@@ -127,17 +128,20 @@ export function ExtensionCalculator() {
   }, [lastExtensionGeometry, lastExtensionAnalysis, unifiedAudit]);
   const defaultDeflection = storedAnalysis?.maxDeflection ?? storedAnalysis?.workingDeflection ?? 15;
 
+  // Get default sample for new users
+  const defaultSample = getDefaultExtensionSample();
+  
   const form = useForm<FormValues>({
     defaultValues: {
-      outerDiameter: lastExtensionGeometry?.outerDiameter ?? 12,
-      wireDiameter: lastExtensionGeometry?.wireDiameter ?? 1.5,
-      activeCoils: lastExtensionGeometry?.activeCoils ?? 10,
-      bodyLength: lastExtensionGeometry?.bodyLength ?? 25,
-      freeLengthInsideHooks: lastExtensionGeometry?.freeLength ?? 35,
-      shearModulus: lastExtensionGeometry?.shearModulus ?? selectedMaterial.shearModulus,
-      initialTension: lastExtensionGeometry?.initialTension ?? 3,
-      hookType: lastExtensionGeometry?.hookType ?? "machine",
-      workingDeflection: defaultDeflection,
+      outerDiameter: lastExtensionGeometry?.outerDiameter ?? defaultSample.outerDiameter,
+      wireDiameter: lastExtensionGeometry?.wireDiameter ?? defaultSample.wireDiameter,
+      activeCoils: lastExtensionGeometry?.activeCoils ?? defaultSample.activeCoils,
+      bodyLength: lastExtensionGeometry?.bodyLength ?? defaultSample.bodyLength,
+      freeLengthInsideHooks: lastExtensionGeometry?.freeLength ?? defaultSample.freeLengthInsideHooks,
+      shearModulus: lastExtensionGeometry?.shearModulus ?? defaultSample.shearModulus,
+      initialTension: lastExtensionGeometry?.initialTension ?? defaultSample.initialTension,
+      hookType: lastExtensionGeometry?.hookType ?? defaultSample.hookType,
+      workingDeflection: defaultDeflection || defaultSample.deflection,
     },
   });
 

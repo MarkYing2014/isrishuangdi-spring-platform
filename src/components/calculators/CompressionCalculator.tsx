@@ -23,6 +23,7 @@ import {
   type SpringMaterialId,
 } from "@/lib/materials/springMaterials";
 import { SpringDesign } from "@/lib/springTypes";
+import { getDefaultCompressionSample } from "@/lib/springPresets";
 import { resolveCompressionNominal } from "@/lib/eds/compressionResolver";
 import { toEdsFromLegacyForm } from "@/lib/eds/legacyAdapters";
 import { buildCompressionDesignRuleReport } from "@/lib/designRules";
@@ -156,16 +157,19 @@ export function CompressionCalculator() {
     }
   }, [lastCompressionGeometry, lastCompressionAnalysis, unifiedAudit]);
 
+  // Get default sample for new users
+  const defaultSample = getDefaultCompressionSample();
+  
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as Resolver<FormValues>,
     defaultValues: {
-      wireDiameter: lastCompressionGeometry?.wireDiameter ?? 3.2,
-      meanDiameter: lastCompressionGeometry?.meanDiameter ?? 24,
-      activeCoils: lastCompressionGeometry?.activeCoils ?? 8,
-      totalCoils: lastCompressionGeometry?.totalCoils ?? 10,
-      shearModulus: lastCompressionGeometry?.shearModulus ?? initialMaterial.shearModulus,
-      freeLength: lastCompressionGeometry?.freeLength ?? 50,
-      deflection: defaultDeflection,
+      wireDiameter: lastCompressionGeometry?.wireDiameter ?? defaultSample.wireDiameter,
+      meanDiameter: lastCompressionGeometry?.meanDiameter ?? defaultSample.meanDiameter,
+      activeCoils: lastCompressionGeometry?.activeCoils ?? defaultSample.activeCoils,
+      totalCoils: lastCompressionGeometry?.totalCoils ?? defaultSample.totalCoils,
+      shearModulus: lastCompressionGeometry?.shearModulus ?? defaultSample.shearModulus,
+      freeLength: lastCompressionGeometry?.freeLength ?? defaultSample.freeLength,
+      deflection: defaultDeflection || defaultSample.deflection,
       preloadDeflection: defaultPreload,
       stressRatio: 0.3,
       topGround: lastCompressionGeometry?.topGround ?? true,
