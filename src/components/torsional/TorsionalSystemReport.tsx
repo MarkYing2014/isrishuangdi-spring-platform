@@ -524,29 +524,20 @@ export function TorsionalSystemReport({
 
           {/* 4. Engineering Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="border-slate-200">
-              <CardHeader className="py-3 px-6 border-b">
-                <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-blue-500" />
-                  Torque–Angle Performance
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="h-[400px] p-4 pb-8">
-                <TorsionalAuditCurveChart 
-                    systemCurve={{
-                        points: result.curves.map(c => ({ 
-                            thetaDeg: c.theta, 
-                            torqueNmm: c.torqueLoad 
-                        })),
-                        thetaSafeSystemDeg: result.thetaSafeSystemDeg // Now exact
-                    }}
-                    playheadTheta={design.referenceAngle}
-                    operatingTheta={design.thetaOperatingCustomerDeg}
-                    thetaPhysicalStop={result.thetaHardSystemDeg}
-                    thetaSafeLife={result.thetaSafeSystemDeg} // Use exact safe limit
-                />
-              </CardContent>
-            </Card>
+            {/* Torque-Angle Performance Chart - component has its own Card wrapper */}
+            <TorsionalAuditCurveChart 
+                systemCurve={{
+                    points: result.curves.map(c => ({ 
+                        thetaDeg: c.theta, 
+                        torqueNmm: c.torqueLoad 
+                    })),
+                    thetaSafeSystemDeg: result.thetaSafeSystemDeg
+                }}
+                playheadTheta={design.referenceAngle}
+                operatingTheta={design.thetaOperatingCustomerDeg}
+                thetaPhysicalStop={result.thetaHardSystemDeg}
+                thetaSafeLife={result.thetaSafeSystemDeg}
+            />
 
             <Card className="border-slate-200">
               <CardHeader className="py-3 px-6 border-b">
