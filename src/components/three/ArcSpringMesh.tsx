@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import React, { useLayoutEffect, useMemo, useRef, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Edges, Line } from "@react-three/drei";
 import * as THREE from "three";
 import { previewTheme } from "@/lib/three/previewTheme";
 import {
-  createArcSpringTubeGeometry,
   validateArcSpringGeometry,
   type ArcSpringGeometryParams,
 } from "@/lib/spring3d/arcSpringGeometry";
+import { buildArcBackboneFrames, type BackboneFrame } from "@/lib/spring3d/arcBackbone";
 
 type ArcSpringColorMode = "solid" | "approx_stress";
 
@@ -76,6 +76,15 @@ export interface ArcSpringMeshProps {
   alphaSolidDeg?: number;
   arcRadiusMm?: number;
   
+  // Pack / Bow Props
+  profile?: "ARC" | "BOW";
+  packIndex?: number;      // 0-based index for this specific spring in the pack
+  packGapMm?: number;      // Radial gap between springs
+  packPhaseDeg?: number;   // Phase offset for nested springs to avoid visual overlap
+  bowLeanDeg?: number;
+  bowPlaneTiltDeg?: number;
+  endCapStyle?: "RING" | "BLOCK";
+  spring2?: { d: number; D: number; n: number };
   deadCoilsStart?: number;
   deadCoilsEnd?: number;
   deadTightnessK?: number;
@@ -88,6 +97,10 @@ export interface ArcSpringMeshProps {
   roughness?: number;
   wireframe?: boolean;
   showCenterline?: boolean;
+  
+  // Fit Audit
+  fitResult?: { status: "PASS" | "WARN" | "FAIL" };
+  forceRender?: boolean;
 }
 
 export function ArcSpringMesh({
@@ -100,6 +113,13 @@ export function ArcSpringMesh({
   alphaFreeDeg,
   alphaSolidDeg,
   arcRadiusMm,
+  profile = 'ARC',
+  packIndex = 0,
+  packGapMm = 0,
+  packPhaseDeg = 0,
+  bowLeanDeg = 0,
+  bowPlaneTiltDeg = 0,
+  spring2,
   deadCoilsStart = 0,
   deadCoilsEnd = 0,
   deadTightnessK = 0,
@@ -142,33 +162,241 @@ export function ArcSpringMesh({
 
   const validation = useMemo(() => validateArcSpringGeometry(params), [params]);
 
-  const { geometry, centerline } = useMemo(() => {
+  const { geometry, centerline, endCaps } = useMemo(() => {
     if (!validation.valid) {
-      return { geometry: new THREE.BoxGeometry(10, 10, 10), centerline: [] as THREE.Vector3[] };
+      return { geometry: new THREE.BoxGeometry(10, 10, 10), centerline: [] as THREE.Vector3[], endCaps: [] };
     }
 
-    const res = createArcSpringTubeGeometry(params, {
-      centerArc: true,
-      radialSegments: 16,
-      deadCoilsStart,
-      deadCoilsEnd,
-      deadDensityFactor: 4,
-      tightnessK: deadTightnessK,
-      tightnessSigma: deadTightnessSigma,
+    // --- NEW BACKBONE IMPLEMENTATION ---
+    const samples = 400; // Increased resolution
+    const backboneFrames = buildArcBackboneFrames({
+      arcRadiusMm: r,
+      alphaDeg: currentAlphaDeg,
+      samples,
+      profile,
+      bowLeanDeg,
+      bowPlaneTiltDeg
     });
-    if (colorMode === "approx_stress") {
-      applyApproxStressColors(res.geometry, approxStressBeta);
+
+
+    const tubePath: THREE.Vector3[] = [];
+    const totalCoils = n + (deadCoilsStart ?? 0) + (deadCoilsEnd ?? 0);
+    
+    let currentD = D;
+    let currentd = d;
+    
+    // Helper to shrink from a base spring
+    const shrink = (baseD: number, based: number, gap: number) => {
+        const ID_outer = baseD - based;
+        const TargetOD_inner = ID_outer - 2 * gap;
+        if (TargetOD_inner <= 0.5) return { D: 0.1, d: 0.05 };
+        
+        const previousOD = baseD + based;
+        const scale = TargetOD_inner / previousOD;
+        return { D: baseD * scale, d: based * scale };
+    };
+
+    // Iteratively compute up to current packIndex
+    for (let i = 1; i <= packIndex; i++) {
+        // Gap for this layer
+        const gap = packGapMm > 0 ? packGapMm : 0.5;
+        
+        if (i === 1 && spring2 && spring2.D && spring2.d) {
+            // Explicit override for 2nd spring
+            currentD = spring2.D;
+            currentd = spring2.d;
+        } else {
+            // Auto-shrink from current (which is previous layer at this point in loop)
+            const next = shrink(currentD, currentd, gap);
+            currentD = next.D;
+            currentd = next.d;
+        }
     }
-    return res;
+    
+    const meanCoilRadius = currentD / 2;
+    
+    // 2. Radial Offset (Centerline shift)
+    // For concentric springs, centerline is roughly the same.
+    // Previous "radialOffset" moved them apart side-by-side.
+    // Now we keep them centered (Offset = 0).
+    const radialOffset = 0; 
+    
+    // 3. Arc Shift (Tangential Jitter)
+    // Keep subtle shift or phase shift to avoid z-fighting if they touch
+    const arcShiftRatio = 0.0; // Disable arc physical shift for proper nesting look
+    
+    const arcLength = (currentAlphaDeg * Math.PI / 180) * r;
+    const arcShift = 0; // Keep centered
+    
+    // 4. Phase Offset (Critical for visual separation of nested coils)
+    const phaseOffsetRad = (packIndex * (packPhaseDeg ?? 0)) * (Math.PI / 180);
+
+    // Generate Coil Points
+    for (let i = 0; i < backboneFrames.length; i++) {
+        const frame = backboneFrames[i];
+        
+        // Unmodified U along backbone
+        const u = i / (backboneFrames.length - 1); // 0..1
+        
+        const currentTurns = u * totalCoils;
+        const phi = (2 * Math.PI * currentTurns) + phaseOffsetRad;
+
+        const cosPhi = Math.cos(phi);
+        const sinPhi = Math.sin(phi);
+
+        // Standard Coil Position on this frame
+        // p_coil_local = meanCoilRadius * (cos * n + sin * b)
+        
+        const centerOffset = new THREE.Vector3()
+            .addScaledVector(frame.n, -radialOffset) 
+            .addScaledVector(frame.t, arcShift);
+            
+        const coilVector = new THREE.Vector3()
+            .addScaledVector(frame.n, cosPhi * meanCoilRadius)
+            .addScaledVector(frame.b, sinPhi * meanCoilRadius);
+            
+        // Note: For concentric nesting, we do NOT offset the center.
+        // We just used the smaller meanCoilRadius calculated above.
+            
+        const pFinal = frame.p.clone().add(centerOffset).add(coilVector);
+        
+        tubePath.push(pFinal);
+    }
+
+    // Build Coil Geometry
+    const curve = new THREE.CatmullRomCurve3(tubePath);
+    // Increase radialSegments from 8 to 24 for smoother look
+    const tubeGeometry = new THREE.TubeGeometry(curve, tubePath.length * 4, currentd/2, 24, false); 
+    
+    // --- END CAP GEOMETRY ---
+    // Rule:
+    // ARC -> "RING" (Thin cylinder cap)
+    // BOW -> "BLOCK" (Rectangular block) - ONLY for the primary pack (packIndex === 0) to avoid double-vision
+    // Unless explicitly overridden (which we don't have explicit prop for yet, so infer from profile)
+    
+    let endStyle = "RING";
+    if (profile === "BOW") {
+        endStyle = (packIndex === 0) ? "BLOCK" : "NONE";
+    }
+    const geometriesToMerge: THREE.BufferGeometry[] = [tubeGeometry];
+    
+    if (endStyle === "BLOCK") {
+        // Create Blocks at Start and End
+        // They should align with the FIRST and LAST backbone frame, offset by the same pack amount.
+        
+        const makeBlock = (isStart: boolean) => {
+            const frameIndex = isStart ? 0 : backboneFrames.length - 1;
+            const frame = backboneFrames[frameIndex];
+            
+            // Apply sane offsets
+            const centerOffset = new THREE.Vector3()
+                .addScaledVector(frame.n, -radialOffset) 
+                .addScaledVector(frame.t, arcShift);
+                
+            const blockCenter = frame.p.clone().add(centerOffset);
+            
+            // Dimensions
+            // Make block LARGER than the spring Outer Diameter (De = D + d) to ensure it's visible as a seat/cap.
+            // D = Mean, d = Wire. De = D + d.
+            // Let's use D + 1.5d for width/height.
+            
+            const w = D + d * 1.5;
+            const h = D + d * 1.5;
+            const len = d * 2.5; // Slightly longer
+            
+            const boxGeo = new THREE.BoxGeometry(len, w, h);
+            
+            // Rotate Box to align with Frame
+            // Box default is axis-aligned.
+            // X axis is length. Align X with Tangent.
+            // Y, Z with Normal, Binormal.
+            // Matrix construction:
+            // Col 0: T
+            // Col 1: N
+            // Col 2: B
+            
+            const matrix = new THREE.Matrix4();
+            matrix.makeBasis(frame.t, frame.n, frame.b);
+            matrix.setPosition(blockCenter);
+            
+            boxGeo.applyMatrix4(matrix);
+            return boxGeo;
+        };
+        
+        geometriesToMerge.push(makeBlock(true));
+        geometriesToMerge.push(makeBlock(false));
+    }
+    
+    // Merge if multiple parts
+    // Note: use simple merge if supported, or group them. 
+    // For single mesh return, merge is best.
+    // Three.js mergeBufferGeometries utils... 
+    // Since we are inside useMemo returning { geometry }, we might need to import BufferGeometryUtils.
+    // But standard THREE doesn't include Utils by default in import * as THREE.
+    // For simplicity/safety without extra deps: Just return the TubeGeometry for now 
+    // and rely on Group for end caps? 
+    // Returning multiple geometries from hook is weird.
+    // Let's stick to Group in the Render?
+    
+    // But hook returns { geometry }.
+    // If we want blocks, let's create them as separate meshes in the render loop component.
+    // BUT the calculations are heavy here (frames).
+    // Let's compute the Block Matrices here and return them?
+    
+    // Better: Helper function to get end cap transforms.
+    
+    // Let's modify the return signature of useMemo to include "endCaps" data.
+    
+    const endCaps = [];
+    if (endStyle === "BLOCK") {
+         const getMatrix = (idx: number) => {
+            const frame = backboneFrames[idx];
+            const centerOffset = new THREE.Vector3()
+                .addScaledVector(frame.n, -radialOffset) 
+                .addScaledVector(frame.t, arcShift);
+            const pos = frame.p.clone().add(centerOffset);
+            const m = new THREE.Matrix4();
+            m.makeBasis(frame.t, frame.n, frame.b);
+            m.setPosition(pos);
+            return m;
+         };
+         
+         const size: [number, number, number] = [d*2.5, D+d*1.5, D+d*1.5];
+         endCaps.push({ matrix: getMatrix(0), size });
+         endCaps.push({ matrix: getMatrix(backboneFrames.length - 1), size });
+    }
+
+    if (colorMode === "approx_stress") {
+      applyApproxStressColors(tubeGeometry, approxStressBeta);
+    }
+    
+    // Extract centerline for visualization from frames
+    const centerlinePts = backboneFrames.map(f => {
+         // Apply same center offsets to centerline viz
+         const centerOffset = new THREE.Vector3()
+            .addScaledVector(f.n, -radialOffset) 
+            .addScaledVector(f.t, arcShift);
+         return f.p.clone().add(centerOffset);
+    });
+
+    return { 
+        geometry: tubeGeometry, 
+        centerline: centerlinePts,
+        endCaps // Array of { matrix: Matrix4, size: [l,w,h] }
+    };
+
   }, [
     params,
     validation.valid,
-    deadCoilsStart,
-    deadCoilsEnd,
-    deadTightnessK,
-    deadTightnessSigma,
-    colorMode,
-    approxStressBeta,
+    profile, 
+    packIndex, 
+    packGapMm, 
+    packPhaseDeg, 
+    bowLeanDeg, 
+    bowPlaneTiltDeg,
+    d, D, n, r, 
+    deadCoilsStart, deadCoilsEnd,
+    colorMode, approxStressBeta
   ]);
 
   useEffect(() => {
@@ -177,8 +405,17 @@ export function ArcSpringMesh({
     };
   }, [geometry]);
 
+
+  
+  // Wait, the previous replace_file_content modified the return of the big useMemo block.
+  // But the destructuring at the top of the component:
+  // const { geometry, centerline } = useMemo(...)
+  // needs to be updated.
+
+
   return (
     <group>
+      {/* Main Coil */}
       <mesh geometry={geometry} castShadow receiveShadow>
         {colorMode === "approx_stress" ? (
           <meshBasicMaterial
@@ -189,7 +426,7 @@ export function ArcSpringMesh({
           />
         ) : (
           <meshStandardMaterial
-            color={validation.valid ? color : "#ff4444"}
+            color={packIndex === 0 ? (validation.valid ? color : "#ff4444") : "#555555"} // Inner springs dark grey to verify visibility
             metalness={metalness}
             roughness={roughness}
             wireframe={wireframe}
@@ -198,11 +435,51 @@ export function ArcSpringMesh({
         )}
         <Edges threshold={35} color="#1a365d" />
       </mesh>
+      
+      {/* End Caps (Blocks) */}
+      {(endCaps || []).map((cap, i) => (
+         <BlockCap 
+            key={`cap-${i}`} 
+            matrix={cap.matrix} 
+            size={cap.size}
+            color={color}
+            metalness={metalness}
+            roughness={roughness}
+         />
+      ))}
+
       {showCenterline && centerline.length > 1 && (
         <Line points={centerline} color="#93c5fd" lineWidth={1} />
       )}
     </group>
   );
+}
+
+function BlockCap({ matrix, size, color, metalness, roughness }: {
+    matrix: THREE.Matrix4;
+    size: [number, number, number];
+    color: string;
+    metalness: number;
+    roughness: number;
+}) {
+    const meshRef = useRef<THREE.Mesh>(null);
+
+    useLayoutEffect(() => {
+        if (meshRef.current) {
+            meshRef.current.matrix.copy(matrix);
+            // MatrixAutoUpdate is false, so we must manually update world matrix if needed, 
+            // though copy() sets local matrix. R3F/Three usually needs updateMatrixWorld() if not auto updating.
+            meshRef.current.updateMatrixWorld(); 
+        }
+    }, [matrix]);
+
+    return (
+        <mesh ref={meshRef} matrixAutoUpdate={false} castShadow receiveShadow>
+            <boxGeometry args={size} />
+            <meshStandardMaterial color={color} metalness={metalness} roughness={roughness} />
+            <Edges threshold={35} color="#1a365d" />
+        </mesh>
+    );
 }
 
 function FitToObject({ groupRef, autoRotate }: { groupRef: React.RefObject<THREE.Group | null>; autoRotate: boolean }) {
@@ -244,80 +521,39 @@ function FitToObject({ groupRef, autoRotate }: { groupRef: React.RefObject<THREE
   );
 }
 
-export interface ArcSpringVisualizerProps {
-  d?: number;
-  D?: number;
-  n?: number;
-  r?: number;
-  alpha0Deg?: number;
-  // Standard Stroke Model Props
-  previewStrokeMm?: number;
-  alphaFreeDeg?: number;
-  alphaSolidDeg?: number;
-  arcRadiusMm?: number;
 
-  useDeadCoils?: boolean;
-  deadCoilsPerEnd?: number;
-  deadCoilsStart?: number;
-  deadCoilsEnd?: number;
-  deadTightnessK?: number;
-  deadTightnessSigma?: number;
-  colorMode?: ArcSpringColorMode;
-  approxTauMax?: number;
-  approxStressBeta?: number;
+
+export interface ArcSpringVisualizerProps extends ArcSpringMeshProps {
+  // Adds pack config to the visualizer container
+  packCount?: number;
   autoRotate?: boolean;
-  wireframe?: boolean;
-  showCenterline?: boolean;
 }
 
-type ArcSpringSceneProps = {
-  d: number;
-  D: number;
-  n: number;
-  r: number;
-  alpha0Deg: number;
-  previewStrokeMm?: number;
-  alphaFreeDeg?: number;
-  alphaSolidDeg?: number;
-  arcRadiusMm?: number;
-  useDeadCoils: boolean;
-  deadCoilsPerEnd: number;
-  deadCoilsStart?: number;
-  deadCoilsEnd?: number;
-  deadTightnessK: number;
-  deadTightnessSigma: number;
-  colorMode: ArcSpringColorMode;
-  approxTauMax?: number;
-  approxStressBeta: number;
-  autoRotate: boolean;
-  wireframe: boolean;
-  showCenterline: boolean;
-};
-
 function ArcSpringScene({
-  d,
-  D,
-  n,
-  r,
-  alpha0Deg,
-  previewStrokeMm,
-  alphaFreeDeg,
-  alphaSolidDeg,
-  arcRadiusMm,
-  useDeadCoils,
-  deadCoilsPerEnd,
-  deadCoilsStart,
-  deadCoilsEnd,
-  deadTightnessK,
-  deadTightnessSigma,
-  colorMode,
-  approxTauMax,
-  approxStressBeta,
+  packCount = 1,
+  packGapMm = 3, // Default gap
+  packPhaseDeg, 
+  bowLeanDeg, 
+  bowPlaneTiltDeg,
+  spring2,
+  fitResult,
+  forceRender,
   autoRotate,
-  wireframe,
-  showCenterline,
-}: ArcSpringSceneProps) {
+  ...meshProps
+}: ArcSpringVisualizerProps) {
   const groupRef = useRef<THREE.Group>(null);
+  
+  // Create array of indices 0..packCount-1
+  const packs = useMemo(() => {
+      const count = Math.max(1, Math.round(packCount ?? 1));
+      const arr = Array.from({ length: count }, (_, i) => i);
+      
+      // Defensive Audit Layer: Suppress inner springs if FAIL and !forceRender
+      if (fitResult?.status === "FAIL" && !forceRender) {
+          return [0];
+      }
+      return arr;
+  }, [packCount, fitResult, forceRender]);
 
   return (
     <>
@@ -328,81 +564,29 @@ function ArcSpringScene({
       <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
 
       <group ref={groupRef}>
-        <ArcSpringMesh
-          d={d}
-          D={D}
-          n={n}
-          r={r}
-          alpha0Deg={alpha0Deg}
-          previewStrokeMm={previewStrokeMm}
-          alphaFreeDeg={alphaFreeDeg}
-          alphaSolidDeg={alphaSolidDeg}
-          arcRadiusMm={arcRadiusMm}
-          deadCoilsStart={useDeadCoils ? (deadCoilsStart ?? deadCoilsPerEnd) : 0}
-          deadCoilsEnd={useDeadCoils ? (deadCoilsEnd ?? deadCoilsPerEnd) : 0}
-          deadTightnessK={useDeadCoils ? deadTightnessK : 0}
-          deadTightnessSigma={useDeadCoils ? deadTightnessSigma : 0}
-          colorMode={colorMode}
-          approxTauMax={approxTauMax}
-          approxStressBeta={approxStressBeta}
-          wireframe={wireframe}
-          showCenterline={showCenterline}
-        />
+        {packs.map(i => (
+           <ArcSpringMesh
+             key={i}
+             {...meshProps}
+             packIndex={i}
+             packGapMm={packGapMm}
+             packPhaseDeg={packPhaseDeg}
+             bowLeanDeg={bowLeanDeg}
+             bowPlaneTiltDeg={bowPlaneTiltDeg}
+             spring2={spring2}
+           />
+        ))}
       </group>
 
-      <FitToObject groupRef={groupRef} autoRotate={autoRotate} />
+      <FitToObject groupRef={groupRef} autoRotate={!!autoRotate} />
     </>
   );
 }
 
-export function ArcSpringVisualizer({
-  d = 3,
-  D = 30,
-  n = 6,
-  r = 80,
-  alpha0Deg = 120,
-  previewStrokeMm,
-  alphaFreeDeg,
-  alphaSolidDeg,
-  arcRadiusMm,
-  useDeadCoils = false,
-  deadCoilsPerEnd = 1,
-  deadCoilsStart,
-  deadCoilsEnd,
-  deadTightnessK = 0,
-  deadTightnessSigma = 0,
-  colorMode = "solid",
-  approxTauMax,
-  approxStressBeta = 0.25,
-  autoRotate = false,
-  wireframe = false,
-  showCenterline = false,
-}: ArcSpringVisualizerProps) {
+export function ArcSpringVisualizer(props: ArcSpringVisualizerProps) {
   return (
     <Canvas camera={{ fov: 45, near: 0.1, far: 5000 }} style={{ width: "100%", height: "100%" }}>
-      <ArcSpringScene
-        d={d}
-        D={D}
-        n={n}
-        r={r}
-        alpha0Deg={alpha0Deg}
-        previewStrokeMm={previewStrokeMm}
-        alphaFreeDeg={alphaFreeDeg}
-        alphaSolidDeg={alphaSolidDeg}
-        arcRadiusMm={arcRadiusMm}
-        deadCoilsPerEnd={Math.max(0, deadCoilsPerEnd)}
-        useDeadCoils={useDeadCoils}
-        deadCoilsStart={deadCoilsStart}
-        deadCoilsEnd={deadCoilsEnd}
-        deadTightnessK={Math.max(0, deadTightnessK)}
-        deadTightnessSigma={Math.max(0, deadTightnessSigma)}
-        colorMode={colorMode}
-        approxTauMax={approxTauMax}
-        approxStressBeta={approxStressBeta}
-        autoRotate={autoRotate}
-        wireframe={wireframe}
-        showCenterline={showCenterline}
-      />
+      <ArcSpringScene {...props} />
     </Canvas>
   );
 }

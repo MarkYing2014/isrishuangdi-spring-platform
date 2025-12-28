@@ -348,35 +348,104 @@ export function computeArcSpringCurve(input: ArcSpringInput): ArcSpringResult {
   // 拐点角度标记 (dual_staged)
   const engageAngleMarker = system === "dual_staged" ? engage : undefined;
 
-  // 应力分析 - 使用主弹簧的参数
-  const springIndex = s1.springIndex;
-  const wahlFactor = s1.wahlFactor;
-  // 重新计算双级系统的最大应力
-  const F_max = MMax_load / input.r;
-  const tauMax = wahlFactor * (8 * F_max * input.D) / (PI * Math.pow(input.d, 3));
+  // --------------------------------------------------------
+  // Dual Spring Engineering (Physics Correction)
+  // --------------------------------------------------------
 
-  // 工作点计算
+  // 1. Stress Analysis (Independent)
+  // S1 Stress: Uses M1_load (partial torque)
+  const F1_max = s1.MMax_load / input.r; // Note: s1.MMax_load is isolated S1 (see line 232)
+  const tau1_max = s1.wahlFactor * (8 * F1_max * input.D) / (PI * Math.pow(input.d, 3));
+
+  // S2 Stress: Uses M2_load
+  const F2_max = s2.MMax_load / input.spring2?.r!; // s2 is computed from s2in, so safe
+  const tau2_max = s2.wahlFactor * (8 * F2_max * s2in.D) / (PI * Math.pow(s2in.d, 3));
+
+  // System Max Stress & Governing Spring
+  const tauMaxSystem = isFinite(tau2_max) ? Math.max(tau1_max, tau2_max) : tau1_max;
+  const governingSpring: 1 | 2 = (isFinite(tau2_max) && tau2_max > tau1_max) ? 2 : 1;
+
+  // 2. System Stiffness (R_deg)
+  let R_system = s1.R_deg;
+  if (system === "dual_parallel") {
+    R_system = s1.R_deg + s2.R_deg;
+  } else if (system === "dual_staged") {
+    // Staged stiffness is piecewise. 
+    // We report the INITIAL stiffness (stage 1) as K1
+    // The secondary stiffness is K1 + K2, but R_deg usually implies primary rate.
+    // However, usually specific 'bi-linear' fields are better. 
+    // For now, let's keep R_deg as Stage 1 to avoid breaking single-rate assumption 
+    // or return the max rate? 
+    // Standard practice: Report K1. The curve shows the staging.
+    R_system = s1.R_deg;
+  }
+
+  // 3. Work Point Stress
   let deltaAlphaWork: number | undefined;
   let M_work: number | undefined;
   let tauWork: number | undefined;
+  let s2_M_work: number | undefined;
+  let s2_tauWork: number | undefined;
 
   if (input.alphaWork !== undefined) {
     deltaAlphaWork = Math.max(0, input.alpha0 - input.alphaWork);
+
+    // System Work Point
     const pWork = sampleAt({ curve, deltaAlphaMax: deltaAlphaMax } as any, deltaAlphaWork);
     if (pWork) {
-      M_work = pWork.M_load; // 使用加载扭矩
-      // 计算工作应力 (基于外弹簧/主弹簧尺寸)
-      const F_work = M_work / input.r;
-      tauWork = wahlFactor * (8 * F_work * input.D) / (PI * Math.pow(input.d, 3));
+      M_work = pWork.M_load;
+
+      // Calculate S1 Component at Work Point
+      const p1Work = sampleAt(s1, deltaAlphaWork);
+      if (p1Work) {
+        const F1_work = p1Work.M_load / input.r;
+        tauWork = s1.wahlFactor * (8 * F1_work * input.D) / (PI * Math.pow(input.d, 3));
+      }
+
+      // Calculate S2 Component at Work Point
+      let p2Work = null;
+      if (system === "dual_parallel") {
+        p2Work = sampleAt(s2, deltaAlphaWork);
+      } else if (system === "dual_staged" && deltaAlphaWork >= engage) {
+        p2Work = sampleAt(s2, deltaAlphaWork - engage);
+      }
+
+      if (p2Work) {
+        s2_M_work = p2Work.M_load;
+        const F2_work = p2Work.M_load / s2in.r;
+        s2_tauWork = s2.wahlFactor * (8 * F2_work * s2in.D) / (PI * Math.pow(s2in.d, 3));
+      }
     }
   }
 
   return {
-    k, R_deg, deltaAlphaMax, xMax, MMax_load, MMax_unload,
-    De, Di, springIndex, wahlFactor, tauMax,
-    deltaAlphaWork, M_work, tauWork,
-    safetyMarginToSolid, housingClearance, hysteresisWork, dampingCapacity,
+    // System Level Props
+    k: s1.k, // Tangential stiffness of S1 (Reference)
+    R_deg: R_system, // System Rotational Stiffness (Corrected)
+    deltaAlphaMax, xMax, MMax_load, MMax_unload,
+    De, Di, safetyMarginToSolid, housingClearance, hysteresisWork, dampingCapacity,
     engageAngleMarker, spring2Clearance,
+
+    // S1 Limits
+    springIndex: s1.springIndex,
+    wahlFactor: s1.wahlFactor,
+    tauMax: tauMaxSystem, // Corrected: System Max Stress
+    governingSpring,
+
+    // S1 Work Point
+    deltaAlphaWork, M_work, tauWork,
+
+    // S2 Details
+    spring2Result: {
+      k: s2.k,
+      R_deg: s2.R_deg,
+      tauMax: tau2_max,
+      wahlFactor: s2.wahlFactor,
+      M_work: s2_M_work,
+      tauWork: s2_tauWork,
+      engagedAtWork: system === "dual_staged" ? (deltaAlphaWork ?? 0) >= engage : true
+    },
+
     curve, warnings
   };
 }

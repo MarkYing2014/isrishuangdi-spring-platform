@@ -119,6 +119,101 @@ function ScoreBadge({ rating }: { rating: string }) {
   }
 }
 
+function SpringBreakdownTable({ 
+  input, 
+  result, 
+  isZh,
+  allowableTau 
+}: { 
+  input: ArcSpringInput; 
+  result: ArcSpringResult; 
+  isZh: boolean;
+  allowableTau: number;
+}) {
+  const isDual = input.systemMode === "dual_parallel" || input.systemMode === "dual_staged";
+  const s2 = input.spring2;
+  const s2Res = result.spring2Result;
+
+  // Helpers
+  const getSF = (tau: number) => (tau > 0 ? allowableTau / tau : NaN);
+  const fmt = (n: number | undefined, d = 2) => (n !== undefined && isFinite(n) ? n.toFixed(d) : "—");
+  
+  const s1SF = getSF(result.tauMax);
+  const s2SF = s2Res ? getSF(s2Res.tauMax) : NaN;
+
+  const StatusIcon = ({ sf }: { sf: number }) => {
+     if (!isFinite(sf)) return <span className="text-muted-foreground">-</span>;
+     if (sf >= 1.2) return <CheckCircle className="w-3 h-3 text-green-600" />;
+     if (sf >= 1.0) return <AlertTriangle className="w-3 h-3 text-amber-600" />;
+     return <XCircle className="w-3 h-3 text-red-600" />;
+  };
+
+  return (
+    <div className="overflow-x-auto border rounded-lg">
+      <table className="w-full text-xs text-left">
+        <thead className="bg-muted/50 text-muted-foreground">
+          <tr>
+            <th className="p-2 font-medium">Spring</th>
+            <th className="p-2 font-medium">d (mm)</th>
+            <th className="p-2 font-medium">D (mm)</th>
+            <th className="p-2 font-medium">n</th>
+            <th className="p-2 font-medium">k (N/mm)</th>
+            <th className="p-2 font-medium">R (Nmm/°)</th>
+            <th className="p-2 font-medium">τ Max (MPa)</th>
+            <th className="p-2 font-medium">SF (Yield)</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {/* Spring 1 */}
+          <tr>
+            <td className="p-2 font-bold flex items-center gap-2">
+               <Badge variant="outline" className="h-5 px-1">S1</Badge>
+               {isZh ? "外弹簧" : "Outer"}
+            </td>
+            <td className="p-2 font-mono">{input.d}</td>
+            <td className="p-2 font-mono">{input.D}</td>
+            <td className="p-2 font-mono">{input.n}</td>
+            <td className="p-2 font-mono">{fmt(result.k, 1)}</td>
+            <td className="p-2 font-mono">{fmt(input.systemMode === 'dual_parallel' ? ((result.R_deg - (s2Res?.R_deg ?? 0))) : result.R_deg, 1)}</td>
+            <td className="p-2 font-mono">{fmt(result.tauMax, 0)}</td>
+            <td className="p-2 font-mono flex items-center gap-1">
+               <StatusIcon sf={s1SF} />
+               {fmt(s1SF)}
+            </td>
+          </tr>
+          
+          {/* Spring 2 */}
+          {isDual && s2 && s2Res && (
+            <tr>
+              <td className="p-2 font-bold flex items-center gap-2">
+                 <Badge variant="outline" className="h-5 px-1">S2</Badge>
+                 {isZh ? "内弹簧" : "Inner"}
+              </td>
+              <td className="p-2 font-mono">{s2.d ?? input.d}</td>
+              <td className="p-2 font-mono">{s2.D ?? input.D}</td>
+              <td className="p-2 font-mono">{s2.n ?? input.n}</td>
+              <td className="p-2 font-mono">{fmt(s2Res.k, 1)}</td>
+              <td className="p-2 font-mono">{fmt(s2Res.R_deg, 1)}</td>
+              <td className="p-2 font-mono">{fmt(s2Res.tauMax, 0)}</td>
+              <td className="p-2 font-mono flex items-center gap-1">
+                 <StatusIcon sf={s2SF} />
+                 {fmt(s2SF)}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+      {input.systemMode === "dual_staged" && (
+         <div className="p-2 bg-slate-50 text-[10px] text-muted-foreground border-t">
+            {isZh 
+              ? `* 分段刚度：初始刚度 ${fmt(result.R_deg, 1)} Nmm/°，拐点 ${input.engageAngle2 ?? 0}° 后叠加 S2`
+              : `* Staged Stiffness: Initial ${fmt(result.R_deg, 1)} Nmm/deg. S2 adds on after ${input.engageAngle2 ?? 0}deg.`
+            }
+         </div>
+      )}
+    </div>
+  );
+}
 export function ArcSpringAdvancedPanel({
   isZh = false,
   input,
@@ -228,6 +323,13 @@ export function ArcSpringAdvancedPanel({
             {isZh ? "评分" : "Score"}: {designScore.overallScore}/100
           </Badge>
           <ScoreBadge rating={designScore.rating} />
+          {/* Governing Badge for Dual Systems */}
+          {(input.systemMode === "dual_parallel" || input.systemMode === "dual_staged") && (
+             <Badge variant="outline" className="ml-auto border-blue-200 bg-blue-50 text-blue-700">
+                {isZh ? "控制弹簧: " : "Governing: "}
+                { result.governingSpring === 2 ? "S2 (Inner)" : "S1 (Outer)" }
+             </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -306,6 +408,15 @@ export function ArcSpringAdvancedPanel({
 
           {/* P1: Manufacturability Tab */}
           <TabsContent value="manufacturability" className="space-y-4">
+            
+            {/* Engineer Breakdown Table */}
+            <SpringBreakdownTable 
+                input={input} 
+                result={result} 
+                isZh={isZh} 
+                allowableTau={allowableTau} 
+            />
+
             <div className="flex items-center gap-2 mb-4">
               {manufacturability.isManufacturable ? (
                 <CheckCircle className="w-5 h-5 text-green-600" />

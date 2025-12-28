@@ -65,6 +65,17 @@ export interface ArcSpringInput {
   // Loadcase (工况)
   preloadTorque?: number; // N·mm - 装配预载扭矩 T0
   alphaPreload?: number;  // deg - 预载角度 (Preload Angle)
+
+  // Visual/Bow Spring Parameters (Visual Only)
+  profile?: "ARC" | "BOW";
+  packCount?: number;
+  packGapMm?: number;
+  packPhaseDeg?: number;
+  bowPose?: {
+    leanDeg?: number;
+    planeTiltDeg?: number;
+  };
+  endCapStyle?: "RING" | "BLOCK";
 }
 
 export interface ArcSpringPoint {
@@ -119,6 +130,20 @@ export interface ArcSpringResult {
   // 双级系统
   engageAngleMarker?: number;   // deg - 拐点角度 (dual_staged 模式)
   spring2Clearance?: number;    // mm - 内外弹簧间隙 (dual 模式)
+
+  // Engineer Engineering Data for 2nd Spring
+  spring2Result?: {
+    k: number;
+    R_deg: number;
+    tauMax: number;
+    wahlFactor: number;
+    M_work?: number;
+    tauWork?: number;
+    engagedAtWork?: boolean;
+  };
+
+  // System-level governing spring
+  governingSpring?: 1 | 2;
 
   // 曲线数据
   curve: ArcSpringPoint[];

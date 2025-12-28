@@ -191,6 +191,33 @@ export interface ArcGeometry {
   workingAngle: number; // alphaWork
   solidAngle: number; // alphaC
   materialId?: SpringMaterialId;
+
+  // Visual-only fields for Bow Spring / Pack support
+  profile?: "ARC" | "BOW"; // defaults to ARC
+  packCount?: number; // defaults to 1
+  packGapMm?: number; // defaults to 0.5 * wireDiameter
+  packPhaseDeg?: number; // defaults to 0 or 20
+  bowPose?: {
+    leanDeg?: number;
+    planeTiltDeg?: number;
+  };
+  endCapStyle?: "RING" | "BLOCK"; // Defaults: ARC->RING, BOW->BLOCK
+  spring2?: {
+    d?: number;
+    D?: number;
+    n?: number;
+  };
+
+  // Defensive Audit Layer
+  fitResult?: {
+    status: "PASS" | "WARN" | "FAIL";
+    clearance: number; // Renamed from clearanceMm to match store
+    outerID: number;
+    innerOD: number;
+    message?: string;
+  };
+  forceRender?: boolean;
+  policyClearanceMm?: number;
 }
 
 /** 波形弹簧几何参数 (Crest-to-crest) */

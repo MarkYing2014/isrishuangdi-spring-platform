@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { computeAngles, arcAngles } from "@/lib/angle/AngleModel";
-import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer, Download, BookOpen, HelpCircle, Info, AlertTriangle, Factory } from "lucide-react";
+import { AlertCircle, Settings2, Circle, Layers, Activity, FileText, Printer, Download, BookOpen, HelpCircle, Info, AlertTriangle, Factory, CheckCircle2, XCircle } from "lucide-react";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
@@ -48,9 +48,9 @@ import {
 } from "recharts";
 
 import { Calculator3DPreview } from "@/components/calculators/Calculator3DPreview";
+import { calculateFit, DEFAULT_RADIAL_CLEARANCE_MM } from "@/lib/spring3d/fitCheck";
 
 // Remove old ArcSpringVisualizer dynamic import as it's now wrapped in Calculator3DPreview
-
 
 interface NumberInputProps {
   label: string;
@@ -122,14 +122,16 @@ function SliderNumberInput({
           <span>{label}</span>
           {unit && <span className="text-[10px] opacity-60">({unit})</span>}
         </Label>
-        <NumericInput
-          value={Number.isFinite(value) ? value : 0}
-          onChange={(v) => onChange(v ?? 0)}
-          min={min}
-          step={step}
-          disabled={disabled}
-          className="h-9 w-full arc-no-spinner"
-        />
+        <div className="flex gap-2">
+           <NumericInput
+             value={Number.isFinite(value) ? value : 0}
+             onChange={(v) => onChange(v ?? 0)}
+             min={min}
+             step={step}
+             disabled={disabled}
+             className="h-9 w-full arc-no-spinner"
+           />
+        </div>
       </div>
       <div className="space-y-1">
         <Slider
@@ -248,6 +250,20 @@ export function ArcSpringCalculator() {
   const [stressBeta, setStressBeta] = useState(0.25);
 
   const storedGeometry = useSpringDesignStore(state => state.geometry);
+  const [forceRender, setForceRender] = useState(false);
+  const [policyClearanceMm, setPolicyClearanceMm] = useState(DEFAULT_RADIAL_CLEARANCE_MM);
+
+  // Compute Nested Fit Status (Memoized SSOT)
+  const fitResult = useMemo(() => {
+    if ((input.systemMode === "dual_parallel" || input.systemMode === "dual_staged") && input.spring2) {
+       return calculateFit(
+         { meanDiameter: input.D, wireDiameter: input.d },
+         { meanDiameter: input.spring2.D ?? 0, wireDiameter: input.spring2.d ?? 0 },
+         policyClearanceMm
+       );
+    }
+    return undefined; 
+  }, [input.D, input.d, input.spring2, input.systemMode, policyClearanceMm]);
   const lastSavedJsonRef = useRef<string>("");
   const isHydratingRef = useRef<boolean>(false);
   
@@ -277,6 +293,11 @@ export function ArcSpringCalculator() {
       };
       
       setInput(hydratedInput);
+      
+      // Hydrate Audit State
+      if (g.forceRender !== undefined) setForceRender(g.forceRender);
+      if (g.policyClearanceMm !== undefined) setPolicyClearanceMm(g.policyClearanceMm);
+      
       setResult(computeArcSpringCurve(hydratedInput));
       setCalculated(true);
       
@@ -327,6 +348,8 @@ export function ArcSpringCalculator() {
     setCalculated(false);
   };
 
+
+
   // Persistence Effect: Save to store when input changes (debounced)
   useEffect(() => {
     if (!mounted) return;
@@ -343,6 +366,22 @@ export function ArcSpringCalculator() {
       workingAngle: input.alphaWork ?? 0,
       solidAngle: input.alphaC,
       materialId: input.materialKey === "CUSTOM" ? undefined : input.materialKey as any,
+      
+      // Visual params
+      profile: input.profile,
+      packCount: input.packCount,
+      packGapMm: input.packGapMm,
+      packPhaseDeg: input.packPhaseDeg,
+      bowPose: input.bowPose,
+      endCapStyle: input.endCapStyle,
+      spring2: (input.systemMode === "dual_parallel" || input.systemMode === "dual_staged") && input.spring2 
+        ? { d: (input.spring2 as any).d, D: (input.spring2 as any).D, n: (input.spring2 as any).n }
+        : undefined,
+
+      // Defensive Audit Layer
+      fitResult: fitResult,
+      forceRender: forceRender,
+      policyClearanceMm: policyClearanceMm,
     };
 
     // Use a small timeout to avoid thrashing the store on every keystroke/slider move
@@ -359,7 +398,7 @@ export function ArcSpringCalculator() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [input, mounted]);
+  }, [input, mounted, fitResult, forceRender, policyClearanceMm]);
 
   const updateSpring2 = <K extends keyof ArcSpringInput>(key: K, value: ArcSpringInput[K]) => {
     setInput((prev) => ({
@@ -606,6 +645,15 @@ export function ArcSpringCalculator() {
                           workingAngle: newInput.alphaWork ?? 0,
                           solidAngle: newInput.alphaC,
                           materialId: newInput.materialKey === "CUSTOM" ? undefined : newInput.materialKey as any,
+                          profile: newInput.profile,
+                          packCount: newInput.packCount,
+                          packGapMm: newInput.packGapMm,
+                          packPhaseDeg: newInput.packPhaseDeg,
+                          bowPose: newInput.bowPose,
+                          endCapStyle: newInput.endCapStyle,
+                          spring2: ((newInput as any).systemMode === "dual_parallel" || (newInput as any).systemMode === "dual_staged") && (newInput as any).spring2 
+                            ? { d: (newInput as any).spring2.d, D: (newInput as any).spring2.D, n: (newInput as any).spring2.n }
+                            : undefined,
                         },
                         springType: "arc",
                         hasValidDesign: true,
@@ -636,6 +684,15 @@ export function ArcSpringCalculator() {
                           workingAngle: def.alphaWork ?? 0,
                           solidAngle: def.alphaC,
                           materialId: def.materialKey === "CUSTOM" ? undefined : def.materialKey as any,
+                          profile: def.profile,
+                          packCount: def.packCount,
+                          packGapMm: def.packGapMm,
+                          packPhaseDeg: def.packPhaseDeg,
+                          bowPose: def.bowPose,
+                          endCapStyle: def.endCapStyle,
+                          spring2: (def.systemMode === "dual_parallel" || def.systemMode === "dual_staged") && def.spring2 
+                            ? { d: def.spring2.d, D: def.spring2.D, n: def.spring2.n }
+                            : undefined,
                         },
                         springType: "arc",
                         hasValidDesign: true,
@@ -645,6 +702,114 @@ export function ArcSpringCalculator() {
                     Reset / 重置
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+          
+          {/* 3D Preview Customization (Visual Only) */}
+          <Card className="border-slate-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                   <Layers className="w-4 h-4 text-purple-600" />
+                   <LanguageText en="3D Preview Options" zh="3D 预览选项" />
+                </div>
+                {/* Profile Badge */}
+                <Badge variant={input.profile === "BOW" ? "default" : "outline"} className={input.profile === "BOW" ? "bg-purple-600 hover:bg-purple-700" : ""}>
+                    {input.profile === "BOW" ? "BOW PROFILE" : "ARC PROFILE"}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {/* Profile Toggle */}
+                <div className="flex items-center gap-4">
+                    <Label className="w-20 text-xs text-muted-foreground">{isZh ? "几何轮廓" : "Profile"}</Label>
+                    <div className="flex gap-2">
+                        <Button 
+                            variant={input.profile === "ARC" || !input.profile ? "secondary" : "ghost"} 
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => updateInput("profile", "ARC")}
+                        >
+                            ARC (Default)
+                        </Button>
+                        <Button 
+                            variant={input.profile === "BOW" ? "secondary" : "ghost"} 
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => updateInput("profile", "BOW")}
+                        >
+                            BOW
+                        </Button>
+                    </div>
+                </div>
+                
+                {input.profile === "BOW" && (
+                    <Alert className="bg-purple-50 border-purple-100 py-2">
+                        <Info className="h-3 w-3 text-purple-600" />
+                        <AlertDescription className="text-[10px] text-purple-700 ml-2">
+                            <strong>Note:</strong> Bow profile is a visual estimation only. Engineering calculations remain based on arc geometry (R, Alpha).
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                {/* Pack Settings */}
+                <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">{isZh ? "弹簧包层数" : "Pack Count"}</Label>
+                        <NumericInput 
+                            value={input.packCount ?? 1} 
+                            onChange={v => updateInput("packCount", Math.max(1, Math.min(6, Math.round(v))))}
+                            min={1} max={6} step={1}
+                            className="h-8 arc-no-spinner"
+                        />
+                    </div>
+                     <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground w-full block mb-1">Pack Gap (mm)</Label>
+                  <Input 
+                      type="number" 
+                      className="h-7 text-xs" 
+                      value={input.packGapMm ?? 0.5} 
+                      step={0.1}
+                      min={0.1}
+                      onChange={e => updateInput("packGapMm", parseFloat(e.target.value) || 0)}
+                  />
+              </div>
+              <div>
+                  <Label className="text-[10px] text-muted-foreground w-full block mb-1">Phase (deg)</Label>
+                  <Input 
+                      type="number" 
+                      className="h-7 text-xs" 
+                      value={input.packPhaseDeg ?? 20} 
+                      onChange={e => updateInput("packPhaseDeg", parseFloat(e.target.value) || 0)}
+                  />
+                    </div>
+                </div>
+
+                {/* Bow Pose Options */}
+                {input.profile === "BOW" && (
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                        <div className="space-y-1">
+                             <Label className="text-[10px] text-muted-foreground">{isZh ? "倾斜角 (Lean)" : "Lean Angle"}</Label>
+                             <Slider 
+                                value={[input.bowPose?.leanDeg ?? 0]} 
+                                min={-30} max={30} step={1}
+                                onValueChange={v => updateInput("bowPose", { ...input.bowPose, leanDeg: v[0] })}
+                                className="my-2"
+                             />
+                             <div className="text-[9px] text-right font-mono text-slate-500">{input.bowPose?.leanDeg ?? 0}°</div>
+                        </div>
+                        <div className="space-y-1">
+                             <Label className="text-[10px] text-muted-foreground">{isZh ? "平面翻转 (Tilt)" : "Plane Tilt"}</Label>
+                             <Slider 
+                                value={[input.bowPose?.planeTiltDeg ?? 0]} 
+                                min={-45} max={45} step={1}
+                                onValueChange={v => updateInput("bowPose", { ...input.bowPose, planeTiltDeg: v[0] })}
+                                className="my-2"
+                             />
+                             <div className="text-[9px] text-right font-mono text-slate-500">{input.bowPose?.planeTiltDeg ?? 0}°</div>
+                        </div>
+                    </div>
+                )}
             </CardContent>
           </Card>
 
@@ -1457,6 +1622,111 @@ export function ArcSpringCalculator() {
                         <div className="font-medium">{result.spring2Clearance.toFixed(1)} mm</div>
                       </div>
                     )}
+                    <div className="p-2 bg-slate-50 rounded">
+                        <div className="text-slate-500">System Stiffness</div>
+                        <div className="font-medium">{result.R_deg.toFixed(2)} Nmm/deg</div>
+                    </div>
+                    {/* Dual Stress Split */}
+                    <div className="col-span-2 grid grid-cols-2 gap-2 mt-1 pt-1 border-t border-dashed">
+                        <div>
+                             <div className="text-[10px] text-muted-foreground">Outer Stress (S1)</div>
+                             <div className="font-mono font-medium">{result.tauMax.toFixed(0)} MPa</div>
+                        </div>
+                        {result.spring2Result && (
+                            <div>
+                                <div className="text-[10px] text-muted-foreground">Inner Stress (S2)</div>
+                                <div className="font-mono font-medium">{result.spring2Result.tauMax.toFixed(0)} MPa</div>
+                            </div>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Defensive Audit: Nested Fit Result */}
+
+
+              {/* Defensive Audit: Nested Fit Result */}
+              {/* Defensive Audit: Nested Fit Result */}
+              {fitResult && (
+                <div className="pt-2 border-t">
+                  <div className="flex items-center justify-between mb-2">
+                     <div className="flex items-center gap-2">
+                        <div className="text-xs text-muted-foreground">Nested Fit Audit / 嵌套配合审计</div>
+                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground bg-slate-100 px-1.5 py-0.5 rounded">
+                           Policy: {policyClearanceMm}mm
+                        </div>
+                     </div>
+                     {fitResult.status === "FAIL" && (
+                         <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-red-600">FORCE RENDER</span>
+                            <input 
+                                type="checkbox" 
+                                checked={forceRender} 
+                                onChange={e => setForceRender(e.target.checked)}
+                                className="toggle toggle-xs toggle-error"
+                            />
+                         </div>
+                     )}
+                  </div>
+                  <div className={`grid grid-cols-4 gap-2 text-xs p-2 rounded border ${
+                      fitResult.status === "PASS" ? "bg-green-50 border-green-200" :
+                      fitResult.status === "WARN" ? "bg-amber-50 border-amber-200" :
+                      "bg-red-50 border-red-200"
+                  }`}>
+                    <div>
+                      <div className="text-muted-foreground opacity-70">Outer ID</div>
+                      <div className="font-medium">{fitResult.outerID.toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground opacity-70">Inner OD</div>
+                      <div className="font-medium">{fitResult.innerOD.toFixed(2)}</div>
+                    </div>
+                    <div className="col-span-2">
+                       <div className="text-muted-foreground opacity-70 flex items-center gap-1">
+                           Radial Clearance
+                           {fitResult.status === "PASS" ? <CheckCircle2 className="w-3 h-3 text-green-600"/> : 
+                            fitResult.status === "WARN" ? <AlertTriangle className="w-3 h-3 text-amber-600"/> :
+                            <XCircle className="w-3 h-3 text-red-600"/>}
+                       </div>
+                       <div className="flex items-baseline gap-2">
+                           <div className={`font-bold text-sm ${
+                               fitResult.status === "FAIL" ? "text-red-700" : "text-slate-700"
+                           }`}>
+                               {fitResult.clearance.toFixed(2)} <span className="text-[10px] font-normal text-muted-foreground">mm</span>
+                           </div>
+                           <div className={`text-[9px] ${
+                               fitResult.clearance < policyClearanceMm ? "text-red-500" : "text-green-600"
+                           }`}>
+                               (Δ {(fitResult.clearance - policyClearanceMm).toFixed(2)})
+                           </div>
+                       </div>
+                    </div>
+                  </div>
+                  {fitResult.message && (
+                      <div className={`mt-1 text-[10px] font-medium px-1 ${
+                          fitResult.status === "FAIL" ? "text-red-600" :
+                          fitResult.status === "WARN" ? "text-amber-600" : "text-green-600"
+                      }`}>
+                          {fitResult.message}
+                      </div>
+                  )}
+                  
+                  {/* Policy Clearance Input */}
+                  <div className="mt-2 text-[10px] text-muted-foreground border-t pt-2">
+                      <div className="flex items-center gap-2">
+                          <span>Audit Policy / 安全策略:</span>
+                          <div className="w-20">
+                              <NumericInput 
+                                  value={policyClearanceMm} 
+                                  onChange={(v) => setPolicyClearanceMm(v ?? 0)}
+                                  step={0.05}
+                                  min={0}
+                                  className="h-5 text-[10px]"
+                              />
+                          </div>
+                          <span>mm min clearance</span>
+                      </div>
                   </div>
                 </div>
               )}

@@ -91,6 +91,8 @@ const WaveSpringVisualizer = dynamic(
   }
 );
 
+import { PreviewWatermark } from "@/components/three/PreviewWatermark";
+
 export function Calculator3DPreview({
   expectedType,
   heightClassName = "h-[420px]",
@@ -413,21 +415,36 @@ export function Calculator3DPreview({
 
     if (geometry.type === "arc") {
       return (
-        <ArcSpringVisualizer
-          d={geometry.wireDiameter}
-          D={geometry.meanDiameter}
-          n={geometry.coils}
-          r={geometry.workingRadius}
-          alpha0Deg={geometry.unloadedAngle}
-          previewStrokeMm={isAnimating ? previewStrokeMm : (analysis?.workingDeflection ?? 0)}
-          alphaFreeDeg={geometry.unloadedAngle}
-          alphaSolidDeg={geometry.solidAngle}
-          arcRadiusMm={geometry.workingRadius}
-          colorMode={showStressColors ? "approx_stress" : "solid"}
-          approxStressBeta={stressBeta ?? 0.25}
-        />
+        <div className="relative w-full h-full">
+          <ArcSpringVisualizer
+            d={geometry.wireDiameter}
+            D={geometry.meanDiameter}
+            n={geometry.coils}
+            r={geometry.workingRadius}
+            alpha0Deg={geometry.unloadedAngle}
+            previewStrokeMm={isAnimating ? previewStrokeMm : (analysis?.workingDeflection ?? 0)}
+            alphaFreeDeg={geometry.unloadedAngle}
+            alphaSolidDeg={geometry.solidAngle}
+            arcRadiusMm={geometry.workingRadius}
+            colorMode={showStressColors ? "approx_stress" : "solid"}
+            approxStressBeta={stressBeta ?? 0.25}
+            
+            // Visual Props
+            profile={geometry.profile ?? "ARC"}
+            packCount={geometry.packCount}
+            packGapMm={geometry.packGapMm}
+            packPhaseDeg={geometry.packPhaseDeg}
+            bowLeanDeg={geometry.bowPose?.leanDeg}
+            bowPlaneTiltDeg={geometry.bowPose?.planeTiltDeg}
+            endCapStyle={geometry.endCapStyle}
+            spring2={geometry.spring2} // Pass explicit engineering data if available
+            fitResult={geometry.fitResult}
+            forceRender={geometry.forceRender}
+          />
+          <PreviewWatermark show={!!geometry.forceRender && geometry.fitResult?.status === "FAIL"} />
+        </div>
       );
-    }
+  }
 
     // For CadPreview3D types, use stable params and pass deflection override
     if (cadParams) {
