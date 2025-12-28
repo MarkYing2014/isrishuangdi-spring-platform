@@ -21,7 +21,8 @@ export function TorsionalAuditPlayController({ thetaSafe, currentTheta, onThetaC
           const step = 0.25 * speed; // Base step size
           const next = prev + step;
           if (next >= thetaSafe) {
-            setIsPlaying(false);
+            // Use setTimeout to avoid updating state during render
+            setTimeout(() => setIsPlaying(false), 0);
             return thetaSafe;
           }
           return next;
