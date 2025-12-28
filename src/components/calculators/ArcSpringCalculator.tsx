@@ -758,7 +758,7 @@ export function ArcSpringCalculator() {
                         <Label className="text-[10px] text-muted-foreground">{isZh ? "弹簧包层数" : "Pack Count"}</Label>
                         <NumericInput 
                             value={input.packCount ?? 1} 
-                            onChange={v => updateInput("packCount", Math.max(1, Math.min(6, Math.round(v))))}
+                            onChange={v => updateInput("packCount", Math.max(1, Math.min(6, Math.round(v ?? 1))))}
                             min={1} max={6} step={1}
                             className="h-8 arc-no-spinner"
                         />
