@@ -531,7 +531,7 @@ export function TorsionalSystemReport({
                   Torque–Angle Performance
                 </CardTitle>
               </CardHeader>
-              <CardContent className="h-[350px] p-0 overflow-hidden">
+              <CardContent className="h-[400px] p-4 pb-8">
                 <TorsionalAuditCurveChart 
                     systemCurve={{
                         points: result.curves.map(c => ({ 
