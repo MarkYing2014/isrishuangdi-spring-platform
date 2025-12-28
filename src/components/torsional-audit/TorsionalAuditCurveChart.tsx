@@ -66,17 +66,18 @@ export function TorsionalAuditCurveChart({
         </div>
       </CardHeader>
       <CardContent className="p-4 pt-6">
-        <div className="h-[280px] w-full">
+        <div className="h-[320px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 25 }}>
+            <LineChart data={data} margin={{ top: 10, right: 30, left: 10, bottom: 40 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <XAxis 
                 dataKey="theta" 
                 type="number" 
                 domain={[0, maxTheta]} 
                 tick={{ fontSize: 10, fill: '#64748b' }}
-                label={{ value: 'Angle θ (°)', position: 'insideBottomRight', offset: -5, fontSize: 10, fill: '#64748b' }}
-                stroke="#cbd5e1"
+                tickLine={{ stroke: '#cbd5e1' }}
+                axisLine={{ stroke: '#cbd5e1' }}
+                label={{ value: 'Angle θ (°)', position: 'insideBottom', offset: -10, fontSize: 10, fill: '#64748b' }}
               />
               <YAxis 
                 tick={{ fontSize: 10, fill: '#64748b' }}
