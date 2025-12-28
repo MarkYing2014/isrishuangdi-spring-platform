@@ -69,7 +69,7 @@ function TorsionalAuditContent() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button asChild variant="ghost" size="sm" className="h-8">
-            <Link href="/tools/calculator?type=torsionalSpringSystem">
+            <Link href="/tools/suspension-spring">
               <ArrowLeft className="w-4 h-4 mr-1" />
               {isZh ? "返回工作区" : "Back to Workspace"}
             </Link>
