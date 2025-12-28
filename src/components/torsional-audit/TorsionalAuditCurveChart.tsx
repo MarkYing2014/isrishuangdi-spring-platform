@@ -41,7 +41,7 @@ export function TorsionalAuditCurveChart({
   ) * 1.05;
 
   return (
-    <Card className="border-slate-200 shadow-sm overflow-hidden bg-white/50 backdrop-blur-sm">
+    <Card className="border-slate-200 shadow-sm bg-white/50 backdrop-blur-sm">
       <CardHeader className="py-3 px-4 bg-slate-50/50 border-b">
         <div className="flex justify-between items-center">
           <CardTitle className="text-sm font-semibold text-slate-700 uppercase tracking-tight">System Performance Curve</CardTitle>
