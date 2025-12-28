@@ -429,9 +429,9 @@ export function TorsionalSystemReport({
         />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 2xl:grid-cols-12 gap-6">
         {/* Left Column (8 units) */}
-        <div className="xl:col-span-8 space-y-6">
+        <div className="2xl:col-span-8 space-y-6">
           
           {/* 3. System Definition & Groups */}
           <Card className="border-slate-200">
@@ -523,7 +523,7 @@ export function TorsionalSystemReport({
           </Card>
 
           {/* 4. Engineering Charts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="border-slate-200">
               <CardHeader className="py-3 px-6 border-b">
                 <CardTitle className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
@@ -555,9 +555,9 @@ export function TorsionalSystemReport({
                   Stiffness Stage Verification
                 </CardTitle>
               </CardHeader>
-              <CardContent className="h-[350px] p-6">
+              <CardContent className="h-[380px] p-6">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={result.curves} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <LineChart data={result.curves} margin={{ top: 10, right: 10, left: 0, bottom: 25 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                     <XAxis 
                       dataKey="theta" 
@@ -580,7 +580,7 @@ export function TorsionalSystemReport({
         </div>
 
         {/* Right Column (4 units) */}
-        <div className="xl:col-span-4 space-y-6">
+        <div className="2xl:col-span-4 space-y-6">
           
           {/* OEM Stage Legend */}
           <StageLegendCard design={design} result={result} />
