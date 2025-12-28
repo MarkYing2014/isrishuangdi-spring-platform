@@ -111,12 +111,12 @@ export function TorsionalAuditCurveChart({
                     strokeDasharray="5 5" 
                     strokeWidth={1.5}
                     label={{ 
-                        value: 'θ_safe (Life)', 
-                        position: 'insideTopRight', 
+                        value: 'θ safe', 
+                        position: 'insideTopLeft', 
                         fill: '#059669', 
-                        fontSize: 9, 
+                        fontSize: 8, 
                         fontWeight: 'bold',
-                        dy: -10
+                        dy: 15
                     }} 
                 />
               )}
@@ -128,11 +128,12 @@ export function TorsionalAuditCurveChart({
                     stroke="#be123c" 
                     strokeWidth={2}
                     label={{ 
-                        value: 'θ_hard (Physical)', 
-                        position: 'top', 
+                        value: 'θ hard', 
+                        position: 'insideTopRight', 
                         fill: '#be123c', 
-                        fontSize: 9, 
-                        fontWeight: 'bold'
+                        fontSize: 8, 
+                        fontWeight: 'bold',
+                        dy: 30
                     }} 
                 />
               )}
