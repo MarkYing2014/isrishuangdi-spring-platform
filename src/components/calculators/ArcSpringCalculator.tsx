@@ -382,6 +382,12 @@ export function ArcSpringCalculator() {
       fitResult: fitResult,
       forceRender: forceRender,
       policyClearanceMm: policyClearanceMm,
+
+      // Dead Coils
+      deadCoilsStart: showDeadCoils ? (symmetricDeadCoils ? deadCoilsPerEnd : deadCoilsLeft) : 0,
+      deadCoilsEnd: showDeadCoils ? (symmetricDeadCoils ? deadCoilsPerEnd : deadCoilsRight) : 0,
+      deadTightnessK: deadTightnessK,
+      deadTightnessSigma: deadTightnessSigma,
     };
 
     // Use a small timeout to avoid thrashing the store on every keystroke/slider move
@@ -398,7 +404,10 @@ export function ArcSpringCalculator() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [input, mounted, fitResult, forceRender, policyClearanceMm]);
+  }, [
+    input, mounted, fitResult, forceRender, policyClearanceMm, 
+    showDeadCoils, symmetricDeadCoils, deadCoilsPerEnd, deadCoilsLeft, deadCoilsRight, deadTightnessK, deadTightnessSigma
+  ]);
 
   const updateSpring2 = <K extends keyof ArcSpringInput>(key: K, value: ArcSpringInput[K]) => {
     setInput((prev) => ({

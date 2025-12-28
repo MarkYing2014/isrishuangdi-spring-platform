@@ -218,6 +218,12 @@ export interface ArcGeometry {
   };
   forceRender?: boolean;
   policyClearanceMm?: number;
+
+  // Visual: Dead Coils
+  deadCoilsStart?: number;
+  deadCoilsEnd?: number;
+  deadTightnessK?: number;
+  deadTightnessSigma?: number;
 }
 
 /** 波形弹簧几何参数 (Crest-to-crest) */

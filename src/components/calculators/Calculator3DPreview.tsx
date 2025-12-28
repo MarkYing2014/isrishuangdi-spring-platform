@@ -440,6 +440,12 @@ export function Calculator3DPreview({
             spring2={geometry.spring2} // Pass explicit engineering data if available
             fitResult={geometry.fitResult}
             forceRender={geometry.forceRender}
+            
+            // Dead Coils
+            deadCoilsStart={geometry.deadCoilsStart}
+            deadCoilsEnd={geometry.deadCoilsEnd}
+            deadTightnessK={geometry.deadTightnessK}
+            deadTightnessSigma={geometry.deadTightnessSigma}
           />
           <PreviewWatermark show={!!geometry.forceRender && geometry.fitResult?.status === "FAIL"} />
         </div>
