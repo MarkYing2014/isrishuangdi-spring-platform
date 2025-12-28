@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { SpringType } from "@/lib/springTypes";
 import { useLanguage } from "@/components/language-context";
@@ -116,7 +117,9 @@ const springTypes: {
   },
 ];
 
-export default function SpringCalculatorPage() {
+// Wrapper component that handles client-side search params
+function CalculatorContent() {
+  const searchParams = useSearchParams();
   // 从 store 读取上次保存的弹簧类型，如果没有则默认 compression
   const storedSpringType = useSpringDesignStore(state => state.springType);
   const [selectedType, setSelectedType] = useState<SpringType>(
@@ -124,6 +127,14 @@ export default function SpringCalculatorPage() {
   );
   const { language } = useLanguage();
   const isZh = language === "zh";
+
+  // Read type from URL query parameter on mount
+  useEffect(() => {
+    const typeFromUrl = searchParams.get("type") as SpringType | null;
+    if (typeFromUrl && springTypes.some(t => t.type === typeFromUrl)) {
+      setSelectedType(typeFromUrl);
+    }
+  }, [searchParams]);
 
   const handleTypeSelect = (type: SpringType) => {
     setSelectedType(type);
@@ -153,86 +164,55 @@ export default function SpringCalculatorPage() {
       </div>
 
       {/* Step 1: Choose Spring Type */}
-      <div className="space-y-4 rounded-lg bg-slate-100 p-6">
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold">
-            {isZh ? "第一步 · 选择弹簧类型" : "Step #1 · Choose your spring type"}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {isZh ? "首先选择你要设计的弹簧类型。" : "Select the type of spring you want to design."}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">
+          <span className="text-primary mr-2">1</span>
+          {isZh ? "选择弹簧类型" : "Select Spring Type"}
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {springTypes.map((spring) => (
             <button
               key={spring.type}
               onClick={() => handleTypeSelect(spring.type)}
               className={cn(
-                "group relative flex flex-col items-center gap-3 rounded-lg border-2 bg-white p-6 text-center transition-all hover:shadow-md",
+                "relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-200",
+                "hover:border-primary/50 hover:bg-primary/5",
                 selectedType === spring.type
-                  ? "border-indigo-500 bg-indigo-50 shadow-md"
-                  : "border-slate-200 hover:border-slate-300"
+                  ? "border-primary bg-primary/10"
+                  : "border-border"
               )}
             >
-              {/* Icon */}
-              <span
-                className={cn(
-                  "flex h-14 w-14 items-center justify-center rounded-full text-2xl transition-colors",
-                  selectedType === spring.type
-                    ? "bg-indigo-100 text-indigo-600"
-                    : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
-                )}
-              >
-                {spring.icon}
-              </span>
-
-              {/* Name */}
-              <div className="space-y-1">
-                <p
-                  className={cn(
-                    "font-medium transition-colors",
-                    selectedType === spring.type ? "text-indigo-700" : "text-slate-700"
-                  )}
-                >
-                  {isZh ? spring.nameZh : spring.nameEn}
-                </p>
-                <p
-                  className={cn(
-                    "text-xs transition-colors",
-                    selectedType === spring.type ? "text-indigo-600" : "text-slate-500"
-                  )}
-                >
-                  {isZh ? spring.descZh : spring.descEn}
-                </p>
-              </div>
-
-              {/* Selected indicator */}
               {selectedType === spring.type && (
-                <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500 text-xs text-white">
-                  ✓
-                </span>
+                <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
               )}
+              <div className="w-12 h-12 mb-2 flex items-center justify-center">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                  <span className="text-xl">{spring.icon}</span>
+                </div>
+              </div>
+              <span className="text-sm font-medium text-center">
+                {isZh ? spring.nameZh : spring.nameEn}
+              </span>
+              <span className="text-xs text-muted-foreground text-center mt-1">
+                {isZh ? spring.descZh : spring.descEn}
+              </span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Step 2: Calculator */}
-      <div id="step-2" className="space-y-4 scroll-mt-4">
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold">
-            {isZh ? "第二步 · 输入尺寸与工况参数" : "Step #2 · Enter dimensions and working conditions"}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {isZh 
-              ? "根据所选弹簧类型，输入几何参数与工作压缩量/扭转角度，系统将给出刚度与应力的工程估算结果。"
-              : "Enter geometric parameters and working deflection/angle. The system will calculate stiffness and stress estimates."
-            }
-          </p>
-        </div>
+      {/* Step 2: Calculator Section */}
+      <div id="step-2" className="space-y-4">
+        <h2 className="text-lg font-semibold">
+          <span className="text-primary mr-2">2</span>
+          {isZh ? "输入弹簧参数" : "Enter Spring Parameters"}
+        </h2>
 
-        {/* Render calculator based on selected type */}
+        {/* Dynamic Calculator Component */}
         {selectedType === "compression" && <CompressionCalculator />}
         {selectedType === "extension" && <ExtensionCalculator />}
         {selectedType === "torsion" && <TorsionCalculator />}
@@ -249,5 +229,14 @@ export default function SpringCalculatorPage() {
         <SpringSeoContent type={selectedType} />
       </div>
     </section>
+  );
+}
+
+// Default export wraps content in Suspense for useSearchParams
+export default function SpringCalculatorPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]">Loading...</div>}>
+      <CalculatorContent />
+    </Suspense>
   );
 }
