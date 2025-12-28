@@ -29,8 +29,8 @@ function TorsionalAuditContent() {
 
   // Reconstruct the analysis from query params or use a default sample
   const analysis = useMemo(() => {
-    const sampleKey = searchParams.get("sample") || "AUDI_Q5_Clutch_Dual_Stage";
-    const sample = TORSIONAL_SYSTEM_SAMPLES[sampleKey] || TORSIONAL_SYSTEM_SAMPLES["AUDI_Q5_Clutch_Dual_Stage"];
+    const sampleKey = searchParams.get("sample") || "clutch_passenger";
+    const sample = TORSIONAL_SYSTEM_SAMPLES[sampleKey] || TORSIONAL_SYSTEM_SAMPLES["clutch_passenger"];
 
     // Convert sample groups to DieSpringStageConfig
     const stages: DieSpringStageConfig[] = sample.groups.map(group => {
