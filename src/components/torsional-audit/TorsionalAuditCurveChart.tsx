@@ -43,23 +43,23 @@ export function TorsionalAuditCurveChart({
   return (
     <Card className="border-slate-200 shadow-sm bg-white/50 backdrop-blur-sm">
       <CardHeader className="py-3 px-4 bg-slate-50/50 border-b">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
           <CardTitle className="text-sm font-semibold text-slate-700 uppercase tracking-tight">System Performance Curve</CardTitle>
-          <div className="flex gap-4 text-[10px]">
+          <div className="flex flex-wrap gap-3 text-[10px]">
              <div className="flex items-center gap-1">
                 <div className="w-2 h-2 bg-blue-600 rounded-full" />
-                <span className="text-slate-500 uppercase font-medium">Torque (T)</span>
+                <span className="text-slate-500 uppercase font-medium">Torque</span>
              </div>
              {thetaSafeLife && (
                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-0.5 bg-emerald-500 border-dashed border-t border-emerald-500" />
-                    <span className="text-emerald-600 uppercase font-medium">Safe (Life)</span>
+                    <div className="w-3 h-0.5 bg-emerald-500" />
+                    <span className="text-emerald-600 uppercase font-medium">Safe</span>
                  </div>
              )}
             {thetaPhysicalStop && (
                  <div className="flex items-center gap-1">
                     <div className="w-2 h-2 bg-rose-600 rounded-sm" />
-                    <span className="text-rose-600 uppercase font-medium">Hard Stop</span>
+                    <span className="text-rose-600 uppercase font-medium">Hard</span>
                  </div>
              )}
           </div>
@@ -77,6 +77,8 @@ export function TorsionalAuditCurveChart({
                 tick={{ fontSize: 10, fill: '#64748b' }}
                 tickLine={{ stroke: '#cbd5e1' }}
                 axisLine={{ stroke: '#cbd5e1' }}
+                tickFormatter={(value: number) => value.toFixed(1)}
+                tickCount={6}
                 label={{ value: 'Angle θ (°)', position: 'insideBottom', offset: -10, fontSize: 10, fill: '#64748b' }}
               />
               <YAxis 
