@@ -94,6 +94,26 @@ export function TorsionalSystemCalculator() {
       {/* Left Column: Inputs (Sticky Sidebar) */}
       <div className="xl:col-span-4 space-y-6">
         <div className="sticky top-6 space-y-6">
+            {/* Product Showcase */}
+            <Card className="border-slate-200 shadow-sm bg-white/50 backdrop-blur-sm overflow-hidden">
+                <div className="relative">
+                    <img 
+                        src="/images/spring-pack-product.png" 
+                        alt="Torsional Spring Pack / 扭矩弹簧包"
+                        className="w-full h-40 object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent" />
+                    <div className="absolute bottom-3 left-4 right-4">
+                        <p className="text-white text-xs font-bold uppercase tracking-wider">
+                            {isZh ? "离合器减震弹簧包" : "Clutch Damper Spring Pack"}
+                        </p>
+                        <p className="text-slate-300 text-[10px] mt-0.5">
+                            {isZh ? "多级扭矩传递系统" : "Multi-Stage Torque Transfer System"}
+                        </p>
+                    </div>
+                </div>
+            </Card>
+
             {/* Real-World Samples */}
             <Card className="border-slate-200 shadow-sm bg-white/50 backdrop-blur-sm">
                 <CardHeader className="py-2 px-4 border-b">
