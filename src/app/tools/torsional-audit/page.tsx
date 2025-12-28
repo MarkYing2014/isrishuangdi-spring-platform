@@ -8,6 +8,7 @@ import { TORSIONAL_SYSTEM_SAMPLES } from "@/lib/torsional/torsionalSystem";
 import { ISO_10243_CATALOG } from "@/lib/dieSpring/catalog";
 import { DieSpringSpec } from "@/lib/dieSpring/types";
 import { Button } from "@/components/ui/button";
+import { ModeIndicator } from "@/components/ui/ModeIndicator";
 import { ArrowLeft, Printer } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/components/language-context";
@@ -78,6 +79,7 @@ function TorsionalAuditContent() {
           <h1 className="text-xl font-bold text-slate-900">
             {isZh ? "高级扭矩系统审计 (AUDIT)" : "Advanced Torsional System Audit"}
           </h1>
+          <ModeIndicator />
         </div>
         <Button variant="outline" size="sm" onClick={() => window.print()} className="h-8">
           <Printer className="w-4 h-4 mr-2" />

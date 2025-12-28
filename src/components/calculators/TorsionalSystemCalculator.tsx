@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ModeIndicator } from "@/components/ui/ModeIndicator";
 import { Plus, Trash2, Activity, Settings2, Info } from "lucide-react";
 import Link from "next/link";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -103,6 +104,10 @@ export function TorsionalSystemCalculator() {
                         className="w-full h-40 object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent" />
+                    {/* Mode Indicator Badge */}
+                    <div className="absolute top-2 right-2">
+                        <ModeIndicator />
+                    </div>
                     <div className="absolute bottom-3 left-4 right-4">
                         <p className="text-white text-xs font-bold uppercase tracking-wider">
                             {isZh ? "离合器减震弹簧包" : "Clutch Damper Spring Pack"}
