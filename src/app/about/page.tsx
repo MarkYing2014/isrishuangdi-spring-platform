@@ -597,7 +597,112 @@ export default function AboutPage() {
         </Card>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-2">
+      <section className="space-y-4">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight">
+            <LanguageText 
+              en="Industrial Knowledge Embedding & Advanced Modules" 
+              zh="工业知识嵌入与先进模块" 
+            />
+          </h2>
+          <p className="max-w-4xl text-slate-600">
+            <LanguageText
+              en="We want to embed industrial spring knowledge (from internal presentations) into our system, not as static PPT, but as structured product capabilities."
+              zh="我们致力于将工业弹簧领域的深厚知识（源自内部技术沉淀与演示）嵌入系统，不再是静态的 PPT，而是转化为结构化的产品能力。"
+            />
+          </p>
+        </div>
+
+        <Card className="border-slate-300 bg-slate-50/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-slate-900">
+              <div className="rounded-md bg-slate-900 p-1">
+                <Activity className="size-4 text-white" />
+              </div>
+              <LanguageText en="Arc Springs & Spring Packs Design Module" zh="弧形弹簧与弹簧组设计模块" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-3">
+                <h3 className="font-semibold text-slate-900">
+                  <LanguageText en="Core Mission" zh="核心使命" />
+                </h3>
+                <p className="text-sm text-slate-600">
+                  <LanguageText 
+                    en="Add a new advanced design module for Arc Springs & Spring Packs, aligned with real industrial manufacturing and testing processes." 
+                    zh="新增弧形弹簧（Arc Springs）与弹簧组（Spring Packs）的高级设计模块，深度对齐真实工业制造与测试流程。"
+                  />
+                </p>
+              </div>
+              <div className="space-y-3">
+                <h3 className="font-semibold text-slate-900">
+                  <LanguageText en="System Architecture" zh="系统架构升级" />
+                </h3>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">
+                  <li>
+                    <LanguageText en="Unified SpringType: ArcSpring | CompressionSpring | SpringPack" zh="统一 SpringType：弧形弹簧 | 压缩弹簧 | 弹簧组" />
+                  </li>
+                  <li>
+                    <LanguageText en="Type-specific geometry models & manufacturing processes" zh="各类型专属的几何模型与工艺定义" />
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="font-semibold text-slate-900">
+                <LanguageText en="Key Technical Requirements" zh="关键技术要求" />
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                  <p className="text-sm font-medium text-slate-900">
+                    <LanguageText en="Parametric Modeling" zh="参数化建模" />
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                    <li><LanguageText en="Variable wire & mean diameter" zh="变线径与变中径支持" /></li>
+                    <li><LanguageText en="Variable pitch & arc length integration" zh="变节距与弧长积分" /></li>
+                    <li><LanguageText en="Arc geometry (Radius, Free/Block Angle)" zh="圆弧几何（半径、自由/压并角）" /></li>
+                  </ul>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                  <p className="text-sm font-medium text-slate-900">
+                    <LanguageText en="Engineering Math" zh="工程数学与几何" />
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                    <li><LanguageText en="Angle-based parametric centerline" zh="基于角度的参数化中心线" /></li>
+                    <li><LanguageText en="Boolean grinding (No geometry hacks)" zh="物理磨平布尔切割（非拟合）" /></li>
+                    <li><LanguageText en="High-continuity Tube/Sweep stability" zh="高连续性导管/扫掠稳定性" /></li>
+                  </ul>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                  <p className="text-sm font-medium text-slate-900">
+                    <LanguageText en="Manufacturing Awareness" zh="制造感知" />
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                    <li><LanguageText en="Shot peening & hot setting support" zh="喷丸与强压工艺支持" /></li>
+                    <li><LanguageText en="Grinding depth (endClosedTurns in mm)" zh="端部磨平深度（毫米定义）" /></li>
+                    <li><LanguageText en="Manufacturing constraints UI" zh="制造约束智能提醒" /></li>
+                  </ul>
+                </div>
+                <div className="col-span-full rounded-lg border border-slate-200 bg-slate-900 p-3 text-white">
+                  <p className="text-sm font-medium">
+                    <LanguageText en="Simulation Readiness (FEM-ready)" zh="仿真就绪（有限元支持）" />
+                  </p>
+                  <p className="mt-1 text-xs text-slate-300">
+                    <LanguageText 
+                      en="Explicit torque, stiffness, and contact regions for high-fidelity nonlinear industrial simulation." 
+                      zh="显式定义扭矩、刚度及接触区域，为高保真非线性工业仿真提供精准支撑。"
+                    />
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="space-y-4">
         <Card>
           <CardHeader>
             <CardTitle>
