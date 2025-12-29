@@ -384,7 +384,7 @@ export function HomeRiskRadar() {
               </p>
             ) : (
               keyFindings.map((f, idx) => (
-                <p key={f.ruleId}>
+                <p key={`${f.ruleId}_${idx}`}>
                   <span className="font-semibold">{idx + 1}.</span>{" "}
                   <LanguageText en={f.title.en} zh={f.title.zh} />
                 </p>

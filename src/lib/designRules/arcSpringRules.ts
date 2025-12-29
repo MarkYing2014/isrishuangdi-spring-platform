@@ -110,7 +110,7 @@ export function buildArcSpringDesignRuleReport(
   let geomIdx = 0;
   for (const msg of baseErrors) {
     const field = inferFieldFromMessage(msg);
-    const suffix = field ? `.${field}` : `.x${geomIdx++}`;
+    const suffix = field ? `.${field}.${geomIdx++}` : `.x${geomIdx++}`;
     findings.push({
       id: `ARC_GEOM_INVALID${suffix}`,
       level: "error",
