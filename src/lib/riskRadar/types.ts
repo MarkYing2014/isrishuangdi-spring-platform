@@ -8,7 +8,8 @@ export type RiskRadarSpringType =
   | "variablePitch"
   | "wave"
   | "dieSpring"
-  | "disk";
+  | "disk"
+  | "garter";
 
 export type RiskDimensionKey = "engineering" | "manufacturing" | "quality";
 

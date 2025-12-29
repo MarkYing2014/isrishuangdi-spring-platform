@@ -120,3 +120,12 @@ export function buildDiskRiskRadar(params: {
   const report = buildDiskSpringDesignRuleReport(params);
   return radarFromDesignRuleReport({ springType: "disk", report });
 }
+
+export function buildGarterRiskRadar(params: {
+  geometry?: import("@/lib/springTypes/garter").GarterSpringDesign | null;
+  analysisResult?: import("@/lib/springTypes/garter").GarterCalculationResult | null;
+}): EngineeringRiskRadar {
+  const { buildGarterSpringDesignRuleReport } = require("@/lib/designRules/garterRules");
+  const report = buildGarterSpringDesignRuleReport(params.geometry, params.analysisResult);
+  return radarFromDesignRuleReport({ springType: "garter", report });
+}

@@ -20,6 +20,11 @@ import {
   buildExtensionRiskRadar,
   buildSpiralRiskRadar,
   buildTorsionRiskRadar,
+  buildArcRiskRadar,
+  buildWaveRiskRadar,
+  buildDieSpringRiskRadar,
+  buildVariablePitchRiskRadar,
+  buildGarterRiskRadar,
   radarFromDesignRuleReport,
 } from "@/lib/riskRadar";
 import type { EngineeringRiskRadar, RadarOverallStatus } from "@/lib/riskRadar";
@@ -52,6 +57,18 @@ function springTypeLabel(geometryType: string | null | undefined): { en: string;
       return { en: "Spiral Torsion Spring", zh: "螺旋扭簧" };
     case "disk":
       return { en: "Disk / Belleville Spring", zh: "碟形弹簧" };
+    case "arc":
+      return { en: "Arc Spring", zh: "弧形弹簧" };
+    case "wave":
+      return { en: "Wave Spring", zh: "波形弹簧" };
+    case "dieSpring":
+      return { en: "Die Spring", zh: "模具弹簧" };
+    case "variablePitchCompression":
+      return { en: "Variable Pitch Compression", zh: "变节距压簧" };
+    case "suspensionSpring":
+      return { en: "Suspension Spring", zh: "减震器弹簧" };
+    case "garter":
+      return { en: "Garter Spring", zh: "环形拉簧" };
     default:
       return { en: "Unknown Spring", zh: "未知弹簧" };
   }
@@ -196,6 +213,26 @@ export function HomeRiskRadar() {
         design: geometry,
         analysisResult,
       });
+    }
+
+    if (geometry.type === "arc") {
+      return buildArcRiskRadar(geometry as any);
+    }
+
+    if (geometry.type === "wave") {
+      return buildWaveRiskRadar({ input: geometry as any });
+    }
+
+    if (geometry.type === "dieSpring") {
+      return buildDieSpringRiskRadar({ input: geometry as any });
+    }
+
+    if (geometry.type === "variablePitchCompression") {
+      return buildVariablePitchRiskRadar(geometry as any);
+    }
+
+    if (geometry.type === "garter") {
+      return buildGarterRiskRadar({ geometry: geometry as any, analysisResult: analysisResult as any });
     }
 
     return buildDemoRadar();
