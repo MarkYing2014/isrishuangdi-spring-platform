@@ -15,6 +15,9 @@ import { previewTheme } from "@/lib/three/previewTheme";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
 import { WaveSpringMesh } from "./WaveSpringMesh";
+import { Download, Loader2 } from "lucide-react";
+import { useCadExportStore } from "@/lib/stores/cadExportStore";
+import { downloadTextFile } from "@/lib/utils/downloadTextFile";
 
 // View presets
 const VIEW_PRESETS = {
@@ -160,6 +163,18 @@ export function WaveSpringVisualizer({
     setCurrentView(view);
   }, []);
 
+  const { isExporting, exportWaveCad } = useCadExportStore();
+
+  const handleExport = useCallback(async () => {
+      const result = await exportWaveCad();
+      if (result.ok && result.content) {
+          downloadTextFile(result.filename, result.content);
+      } else {
+          console.error("Export failed:", result.warnings);
+          // Optional: Show toast
+      }
+  }, [exportWaveCad]);
+
   // Calculate scale for visualization
   const scale = useMemo(() => {
     const maxDim = Math.max(meanDiameter, amplitude * 2);
@@ -223,6 +238,18 @@ export function WaveSpringVisualizer({
 
       {/* View selector - bottom left */}
       <div className="absolute bottom-2 left-2 flex gap-1">
+        <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs gap-1"
+            onClick={handleExport}
+            disabled={isExporting}
+            title="Export to CadQuery Script"
+        >
+            {isExporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+            Export CAD
+        </Button>
+        <div className="w-px h-6 bg-slate-300 mx-1 self-center" />
         <Button
           variant={currentView === "perspective" ? "default" : "secondary"}
           size="sm"

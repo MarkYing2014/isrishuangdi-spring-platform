@@ -274,7 +274,7 @@ function buildCrossoverHookCenterline(
 
   // 9) loop arc
   const loopPts: THREE.Vector3[] = [];
-  const loopSegs = 48;
+  const loopSegs = 96;
   for (let i = 1; i <= loopSegs; i++) {
     const t = i / loopSegs;
     const theta = startAngle + loopAngleRad * t;
@@ -439,7 +439,7 @@ export function buildHookCenterline(
     const hookArcCenter = endPos.clone().sub(arcStartPos);
 
     const arcTotalAngle = THREE.MathUtils.degToRad(300);
-    const arcSegments = 36;
+    const arcSegments = 72;
 
     for (let i = 1; i <= arcSegments; i++) {
       const t = i / arcSegments;
@@ -455,7 +455,7 @@ export function buildHookCenterline(
     const loopCenter = new THREE.Vector3(0, 0, endPos.z + (isEnd ? hookGap : -hookGap));
 
     const totalArc = THREE.MathUtils.degToRad(spec.loopAngleDeg);
-    const loopSegments = 48;
+    const loopSegments = 96;
 
     for (let i = 0; i <= loopSegments; i++) {
       const t = i / loopSegments;
@@ -527,6 +527,16 @@ export function buildHookCenterline(
       const reversedTransitionPts = [...transitionPts].reverse();
       pts.push(...reversedHookPts.slice(0, -1));
       pts.push(...reversedTransitionPts);
+    }
+  }
+
+  if (pts.length > 0) {
+    if (isEnd) {
+      // End Hook: First point must match endPos exactly
+      pts[0].copy(endPos);
+    } else {
+      // Start Hook: Last point must match endPos exactly (which is body[0])
+      pts[pts.length - 1].copy(endPos);
     }
   }
 

@@ -17,7 +17,9 @@ import { useFeaStore } from "@/lib/stores/feaStore";
 import { applyFeaColors, findMaxSigmaNodeIndex, findMaxDispNodeIndex } from "@/lib/fea/feaTypes";
 import { Html } from "@react-three/drei";
 import { Button } from "@/components/ui/button";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Download, Loader2 } from "lucide-react";
+import { useCadExportStore } from "@/lib/stores/cadExportStore";
+import { downloadTextFile } from "@/lib/utils/downloadTextFile";
 
 import { previewTheme } from "@/lib/three/previewTheme";
 
@@ -309,6 +311,23 @@ export function TorsionSpringVisualizer({ previewStrokeMm }: { previewStrokeMm?:
     setCurrentView(view);
   }, []);
 
+  const { isExporting, exportTorsionCad } = useCadExportStore();
+
+  const handleExport = useCallback(async () => {
+    if (isExporting || !torsionDesign) return;
+    
+    // Prevent default store action if busy (though store handles this too)
+    const result = await exportTorsionCad();
+    
+    if (result.ok && result.content) {
+      downloadTextFile(result.filename, result.content);
+    } else {
+        console.error("CAD Export failed:", result.warnings);
+    }
+  }, [isExporting, torsionDesign, exportTorsionCad]);
+
+  const canExport = !!torsionDesign && !isExporting;
+
   if (!torsionDesign) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-slate-100 rounded-lg">
@@ -391,6 +410,25 @@ export function TorsionSpringVisualizer({ previewStrokeMm }: { previewStrokeMm?:
           title="侧视图 / Side View"
         >
           侧
+        </Button>
+      </div>
+
+      {/* CAD Export Button - Bottom Left (Offset from View Selector) */}
+      <div className="absolute bottom-12 left-2 flex gap-1">
+        <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs bg-white/90 shadow backdrop-blur hover:bg-white"
+            onClick={handleExport}
+            disabled={!canExport}
+            title="Export standard STEP file for CAD"
+        >
+            {isExporting ? (
+                <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+            ) : (
+                <Download className="h-3 w-3 mr-2 text-blue-600" />
+            )}
+            {isExporting ? "Exporting..." : "Export CAD"}
         </Button>
       </div>
 

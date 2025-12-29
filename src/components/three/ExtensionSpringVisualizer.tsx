@@ -16,7 +16,9 @@ import { useFeaStore } from "@/lib/stores/feaStore";
 import { applyFeaColors, findMaxSigmaNodeIndex, findMaxDispNodeIndex } from "@/lib/fea/feaTypes";
 import { Html } from "@react-three/drei";
 import { Button } from "@/components/ui/button";
-import { Eye, RotateCcw } from "lucide-react";
+import { Eye, RotateCcw, Download, Loader2 } from "lucide-react";
+import { useCadExportStore } from "@/lib/stores/cadExportStore";
+import { downloadTextFile } from "@/lib/utils/downloadTextFile";
 
 import { previewTheme } from "@/lib/three/previewTheme";
 
@@ -348,6 +350,28 @@ export function ExtensionSpringVisualizer({ previewStrokeMm }: { previewStrokeMm
         >
           <RotateCcw className="h-3 w-3 mr-1" />
           3D
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={async () => {
+            const res = await useCadExportStore.getState().exportExtensionCad();
+            if (res.ok) {
+              downloadTextFile(res.filename, res.content, "text/x-python");
+            } else {
+              alert(useCadExportStore.getState().lastError || "Export failed");
+            }
+          }}
+          disabled={useCadExportStore.getState().isExporting}
+          title="Export CAD (CadQuery Python)"
+        >
+          {useCadExportStore.getState().isExporting ? (
+            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+          ) : (
+            <Download className="h-3 w-3 mr-1" />
+          )}
+          CAD
         </Button>
         <Button
           variant={currentView === "front" ? "default" : "secondary"}

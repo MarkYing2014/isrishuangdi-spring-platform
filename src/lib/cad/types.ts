@@ -10,7 +10,7 @@
  */
 
 import type { SpringMaterialId } from '@/lib/materials/springMaterials';
-import type { 
+import type {
   CompressionSpringGeometry,
   ExtensionSpringGeometry,
   TorsionSpringGeometry,
@@ -22,7 +22,7 @@ import type {
 // ============================================================================
 
 /** CAD 导出格式 */
-export type CadExportFormat = 
+export type CadExportFormat =
   | 'STEP'           // STEP AP214 (通用 3D 交换格式)
   | 'IGES'           // IGES (旧版 3D 交换格式)
   | 'DXF'            // AutoCAD DXF (2D)
@@ -127,24 +127,24 @@ export interface AnalysisSummary {
   springRate: number;
   /** 刚度单位 */
   springRateUnit: 'N/mm' | 'N·mm/deg' | 'lbf/in';
-  
+
   /** 最大位移/角度 */
   maxDeflection?: number;
   /** 工作位移/角度 */
   workingDeflection?: number;
-  
+
   /** 工作力/扭矩 */
   workingLoad?: number;
   /** 最大力/扭矩 */
   maxLoad?: number;
-  
+
   /** 最大应力 (MPa) */
   maxStress?: number;
   /** 静态安全系数 */
   staticSafetyFactor?: number;
   /** 疲劳安全系数 */
   fatigueSafetyFactor?: number;
-  
+
   /** 固有频率 (Hz) */
   naturalFrequency?: number;
   /** 屈曲安全系数（仅压簧） */
@@ -232,35 +232,35 @@ export interface TitleBlockInfo {
 // ============================================================================
 
 /** 弹簧几何参数（复用现有类型） */
-export type SpringGeometry = 
-  | CompressionSpringGeometry 
-  | ExtensionSpringGeometry 
-  | TorsionSpringGeometry 
+export type SpringGeometry =
+  | CompressionSpringGeometry
+  | ExtensionSpringGeometry
+  | TorsionSpringGeometry
   | ConicalSpringGeometry;
 
 /** CAD 导出设计数据 */
 export interface CadExportDesign {
   /** 弹簧类型 */
   springType: 'compression' | 'extension' | 'torsion' | 'conical';
-  
+
   /** 单位设置 */
   units: UnitSettings;
-  
+
   /** 材料信息 */
   material: CadMaterialInfo;
-  
+
   /** 几何参数（复用现有类型） */
   geometry: SpringGeometry;
-  
+
   /** 分析结果摘要 */
   analysis?: AnalysisSummary;
-  
+
   /** 图纸设置 */
   drawingSettings?: DrawingSettings;
-  
+
   /** 标题栏信息 */
   titleBlock?: TitleBlockInfo;
-  
+
   /** 
    * 扩展参数（用于特殊需求）
    * 例如：钩部详细参数、腿部弯曲参数等
@@ -302,16 +302,16 @@ export interface CadExportDesign {
 export interface CadExportRequest {
   /** 请求 ID（用于追踪） */
   requestId?: string;
-  
+
   /** 设计编号 */
   designCode: string;
-  
+
   /** 设计数据 */
   design: CadExportDesign;
-  
+
   /** 导出格式列表 */
   formats: CadExportFormat[];
-  
+
   /** 导出选项 */
   options?: {
     /** 是否压缩为 ZIP */
@@ -343,20 +343,20 @@ export interface ExportedFile {
 export interface CadExportResponse {
   /** 请求 ID */
   requestId: string;
-  
+
   /** 状态 */
   status: 'pending' | 'processing' | 'completed' | 'failed';
-  
+
   /** 导出文件列表 */
   files?: ExportedFile[];
-  
+
   /** 错误信息 */
   error?: {
     code: string;
     message: string;
     details?: unknown;
   };
-  
+
   /** 处理时间 (ms) */
   processingTime?: number;
 }
@@ -369,10 +369,10 @@ export interface CadExportResponse {
 export interface BatchCadExportRequest {
   /** 批次 ID */
   batchId?: string;
-  
+
   /** 导出项目列表 */
   items: CadExportRequest[];
-  
+
   /** 批量选项 */
   options?: {
     /** 是否合并为单个 ZIP */
@@ -386,19 +386,91 @@ export interface BatchCadExportRequest {
 export interface BatchCadExportResponse {
   /** 批次 ID */
   batchId: string;
-  
+
   /** 总数 */
   total: number;
-  
+
   /** 已完成数 */
   completed: number;
-  
+
   /** 失败数 */
   failed: number;
-  
+
   /** 各项结果 */
   results: CadExportResponse[];
-  
+
   /** 合并文件（如果启用） */
   mergedFile?: ExportedFile;
 }
+
+// ============================================================================
+// EXTENSION SPRING CAD EXPORT TYPES (STRICT)
+// ============================================================================
+
+export type CadKernel = "cadquery";
+
+export interface CadExportMeta {
+  partName: string;            // e.g. "ExtensionSpring"
+  unit: "mm";
+  generatedAtIso: string;
+  repoCommit?: string;         // Optional
+}
+
+export interface CadExportResult {
+  ok: boolean;
+  kernel: CadKernel;
+  filename: string;            // e.g. extension_spring_cadquery.py
+  content: string;             // python script
+  meta: CadExportMeta;
+  warnings?: string[];
+}
+
+export type Vec3Mm = { x: number; y: number; z: number };
+
+export interface ExtensionSpringCenterlineMm {
+  startHook: Vec3Mm[];
+  body: Vec3Mm[];
+  endHook: Vec3Mm[];
+  centerline: Vec3Mm[];        // startHook + body + endHook
+  stats: {
+    meanRadiusMm: number;
+    wireDiameterMm: number;
+    extendedLengthMm: number;
+    activeCoils: number;
+    hookType: string;
+    sampleCountBody: number;
+    samplePerTurn?: number;
+  };
+}
+
+export interface TorsionSpringCenterlineMm {
+  leg1: Vec3Mm[]; // From Tip to Body
+  body: Vec3Mm[]; // Helix
+  leg2: Vec3Mm[]; // From Body to Tip
+  centerline: Vec3Mm[]; // Complete data combined
+  stats: {
+    wireDiameterMm: number;
+    meanRadiusMm: number;
+    activeCoils: number;
+    bodyLengthMm: number;
+    legLength1Mm: number;
+    legLength2Mm: number;
+    sampleCountBody: number;
+    sampleCountLegs: number;
+  };
+}
+
+export interface WaveSpringCenterlineMm {
+  body: Vec3Mm[]; // Continuous wavy helix
+  stats: {
+    meanRadiusMm: number;
+    thicknessMm: number; // Axial
+    widthMm: number;     // Radial
+    wavesPerTurn: number;
+    activeCoils: number; // Turns
+    amplitudeMm: number;
+    totalHeightMm: number;
+    sampleCount: number;
+  };
+}
+

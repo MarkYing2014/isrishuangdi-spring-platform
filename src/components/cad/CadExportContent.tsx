@@ -40,6 +40,7 @@ import { FileCode, Box } from "lucide-react";
 import { QuoteCTA } from "@/components/common/QuoteCTA";
 import { generateGarterSpringDxf, generateGarterSpringSvg } from "@/lib/cad/garterSpringCad";
 import { GarterSpringDesign } from "@/lib/springTypes/garter";
+import { useCadExportStore } from "@/lib/stores/cadExportStore";
 
 // Dynamic import for 3D preview (client-side only)
 const CadPreview3D = dynamic(
@@ -1117,13 +1118,35 @@ function CadExportContent() {
             </TabsContent>
             
             <TabsContent value="cad">
-              {springType === "wave" || springType === "arc" || (springType === "variablePitchCompression" && !isVariablePitch) ? (
+              {springType === "wave" ? (
+                <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 rounded-lg p-6 border text-center space-y-4">
+                  <Box className="w-10 h-10 text-blue-500 mb-2" />
+                  <div>
+                    <h3 className="text-lg font-medium">
+                      <LanguageText en="Wave Spring CAD" zh="波形弹簧 CAD" />
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+                      <LanguageText 
+                        en="FreeCAD preview is not supported for Wave Springs yet, but you can generate a CadQuery Python script to build the model."
+                        zh="波形弹簧暂不支持 FreeCAD 预览，但您可以生成 CadQuery Python 脚本来构建模型。"
+                      />
+                    </p>
+                  </div>
+                  <Button 
+                    variant="default"
+                    onClick={() => useCadExportStore.getState().exportWaveCad()}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    <LanguageText en="Download Generator Script" zh="下载生成脚本" />
+                  </Button>
+                </div>
+              ) : springType === "arc" || (springType === "variablePitchCompression" && !isVariablePitch) ? (
                 <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 rounded-lg p-6 border text-center">
                   <AlertCircle className="w-10 h-10 text-slate-300 mb-4" />
                   <p className="text-muted-foreground">
                     <LanguageText 
-                      en={`FreeCAD preview is not available for ${springType === "wave" ? "Wave" : springType === "arc" ? "Arc" : "Variable Pitch"} Springs yet.`}
-                      zh={`${springType === "wave" ? "波形" : springType === "arc" ? "弧形" : "变节距"}弹簧暂不支持 FreeCAD 预览。`}
+                      en={`FreeCAD preview is not available for ${springType === "arc" ? "Arc" : "Variable Pitch"} Springs yet.`}
+                      zh={`${springType === "arc" ? "弧形" : "变节距"}弹簧暂不支持 FreeCAD 预览。`}
                     />
                   </p>
                 </div>

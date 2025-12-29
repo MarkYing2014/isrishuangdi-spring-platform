@@ -55,7 +55,7 @@ export interface ExtensionSpringGeometry extends BaseSpringGeometry {
   /** Initial tension Fi (N) */
   initialTension: number;
   /** Hook type */
-  hookType?: 'machine' | 'crossover' | 'side' | 'extended';
+  hookType?: 'machine' | 'crossover' | 'side' | 'extended' | 'doubleLoop';
 }
 
 /**
@@ -95,10 +95,10 @@ export interface ConicalSpringGeometry extends BaseSpringGeometry {
 /**
  * Union type for all spring geometries
  */
-export type SpringGeometry = 
-  | CompressionSpringGeometry 
-  | ExtensionSpringGeometry 
-  | TorsionSpringGeometry 
+export type SpringGeometry =
+  | CompressionSpringGeometry
+  | ExtensionSpringGeometry
+  | TorsionSpringGeometry
   | ConicalSpringGeometry;
 
 // ============================================================================

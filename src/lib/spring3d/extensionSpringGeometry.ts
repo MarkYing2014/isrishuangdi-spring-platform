@@ -89,7 +89,8 @@ export function generateExtensionCenterline(
   const extendedLength = solidBodyLength + Δx;
 
   // Sampling parameters
-  const numSamples = Math.max(400, activeCoils * 50);
+  // Ultra-high resolution for visual smoothness
+  const numSamples = Math.max(800, activeCoils * 200);
   const totalAngle = 2 * Math.PI * activeCoils;
 
   const points: THREE.Vector3[] = [];
@@ -292,14 +293,18 @@ export function buildExtensionSpringGeometry(
   centerlinePts.push(...endHookPts);     // 顶部钩
 
   // === PART 4: Build TubeGeometry ONCE from continuous curve ===
-  const radialSegments = 16;
+  // Increased resolution for smoother rendering (User feedback round 2)
+  // Radial: 32 -> 64
+  // Tubular: 2x -> 4x length
+  const radialSegments = 64;
+  const tubularSegments = Math.max(960, centerlinePts.length * 4);
 
   const curve = new THREE.CatmullRomCurve3(centerlinePts);
   curve.tension = 0;
 
   const bodyGeometry = new THREE.TubeGeometry(
     curve,
-    Math.max(240, centerlinePts.length),
+    tubularSegments,
     wireRadius,
     radialSegments,
     false
