@@ -6,8 +6,12 @@ import {
   Cog,
   Mail,
   Shield,
+  ShieldCheck,
   TrendingDown,
   TrendingUp,
+  Users,
+  Factory,
+  Cpu,
 } from "lucide-react";
 
 import { LanguageText } from "@/components/language-context";
@@ -700,6 +704,98 @@ export default function AboutPage() {
             </div>
           </CardContent>
         </Card>
+      </section>
+
+      <section className="space-y-4">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight">
+            <LanguageText 
+              en="Manufacturing Excellence & Production Capabilities" 
+              zh="卓越制造与生产能力" 
+            />
+          </h2>
+          <p className="max-w-3xl text-slate-600">
+            <LanguageText
+              en="Combining decades of industrial heritage with next-generation digital intelligence — we deliver precision at scale."
+              zh="我们将数十年的工业底蕴与新一代数字智能相结合：规模化交付高精度产品。"
+            />
+          </p>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="border-slate-200">
+            <CardHeader className="pb-2">
+              <div className="mb-2 inline-flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-900">
+                <Factory className="size-5" />
+              </div>
+              <CardTitle className="text-lg">
+                <LanguageText en="Advanced Equipment" zh="先进设备" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-slate-600">
+              <ul className="list-disc space-y-1 pl-4">
+                <li><LanguageText en="CNC multi-axis coiling" zh="数控多轴卷制" /></li>
+                <li><LanguageText en="Automated grinding lines" zh="全自动磨削线" /></li>
+                <li><LanguageText en="Precision heat treatment" zh="精密热处理过程" /></li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200">
+            <CardHeader className="pb-2">
+              <div className="mb-2 inline-flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-900">
+                <Cpu className="size-5" />
+              </div>
+              <CardTitle className="text-lg">
+                <LanguageText en="Technical Leadership" zh="技术领军" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-slate-600">
+              <ul className="list-disc space-y-1 pl-4">
+                <li><LanguageText en="Real-time 3D simulation" zh="实时 3D 仿真模拟" /></li>
+                <li><LanguageText en="CAD/CAM integrated design" zh="CAD/CAM 集成设计" /></li>
+                <li><LanguageText en="Proprietary rule engine" zh="自研工程规则引擎" /></li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200">
+            <CardHeader className="pb-2">
+              <div className="mb-2 inline-flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-900">
+                <ShieldCheck className="size-5" />
+              </div>
+              <CardTitle className="text-lg">
+                <LanguageText en="Quality Assurance" zh="质量保证" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-slate-600">
+              <ul className="list-disc space-y-1 pl-4">
+                <li><LanguageText en="Automated optical inspection" zh="全自动光学影像检测" /></li>
+                <li><LanguageText en="IATF 16949 compliant" zh="符合 IATF 16949 标准" /></li>
+                <li><LanguageText en="SPC process control" zh="SPC 全程质量管控" /></li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200">
+            <CardHeader className="pb-2">
+              <div className="mb-2 inline-flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-900">
+                <Users className="size-5" />
+              </div>
+              <CardTitle className="text-lg">
+                <LanguageText en="Customer Ecosystem" zh="客户生态" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-slate-600">
+              <p className="leading-relaxed">
+                <LanguageText 
+                  en="Trusted by global automotive OEMs, Tier 1 suppliers, and specialized industrial equipment leaders." 
+                  zh="备受全球汽车整车厂 (OEM)、一级供应商 (Tier 1) 及专业工业设备领跑者的信赖。"
+                />
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </section>
 
       <section className="space-y-4">
