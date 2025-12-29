@@ -17,6 +17,7 @@ import { GarterSpringCalculator } from "@/components/calculators/GarterSpringCal
 import { SuspensionSpringCalculator } from "@/components/calculators/SuspensionSpringCalculator";
 import { DiskSpringCalculator } from "@/components/calculators/DiskSpringCalculator";
 import { TorsionalSystemCalculator } from "@/components/calculators/TorsionalSystemCalculator";
+import { ArcSpringCalculator } from "@/components/calculators/ArcSpringCalculator";
 import { SpringSeoContent } from "@/components/seo/SpringSeoContent";
 
 const springTypes: {
@@ -114,6 +115,14 @@ const springTypes: {
     nameZh: "弹簧包 (Spring Pack)",
     descEn: "Clutch dampening, multi-group",
     descZh: "离合器减震，多组弹簧包",
+  },
+  {
+    type: "arc",
+    icon: "◎",
+    nameEn: "Arc Spring",
+    nameZh: "弧形弹簧",
+    descEn: "Torque dampening, curved axis",
+    descZh: "扭转减震，圆弧轴线",
   },
 ];
 
@@ -224,6 +233,7 @@ function CalculatorContent() {
         {selectedType === "disk" && <DiskSpringCalculator />}
         {selectedType === "garter" && <GarterSpringCalculator />}
         {selectedType === "torsionalSpringSystem" && <TorsionalSystemCalculator />}
+        {selectedType === "arc" && <ArcSpringCalculator />}
 
         {/* SEO Content Section */}
         <SpringSeoContent type={selectedType} />

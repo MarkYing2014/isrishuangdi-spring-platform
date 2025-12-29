@@ -80,7 +80,7 @@ function AnalysisContent() {
   const searchParams = useSearchParams();
   const analysisType = searchParams.get("type");
 
-  if (analysisType === "arc") {
+  if (analysisType === "arc" || designGeometry?.type === "arc") {
     return <ArcSpringEngineeringPage />;
   }
 
@@ -196,23 +196,7 @@ function AnalysisReady({
       </main>
     );
   }
-  if (designGeometry.type === "arc") {
-    return (
-      <div className="container mx-auto py-12 text-center">
-        <h1 className="text-2xl font-bold mb-4">{isZh ? "弧形弹簧分析" : "Arc Spring Analysis"}</h1>
-        <p className="text-muted-foreground mb-6">
-          {isZh 
-            ? "弧形弹簧的通用工程分析暂未开通。" 
-            : "Standard engineering analysis is not yet available for Arc Springs."}
-        </p>
-        <Button asChild variant="outline">
-          <Link href="/tools/calculator?type=arcSpring">
-            {isZh ? "返回计算器" : "Back to Calculator"}
-          </Link>
-        </Button>
-      </div>
-    );
-  }
+
 
   // Garter Spring Route
   if (designGeometry.type === "garter") {
