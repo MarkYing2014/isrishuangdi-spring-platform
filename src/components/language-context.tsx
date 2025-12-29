@@ -14,18 +14,27 @@ const LanguageContext = createContext<LanguageContextValue | undefined>(undefine
 
 export function LanguageProvider({
   children,
-  defaultLanguage = "zh",
+  initialLanguage = "zh",
 }: {
   children: React.ReactNode;
-  defaultLanguage?: SupportedLanguage;
+  initialLanguage?: SupportedLanguage;
 }) {
-  const [language, setLanguage] = useState<SupportedLanguage>(defaultLanguage);
+  const [language, setLanguageState] = useState<SupportedLanguage>(initialLanguage);
+
+  const setLanguage = (newLang: SupportedLanguage) => {
+    setLanguageState(newLang);
+    // Persist to cookie
+    document.cookie = `lang=${newLang}; path=/; max-age=${60 * 60 * 24 * 365}`;
+  };
 
   const value = useMemo(
     () => ({
       language,
       setLanguage,
-      toggleLanguage: () => setLanguage((prev) => (prev === "en" ? "zh" : "en")),
+      toggleLanguage: () => {
+        const nextLang = language === "en" ? "zh" : "en";
+        setLanguage(nextLang);
+      },
     }),
     [language],
   );
