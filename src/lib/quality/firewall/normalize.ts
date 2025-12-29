@@ -83,9 +83,10 @@ export function normalizeMeasurements(args: {
     const uslParsed = mapping.usl ? parseNumber(uslRaw) : null;
     const targetParsed = mapping.target ? parseNumber(targetRaw) : null;
 
-    const lsl = lslParsed === null ? undefined : lslParsed;
-    const usl = uslParsed === null ? undefined : uslParsed;
-    const target = targetParsed === null ? undefined : targetParsed;
+    // Use fixed values as fallback when no column is mapped or value is invalid
+    const lsl = lslParsed ?? mapping.lslFixed ?? undefined;
+    const usl = uslParsed ?? mapping.uslFixed ?? undefined;
+    const target = targetParsed ?? mapping.targetFixed ?? undefined;
 
     if (mapping.lsl && lslParsed === null && lslRaw.trim()) {
       issues.push(issue("Q_LSL_INVALID", "WARN", "Invalid LSL value", "LSL 数值不合法"));

@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const defaultMapping = dataset.inferredMapping ?? inferMapping(dataset.headers).mapping;
+    const defaultMapping = inferMapping(dataset.headers ?? []).mapping;
     const mapping = normalizeMapping(body.mapping ?? defaultMapping);
 
     if (!mapping.value) {

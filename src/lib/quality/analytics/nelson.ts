@@ -1,4 +1,15 @@
-import type { NelsonResult, NelsonViolation } from "../types";
+export interface NelsonViolation {
+  rule: number;
+  startIndex: number;
+  endIndex: number;
+  direction: string;
+  points: number[];
+}
+
+export interface NelsonResult {
+  violations: NelsonViolation[];
+  counts: Record<string, number>;
+}
 
 function pushViolation(list: NelsonViolation[], v: NelsonViolation) {
   const last = list[list.length - 1];

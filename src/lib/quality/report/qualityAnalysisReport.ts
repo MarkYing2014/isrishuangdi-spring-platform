@@ -3,6 +3,7 @@ import { Document, Page, Text, View, StyleSheet, Svg, Path, Line } from "@react-
 
 import type { FieldMapping, QualityAnalysisResult, QualityDataset } from "../types";
 import { buildQualityReportNarrative } from "./reportNarrator";
+import { computeHistogram } from "../analytics/histogram";
 
 export type QualityAnalysisReportModel = {
   dataset: Pick<QualityDataset, "id" | "name" | "createdAtISO" | "source" | "headers">;
@@ -134,6 +135,202 @@ function SimpleLineChart({ title, points }: { title: string; points: XY[] }) {
   );
 }
 
+// --- SVG Chart Generators ---
+
+function svgControlChart(
+  title: string,
+  points: { x: number; value: number; outOfControl?: boolean; ucl?: number; lcl?: number; cl?: number }[],
+  options: { height?: number; width?: number; yLabel?: string } = {}
+): string {
+  const width = options.width || 600;
+  const height = options.height || 200;
+  const padding = { top: 20, right: 20, bottom: 30, left: 40 };
+  const innerW = width - padding.left - padding.right;
+  const innerH = height - padding.top - padding.bottom;
+
+  if (points.length === 0) return "";
+
+  const values = points.map((p) => p.value);
+  const ucls = points.map(p => p.ucl ?? -Infinity).filter(isFinite);
+  const lcls = points.map(p => p.lcl ?? Infinity).filter(isFinite);
+
+  // Dynamic Range
+  let min = Math.min(...values, ...lcls);
+  let max = Math.max(...values, ...ucls);
+
+  if (min === Infinity) min = Math.min(...values);
+  if (max === -Infinity) max = Math.max(...values);
+
+  // Pad
+  const span = max - min || 1;
+  min -= span * 0.1;
+  max += span * 0.1;
+
+  const xScale = (i: number) => padding.left + (i / (points.length - 1 || 1)) * innerW;
+  const yScale = (v: number) => padding.top + innerH - ((v - min) / (max - min)) * innerH;
+
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${xScale(i)} ${yScale(p.value)}`).join(" ");
+
+  // Limits
+  const clLine = points[0].cl !== undefined ? `
+    <line x1="${padding.left}" y1="${yScale(points[0].cl)}" x2="${width - padding.right}" y2="${yScale(points[0].cl)}" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,4" />
+    <text x="${width - padding.right + 4}" y="${yScale(points[0].cl)}" font-size="10" fill="#10b981" alignment-baseline="middle">CL</text>
+  ` : "";
+
+  const uclLine = points[0].ucl !== undefined ? `
+    <line x1="${padding.left}" y1="${yScale(points[0].ucl!)}" x2="${width - padding.right}" y2="${yScale(points[0].ucl!)}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,4" />
+    <text x="${width - padding.right + 4}" y="${yScale(points[0].ucl!)}" font-size="10" fill="#ef4444" alignment-baseline="middle">UCL</text>
+  ` : "";
+
+  const lclLine = points[0].lcl !== undefined ? `
+    <line x1="${padding.left}" y1="${yScale(points[0].lcl!)}" x2="${width - padding.right}" y2="${yScale(points[0].lcl!)}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,4" />
+    <text x="${width - padding.right + 4}" y="${yScale(points[0].lcl!)}" font-size="10" fill="#ef4444" alignment-baseline="middle">LCL</text>
+  ` : "";
+
+  // Points (Red if OOC)
+  const dots = points.map((p, i) => {
+    const cx = xScale(i);
+    const cy = yScale(p.value);
+    const color = p.outOfControl ? "#ef4444" : "#3b82f6";
+    const r = p.outOfControl ? 4 : 2;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" />`;
+  }).join("");
+
+  // Labels (X Axis for every nth item to avoid crowding)
+  const step = Math.ceil(points.length / 10);
+  const xLabels = points.map((_, i) => {
+    if (i % step !== 0) return "";
+    return `<text x="${xScale(i)}" y="${height - 5}" font-size="10" fill="#64748b" text-anchor="middle">${i + 1}</text>`;
+  }).join("");
+
+  // Y Labels
+  const yLabels = [min, (min + max) / 2, max].map(v => {
+    return `<text x="${padding.left - 6}" y="${yScale(v)}" font-size="10" fill="#64748b" text-anchor="end" alignment-baseline="middle">${v.toFixed(2)}</text>`;
+  }).join("");
+
+  return `
+    <div style="margin-bottom: 24px;">
+      <div style="font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 4px;">${title}</div>
+      <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+        <rect x="0" y="0" width="${width}" height="${height}" fill="#f8fafc" rx="4" />
+        <!-- Grid -->
+        <rect x="${padding.left}" y="${padding.top}" width="${innerW}" height="${innerH}" fill="none" stroke="#e2e8f0" />
+        ${yLabels}
+        ${xLabels}
+        ${clLine} ${uclLine} ${lclLine}
+        <path d="${path}" fill="none" stroke="#3b82f6" stroke-width="2" />
+        ${dots}
+      </svg>
+    </div>
+  `;
+}
+
+function svgHistogram(
+  title: string,
+  values: number[],
+  specs: { lsl: number | null; usl: number | null; target: number | null },
+  options: { height?: number; width?: number } = {}
+): string {
+  const width = options.width || 600;
+  const height = options.height || 240;
+  const padding = { top: 20, right: 30, bottom: 30, left: 40 };
+  const innerW = width - padding.left - padding.right;
+  const innerH = height - padding.top - padding.bottom;
+
+  const hist = computeHistogram(values);
+  if (hist.bins.length === 0) return "";
+
+  const xScale = (v: number) => padding.left + ((v - hist.min) / (hist.max - hist.min)) * innerW;
+  const yScale = (count: number) => padding.top + innerH - (count / hist.maxCount) * innerH;
+
+  const bars = hist.bins.map(b => {
+    const x = xScale(b.start);
+    const w = Math.max(0, xScale(b.end) - x - 1);
+    const h = innerH - (yScale(b.count) - padding.top);
+    const y = yScale(b.count);
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#93c5fd" />`;
+  }).join("");
+
+  // Specs
+  const specLines = [];
+  if (specs.lsl !== null) {
+    const x = xScale(specs.lsl);
+    if (x >= padding.left && x <= width - padding.right) {
+      specLines.push(`<line x1="${x}" y1="${padding.top}" x2="${x}" y2="${height - padding.bottom}" stroke="#ef4444" stroke-dasharray="4,4" stroke-width="2" />
+             <text x="${x}" y="${padding.top - 6}" font-size="10" fill="#ef4444" text-anchor="middle">LSL</text>`);
+    }
+  }
+  if (specs.usl !== null) {
+    const x = xScale(specs.usl);
+    if (x >= padding.left && x <= width - padding.right) {
+      specLines.push(`<line x1="${x}" y1="${padding.top}" x2="${x}" y2="${height - padding.bottom}" stroke="#ef4444" stroke-dasharray="4,4" stroke-width="2" />
+             <text x="${x}" y="${padding.top - 6}" font-size="10" fill="#ef4444" text-anchor="middle">USL</text>`);
+    }
+  }
+
+  return `
+    <div style="margin-bottom: 24px;">
+      <div style="font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 4px;">${title}</div>
+      <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+         <rect x="0" y="0" width="${width}" height="${height}" fill="#f8fafc" rx="4" />
+         <!-- Axis -->
+         <line x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" stroke="#94a3b8" />
+         ${bars}
+         ${specLines.join("")}
+         <!-- Min/Max Labels -->
+         <text x="${padding.left}" y="${height - 10}" font-size="10" fill="#64748b">${hist.min.toFixed(2)}</text>
+         <text x="${width - padding.right}" y="${height - 10}" font-size="10" fill="#64748b" text-anchor="end">${hist.max.toFixed(2)}</text>
+      </svg>
+    </div>
+    `;
+}
+
+function svgStratificationChart(result: NonNullable<QualityAnalysisResult["stratification"]>, title: string): string {
+  const width = 600;
+  const height = 200;
+  const padding = { top: 20, right: 30, bottom: 40, left: 60 };
+  const innerW = width - padding.left - padding.right;
+  const innerH = height - padding.top - padding.bottom;
+
+  const maxScore = 100;
+  const barHeight = 20;
+  const gap = 10;
+
+  // Sort items by key
+  const items = result.strata.slice(0, 5); // Top 5
+
+  const yScale = (i: number) => padding.top + i * (barHeight + gap);
+  const xScale = (score: number) => padding.left + (score / maxScore) * innerW;
+
+  const bars = items.map((item, i) => {
+    const y = yScale(i);
+    const w = xScale(item.score) - padding.left;
+    const color = item.score >= 90 ? "#10b981" : item.score >= 60 ? "#f59e0b" : "#ef4444";
+    return `
+          <text x="${padding.left - 8}" y="${y + barHeight / 2 + 4}" font-size="12" fill="#334155" text-anchor="end">${item.key}</text>
+          <rect x="${padding.left}" y="${y}" width="${w}" height="${barHeight}" fill="${color}" rx="2" />
+          <text x="${padding.left + w + 8}" y="${y + barHeight / 2 + 4}" font-size="10" fill="#334155">${item.score}</text>
+        `;
+  }).join("");
+
+  return `
+    <div style="margin-bottom: 24px;">
+      <div style="font-size: 12px; font-weight: bold; color: #334155; margin-bottom: 4px;">${title}</div>
+      <svg width="${width}" height="${Math.max(height, items.length * 30 + 50)}" viewBox="0 0 ${width} ${Math.max(height, items.length * 30 + 50)}">
+         <rect x="0" y="0" width="${width}" height="${height}" fill="#f8fafc" rx="4" />
+         <!-- Grid -->
+         <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" stroke="#e2e8f0" />
+         ${bars}
+         <text x="${xScale(0)}" y="${height - 10}" font-size="10" fill="#94a3b8">0</text>
+         <text x="${xScale(50)}" y="${height - 10}" font-size="10" fill="#94a3b8" text-anchor="middle">50</text>
+         <text x="${xScale(100)}" y="${height - 10}" font-size="10" fill="#94a3b8" text-anchor="end">100</text>
+      </svg>
+    </div>
+    `;
+}
+
+// ------------------------------------
+
 export function generateQualityAnalysisReportHTML(model: QualityAnalysisReportModel): string {
   const lang = model.meta?.language ?? "bilingual";
 
@@ -142,8 +339,7 @@ export function generateQualityAnalysisReportHTML(model: QualityAnalysisReportMo
 
   const narrative = buildQualityReportNarrative({ analysis: model.analysis, lang });
 
-
-
+  // 1. Prepare Executive Summary HTML
   const executiveReasonsHtml = narrative.executiveSummary.keyReasons
     .map((r) => `<li>${t(lang, r.en, r.zh)}</li>`)
     .join("\n");
@@ -152,34 +348,94 @@ export function generateQualityAnalysisReportHTML(model: QualityAnalysisReportMo
     .map((x) => `<li>${t(lang, x.en, x.zh)}</li>`)
     .join("\n");
 
-  const criticalByCharacteristicHtml = (() => {
-    const items = narrative.criticalFindingsByCharacteristic.items
-      .map((it) => {
-        const stability = it.stability.length
-          ? `<ul>${it.stability.map((b) => `<li>${t(lang, b.en, b.zh)}</li>`).join("\n")}</ul>`
-          : "";
-        const capability = it.capability.length
-          ? `<ul>${it.capability.map((b) => `<li>${t(lang, b.en, b.zh)}</li>`).join("\n")}</ul>`
-          : "";
-        const rec = it.recommendation.length
-          ? `<ul>${it.recommendation.map((b) => `<li>${t(lang, b.en, b.zh)}</li>`).join("\n")}</ul>`
-          : "";
+  // 2. Prepare Detailed Characteristic Sections (Charts + Specific Findings)
+  const characteristicDetailsHtml = model.analysis.characteristics.map(c => {
+    // A. Charts
+    const values = c.imr.points.map(p => p.value);
+    const lsl = c.capability.lsl ?? null;
+    const usl = c.capability.usl ?? null;
+    // const target = c.capability.target ?? null;
 
-        return `
-          <div style="margin-bottom:12px">
-            <div style="font-weight:800;color:#0f172a;margin-bottom:6px">${it.characteristic}</div>
-            ${stability ? `<div style="margin-top:6px"><div style="font-weight:700">${t(lang, it.stabilityLabel.en, it.stabilityLabel.zh)}</div>${stability}</div>` : ""}
-            ${capability ? `<div style="margin-top:6px"><div style="font-weight:700">${t(lang, it.capabilityLabel.en, it.capabilityLabel.zh)}</div>${capability}</div>` : ""}
-            <div style="margin-top:6px"><div style="font-weight:700">${t(lang, it.assessmentLabel.en, it.assessmentLabel.zh)}</div><div>${t(lang, it.assessment.en, it.assessment.zh)}</div></div>
-            ${rec ? `<div style="margin-top:6px"><div style="font-weight:700">${t(lang, it.recommendationLabel.en, it.recommendationLabel.zh)}</div>${rec}</div>` : ""}
-          </div>
+    const chartHist = svgHistogram(t(lang, `Distribution: ${c.name}`, `分布图: ${c.name}`), values, { lsl, usl, target: null });
+
+    const chartI = svgControlChart(t(lang, "I Chart", "I 图 (单值)"), c.imr.points.map(p => ({
+      x: p.x, value: p.value, ucl: p.ucl, lcl: p.lcl, cl: p.cl, outOfControl: p.outOfControl
+    })));
+
+    // Compute MR points for Chart
+    const mrPoints = [];
+    const xs = c.imr.points;
+    for (let i = 1; i < xs.length; i++) {
+      mrPoints.push({
+        x: i + 1,
+        value: Math.abs(xs[i].value - xs[i - 1].value),
+        // approximate MR limits if not stored (UCL_MR = 3.267 * MRbar roughly, or D4*MRbar)
+        // But we can just plot the values. 
+        // Better: use the MRbar from imr object
+        cl: c.imr.mrBar,
+        ucl: 3.267 * c.imr.mrBar, // D4 for n=2 is 3.267
+        lcl: 0, // D3 for n=2 is 0
+        outOfControl: false // We verify this if needed
+      });
+    }
+
+    const chartMR = svgControlChart(t(lang, "MR Chart", "MR 图 (移动极差)"), mrPoints);
+
+
+    let chartXbar = "";
+    let chartR = "";
+
+    if (c.xbarr) {
+      chartXbar = svgControlChart(t(lang, `Xbar Chart (n=${c.xbarr.subgroupSize})`, `Xbar 图 (n=${c.xbarr.subgroupSize})`), c.xbarr.points.map((p, i) => ({
+        x: i, value: p.mean, ucl: p.xucl, lcl: p.xlcl, cl: p.xcl, outOfControl: p.xOutOfControl
+      })));
+
+      chartR = svgControlChart(t(lang, "R Chart", "R 图 (极差)"), c.xbarr.points.map((p, i) => ({
+        x: i, value: p.range, ucl: p.rucl, lcl: p.rlcl ?? 0, cl: p.rcl, outOfControl: p.rOutOfControl
+      })));
+    }
+
+    // B. Findings Text (from narrative)
+    const findingItem = narrative.criticalFindingsByCharacteristic.items.find(it => it.characteristic === c.name);
+    let textHtml = "";
+    if (findingItem) {
+      const stability = findingItem.stability.length
+        ? `<ul>${findingItem.stability.map((b) => `<li>${t(lang, b.en, b.zh)}</li>`).join("\n")}</ul>`
+        : "";
+      const capability = findingItem.capability.length
+        ? `<ul>${findingItem.capability.map((b) => `<li>${t(lang, b.en, b.zh)}</li>`).join("\n")}</ul>`
+        : "";
+      const rec = findingItem.recommendation.length
+        ? `<ul>${findingItem.recommendation.map((b) => `<li>${t(lang, b.en, b.zh)}</li>`).join("\n")}</ul>`
+        : "";
+
+      textHtml = `
+            <div style="margin-top:16px; border-top:1px dashed #e2e8f0; padding-top:12px">
+                ${stability ? `<div style="margin-top:6px"><div style="font-weight:700; color:#334155">${t(lang, findingItem.stabilityLabel.en, findingItem.stabilityLabel.zh)}</div>${stability}</div>` : ""}
+                ${capability ? `<div style="margin-top:6px"><div style="font-weight:700; color:#334155">${t(lang, findingItem.capabilityLabel.en, findingItem.capabilityLabel.zh)}</div>${capability}</div>` : ""}
+                <div style="margin-top:6px"><strong style="color:#334155">${t(lang, findingItem.assessmentLabel.en, findingItem.assessmentLabel.zh)}</strong>: ${t(lang, findingItem.assessment.en, findingItem.assessment.zh)}</div>
+                ${rec ? `<div style="margin-top:6px"><div style="font-weight:700; color:#334155">${t(lang, findingItem.recommendationLabel.en, findingItem.recommendationLabel.zh)}</div>${rec}</div>` : ""}
+            </div>
         `;
-      })
-      .join("\n");
+    }
 
-    return items ? items : "";
-  })();
+    return `
+        <div class="card">
+           <div class="section-title" style="font-size:16px; color:#1e40af">${c.name}</div>
+           <div style="display:flex; flex-wrap:wrap; gap:12px;">
+              ${chartHist}
+              ${chartI}
+              ${chartMR}
+              ${chartXbar}
+              ${chartR}
+           </div>
+           ${textHtml}
+        </div>
+      `;
+  }).join("\n");
 
+
+  // 3. Other Sections
   const spcInterpretationHtml = (() => {
     const items = narrative.controlChartInterpretation.items
       .map((it) => {
@@ -263,12 +519,16 @@ export function generateQualityAnalysisReportHTML(model: QualityAnalysisReportMo
       ? `<div>
           <div style="color:#334155;margin-bottom:6px">${t(lang, "By", "维度")}: ${s.by}</div>
           <div style="color:#334155;margin-bottom:6px">${t(lang, s.interpretation.en, s.interpretation.zh)}</div>
+          
+          <!-- Stratification Chart Here if needed, but we already have it separately? Or reuse logic -->
+          ${model.analysis.stratification ? svgStratificationChart(model.analysis.stratification, t(lang, "Stratification Score Comparison", "分层评分对比")) : ""}
+
           <ul>${items}</ul>
         </div>`
       : "";
   })();
 
-  const charsHtml = narrative.capability.rows
+  const charsTableHtml = narrative.capability.rows
     .map((r) => {
       const cpk = r.cpk === null ? "—" : fmt(r.cpk, 3);
       const cp = r.cp === null ? "—" : fmt(r.cp, 3);
@@ -288,28 +548,8 @@ export function generateQualityAnalysisReportHTML(model: QualityAnalysisReportMo
     })
     .join("\n");
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${title}</title>
-  <style>
-    body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,sans-serif;padding:24px;color:#0f172a}
-    h1{margin:0 0 6px 0;color:#1d4ed8}
-    .meta{color:#64748b;font-size:12px;margin-bottom:18px}
-    .card{border:1px solid #e2e8f0;border-radius:10px;padding:14px;background:#f8fafc;margin-bottom:14px}
-    table{width:100%;border-collapse:collapse}
-    th,td{border-bottom:1px solid #e2e8f0;padding:8px;font-size:12px}
-    th{text-align:left;color:#334155;background:#f1f5f9}
-  </style>
-</head>
-<body>
-  <h1>${title}</h1>
-  <div class="meta">${t(lang, "Generated", "生成")}: ${generatedAt} | ${t(lang, "Dataset", "数据集")}: ${model.dataset.name}</div>
-
-  <div class="card">
-    <strong>${t(lang, "PPAP / Report Info", "PPAP / 报告信息")}</strong>
+  // Metadata Table
+  const metaTable = `
     <table style="margin-top:8px">
       <tbody>
         <tr><td style="width:180px;color:#64748b">${t(lang, "Customer", "客户")}</td><td>${model.meta?.customer ?? "—"}</td></tr>
@@ -322,40 +562,72 @@ export function generateQualityAnalysisReportHTML(model: QualityAnalysisReportMo
         <tr><td style="color:#64748b">${t(lang, "Approved Date", "批准日期")}</td><td>${model.meta?.approvedAtISO ?? "—"}</td></tr>
       </tbody>
     </table>
+  `;
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${title}</title>
+  <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,sans-serif;padding:24px;color:#0f172a; max-width: 900px; margin: 0 auto;}
+    h1{margin:0 0 6px 0;color:#1d4ed8}
+    .meta{color:#64748b;font-size:12px;margin-bottom:18px}
+    .card{border:1px solid #e2e8f0;border-radius:10px;padding:14px;background:#f8fafc;margin-bottom:14px; page-break-inside: avoid;}
+    .section-title { font-weight: bold; margin-bottom: 8px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid #e2e8f0;padding:8px;font-size:12px}
+    th{text-align:left;color:#334155;background:#f1f5f9}
+    ul { padding-left: 20px; margin: 0; }
+    li { margin-bottom: 4px; font-size: 13px; }
+    @media print {
+      .card { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <h1>${title}</h1>
+  <div class="meta">${t(lang, "Generated", "生成")}: ${generatedAt} | ${t(lang, "Dataset", "数据集")}: ${model.dataset.name || "N/A"}</div>
+
+  <div class="card">
+    <div class="section-title">${t(lang, "Report Info", "报告信息")}</div>
+    ${metaTable}
   </div>
 
   <div class="card">
-    <strong>${t(lang, narrative.executiveSummary.title.en, narrative.executiveSummary.title.zh)}</strong>
-    <div style="margin-top:8px;color:#334155">
+    <div class="section-title">${t(lang, narrative.executiveSummary.title.en, narrative.executiveSummary.title.zh)}</div>
+    <div>
       <div><span style="font-weight:700">${t(lang, narrative.executiveSummary.overallStatusLabel.en, narrative.executiveSummary.overallStatusLabel.zh)}</span>: ${model.analysis.status}</div>
       <div><span style="font-weight:700">${t(lang, "Score", "评分")}</span>: ${model.analysis.score}</div>
       <div style="margin-top:8px"><span style="font-weight:700">${t(lang, narrative.executiveSummary.conclusionLabel.en, narrative.executiveSummary.conclusionLabel.zh)}</span>: ${t(lang, narrative.executiveSummary.conclusion.en, narrative.executiveSummary.conclusion.zh)}</div>
-      <div style="margin-top:8px"><span style="font-weight:700">${t(lang, narrative.executiveSummary.keyReasonsLabel.en, narrative.executiveSummary.keyReasonsLabel.zh)}</span><ul>${executiveReasonsHtml}</ul></div>
+      
+      <div style="margin-top:8px; font-weight:bold; color:#ef4444">${t(lang, "Key Findings", "关键发现")}</div>
+      <ul>${executiveReasonsHtml}</ul>
+      
       <div style="margin-top:8px"><span style="font-weight:700">${t(lang, narrative.executiveSummary.dispositionLabel.en, narrative.executiveSummary.dispositionLabel.zh)}</span><ul>${executiveDispositionHtml}</ul></div>
       <div style="margin-top:6px;color:#64748b;font-size:11px">${t(lang, narrative.executiveSummary.scoreExplain.en, narrative.executiveSummary.scoreExplain.zh)}</div>
     </div>
   </div>
-
-  <div class="card">
-    <strong>${t(lang, narrative.criticalFindingsByCharacteristic.title.en, narrative.criticalFindingsByCharacteristic.title.zh)}</strong>
-    ${criticalByCharacteristicHtml || ""}
-  </div>
+  
+  <h2 style="font-size:16px; margin-top:24px; margin-bottom:12px; border-bottom:2px solid #e2e8f0; padding-bottom:6px">${t(lang, "Characteristic Details", "特性详情")}</h2>
+  ${characteristicDetailsHtml}
 
   ${spcInterpretationHtml ? `
   <div class="card">
-    <strong>${t(lang, narrative.controlChartInterpretation.title.en, narrative.controlChartInterpretation.title.zh)}</strong>
+    <div class="section-title">${t(lang, narrative.controlChartInterpretation.title.en, narrative.controlChartInterpretation.title.zh)}</div>
     ${spcInterpretationHtml}
   </div>
   ` : ""}
 
   <div class="card">
-    <strong>${t(lang, narrative.measurementSystem.title.en, narrative.measurementSystem.title.zh)}</strong>
+    <div class="section-title">${t(lang, narrative.measurementSystem.title.en, narrative.measurementSystem.title.zh)}</div>
     ${measurementHtml}
   </div>
 
   ${xbarrSummaryHtml ? `
   <div class="card">
-    <strong>${t(lang, "Xbar-R", "Xbar-R")}</strong>
+    <strong>${t(lang, "Xbar-R Summary", "Xbar-R 汇总")}</strong>
     ${xbarrSummaryHtml}
   </div>
   ` : ""}
@@ -380,7 +652,7 @@ export function generateQualityAnalysisReportHTML(model: QualityAnalysisReportMo
   </div>
 
   <div class="card">
-    <strong>${t(lang, narrative.capability.title.en, narrative.capability.title.zh)}</strong>
+    <div class="section-title">${t(lang, narrative.capability.title.en, narrative.capability.title.zh)}</div>
     <table>
       <thead>
         <tr>
@@ -394,7 +666,7 @@ export function generateQualityAnalysisReportHTML(model: QualityAnalysisReportMo
         </tr>
       </thead>
       <tbody>
-        ${charsHtml}
+        ${charsTableHtml}
       </tbody>
     </table>
   </div>

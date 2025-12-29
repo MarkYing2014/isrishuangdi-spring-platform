@@ -28,9 +28,9 @@ export function inferMapping(headers: string[]): MappingInference {
 
   const value =
     pick(headers, [
-      (h) => h === "value" || h === "measurement" || h === "meas" || h === "val",
-      (h) => h.includes("value") || h.includes("meas") || h.includes("result") || h.includes("data"),
-      (h) => h.includes("值") || h.includes("测量") || h.includes("尺寸"),
+      (h) => h === "value" || h === "measurement" || h === "meas" || h === "val" || h === "load",
+      (h) => h.includes("value") || h.includes("meas") || h.includes("result") || h.includes("data") || h.includes("load"),
+      (h) => h.includes("值") || h.includes("测量") || h.includes("尺寸") || h.includes("负载"),
     ]) ?? headers[0];
 
   const characteristic = pick(headers, [

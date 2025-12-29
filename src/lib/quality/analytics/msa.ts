@@ -1,4 +1,18 @@
-import type { MsaGageRrResult } from "../types";
+export interface MsaGageRrResult {
+  design: "crossed" | "nested";
+  parts: number;
+  appraisers: number;
+  trials: number;
+  ev: number;
+  av: number;
+  iv: number;
+  pv: number;
+  grr: number;
+  tv: number;
+  pctGrr: number | null;
+  ndc: number | null;
+  assessment: "ACCEPTABLE" | "MARGINAL" | "UNACCEPTABLE" | "INSUFFICIENT_DATA";
+}
 
 type Obs = {
   partId: string;

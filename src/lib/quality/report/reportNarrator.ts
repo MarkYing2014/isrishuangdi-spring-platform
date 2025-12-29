@@ -1,4 +1,6 @@
-import type { BilingualText, QualityAnalysisResult, QualityStratificationResult } from "../types";
+import type { QualityAnalysisResult, QualityStratificationResult } from "../types";
+
+export type BilingualText = { en: string; zh: string };
 
 type Lang = "en" | "zh" | "bilingual";
 

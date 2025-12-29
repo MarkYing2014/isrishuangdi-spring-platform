@@ -24,6 +24,8 @@
     "@react-pdf/renderer": "^4.3.1",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.2",
+    "@tanstack/react-virtual": "^3.13.13",
+    "@types/uuid": "^11.0.0",
     "@vercel/analytics": "^1.6.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -36,6 +38,8 @@
     "tailwind-merge": "^3.4.0",
     "three": "^0.181.2",
     "three-bvh-csg": "^0.0.17",
+    "uuid": "^13.0.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.1.13",
     "zustand": "^5.0.9"
   },
