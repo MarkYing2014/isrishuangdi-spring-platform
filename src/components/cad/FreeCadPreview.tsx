@@ -6,7 +6,7 @@ import { OrbitControls, Environment, Center, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { Loader2, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
+import { Loader2, RefreshCw, AlertCircle, CheckCircle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import { previewTheme } from "@/lib/three/previewTheme";
@@ -221,6 +221,47 @@ function LoadingOverlay({ message, estimatedTime = 15 }: { message: string; esti
   );
 }
 
+// View presets - camera positions for different views
+const VIEW_PRESETS = {
+  perspective: { position: [50, 30, 50], target: [0, 0, 0] },
+  front: { position: [0, 0, 80], target: [0, 0, 0] },      // 前视图 - 沿 Z 轴看
+  top: { position: [0, 80, 0], target: [0, 0, 0] },       // 俯视图 - 从上往下看
+  side: { position: [80, 0, 0], target: [0, 0, 0] },      // 侧视图 - 沿 X 轴看
+} as const;
+
+type ViewType = keyof typeof VIEW_PRESETS;
+
+/**
+ * Camera controller component - must be inside Canvas
+ */
+function CameraController({ 
+  viewType, 
+  controlsRef 
+}: { 
+  viewType: ViewType; 
+  controlsRef: React.RefObject<any>;
+}) {
+  const { camera } = useThree();
+  
+  // Update camera when view type changes
+  useEffect(() => {
+    const preset = VIEW_PRESETS[viewType];
+    camera.position.set(...(preset.position as [number, number, number]));
+    camera.lookAt(...(preset.target as [number, number, number]));
+    camera.updateProjectionMatrix();
+    
+    // Update OrbitControls target after a small delay to ensure it's mounted
+    setTimeout(() => {
+      if (controlsRef.current) {
+        controlsRef.current.target.set(...(preset.target as [number, number, number]));
+        controlsRef.current.update();
+      }
+    }, 10);
+  }, [viewType, camera, controlsRef]);
+  
+  return null;
+}
+
 /**
  * 场景设置
  */
@@ -247,6 +288,8 @@ export function FreeCadPreview({
 }: FreeCadPreviewProps) {
   const [state, setState] = useState<PreviewState>({ status: "idle" });
   const abortControllerRef = useRef<AbortController | null>(null);
+  const controlsRef = useRef<any>(null);
+  const [currentView, setCurrentView] = useState<ViewType>("perspective");
   
   // 稳定化 geometry 引用，避免无限循环
   const geometryJson = JSON.stringify(geometry);
@@ -431,6 +474,7 @@ export function FreeCadPreview({
         className="rounded-lg"
       >
         <SceneSetup />
+        <CameraController viewType={currentView} controlsRef={controlsRef} />
 
         <color attach="background" args={[previewTheme.background]} />
         
@@ -470,6 +514,7 @@ export function FreeCadPreview({
         
         {/* 控制器 */}
         <OrbitControls
+          ref={controlsRef}
           enablePan={true}
           enableZoom={true}
           enableRotate={true}
@@ -480,6 +525,47 @@ export function FreeCadPreview({
         {/* 网格地面 */}
         <gridHelper args={[100, 20, previewTheme.grid.major, previewTheme.grid.minor]} position={[0, -20, 0]} />
       </Canvas>
+      
+      {/* 视图控制 - 底部左侧 */}
+      <div className="absolute bottom-8 left-2 z-20 flex gap-1 bg-white/80 backdrop-blur-sm rounded-md p-1 shadow-sm">
+        <Button
+          variant={currentView === "perspective" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => setCurrentView("perspective")}
+          title="透视图 / Perspective"
+        >
+          <RotateCcw className="h-3 w-3 mr-1" />
+          3D
+        </Button>
+        <Button
+          variant={currentView === "front" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => setCurrentView("front")}
+          title="前视图 / Front View"
+        >
+          前
+        </Button>
+        <Button
+          variant={currentView === "top" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => setCurrentView("top")}
+          title="俯视图 / Top View"
+        >
+          顶
+        </Button>
+        <Button
+          variant={currentView === "side" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => setCurrentView("side")}
+          title="侧视图 / Side View"
+        >
+          侧
+        </Button>
+      </div>
       
       {/* 底部提示 */}
       <div className="absolute bottom-2 left-2 right-2 text-center">
