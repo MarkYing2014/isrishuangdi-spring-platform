@@ -2,8 +2,9 @@
 
 import React, { useLayoutEffect, useMemo, useRef, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Edges, Line } from "@react-three/drei";
+import { Edges, Line } from "@react-three/drei";
 import * as THREE from "three";
+import { AutoFitControls } from "./AutoFitControls";
 import { previewTheme } from "@/lib/three/previewTheme";
 import {
   validateArcSpringGeometry,
@@ -231,22 +232,62 @@ export function ArcSpringMesh({
     // 4. Phase Offset (Critical for visual separation of nested coils)
     const phaseOffsetRad = (packIndex * (packPhaseDeg ?? 0)) * (Math.PI / 180);
 
+    // 1. Turn Distribution Model (Intensity k blends between uniform and tight ends)
+    const sigma = Math.max(0.01, deadTightnessSigma || 0.08);
+    const expNegInvSigma = Math.exp(-1 / sigma);
+
+    // --- OVERLAP PROTECTION (SOLID HEIGHT LIMIT) ---
+    const arcLengthPhysical = r * (currentAlphaDeg * Math.PI / 180);
+    const maxDensity = d > 0 ? arcLengthPhysical / d : 1000;
+    const maxLambdaDeriv = totalCoils > 0 ? maxDensity / totalCoils : 1000;
+
+    // 1. Turn Distribution Model (Intensity k blends between uniform and tight ends)
+    const sL_solid = totalCoils > 0 && arcLengthPhysical > 0 ? ((deadCoilsStart || 0) * d) / arcLengthPhysical : 0;
+    const sR_solid = totalCoils > 0 && arcLengthPhysical > 0 ? ((deadCoilsEnd || 0) * d) / arcLengthPhysical : 0;
+    
+    // Safety: don't let dead zones overlap more than 90% of spring
+    const totalSDead = sL_solid + sR_solid;
+    const scaleS = totalSDead > 0.9 ? 0.9 / totalSDead : 1.0;
+    const finalSL = sL_solid * scaleS;
+    const finalSR = sR_solid * scaleS;
+
+    const propL = totalCoils > 0 ? (deadCoilsStart ?? 0) / totalCoils : 0;
+    const propR = totalCoils > 0 ? (deadCoilsEnd ?? 0) / totalCoils : 0;
+
+    const lambdaAt = (s: number) => {
+        // Idealized "Solid" distribution (Piecewise Linear)
+        // Maps segments [0, sL] -> [0, propL], [sL, 1-sR] -> [propL, 1-propR], [1-sR, 1] -> [1-propR, 1]
+        let solid = s;
+        if (s < finalSL) {
+            solid = s * (propL / Math.max(1e-6, finalSL));
+        } else if (s > (1 - finalSR)) {
+            const u = (s - (1 - finalSR)) / Math.max(1e-6, finalSR);
+            solid = (1 - propR) + propR * u;
+        } else {
+            const midSRange = 1 - finalSL - finalSR;
+            const u = (s - finalSL) / Math.max(1e-6, midSRange);
+            solid = propL + (1 - propL - propR) * u;
+        }
+
+        // Intensity k blends between Uniform (s) and Solid (segmented)
+        // k=0 -> Uniform
+        // k=1 -> Dead coils are as tight as physically possible (touching)
+        // Higher values of k are clamped to 1.0 for physical realism.
+        const k = Math.max(0, Math.min(1.0, (deadTightnessK ?? 1.0)));
+        return s * (1 - k) + solid * k;
+    };
+
     // Generate Coil Points
     for (let i = 0; i < backboneFrames.length; i++) {
         const frame = backboneFrames[i];
+        const s = i / (backboneFrames.length - 1); 
         
-        // Unmodified U along backbone
-        const u = i / (backboneFrames.length - 1); // 0..1
-        
-        const currentTurns = u * totalCoils;
+        const currentTurns = lambdaAt(s) * totalCoils;
         const phi = (2 * Math.PI * currentTurns) + phaseOffsetRad;
 
         const cosPhi = Math.cos(phi);
         const sinPhi = Math.sin(phi);
 
-        // Standard Coil Position on this frame
-        // p_coil_local = meanCoilRadius * (cos * n + sin * b)
-        
         const centerOffset = new THREE.Vector3()
             .addScaledVector(frame.n, -radialOffset) 
             .addScaledVector(frame.t, arcShift);
@@ -255,11 +296,7 @@ export function ArcSpringMesh({
             .addScaledVector(frame.n, cosPhi * meanCoilRadius)
             .addScaledVector(frame.b, sinPhi * meanCoilRadius);
             
-        // Note: For concentric nesting, we do NOT offset the center.
-        // We just used the smaller meanCoilRadius calculated above.
-            
         const pFinal = frame.p.clone().add(centerOffset).add(coilVector);
-        
         tubePath.push(pFinal);
     }
 
@@ -396,7 +433,10 @@ export function ArcSpringMesh({
     bowPlaneTiltDeg,
     d, D, n, r, 
     deadCoilsStart, deadCoilsEnd,
-    colorMode, approxStressBeta
+    deadTightnessK, deadTightnessSigma,
+    spring2, colorMode, approxStressBeta,
+    profile, packIndex, packGapMm, packPhaseDeg, 
+    bowLeanDeg, bowPlaneTiltDeg
   ]);
 
   useEffect(() => {
@@ -482,44 +522,6 @@ function BlockCap({ matrix, size, color, metalness, roughness }: {
     );
 }
 
-function FitToObject({ groupRef, autoRotate }: { groupRef: React.RefObject<THREE.Group | null>; autoRotate: boolean }) {
-  const { camera } = useThree();
-  const controlsRef = useRef<any>(null);
-
-  useEffect(() => {
-    const obj = groupRef.current;
-    if (!obj) return;
-
-    const box = new THREE.Box3().setFromObject(obj);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const dist = maxDim * 2.0;
-
-    camera.position.set(center.x + dist * 0.8, center.y - dist * 0.6, center.z + dist * 0.8);
-    camera.near = Math.max(0.1, maxDim / 100);
-    camera.far = Math.max(5000, maxDim * 100);
-    camera.updateProjectionMatrix();
-
-    if (controlsRef.current) {
-      controlsRef.current.target.copy(center);
-      controlsRef.current.update();
-    }
-  }, [camera, groupRef]);
-
-  return (
-    <OrbitControls
-      ref={controlsRef}
-      makeDefault
-      enablePan={true}
-      enableZoom={true}
-      enableRotate={true}
-      autoRotate={autoRotate}
-      autoRotateSpeed={0.8}
-    />
-  );
-}
 
 
 
@@ -578,7 +580,7 @@ function ArcSpringScene({
         ))}
       </group>
 
-      <FitToObject groupRef={groupRef} autoRotate={!!autoRotate} />
+      <AutoFitControls targetRef={groupRef} autoRotate={!!autoRotate} />
     </>
   );
 }

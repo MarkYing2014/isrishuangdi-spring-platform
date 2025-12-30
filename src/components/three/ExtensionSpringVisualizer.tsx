@@ -2,8 +2,8 @@
 
 import React, { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import { AutoFitControls } from "./AutoFitControls";
 import { 
   useSpringSimulationStore, 
   type ExtensionDesignMeta 
@@ -44,7 +44,13 @@ const HOOK_COLOR = previewTheme.material.endCap.color; // Silver for hooks
  * - Hook geometry at both ends
  * - Dynamic extension animation
  */
-function AnimatedExtensionSpring({ previewStrokeMm }: { previewStrokeMm?: number }) {
+function AnimatedExtensionSpring({ 
+  previewStrokeMm, 
+  groupRef 
+}: { 
+  previewStrokeMm?: number;
+  groupRef: React.RefObject<THREE.Group | null>;
+}) {
   const design = useSpringSimulationStore((state) => state.design);
   const storeDeflection = useSpringSimulationStore((state) => state.currentDeflection);
   const currentDeflection = previewStrokeMm ?? storeDeflection;
@@ -132,7 +138,7 @@ function AnimatedExtensionSpring({ previewStrokeMm }: { previewStrokeMm?: number
   const { bodyGeometry, topHookGeometry, bottomHookGeometry, state } = springGeometry;
 
   return (
-    <group>
+    <group ref={groupRef}>
       {/* Main spring body - key forces re-render when FEA mode changes */}
       <mesh key={`spring-${isFeaMode}-${colorMode}`} geometry={bodyGeometry} material={springMaterial} />
       
@@ -287,6 +293,7 @@ export function ExtensionSpringVisualizer({ previewStrokeMm }: { previewStrokeMm
   const { design, currentDeflection, currentLoad, currentStiffness, initialTension } = useSpringSimulationStore();
   const extensionDesign = design?.type === "extension" ? design as ExtensionDesignMeta : null;
   const controlsRef = useRef<any>(null);
+  const springGroupRef = useRef<THREE.Group>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
 
   const handleViewChange = useCallback((view: ViewType) => {
@@ -319,16 +326,16 @@ export function ExtensionSpringVisualizer({ previewStrokeMm }: { previewStrokeMm
         <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
         <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
         
-        <AnimatedExtensionSpring previewStrokeMm={previewStrokeMm} />
+        <AnimatedExtensionSpring previewStrokeMm={previewStrokeMm} groupRef={springGroupRef} />
         
-        <OrbitControls 
+        <AutoFitControls 
           ref={controlsRef}
+          targetRef={springGroupRef}
           enablePan={true}
           enableZoom={true}
           enableRotate={true}
           minDistance={20}
-          maxDistance={200}
-          target={[0, 0, 25]}
+          maxDistance={350}
         />
         
         {/* Ground grid */}

@@ -9,7 +9,9 @@
 
 import { useRef, useState, useCallback, useEffect, Suspense } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Environment } from "@react-three/drei";
+import { Environment } from "@react-three/drei";
+import * as THREE from "three";
+import { AutoFitControls } from "./AutoFitControls";
 import { DieSpringMesh } from "./DieSpringMesh";
 import type { DieSpringDuty } from "@/lib/dieSpring/riskModel";
 import { Button } from "@/components/ui/button";
@@ -115,6 +117,7 @@ export function DieSpringVisualizer({
   const scale = maxDim > 0 ? 2 / maxDim : 0.05;
 
   const controlsRef = useRef<any>(null);
+  const springGroupRef = useRef<THREE.Group>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
 
   const handleViewChange = useCallback((view: ViewType) => {
@@ -141,7 +144,7 @@ export function DieSpringVisualizer({
           <Environment preset="studio" />
 
           {/* Die Spring Mesh - Rotate to stand upright */}
-          <group rotation={[Math.PI / 2, 0, 0]}>
+          <group ref={springGroupRef} rotation={[Math.PI / 2, 0, 0]}>
           <DieSpringMesh
             outerDiameter={outerDiameter}
             wireThickness={wireThickness}
@@ -158,8 +161,9 @@ export function DieSpringVisualizer({
           />
           </group>
 
-          <OrbitControls
+          <AutoFitControls
             ref={controlsRef}
+            targetRef={springGroupRef}
             autoRotate={autoRotate}
             autoRotateSpeed={1}
             enablePan={true}

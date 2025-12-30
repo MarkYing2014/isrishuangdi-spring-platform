@@ -2,8 +2,8 @@
 
 import React, { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import { AutoFitControls } from "./AutoFitControls";
 import { useSpringSimulationStore, type ConicalDesignMeta } from "@/lib/stores/springSimulationStore";
 import { 
   buildConicalSpringGeometry,
@@ -70,7 +70,7 @@ function CameraController({
  * Conical spring model using new geometry generator with closed ground ends
  * 使用新几何生成器的锥形弹簧模型，支持并紧磨平端
  */
-function ConicalSpringModel() {
+function ConicalSpringModel({ groupRef }: { groupRef: React.RefObject<THREE.Group | null> }) {
   const { design, collapsedCoils, currentDeflection } = useSpringSimulationStore();
 
   // FEA store state for coloring
@@ -158,7 +158,7 @@ function ConicalSpringModel() {
   const clippingPlanes = clipPlanes ? [clipPlanes.bottom, clipPlanes.top] : [];
 
   return (
-    <group>
+    <group ref={groupRef}>
       {/* Collapsed coils (gray) with clipping - key forces re-render when FEA mode changes */}
       {collapsedGeometry && (
         <mesh key={`collapsed-${isFeaMode}-${colorMode}`} geometry={collapsedGeometry}>
@@ -372,6 +372,7 @@ export interface ConicalSpringVisualizerProps {
 export function ConicalSpringVisualizer(props: ConicalSpringVisualizerProps) {
   const { mode, design, maxDeflection, setDeflection } = useSpringSimulationStore();
   const controlsRef = useRef<any>(null);
+  const springGroupRef = useRef<THREE.Group>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
   
   // 动画控制状态
@@ -487,14 +488,13 @@ export function ConicalSpringVisualizer(props: ConicalSpringVisualizerProps) {
         <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
         <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
         
-        <ConicalSpringModel />
+        <ConicalSpringModel groupRef={springGroupRef} />
         
-        <OrbitControls 
+        <AutoFitControls 
           ref={controlsRef}
-          enablePan={false}
+          targetRef={springGroupRef}
           minDistance={20}
-          maxDistance={150}
-          target={[0, springCenterY, 0]}
+          maxDistance={250}
           autoRotate={currentView === "perspective"}
           autoRotateSpeed={0.5}
         />

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useCallback, Suspense } from "rea
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Environment } from "@react-three/drei";
 import * as THREE from "three";
+import { AutoFitControls } from "./AutoFitControls";
 import { RotateCcw, Info } from "lucide-react";
 
 import { previewTheme } from "@/lib/three/previewTheme";
@@ -63,6 +64,7 @@ export type DiskSpringVisualizerProps = {
 export function DiskSpringVisualizer(props: DiskSpringVisualizerProps) {
   const [mounted, setMounted] = useState(false);
   const controlsRef = useRef<any>(null);
+  const springGroupRef = useRef<THREE.Group>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
 
   useEffect(() => {
@@ -99,28 +101,27 @@ export function DiskSpringVisualizer(props: DiskSpringVisualizerProps) {
           <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
           <Environment preset="studio" />
 
-          <DiskSpringMesh 
-            outerDiameter={props.outerDiameter}
-            innerDiameter={props.innerDiameter}
-            thickness={props.thickness}
-            freeConeHeight={props.freeConeHeight}
-            currentDeflection={props.deflection}
-            nP={props.nP}
-            nS={props.nS}
-            color={statusColor}
-          />
+          <group ref={springGroupRef}>
+            <DiskSpringMesh 
+              outerDiameter={props.outerDiameter}
+              innerDiameter={props.innerDiameter}
+              thickness={props.thickness}
+              freeConeHeight={props.freeConeHeight}
+              currentDeflection={props.deflection}
+              nP={props.nP}
+              nS={props.nS}
+              color={statusColor}
+            />
+          </group>
 
           <gridHelper 
             args={[200, 20, previewTheme.grid.major, previewTheme.grid.minor]} 
             position={[0, -10, 0]} 
           />
 
-          <OrbitControls
+          <AutoFitControls
             ref={controlsRef}
-            makeDefault
-            enablePan={true}
-            enableZoom={true}
-            enableRotate={true}
+            targetRef={springGroupRef}
             autoRotate={props.autoRotate}
             autoRotateSpeed={0.8}
             minDistance={10}

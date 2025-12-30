@@ -2,8 +2,8 @@
 
 import React, { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import { AutoFitControls } from "./AutoFitControls";
 import { 
   useSpringSimulationStore, 
   type CompressionDesignMeta 
@@ -75,7 +75,13 @@ function CameraController({
  * - Clipping planes for ground ends
  * - Dynamic compression animation
  */
-function AnimatedCompressionSpring({ previewStrokeMm }: { previewStrokeMm?: number }) {
+function AnimatedCompressionSpring({ 
+  previewStrokeMm, 
+  groupRef 
+}: { 
+  previewStrokeMm?: number;
+  groupRef: React.RefObject<THREE.Group | null>;
+}) {
   const design = useSpringSimulationStore((state) => state.design);
   const storeDeflection = useSpringSimulationStore((state) => state.currentDeflection);
   const currentDeflection = previewStrokeMm ?? storeDeflection;
@@ -160,7 +166,7 @@ function AnimatedCompressionSpring({ previewStrokeMm }: { previewStrokeMm?: numb
   const { tubeGeometry, endDiscs } = springGeometry;
 
   return (
-    <group>
+    <group ref={groupRef}>
       {/* Main spring tube with clipping - key forces re-render when FEA mode changes */}
       <mesh key={`spring-${isFeaMode}-${colorMode}`} geometry={tubeGeometry} material={springMaterial} />
       
@@ -309,6 +315,7 @@ export function CompressionSpringVisualizer({ previewStrokeMm }: { previewStroke
   // Note: useLanguage would require this to be a client component with LanguageProvider
   // For now, we'll use bilingual labels or just show technical symbols
   const controlsRef = useRef<any>(null);
+  const springGroupRef = useRef<THREE.Group>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
 
   const handleViewChange = useCallback((view: ViewType) => {
@@ -345,16 +352,16 @@ export function CompressionSpringVisualizer({ previewStrokeMm }: { previewStroke
         <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
         <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
         
-        <AnimatedCompressionSpring previewStrokeMm={previewStrokeMm} />
+        <AnimatedCompressionSpring previewStrokeMm={previewStrokeMm} groupRef={springGroupRef} />
         
-        <OrbitControls 
+        <AutoFitControls 
           ref={controlsRef}
+          targetRef={springGroupRef}
           enablePan={true}
           enableZoom={true}
           enableRotate={true}
           minDistance={20}
-          maxDistance={200}
-          target={[0, 0, 25]}
+          maxDistance={250}
         />
         
         {/* Ground grid */}

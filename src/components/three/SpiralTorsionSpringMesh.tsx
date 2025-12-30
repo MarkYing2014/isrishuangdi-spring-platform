@@ -10,8 +10,9 @@
 
 import { useRef, useState, useCallback, useEffect, useMemo, Suspense } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Edges, Environment } from "@react-three/drei";
+import { Edges, Environment } from "@react-three/drei";
 import * as THREE from "three";
+import { AutoFitControls } from "./AutoFitControls";
 import { useFeaStore } from "@/lib/stores/feaStore";
 import { applyFeaColors } from "@/lib/fea/feaTypes";
 import { previewTheme } from "@/lib/three/previewTheme";
@@ -225,6 +226,7 @@ export function SpiralTorsionSpringVisualizer({
   torque,
 }: SpiralTorsionSpringVisualizerProps) {
   const controlsRef = useRef<any>(null);
+  const springGroupRef = useRef<THREE.Group>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
 
   const handleViewChange = useCallback((view: ViewType) => {
@@ -255,7 +257,7 @@ export function SpiralTorsionSpringVisualizer({
               Mesh generator creates it in XY plane generally. 
               Let's rotate it -90 X to lie flat on XZ grid if we use standard Y-up grid.
           */}
-          <group rotation={[-Math.PI / 2, 0, 0]}>
+          <group ref={springGroupRef} rotation={[-Math.PI / 2, 0, 0]}>
             <SpiralTorsionSpringMesh
               innerDiameter={innerDiameter}
               outerDiameter={outerDiameter}
@@ -275,15 +277,16 @@ export function SpiralTorsionSpringVisualizer({
             position={[0, -stripWidth/2, 0]} 
           />
           
-          <OrbitControls 
+          <AutoFitControls
             ref={controlsRef}
+            targetRef={springGroupRef}
             autoRotate={autoRotate}
             autoRotateSpeed={1}
             enablePan={true}
             enableZoom={true}
             enableRotate={true}
             minDistance={10}
-            maxDistance={500}
+            maxDistance={800}
           />
         </Suspense>
       </Canvas>

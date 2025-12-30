@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback, Suspense } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Edges, Environment } from "@react-three/drei";
+import { Edges, Environment } from "@react-three/drei";
 import * as THREE from "three";
+import { AutoFitControls } from "./AutoFitControls";
 import { RotateCcw } from "lucide-react";
 
 import { previewTheme } from "@/lib/three/previewTheme";
@@ -199,7 +200,8 @@ function SpringMesh({
   showStressColors,
   stressUtilization,
   stressBeta,
-}: VariablePitchCompressionSpringVisualizerProps) {
+  groupRef,
+}: VariablePitchCompressionSpringVisualizerProps & { groupRef: React.RefObject<THREE.Group | null> }) {
   const utilization = useMemo(() => {
     const u = stressUtilization;
     return Number.isFinite(u) ? Math.max(0, Math.min(2, u as number)) : 0;
@@ -353,7 +355,7 @@ function SpringMesh({
   const topCapZ = zTop - capEps;
 
   return (
-    <group rotation={[0, 0, 0]}>
+    <group ref={groupRef} rotation={[0, 0, 0]}>
       <mesh geometry={geometry} material={material} castShadow receiveShadow />
       <mesh
         geometry={capGeom}
@@ -381,6 +383,7 @@ export function VariablePitchCompressionSpringVisualizer(
   const deflection = previewStrokeMm ?? initialDeflection;
   const [mounted, setMounted] = useState(false);
   const controlsRef = useRef<any>(null);
+  const springGroupRef = useRef<THREE.Group>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
 
   useEffect(() => {
@@ -424,20 +427,11 @@ export function VariablePitchCompressionSpringVisualizer(
           {/* Rotate the spring to be vertical if generator uses XY plane, or stay if it uses Z up.
               Variable pitch generator usually produces Z-up geometry.
           */}
-          <SpringMesh {...props} deflection={deflection} />
+          <SpringMesh {...props} deflection={deflection} groupRef={springGroupRef} />
 
-          <gridHelper 
-            args={[200, 20, previewTheme.grid.major, previewTheme.grid.minor]} 
-            position={[0, 0, 0]} 
-            rotation={[Math.PI / 2, 0, 0]} // Grid on XY plane
-          />
-
-          <OrbitControls
+          <AutoFitControls
             ref={controlsRef}
-            makeDefault
-            enablePan={true}
-            enableZoom={true}
-            enableRotate={true}
+            targetRef={springGroupRef}
             autoRotate={props.autoRotate}
             autoRotateSpeed={0.8}
             minDistance={10}

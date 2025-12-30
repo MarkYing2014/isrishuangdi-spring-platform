@@ -9,8 +9,9 @@
 
 import React, { useMemo, useRef, useState, useCallback, useEffect, Suspense } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Grid, Environment } from "@react-three/drei";
+import { Grid, Environment } from "@react-three/drei";
 import * as THREE from "three";
+import { AutoFitControls } from "./AutoFitControls";
 import { previewTheme } from "@/lib/three/previewTheme";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
@@ -157,6 +158,7 @@ export function WaveSpringVisualizer({
   loadAtWorkingHeight,
 }: WaveSpringVisualizerProps) {
   const controlsRef = useRef<any>(null);
+  const springGroupRef = useRef<THREE.Group>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
 
   const handleViewChange = useCallback((view: ViewType) => {
@@ -210,28 +212,30 @@ export function WaveSpringVisualizer({
           <SceneGrid size={gridSize} />
 
           {/* Wave Spring Mesh */}
-          <WaveSpringMesh
-            meanDiameter={meanDiameter}
-            thickness={thickness}
-            width={width}
-            amplitude={amplitude}
-            waves={waves}
-            turns={turns}
-            phase={phase}
-            color={color}
-            scale={scale}
-            showEdges={true}
-          />
+          <group ref={springGroupRef}>
+            <WaveSpringMesh
+              meanDiameter={meanDiameter}
+              thickness={thickness}
+              width={width}
+              amplitude={amplitude}
+              waves={waves}
+              turns={turns}
+              phase={phase}
+              color={color}
+              scale={scale}
+              showEdges={true}
+            />
+          </group>
 
           {/* Orbit Controls */}
-          <OrbitControls
+          <AutoFitControls
             ref={controlsRef}
+            targetRef={springGroupRef}
             enablePan={true}
             enableZoom={true}
             enableRotate={true}
             minDistance={10}
-            maxDistance={200}
-            target={[0, 0, 0]}
+            maxDistance={300}
           />
         </Suspense>
       </Canvas>

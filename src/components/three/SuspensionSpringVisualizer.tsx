@@ -2,7 +2,8 @@
 
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import * as THREE from "three";
+import { AutoFitControls } from "./AutoFitControls";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
 import { SuspensionSpringMesh } from "./SuspensionSpringMesh";
@@ -85,6 +86,7 @@ export function SuspensionSpringVisualizer({
   displayMode = "geometry",
 }: SuspensionSpringVisualizerProps) {
   const controlsRef = useRef<any>(null);
+  const springGroupRef = useRef<THREE.Group>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
 
   const handleViewChange = useCallback((view: ViewType) => {
@@ -131,41 +133,43 @@ export function SuspensionSpringVisualizer({
           intensity={previewTheme.lights.point.intensity}
         />
 
-        {showStressContour && feaForce && feaForce > 0 ? (
-          <StressSpringModel
-            wireDiameter={wireDiameter}
-            meanDiameter={meanDiameter}
-            activeCoils={activeCoils}
-            pitch={(freeLength - wireDiameter * totalCoils) / activeCoils}
-            totalCoils={totalCoils}
-            axialForce={feaForce}
-            showStress={true}
-            scale={scale}
-            showCoilBind={true}
-          />
-        ) : (
-          <SuspensionSpringMesh
-            wireDiameter={wireDiameter}
-            activeCoils={activeCoils}
-            totalCoils={totalCoils}
-            freeLength={freeLength}
-            currentDeflection={currentDeflection}
-            stressRatio={stressRatio}
-            solidHeight={solidHeight}
-            scale={scale}
-            pitchProfile={pitchProfile}
-            diameterProfile={diameterProfile}
-          />
-        )}
+        <group ref={springGroupRef}>
+          {showStressContour && feaForce && feaForce > 0 ? (
+            <StressSpringModel
+              wireDiameter={wireDiameter}
+              meanDiameter={meanDiameter}
+              activeCoils={activeCoils}
+              pitch={(freeLength - wireDiameter * totalCoils) / activeCoils}
+              totalCoils={totalCoils}
+              axialForce={feaForce}
+              showStress={true}
+              scale={scale}
+              showCoilBind={true}
+            />
+          ) : (
+            <SuspensionSpringMesh
+              wireDiameter={wireDiameter}
+              activeCoils={activeCoils}
+              totalCoils={totalCoils}
+              freeLength={freeLength}
+              currentDeflection={currentDeflection}
+              stressRatio={stressRatio}
+              solidHeight={solidHeight}
+              scale={scale}
+              pitchProfile={pitchProfile}
+              diameterProfile={diameterProfile}
+            />
+          )}
+        </group>
 
-        <OrbitControls
+        <AutoFitControls
           ref={controlsRef}
+          targetRef={springGroupRef}
           enablePan
           enableZoom
           enableRotate
           minDistance={20}
-          maxDistance={200}
-          target={[0, 0, 25]}
+          maxDistance={300}
         />
 
         <gridHelper

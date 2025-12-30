@@ -2,8 +2,8 @@
 
 import React, { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import { AutoFitControls } from "./AutoFitControls";
 import { 
   useSpringSimulationStore, 
   type TorsionDesignMeta 
@@ -74,7 +74,13 @@ function CameraController({
  * - Straight or bent legs
  * - Dynamic angle animation
  */
-function AnimatedTorsionSpring({ previewStrokeMm }: { previewStrokeMm?: number }) {
+function AnimatedTorsionSpring({ 
+  previewStrokeMm, 
+  groupRef 
+}: { 
+  previewStrokeMm?: number;
+  groupRef: React.RefObject<THREE.Group | null>;
+}) {
   const design = useSpringSimulationStore((state) => state.design);
   const storeDeflection = useSpringSimulationStore((state) => state.currentDeflection);
   const currentDeflection = previewStrokeMm ?? storeDeflection;
@@ -181,7 +187,7 @@ function AnimatedTorsionSpring({ previewStrokeMm }: { previewStrokeMm?: number }
   const { bodyGeometry, leg1Geometry, leg2Geometry, state } = springGeometry;
 
   return (
-    <group rotation={[Math.PI / 2, 0, 0]}>
+    <group ref={groupRef} rotation={[Math.PI / 2, 0, 0]}>
       {/* Main spring body - key forces re-render when FEA mode changes */}
       <mesh key={`spring-${isFeaMode}-${colorMode}`} geometry={bodyGeometry} material={bodyMaterial} />
       
@@ -305,6 +311,7 @@ export function TorsionSpringVisualizer({ previewStrokeMm }: { previewStrokeMm?:
   const { design, currentDeflection, currentLoad, currentStiffness } = useSpringSimulationStore();
   const torsionDesign = design?.type === "torsion" ? design as TorsionDesignMeta : null;
   const controlsRef = useRef<any>(null);
+  const springGroupRef = useRef<THREE.Group>(null);
   const [currentView, setCurrentView] = useState<ViewType>("perspective");
 
   const handleViewChange = useCallback((view: ViewType) => {
@@ -353,16 +360,13 @@ export function TorsionSpringVisualizer({ previewStrokeMm }: { previewStrokeMm?:
         <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
         <pointLight position={previewTheme.lights.point.position} intensity={previewTheme.lights.point.intensity} />
         
-        <AnimatedTorsionSpring previewStrokeMm={previewStrokeMm} />
+        <AnimatedTorsionSpring previewStrokeMm={previewStrokeMm} groupRef={springGroupRef} />
         
-        <OrbitControls 
+        <AutoFitControls 
           ref={controlsRef}
-          enablePan={true}
-          enableZoom={true}
-          enableRotate={true}
+          targetRef={springGroupRef}
           minDistance={30}
-          maxDistance={250}
-          target={[0, 0, 0]}
+          maxDistance={350}
         />
         
         {/* Ground grid */}
