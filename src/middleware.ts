@@ -49,14 +49,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
     matcher: [
-        /*
-         * Match all request paths except for:
-         * - api (API routes - including webhooks, should not be affected)
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico, robots.txt, sitemap.xml (static files)
-         */
-        "/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)",
+        '/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js|map|json|txt|xml|woff|woff2|ttf|otf)).*)',
     ],
-};
-
+}
