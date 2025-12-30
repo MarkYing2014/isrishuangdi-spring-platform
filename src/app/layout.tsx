@@ -38,6 +38,7 @@ export default async function RootLayout({
     <html lang={lang} suppressHydrationWarning={true}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} bg-slate-50 text-slate-900 antialiased`}
+        suppressHydrationWarning={true}
       >
         <LanguageProvider initialLanguage={lang}>
           <div className="flex min-h-screen flex-col">
