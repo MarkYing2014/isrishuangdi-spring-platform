@@ -68,16 +68,25 @@ export const AutoFitControls = forwardRef<any, AutoFitControlsProps>(({
     
     // Calculate distance based on FOV
     // dist = (maxDim / 2) / tan(fov / 2)
-    const extraPadding = 1.5; // Padding factor
+    const extraPadding = 1.35; // Standardized padding factor
     const dist = (maxDim / 2) / Math.tan((fov * Math.PI) / 360) * extraPadding;
 
-    // Position camera at an angle
-    // Default perspective angle: [1, 0.7, 1] normalized
-    const direction = new THREE.Vector3(1, 0.7, 1).normalize();
+    // Determine direction based on viewType
+    let direction = new THREE.Vector3(1, 0.7, 1); // Default Perspective
+    
+    if (viewType === "front") {
+      direction.set(0, 0, 1);
+    } else if (viewType === "top") {
+      direction.set(0, 1, 0);
+    } else if (viewType === "side") {
+      direction.set(1, 0, 0);
+    }
+    
+    direction.normalize();
     camera.position.copy(center).addScaledVector(direction, dist);
     
     // Update camera limits based on object size
-    camera.near = Math.max(0.01, maxDim / 1000);
+    camera.near = Math.max(0.1, maxDim / 1000);
     camera.far = Math.max(10000, maxDim * 100);
     camera.updateProjectionMatrix();
 
@@ -96,7 +105,7 @@ export const AutoFitControls = forwardRef<any, AutoFitControlsProps>(({
       const timeout = setTimeout(performFit, 50);
       return () => clearTimeout(timeout);
     }
-  }, [autoFit, fitTrigger]);
+  }, [autoFit, fitTrigger, viewType]);
 
   // Run when targetRef becomes available (if it was null)
   useLayoutEffect(() => {

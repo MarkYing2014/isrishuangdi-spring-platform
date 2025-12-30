@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useLayoutEffect, useMemo, useRef, useEffect } from "react";
+import React, { useLayoutEffect, useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { Edges, Line } from "@react-three/drei";
 import * as THREE from "three";
+import { Button } from "@/components/ui/button";
+import { RotateCcw } from "lucide-react";
 import { AutoFitControls } from "./AutoFitControls";
 import { previewTheme } from "@/lib/three/previewTheme";
 import {
@@ -540,6 +542,8 @@ export interface ArcSpringVisualizerProps extends ArcSpringMeshProps {
   autoRotate?: boolean;
 }
 
+type ViewType = "perspective" | "front" | "top" | "side";
+
 function ArcSpringScene({
   packCount = 1,
   packGapMm = 3, // Default gap
@@ -550,8 +554,9 @@ function ArcSpringScene({
   fitResult,
   forceRender,
   autoRotate,
+  viewType,
   ...meshProps
-}: ArcSpringVisualizerProps) {
+}: ArcSpringVisualizerProps & { viewType: ViewType }) {
   const groupRef = useRef<THREE.Group>(null);
   
   // Create array of indices 0..packCount-1
@@ -589,16 +594,70 @@ function ArcSpringScene({
         ))}
       </group>
 
-      <AutoFitControls targetRef={groupRef} autoRotate={!!autoRotate} />
+      <AutoFitControls 
+         targetRef={groupRef} 
+         autoRotate={!!autoRotate} 
+         viewType={viewType}
+         fitTrigger={viewType} // Refit when view type changes
+      />
     </>
   );
 }
 
 export function ArcSpringVisualizer(props: ArcSpringVisualizerProps) {
+  const [viewType, setViewType] = useState<ViewType>("perspective");
+
+  const handleViewChange = useCallback((view: ViewType) => {
+    setViewType(view);
+  }, []);
+
   return (
-    <Canvas camera={{ fov: 45, near: 0.1, far: 5000 }} style={{ width: "100%", height: "100%" }}>
-      <ArcSpringScene {...props} />
-    </Canvas>
+    <div className="relative h-full w-full">
+      <Canvas camera={{ fov: 45, near: 0.1, far: 5000 }} style={{ width: "100%", height: "100%" }}>
+        <ArcSpringScene {...props} viewType={viewType} />
+      </Canvas>
+
+      {/* View selector - bottom left */}
+      <div className="absolute bottom-2 left-2 flex gap-1">
+        <Button
+          variant={viewType === "perspective" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("perspective")}
+          title="透视图 / Perspective"
+        >
+          <RotateCcw className="h-3 w-3 mr-1" />
+          3D
+        </Button>
+        <Button
+          variant={viewType === "front" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("front")}
+          title="前视图 / Front View"
+        >
+          前
+        </Button>
+        <Button
+          variant={viewType === "top" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("top")}
+          title="俯视图 / Top View"
+        >
+          顶
+        </Button>
+        <Button
+          variant={viewType === "side" ? "default" : "secondary"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => handleViewChange("side")}
+          title="侧视图 / Side View"
+        >
+          侧
+        </Button>
+      </div>
+    </div>
   );
 }
 
