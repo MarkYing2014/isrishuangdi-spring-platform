@@ -242,60 +242,55 @@ export function ArcSpringMesh({
         cumulativeDistances[i] = totalLength;
     }
     
-    // 2. Define the "Proportion" of turns for each segment
-    const propL = totalCoils > 0 ? (deadCoilsStart ?? 0) / totalCoils : 0;
-    const propR = totalCoils > 0 ? (deadCoilsEnd ?? 0) / totalCoils : 0;
-    const propActive = Math.max(0, 1 - propL - propR);
-
-    // 3. Define the "Spatial Proportion" (s) for each segment
-    // Case Solid: Dead coils take minimum space (L = N*d)
-    const sL_solid = totalLength > 0 ? ((deadCoilsStart || 0) * d) / totalLength : 0;
-    const sR_solid = totalLength > 0 ? ((deadCoilsEnd || 0) * d) / totalLength : 0;
+    // 2. Define Turn Groups
+    const turnsStart = deadCoilsStart || 0;
+    const turnsEnd = deadCoilsEnd || 0;
+    const turnsActive = n;
     
-    // Case Uniform: Dead coils take their "fair share" of the total arc
-    const sL_uniform = propL;
-    const sR_uniform = propR;
-
-    // 4. Blend the ANCHORS based on kIntensity
-    // k=0 -> sL follows turns proportion (Uniform)
-    // k=1 -> sL follows physical wire limit (Solid)
-    const kIntensity = Math.max(0, Math.min(1.0, (deadTightnessK ?? 1.0)));
-    const anchorSL = sL_uniform * (1 - kIntensity) + sL_solid * kIntensity;
-    const anchorSR = sR_uniform * (1 - kIntensity) + sR_solid * kIntensity;
-
-    // Safety: ensure anchors don't cross and leave room for active coils
-    const maxAnchorSum = 0.95;
-    const currentSum = anchorSL + anchorSR;
-    const scaleAnchors = currentSum > maxAnchorSum ? maxAnchorSum / currentSum : 1.0;
-    const finalSL = anchorSL * scaleAnchors;
-    const finalSR = anchorSR * scaleAnchors;
-
-    const lambdaAt = (s_param: number) => {
-        // Find current physical progress along backbone
-        if (totalLength <= 0) return s_param;
-        const idx = Math.floor(s_param * (cumulativeDistances.length - 1));
-        const s_phys = cumulativeDistances[idx] / totalLength;
-
-        // Piecewise mapping of s_phys -> turns_prop
-        // This mapping has FIXED ANCHORS: turns(finalSL) is ALWAYS propL
-        // This guarantees "No Leakage".
-        if (s_phys <= finalSL) {
-            return s_phys * (propL / Math.max(1e-6, finalSL));
-        } else if (s_phys >= (1 - finalSR)) {
-            const u = (s_phys - (1 - finalSR)) / Math.max(1e-6, finalSR);
-            return (1 - propR) + propR * u;
+    // 3. Define Spatial Segments (Anchors)
+    const k = Math.max(0, Math.min(1.0, (deadTightnessK ?? 1.0)));
+    
+    // L_solid: Minimum space needed for dead coils (L = N*d)
+    const Ls_solid = turnsStart * d;
+    const Le_solid = turnsEnd * d;
+    
+    // L_uniform: Fair share of total arc length
+    const Ls_uniform = (totalCoils > 0) ? (turnsStart / totalCoils) * totalLength : 0;
+    const Le_uniform = (totalCoils > 0) ? (turnsEnd / totalCoils) * totalLength : 0;
+    
+    // Blended boundaries: Move from uniform to solid based on k
+    const anchorLs = Ls_uniform * (1 - k) + Ls_solid * k;
+    const anchorLe = Le_uniform * (1 - k) + Le_solid * k;
+    
+    // Safety: ensure segments don't cross
+    const maxBound = totalLength * 0.48; // Each end max 48%
+    const finalLs = Math.min(anchorLs, maxBound);
+    const finalLe = Math.min(anchorLe, maxBound);
+    
+    // 4. Map Turns to Indices
+    const turnsMap = new Float32Array(backboneFrames.length);
+    for (let i = 0; i < backboneFrames.length; i++) {
+        const curL = cumulativeDistances[i];
+        
+        if (curL <= finalLs) {
+            // Start Dead Segment: 0 -> turnsStart
+            turnsMap[i] = turnsStart * (curL / Math.max(1e-6, finalLs));
+        } else if (curL >= (totalLength - finalLe)) {
+            // End Dead Segment: (turnsStart + turnsActive) -> totalCoils
+            const u = (curL - (totalLength - finalLe)) / Math.max(1e-6, finalLe);
+            turnsMap[i] = (turnsStart + turnsActive) + turnsEnd * Math.min(1, u);
         } else {
-            const u = (s_phys - finalSL) / Math.max(1e-6, 1 - finalSL - finalSR);
-            return propL + propActive * u;
+            // Active Segment: turnsStart -> (turnsStart + turnsActive)
+            const activeRange = totalLength - finalLs - finalLe;
+            const u = (curL - finalLs) / Math.max(1e-6, activeRange);
+            turnsMap[i] = turnsStart + turnsActive * u;
         }
-    };
+    }
 
     // Generate Coil Points
     for (let i = 0; i < backboneFrames.length; i++) {
         const frame = backboneFrames[i];
-        const s = i / (backboneFrames.length - 1); 
-        
-        const currentTurns = lambdaAt(s) * totalCoils;
+        const currentTurns = turnsMap[i];
         const phi = (2 * Math.PI * currentTurns) + phaseOffsetRad;
 
         const cosPhi = Math.cos(phi);
@@ -436,20 +431,13 @@ export function ArcSpringMesh({
     };
 
   }, [
-    params,
-    validation.valid,
-    profile, 
-    packIndex, 
-    packGapMm, 
-    packPhaseDeg, 
-    bowLeanDeg, 
-    bowPlaneTiltDeg,
     d, D, n, r, 
     deadCoilsStart, deadCoilsEnd,
     deadTightnessK, deadTightnessSigma,
     spring2, colorMode, approxStressBeta,
     profile, packIndex, packGapMm, packPhaseDeg, 
-    bowLeanDeg, bowPlaneTiltDeg
+    bowLeanDeg, bowPlaneTiltDeg,
+    params, validation.valid
   ]);
 
   useEffect(() => {
