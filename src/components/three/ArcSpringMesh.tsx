@@ -258,16 +258,24 @@ export function ArcSpringMesh({
     const Ls_uniform = (totalCoils > 0) ? (turnsStart / totalCoils) * totalLength : 0;
     const Le_uniform = (totalCoils > 0) ? (turnsEnd / totalCoils) * totalLength : 0;
     
-    // Blended boundaries: Move from uniform to solid based on k
+    // Blended boundaries: Move from uniform to solid based on k (monotonically)
     const anchorLs = Ls_uniform * (1 - k) + Ls_solid * k;
     const anchorLe = Le_uniform * (1 - k) + Le_solid * k;
     
-    // Safety: ensure segments don't cross
-    const maxBound = totalLength * 0.48; // Each end max 48%
-    const finalLs = Math.min(anchorLs, maxBound);
-    const finalLe = Math.min(anchorLe, maxBound);
+    // Safety: ensure segments don't cross (Proportional scale if sum > 95% of L_tot)
+    const currentSum = anchorLs + anchorLe;
+    const maxAllowedSum = totalLength * 0.95;
+    const limitScale = currentSum > maxAllowedSum ? maxAllowedSum / currentSum : 1.0;
     
-    // 4. Map Turns to Indices
+    const finalLs = anchorLs * limitScale;
+    const finalLe = anchorLe * limitScale;
+    
+    // 4. Map Turns to Indices (Piecewise Linear)
+    // Numerically guaranteed:
+    // T(0) = 0
+    // T(finalLs) = turnsStart (Dead coil count exactly preserved)
+    // T(totalLength - finalLe) = turnsStart + turnsActive
+    // T(totalLength) = totalCoils
     const turnsMap = new Float32Array(backboneFrames.length);
     for (let i = 0; i < backboneFrames.length; i++) {
         const curL = cumulativeDistances[i];
