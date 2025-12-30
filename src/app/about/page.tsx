@@ -628,27 +628,42 @@ export default function AboutPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-3">
-                <h3 className="font-semibold text-slate-900">
-                  <LanguageText en="Core Mission" zh="核心使命" />
-                </h3>
-                <p className="text-sm text-slate-600">
-                  <LanguageText 
-                    en="Add a new advanced design module for Arc Springs & Spring Packs, aligned with real industrial manufacturing and testing processes." 
-                    zh="新增弧形弹簧（Arc Springs）与弹簧组（Spring Packs）的高级设计模块，深度对齐真实工业制造与测试流程。"
-                  />
-                </p>
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-slate-900">
+                    <LanguageText en="Core Mission & Goals" zh="核心使命与目标" />
+                  </h3>
+                  <p className="text-sm text-slate-600">
+                    <LanguageText 
+                      en="Deliver industrial-grade precision for Arc Springs through 'Digital Twin' modeling — reducing physical scrap and accelerating the SOP cycle." 
+                      zh="通过“数字孪生”建模，为弧形弹簧提供工业级精度：减少物理报废，显著缩短 SOP 周期。"
+                    />
+                  </p>
+                </div>
+                <ul className="space-y-2 text-xs text-slate-600">
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="size-3 text-slate-900" />
+                    <LanguageText en="Digital twin precision (Physics-aligned)" zh="数字孪生精度（物理对齐）" />
+                  </li>
+                  <li className="items-center gap-2 flex">
+                    <CheckCircle2 className="size-3 text-slate-900" />
+                    <LanguageText en="Manufacturing-ready geometry export" zh="可制造性几何模型导出" />
+                  </li>
+                </ul>
               </div>
               <div className="space-y-3">
                 <h3 className="font-semibold text-slate-900">
                   <LanguageText en="System Architecture" zh="系统架构升级" />
                 </h3>
-                <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">
+                <ul className="list-disc space-y-2 pl-5 text-sm text-slate-600">
                   <li>
-                    <LanguageText en="Unified SpringType: ArcSpring | CompressionSpring | SpringPack" zh="统一 SpringType：弧形弹簧 | 压缩弹簧 | 弹簧组" />
+                    <LanguageText en="Unified Spring Registry: Support for Arc, Compression, and Spring Packs" zh="统一弹簧注册：支持弧形、压缩及弹簧组" />
                   </li>
                   <li>
-                    <LanguageText en="Type-specific geometry models & manufacturing processes" zh="各类型专属的几何模型与工艺定义" />
+                    <LanguageText en="Pipeline: Backbone Generator → Shell Extruder → Physical Validator" zh="流水线：骨架生成器 → 表壳挤出器 → 物理验证器" />
+                  </li>
+                  <li>
+                    <LanguageText en="Type-specific geometry kernels for unique manufacturing constraints" zh="针对独特制造约束的专属几何内核" />
                   </li>
                 </ul>
               </div>
@@ -674,9 +689,9 @@ export default function AboutPage() {
                     <LanguageText en="Engineering Math" zh="工程数学与几何" />
                   </p>
                   <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                    <li><LanguageText en="Toroidal Helix (True geometry)" zh="圆环螺旋（真实几何）" /></li>
                     <li><LanguageText en="Angle-based parametric centerline" zh="基于角度的参数化中心线" /></li>
-                    <li><LanguageText en="Boolean grinding (No geometry hacks)" zh="物理磨平布尔切割（非拟合）" /></li>
-                    <li><LanguageText en="High-continuity Tube/Sweep stability" zh="高连续性导管/扫掠稳定性" /></li>
+                    <li><LanguageText en="Curvature-compensated pitch integration" zh="曲率补偿的节距积分" /></li>
                   </ul>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
@@ -684,9 +699,9 @@ export default function AboutPage() {
                     <LanguageText en="Manufacturing Awareness" zh="制造感知" />
                   </p>
                   <ul className="mt-2 space-y-1 text-xs text-slate-600">
-                    <li><LanguageText en="Shot peening & hot setting support" zh="喷丸与强压工艺支持" /></li>
-                    <li><LanguageText en="Grinding depth (endClosedTurns in mm)" zh="端部磨平深度（毫米定义）" /></li>
-                    <li><LanguageText en="Manufacturing constraints UI" zh="制造约束智能提醒" /></li>
+                    <li><LanguageText en="Grinding depth control (mm definition)" zh="磨平深度精确控制（mm 定义）" /></li>
+                    <li><LanguageText en="Stress/load validation vs wire limits" zh="应力/负载校验与线材极限对比" /></li>
+                    <li><LanguageText en="Automatic manufacturing constraint alerts" zh="制造约束自动警报" /></li>
                   </ul>
                 </div>
                 <div className="col-span-full rounded-lg border border-slate-200 bg-slate-900 p-3 text-white">
