@@ -538,13 +538,49 @@ function CadExportContent() {
             largeOuterDiameter: largeDiameter,
             smallOuterDiameter: smallDiameter,
           };
+
+      // Arc Spring Support
+      const isArc = springType === "arc" || storeGeometry?.type === "arc";
+      
+      let finalSpringType = isSpiralTorsion ? "spiral_torsion" : 
+                           isVariablePitch ? "variable_pitch_compression" : 
+                           isSuspensionSpring ? "suspension_spring" : 
+                           (isArc ? "ARC_SPRING" : springType);
+
+      let finalGeometry = geometryParams;
+
+      if (isArc) {
+        finalGeometry = {
+          d: wireDiameter,
+          D: meanDiameter,
+          n: activeCoils,
+          r: arcRadius,
+          alphaDeg: arcAlpha0,
+          profile: (storeGeometry as any)?.profile || "ARC",
+          deadCoilsStart: (storeGeometry as any)?.deadCoilsStart || 0,
+          deadCoilsEnd: (storeGeometry as any)?.deadCoilsEnd || 0,
+          k: (storeGeometry as any)?.deadTightnessK || 1,
+          bowLeanDeg: (storeGeometry as any)?.bowLeanDeg || 0,
+          bowPlaneTiltDeg: (storeGeometry as any)?.bowPlaneTiltDeg || 0,
+          samples: 400,
+          phaseDeg: 0,
+          capRatio: 0.95
+        } as any;
+
+        // Strict validation for ARC_SPRING
+        const required = ["d", "D", "n", "r", "alphaDeg", "profile"];
+        const missing = required.filter(k => (finalGeometry as any)[k] == null);
+        if (missing.length > 0) {
+          throw new Error(`ARC_SPRING missing required params: ${missing.join(", ")}`);
+        }
+      }
       
       const response = await fetch("/api/freecad/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          springType: isSpiralTorsion ? "spiral_torsion" : isVariablePitch ? "variable_pitch_compression" : isSuspensionSpring ? "suspension_spring" : springType,
-          geometry: geometryParams,
+          springType: finalSpringType,
+          geometry: finalGeometry,
           export: {
             formats: ["STEP"],
             name: `${springType}_spring_${Date.now()}`,
@@ -1140,69 +1176,82 @@ function CadExportContent() {
                     <LanguageText en="Download Generator Script" zh="下载生成脚本" />
                   </Button>
                 </div>
-              ) : springType === "arc" || (springType === "variablePitchCompression" && !isVariablePitch) ? (
-                <div className="flex flex-col items-center justify-center h-[400px] bg-slate-50 rounded-lg p-6 border text-center">
-                  <AlertCircle className="w-10 h-10 text-slate-300 mb-4" />
-                  <p className="text-muted-foreground">
-                    <LanguageText 
-                      en={`FreeCAD preview is not available for ${springType === "arc" ? "Arc" : "Variable Pitch"} Springs yet.`}
-                      zh={`${springType === "arc" ? "弧形" : "变节距"}弹簧暂不支持 FreeCAD 预览。`}
-                    />
-                  </p>
-                </div>
               ) : (
                 <>
                   <FreeCadPreview
-                    springType={isSpiralTorsion ? "spiral_torsion" : isVariablePitch ? "variable_pitch_compression" : isSuspensionSpring ? "suspension_spring" : springType as any}
-                    geometry={isSpiralTorsion && storeGeometry?.type === "spiralTorsion" 
-                      ? {
-                          innerDiameter: storeGeometry.innerDiameter,
-                          outerDiameter: storeGeometry.outerDiameter,
-                          turns: storeGeometry.activeCoils,
-                          stripWidth: storeGeometry.stripWidth,
-                          stripThickness: storeGeometry.stripThickness,
-                          handedness: "ccw",
-                        }
-                      : isVariablePitch && storeGeometry?.type === "variablePitchCompression"
-                      ? {
-                          wireDiameter,
-                          meanDiameter,
-                          activeCoils: storeGeometry.activeCoils,
-                          totalCoils: storeGeometry.totalCoils,
-                          freeLength: storeGeometry.freeLength,
-                          segments: storeGeometry.segments,
-                        }
-                      : isSuspensionSpring && storeGeometry?.type === "suspensionSpring"
-                      ? {
-                          wireDiameter,
-                          meanDiameter,
-                          activeCoils: storeGeometry.activeCoils,
-                          totalCoils: storeGeometry.totalCoils,
-                          freeLength: storeGeometry.freeLength,
-                          pitchProfile: storeGeometry.pitchProfile,
-                          diameterProfile: storeGeometry.diameterProfile,
-                        }
-                      : {
-                          wireDiameter,
-                          meanDiameter,
-                          outerDiameter: springType === "extension" || springType === "torsion" ? meanDiameter + wireDiameter : undefined,
-                          activeCoils,
-                          totalCoils: springType === "conical" ? conicalTotalCoils : totalCoils,
-                          freeLength,
-                          bodyLength,
-                          hookType,
-                          legLength1,
-                          legLength2,
-                          windingDirection,
-                          largeOuterDiameter: largeDiameter,
-                          smallOuterDiameter: smallDiameter,
-                          topGround: storeGeometry?.type === "compression" ? storeGeometry.topGround : undefined,
-                          bottomGround: storeGeometry?.type === "compression" ? storeGeometry.bottomGround : undefined,
-                          endType: springType === "conical" ? conicalEndType : undefined,
-                        }
+                    springType={
+                      isSpiralTorsion ? "spiral_torsion" : 
+                      isVariablePitch ? "variable_pitch_compression" : 
+                      isSuspensionSpring ? "suspension_spring" : 
+                      (springType === "arc" || storeGeometry?.type === "arc") ? "ARC_SPRING" : 
+                      (springType as any)
                     }
-                    className="h-[400px] rounded-lg overflow-hidden"
-                  />
+                  geometry={isSpiralTorsion && storeGeometry?.type === "spiralTorsion" 
+                    ? {
+                        innerDiameter: storeGeometry.innerDiameter,
+                        outerDiameter: storeGeometry.outerDiameter,
+                        turns: storeGeometry.activeCoils,
+                        stripWidth: storeGeometry.stripWidth,
+                        stripThickness: storeGeometry.stripThickness,
+                        handedness: "ccw",
+                      }
+                    : (springType === "arc" || storeGeometry?.type === "arc")
+                    ? ({
+                        d: wireDiameter,
+                        D: meanDiameter,
+                        n: activeCoils,
+                        r: arcRadius,
+                        alphaDeg: arcAlpha0,
+                        profile: (storeGeometry as any)?.profile || "ARC",
+                        deadCoilsStart: (storeGeometry as any)?.deadCoilsStart || 0,
+                        deadCoilsEnd: (storeGeometry as any)?.deadCoilsEnd || 0,
+                        k: (storeGeometry as any)?.deadTightnessK || 1,
+                        bowLeanDeg: (storeGeometry as any)?.bowLeanDeg || 0,
+                        bowPlaneTiltDeg: (storeGeometry as any)?.bowPlaneTiltDeg || 0,
+                        samples: 400,
+                        phaseDeg: 0,
+                        capRatio: 0.95
+                      } as any)
+                    : isVariablePitch && storeGeometry?.type === "variablePitchCompression"
+                    ? {
+                        wireDiameter,
+                        meanDiameter,
+                        activeCoils: storeGeometry.activeCoils,
+                        totalCoils: storeGeometry.totalCoils,
+                        freeLength: storeGeometry.freeLength,
+                        segments: storeGeometry.segments,
+                      }
+                    : isSuspensionSpring && storeGeometry?.type === "suspensionSpring"
+                    ? {
+                        wireDiameter,
+                        meanDiameter,
+                        activeCoils: storeGeometry.activeCoils,
+                        totalCoils: storeGeometry.totalCoils,
+                        freeLength: storeGeometry.freeLength,
+                        pitchProfile: storeGeometry.pitchProfile,
+                        diameterProfile: storeGeometry.diameterProfile,
+                      }
+                    : {
+                        wireDiameter,
+                        meanDiameter,
+                        outerDiameter: springType === "extension" || springType === "torsion" ? meanDiameter + wireDiameter : undefined,
+                        activeCoils,
+                        totalCoils: springType === "conical" ? conicalTotalCoils : totalCoils,
+                        freeLength,
+                        bodyLength,
+                        hookType,
+                        legLength1,
+                        legLength2,
+                        windingDirection,
+                        largeOuterDiameter: largeDiameter,
+                        smallOuterDiameter: smallDiameter,
+                        topGround: storeGeometry?.type === "compression" ? storeGeometry.topGround : undefined,
+                        bottomGround: storeGeometry?.type === "compression" ? storeGeometry.bottomGround : undefined,
+                        endType: springType === "conical" ? conicalEndType : undefined,
+                      }
+                  }
+                  className="h-[400px] rounded-lg overflow-hidden"
+                />
                   <p className="text-xs text-muted-foreground mt-2 text-center">
                     <LanguageText 
                       en="Real CAD model generated by FreeCAD - Click Generate to create"

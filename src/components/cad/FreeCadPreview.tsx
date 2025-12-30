@@ -5,6 +5,7 @@ import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, Center, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
+import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Loader2, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -36,6 +37,7 @@ function getCachedGeometry(key: string): THREE.BufferGeometry | null {
   }
   // 清理过期缓存
   if (entry) {
+    entry.geometry.dispose(); // Dispose geometry when removing from cache
     geometryCache.delete(key);
   }
   return null;
@@ -48,6 +50,8 @@ function setCachedGeometry(key: string, geometry: THREE.BufferGeometry): void {
   if (geometryCache.size > 5) {
     const oldestKey = geometryCache.keys().next().value;
     if (oldestKey) {
+      const entry = geometryCache.get(oldestKey);
+      entry?.geometry.dispose(); // Dispose evicted geometry
       geometryCache.delete(oldestKey);
     }
   }
@@ -55,14 +59,17 @@ function setCachedGeometry(key: string, geometry: THREE.BufferGeometry): void {
 
 /** 清除所有缓存 */
 export function clearGeometryCache(): void {
+  geometryCache.forEach((entry) => {
+    entry.geometry.dispose(); // Dispose all geometries
+  });
   geometryCache.clear();
-  console.log("[FreeCadPreview] Cache cleared");
+  console.log("[FreeCadPreview] Cache cleared and resources disposed");
 }
 
 // ============================================================================
 
 interface FreeCadPreviewProps {
-  springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion" | "variable_pitch_compression" | "suspension_spring";
+  springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion" | "variable_pitch_compression" | "suspension_spring" | "arc";
   geometry: {
     wireDiameter?: number;
     meanDiameter?: number;
@@ -93,6 +100,21 @@ interface FreeCadPreviewProps {
     // Suspension specific
     pitchProfile?: any;
     diameterProfile?: any;
+    // Arc specific (Standardized)
+    d?: number;
+    D?: number;
+    n?: number;
+    r?: number;
+    alphaDeg?: number;
+    profile?: "ARC" | "BOW";
+    deadCoilsStart?: number;
+    deadCoilsEnd?: number;
+    k?: number;
+    bowLeanDeg?: number;
+    bowPlaneTiltDeg?: number;
+    samples?: number;
+    phaseDeg?: number;
+    capRatio?: number;
   };
   className?: string;
 }
@@ -300,8 +322,19 @@ export function FreeCadPreview({
       
       // 加载 STL
       const loader = new STLLoader();
-      const stlGeometry = loader.parse(stlBuffer);
-      stlGeometry.computeVertexNormals();
+      let stlGeometry = loader.parse(stlBuffer);
+      
+      // 优化几何体: 合并顶点与计算法线
+      try {
+         // STL usually has non-merged vertices. Floating point errors might need tolerance.
+         // mergeVertices is critical to reduce vertex count and ensure smooth shading if needed
+         stlGeometry = BufferGeometryUtils.mergeVertices(stlGeometry, 1e-4);
+         stlGeometry.computeVertexNormals();
+         console.log("[FreeCadPreview] Optimized geometry. New vertex count:", stlGeometry.attributes.position?.count);
+      } catch (e) {
+         console.warn("Geometry optimization failed, using raw STL:", e);
+         stlGeometry.computeVertexNormals();
+      }
       
       // 计算边界框
       stlGeometry.computeBoundingBox();
@@ -383,6 +416,17 @@ export function FreeCadPreview({
       {/* 3D 画布 */}
       <Canvas
         shadows
+        onCreated={({ gl }) => {
+          gl.domElement.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            console.warn('WebGL context lost');
+          });
+          gl.domElement.addEventListener('webglcontextrestored', () => {
+             console.warn('WebGL context restored');
+          });
+          // Set safe pixel point ratio to avoid high memory usage on retina screens
+          gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        }}
         camera={{ position: [50, 30, 50], fov: 50 }}
         className="rounded-lg"
       >

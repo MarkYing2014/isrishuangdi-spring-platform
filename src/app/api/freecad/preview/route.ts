@@ -87,7 +87,7 @@ const SCRIPT_PATH = path.join(process.cwd(), "cad-worker/freecad/run_export.py")
 const TEMP_DIR = path.join(process.cwd(), ".tmp/freecad-preview");
 
 interface PreviewRequest {
-  springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion" | "spiralTorsion";
+  springType: "compression" | "extension" | "torsion" | "conical" | "spiral_torsion" | "spiralTorsion" | "variable_pitch_compression" | "suspension_spring" | "arc" | "ARC_SPRING";
   geometry: {
     wireDiameter?: number;
     meanDiameter?: number;
@@ -160,7 +160,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // Prepare payload for worker (same format as export but requesting STL)
         // Note: The worker needs "export" field with formats=["STL"]
         const workerPayload = {
-          springType: body.springType === "spiralTorsion" ? "spiral_torsion" : body.springType,
+          springType: body.springType === "spiralTorsion" ? "spiral_torsion" :
+            body.springType === "ARC_SPRING" ? "ARC_SPRING" :
+              body.springType,
           geometry: body.geometry,
           export: {
             formats: ["STL"],
@@ -241,8 +243,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const designFile = path.join(jobDir, "design.json");
     const exportName = `preview_${jobId}`;
 
-    // 标准化 springType: spiralTorsion -> spiral_torsion
-    const normalizedSpringType = body.springType === "spiralTorsion" ? "spiral_torsion" : body.springType;
+    // 标准化 springType
+    const normalizedSpringType = body.springType === "spiralTorsion" ? "spiral_torsion" :
+      body.springType === "ARC_SPRING" ? "ARC_SPRING" : // Backend supports ARC_SPRING directly
+        body.springType;
 
     const designData = {
       springType: normalizedSpringType,

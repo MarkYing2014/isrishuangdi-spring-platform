@@ -45,6 +45,51 @@ except ImportError:
     HOOK_BUILDER_AVAILABLE = False
 
 # =============================================================================
+# 辅助函数
+# =============================================================================
+
+def vec(x,y,z): 
+    return App.Vector(float(x), float(y), float(z))
+
+def unit(v):
+    l = v.Length
+    return v.multiply(1.0/l) if l > 1e-12 else vec(0,0,0)
+
+def clamp(x, a, b):
+    return max(a, min(b, x))
+
+def first_index_ge(L, target):
+    for i, li in enumerate(L):
+        if li >= target:
+            return i
+    return len(L)-1
+
+def rot_axis_angle(v, axis, deg):
+    """Rodrigues rotation formula"""
+    a = unit(axis)
+    th = math.radians(deg)
+    c = math.cos(th); s = math.sin(th)
+    return v.multiply(c) + a.cross(v).multiply(s) + a.multiply(a.dot(v)*(1-c))
+
+def make_basis_matrix(nx, bx, tx):
+    """
+    Build a 3x3 basis matrix whose columns are (n, b, t) in world coordinates.
+    FreeCAD's App.Matrix is 4x4; we fill the upper-left 3x3.
+    """
+    m = App.Matrix()
+    m.A11, m.A12, m.A13 = nx.x, bx.x, tx.x
+    m.A21, m.A22, m.A23 = nx.y, bx.y, tx.y
+    m.A31, m.A32, m.A33 = nx.z, bx.z, tx.z
+    return m
+
+def rotation_from_basis(n, b, t):
+    """
+    Create a Rotation that maps local axes (X,Y,Z) to (n,b,t).
+    """
+    m = make_basis_matrix(n, b, t)
+    return App.Rotation(m)
+
+# =============================================================================
 # 参数化中心线生成器 (与 Three.js 同步)
 # =============================================================================
 
@@ -2162,6 +2207,236 @@ def make_conical_spring(params):
 
 
 # =============================================================================
+# 弧形弹簧生成器 (Arc Spring - Blended-Anchor 算法)
+# 与 Three.js arcSpringGeometry.ts / arcBackbone.ts 完全同步
+# =============================================================================
+
+def build_arc_backbone_frames(r, alphaDeg, samples, profile, bowLeanDeg=0.0, bowPlaneTiltDeg=0.0):
+    """
+    计算弧形弹簧骨架帧 (Position, Tangent, Normal, Binormal)
+    支持 ARC 和 BOW 两种轮廓
+    """
+    frames = []
+    a0 = -math.radians(alphaDeg) * 0.5
+    a1 =  math.radians(alphaDeg) * 0.5
+
+    axisZ = vec(0, 0, 1)
+
+    for i in range(samples):
+        u = i / (samples - 1)
+        th = a0 + (a1 - a0) * u
+
+        # base arc in XY
+        p = vec(r * math.cos(th), r * math.sin(th), 0.0)
+        t = unit(vec(-math.sin(th), math.cos(th), 0.0))
+        n = unit(vec(-math.cos(th), -math.sin(th), 0.0))
+        b = unit(t.cross(n))
+
+        if profile == "BOW":
+            # plane tilt: rotate (n,b) around local tangent t
+            if abs(bowPlaneTiltDeg) > 1e-9:
+                n = unit(rot_axis_angle(n, t, bowPlaneTiltDeg))
+                b = unit(t.cross(n))
+
+            # lean: rotate entire frame about global Z
+            if abs(bowLeanDeg) > 1e-9:
+                p = rot_axis_angle(p, axisZ, bowLeanDeg)
+                t = unit(rot_axis_angle(t, axisZ, bowLeanDeg))
+                n = unit(rot_axis_angle(n, axisZ, bowLeanDeg))
+                b = unit(rot_axis_angle(b, axisZ, bowLeanDeg))
+
+        frames.append((p, t, n, b))
+    return frames
+
+def accumulated_lengths(frames):
+    L = [0.0] * len(frames)
+    Ltot = 0.0
+    for i in range(1, len(frames)):
+        Ltot += (frames[i][0] - frames[i-1][0]).Length
+        L[i] = Ltot
+    return L, Ltot
+
+def blended_anchor_turns_map(L, Ltot, d, n_active, deadStart, deadEnd, k, capRatio=0.95):
+    """
+    Blended-Anchor 圈数映射算法 (Optimized)
+    """
+    totalCoils = n_active + deadStart + deadEnd
+    if totalCoils <= 1e-12 or Ltot <= 1e-12:
+        return [0.0] * len(L), 0.0, 0.0, 0.0, 0.0
+
+    k = clamp(k, 0.0, 1.0)
+
+    Ls_solid = deadStart * d
+    Le_solid = deadEnd * d
+
+    Ls_uniform = (deadStart / totalCoils) * Ltot if totalCoils > 0 else 0.0
+    Le_uniform = (deadEnd / totalCoils) * Ltot if totalCoils > 0 else 0.0
+
+    anchorLs = Ls_uniform * (1 - k) + Ls_solid * k
+    anchorLe = Le_uniform * (1 - k) + Le_solid * k
+
+    sumLen = anchorLs + anchorLe
+    maxAllowed = capRatio * Ltot
+    if sumLen > maxAllowed and sumLen > 1e-12:
+        scale = maxAllowed / sumLen
+        anchorLs *= scale
+        anchorLe *= scale
+
+    Lb = Ltot - anchorLe
+    Ls = anchorLs
+    Le = anchorLe
+
+    T = [0.0] * len(L)
+    for i, curL in enumerate(L):
+        if curL <= Ls + 1e-9:
+            T[i] = deadStart * (curL / max(1e-9, Ls))
+        elif curL >= Lb - 1e-9:
+            u = (curL - Lb) / max(1e-9, Le)
+            u = clamp(u, 0.0, 1.0)
+            T[i] = (deadStart + n_active) + deadEnd * u
+        else:
+            activeRange = max(1e-9, Lb - Ls)
+            u = (curL - Ls) / activeRange
+            u = clamp(u, 0.0, 1.0)
+            T[i] = deadStart + n_active * u
+
+    T[0] = 0.0
+    T[-1] = totalCoils
+    return T, totalCoils, Ls, Le, Lb
+
+def make_arc_spring(params, doc=None, fileStem="ArcSpring"):
+    """
+    生成弧形弹簧实体 (Axial Lock + Loft based)
+    """
+    # ---- required ----
+    required = ["d", "D", "n", "r", "alphaDeg", "profile"]
+    missing = [k for k in required if k not in params]
+    if missing:
+        raise ValueError("ARC_SPRING missing params: " + ", ".join(missing))
+
+    d = float(params["d"])
+    D = float(params["D"])
+    n_active = float(params["n"])
+    r = float(params["r"])
+    alphaDeg = float(params["alphaDeg"])
+    profile = str(params.get("profile", "ARC"))
+
+    # ---- optional ----
+    deadStart = float(params.get("deadCoilsStart", 0.0))
+    deadEnd = float(params.get("deadCoilsEnd", 0.0))
+    k = float(params.get("k", 1.0))
+    samples = int(params.get("samples", 400))
+    phaseDeg = float(params.get("phaseDeg", 0.0))
+    capRatio = float(params.get("capRatio", 0.95))
+    bowLeanDeg = float(params.get("bowLeanDeg", 0.0))
+    bowPlaneTiltDeg = float(params.get("bowPlaneTiltDeg", 0.0))
+    sectionStride = int(params.get("sectionStride", 1)) # One section per point for max fidelity
+    makeSolid = bool(params.get("solid", True))
+
+    # 1. 生成骨架
+    frames = build_arc_backbone_frames(r, alphaDeg, samples, profile, bowLeanDeg, bowPlaneTiltDeg)
+    L, Ltot = accumulated_lengths(frames)
+
+    # 2. 生成圈数映射
+    T_map, totalCoils, Ls, Le, Lb = blended_anchor_turns_map(
+        L, Ltot, d, n_active, deadStart, deadEnd, k, capRatio
+    )
+
+    # --- Axial Lock / Frame Freezing for dead zones ---
+    iL = first_index_ge(L, Ls)
+    iR = first_index_ge(L, Lb)
+
+    nL, bL = frames[iL][2], frames[iL][3]
+    nR, bR = frames[iR][2], frames[iR][3]
+
+    # ---- build oriented sections for loft ----
+    Rcoil = D * 0.5
+    phase_rad = math.radians(phaseDeg)
+
+    # Pass 1: Generate all points on the helical path
+    # Note: Removed Axial Lock (nv/bv freezing) - the BSpline sweep handles orientation naturally
+    # The T_map already controls pitch (tight spacing in dead zones)
+    pts = []
+    for i, (p, t, nv, bv) in enumerate(frames):
+        phi = 2.0 * math.pi * T_map[i] + phase_rad
+        q = p + nv.multiply(math.cos(phi) * Rcoil) + bv.multiply(math.sin(phi) * Rcoil)
+        pts.append(q)
+
+
+    # Pass 2: Create Spine as Smooth BSpline (eliminates fold lines)
+    # Convert points to a smooth BSpline curve instead of segmented polyline
+    try:
+        bspline = Part.BSplineCurve()
+        bspline.interpolate(pts)
+        spine_wire = Part.Wire([bspline.toShape()])
+        print(f"[ArcSpring] BSpline spine created with {len(pts)} points")
+    except Exception as e:
+        print(f"[ArcSpring] BSpline failed ({e}), falling back to polyline")
+        spine_wire = Part.makePolygon(pts)
+
+
+    # Pass 3: Create Profile (Single Section at Start)
+    # Align initial profile with the ACTUAL BSpline tangent at start point (not chord approximation)
+    # This prevents the "twisted end" artifact caused by mismatch between profile normal and spine tangent
+    try:
+        # Use BSpline derivative at parameter 0 (start) for exact tangent
+        t0 = vec(*bspline.tangent(0)[0]).normalize()
+        print(f"[ArcSpring] Using BSpline tangent at start: {t0}")
+    except:
+        # Fallback to chord approximation
+        if len(pts) > 1:
+            t0 = (pts[1] - pts[0]).normalize()
+        else:
+            t0 = vec(0,0,1)
+
+    p0 = pts[0]
+    # Create the circular wire for sweeping (single profile - maintains circular cross-section)
+    profile_edge = Part.makeCircle(d * 0.5, p0, t0)
+    profile_wire = Part.Wire([profile_edge])
+
+    print(f"[ArcSpring] Generating Pipe (Sweep)...")
+    
+    # 4. Sweep / PipeShell with single profile
+    # For helical paths, Frenet=True often works better than auxiliary frame
+    # Single profile ensures circular cross-section is preserved
+    try:
+        # Try Frenet frame first - better for 3D curves like helices
+        solid = spine_wire.makePipeShell([profile_wire], True, True) # solid=True, frenet=True
+        # Refine shape to merge faces and eliminate bamboo-joint artifacts
+        try:
+            solid = solid.removeSplitter()
+        except:
+            pass # Ignore if removeSplitter fails, solid is still valid
+        print(f"[ArcSpring] Frenet Pipe Success. ShapeType={solid.ShapeType} Volume={solid.Volume:.2f}")
+
+    except Exception as e:
+        print(f"[ArcSpring] Frenet Pipe failed: {e}. Fallback to Auxiliary...")
+        try:
+            solid = spine_wire.makePipeShell([profile_wire], True, False) # Try Auxiliary
+
+            try:
+                solid = solid.removeSplitter()
+            except:
+                pass
+            print(f"[ArcSpring] Auxiliary Pipe Success. Volume={solid.Volume:.2f}")
+        except Exception as e2:
+             print(f"[ArcSpring] All Pipe attempts failed: {e2}")
+             raise
+
+
+
+
+    # 5. Export Centerline (for debug)
+    if doc:
+        try:
+            centerline_obj = doc.addObject("Part::Feature", f"{fileStem}_Centerline")
+            centerline_obj.Shape = spine_wire
+        except: pass
+
+    return solid
+
+
+# =============================================================================
 # TechDraw 工程图生成 - 使用 FreeCAD 真实投影
 # =============================================================================
 
@@ -2250,6 +2525,15 @@ def generate_tech_requirements_svg(spring_type, L0_tol, L0):
       <tspan x="0" dy="4">8. 初拉力公差: +/-15%</tspan>
       <tspan x="0" dy="4">9. 执行标准: GB/T 2089</tspan>
     </text>'''
+    elif spring_type == "arc" or spring_type == "arcSpring":
+        return '''<text class="note-text">
+      <tspan x="0" dy="5">1. 材料: 碳素弹簧钢丝 C级 GB/T 4357</tspan>
+      <tspan x="0" dy="4">2. 热处理: 去应力退火 250-300C</tspan>
+      <tspan x="0" dy="4">3. 表面处理: 发黑或镀锌</tspan>
+      <tspan x="0" dy="4">4. 形式: 弧形弹簧 (Arc/Bow Spring)</tspan>
+      <tspan x="0" dy="4">5. 旋向: 右旋</tspan>
+      <tspan x="0" dy="4">6. 执行标准: 工艺规范 Q/ISRI-001</tspan>
+    </text>'''
     else:
         return '''<text class="note-text">
       <tspan x="0" dy="5">1. 材料: 碳素弹簧钢丝 C级 GB/T 4357</tspan>
@@ -2278,6 +2562,15 @@ def generate_params_table_svg(spring_type, d, Dm, OD, ID, L0, Na, Nt, pitch_acti
       <tspan x="3" dy="4">钩子类型</tspan><tspan x="45" dy="0">机器钩</tspan>
       <tspan x="3" dy="4">刚度 k</tspan><tspan x="45" dy="0">{spring_rate:.2f} N/mm</tspan>
       <tspan x="3" dy="4">初拉力 F0</tspan><tspan x="45" dy="0">{initial_force:.1f} N</tspan>
+    </text>'''
+    elif spring_type == "arc" or spring_type == "arcSpring":
+        return f'''<text class="small-text">
+      <tspan x="3" dy="15">线径 d</tspan><tspan x="45" dy="0">{d:.2f} mm</tspan>
+      <tspan x="3" dy="4">中径 D</tspan><tspan x="45" dy="0">{Dm:.1f} mm</tspan>
+      <tspan x="3" dy="4">弧半径 R</tspan><tspan x="45" dy="0">{geometry.get("arcRadius", 0):.1f} mm</tspan>
+      <tspan x="3" dy="4">弧角度 α</tspan><tspan x="45" dy="0">{geometry.get("arcAlpha", 0):.1f} °</tspan>
+      <tspan x="3" dy="4">有效圈数 n</tspan><tspan x="45" dy="0">{Na}</tspan>
+      <tspan x="3" dy="4">刚度 k</tspan><tspan x="45" dy="0">{spring_rate:.2f} N/mm</tspan>
     </text>'''
     else:
         return f'''<text class="small-text">
@@ -2338,10 +2631,14 @@ def generate_techdraw(doc, spring_obj, geometry, spring_type, output_path, fmt):
     Fs = spring_rate * max_deflection if spring_rate > 0 else 0
     
     # 工作状态参数 (示例)
-    L1 = L0 * 0.85  # 安装长度
-    L2 = L0 * 0.70  # 工作长度
-    F1 = spring_rate * (L0 - L1)  # 安装力
-    F2 = spring_rate * (L0 - L2)  # 工作力
+    if spring_type == "arc" or spring_type == "arcSpring":
+        # 弧形弹簧简化的特性参数
+        L1, L2, F1, F2, Fs = 0, 0, 0, 0, 0
+    else:
+        L1 = L0 * 0.85  # 安装长度
+        L2 = L0 * 0.70  # 工作长度
+        F1 = spring_rate * (L0 - L1)  # 安装力
+        F2 = spring_rate * (L0 - L2)  # 工作力
     
     # 公差
     L0_tol = L0 * 0.02  # ±2%
@@ -2544,11 +2841,22 @@ def generate_techdraw(doc, spring_obj, geometry, spring_type, output_path, fmt):
     <text x="180" y="7" class="small-text" text-anchor="middle">比例</text>
     <text x="215" y="7" class="small-text" text-anchor="middle">日期</text>
     <text x="250" y="7" class="small-text" text-anchor="middle">张次</text>
-    
-    <!-- 内容行 -->
-    <text x="25" y="17" class="title-text" text-anchor="middle">{"拉伸弹簧" if spring_type == "extension" else "压缩弹簧"}</text>
+  '''
+    # 计算标题和图号
+    if spring_type == "arc" or spring_type == "arcSpring":
+        title = "弧形弹簧"
+        doc_no = f"AS-{Na:02d}"
+    elif spring_type == "extension":
+        title = "拉伸弹簧"
+        doc_no = f"EX-{Nt:02d}{Na:02d}"
+    else:
+        title = "压缩弹簧"
+        doc_no = f"CP-{Nt:02d}{Na:02d}"
+
+    svg_content += f'''
+    <text x="25" y="17" class="title-text" text-anchor="middle">{title}</text>
     <text x="75" y="17" class="small-text" text-anchor="middle">60Si2MnA</text>
-    <text x="130" y="17" class="small-text" text-anchor="middle">{"EX" if spring_type == "extension" else "CP"}-{Nt:02d}{Na:02d}</text>
+    <text x="130" y="17" class="small-text" text-anchor="middle">{doc_no}</text>
     <text x="180" y="17" class="small-text" text-anchor="middle">{scale:.1f}:1</text>
     <text x="215" y="17" class="small-text" text-anchor="middle">{datetime.date.today()}</text>
     <text x="250" y="17" class="small-text" text-anchor="middle">1/1</text>
@@ -2733,6 +3041,14 @@ def main():
         spring = make_variable_pitch_compression_spring(geometry)
     elif spring_type == "suspension_spring":
         spring = make_suspension_spring(geometry)
+    elif spring_type == "arc" or spring_type == "arcSpring" or spring_type == "ARC_SPRING":
+        # 强制字段验证
+        required = ["d", "D", "n", "r", "alphaDeg", "profile"]
+        missing = [k for k in required if k not in geometry]
+        if missing:
+            print(f"Error: ARC_SPRING missing required params: {','.join(missing)}")
+            sys.exit(1)
+        spring = make_arc_spring(geometry, doc=doc)
     else:
         print(f"Unknown spring type: {spring_type}")
         sys.exit(1)
@@ -2768,23 +3084,26 @@ def main():
             # 使用 Mesh 模块导出，可以控制精度
             try:
                 import Mesh
-                # 预览用中等精度（平衡质量和速度）
-                linear_deflection = 0.2  # mm - 中等精度
-                angular_deflection = 0.3  # radians - 中等精度（约17°）
+                # 预览用高精度（弹簧专用参数 - 追求视觉平滑）
+                # LinearDeflection: 控制沿路径平滑度, 越小越顺 (mm)
+                # AngularDeflection: 控制圆截面多边形感, 8°≈45边非常圆 (degrees)
+                linear_deflection = 0.01  # mm - 高精度预览
+                angular_deflection = 0.14  # radians ≈ 8° - 极圆
                 
                 # 创建 mesh 并导出
                 mesh = Mesh.Mesh()
                 shape = spring_obj.Shape
                 
-                # 使用 MeshPart 进行更好的控制
+                # 使用 MeshPart 进行更好的控制（弹簧专用设置）
                 try:
                     import MeshPart
                     mesh = MeshPart.meshFromShape(
                         Shape=shape,
                         LinearDeflection=linear_deflection,
                         AngularDeflection=angular_deflection,
-                        Relative=False
+                        Relative=False  # 绝对值更可控，适用于弹簧这种高曲率物体
                     )
+
                 except:
                     # 备用：直接 tessellate
                     vertices, facets = shape.tessellate(linear_deflection)

@@ -5,9 +5,10 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { Edges, Line } from "@react-three/drei";
 import * as THREE from "three";
 import { Button } from "@/components/ui/button";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, FileCode } from "lucide-react";
 import { AutoFitControls } from "./AutoFitControls";
 import { previewTheme } from "@/lib/three/previewTheme";
+import { generateFreeCADScript } from "@/lib/exporters/arcSpringPythonExporter";
 import {
   validateArcSpringGeometry,
   type ArcSpringGeometryParams,
@@ -611,6 +612,29 @@ export function ArcSpringVisualizer(props: ArcSpringVisualizerProps) {
     setViewType(view);
   }, []);
 
+  const handleCopyFreeCAD = useCallback(() => {
+    const script = generateFreeCADScript({
+      d: props.d,
+      D: props.D,
+      n: props.n,
+      r: props.r,
+      alphaDeg: props.alpha0Deg,
+      profile: props.profile ?? "ARC",
+      deadCoilsStart: props.deadCoilsStart ?? 0,
+      deadCoilsEnd: props.deadCoilsEnd ?? 0,
+      k: props.deadTightnessK ?? 1,
+      bowLeanDeg: props.bowLeanDeg,
+      bowPlaneTiltDeg: props.bowPlaneTiltDeg,
+      fileStem: "ArcSpring"
+    });
+    
+    navigator.clipboard.writeText(script).then(() => {
+      alert("FreeCAD Python Script copied to clipboard!\n\nPaste this into FreeCAD's Python Console or a Macro to generate the 1:1 high-precision solid model.");
+    }).catch(err => {
+      console.error("Failed to copy script", err);
+    });
+  }, [props]);
+
   return (
     <div className="relative h-full w-full">
       <Canvas camera={{ fov: 45, near: 0.1, far: 5000 }} style={{ width: "100%", height: "100%" }}>
@@ -655,6 +679,20 @@ export function ArcSpringVisualizer(props: ArcSpringVisualizerProps) {
           title="侧视图 / Side View"
         >
           侧
+        </Button>
+      </div>
+
+      {/* Exporter - bottom right */}
+      <div className="absolute bottom-2 right-2">
+        <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs bg-white/80 hover:bg-violet-50 text-violet-600 border-violet-200"
+            onClick={handleCopyFreeCAD}
+            title="Export to FreeCAD (Python)"
+        >
+            <FileCode className="h-3 w-3 mr-1" />
+            FreeCAD
         </Button>
       </div>
     </div>

@@ -5,7 +5,7 @@ import { Loader2, RefreshCw, Download, CheckCircle, AlertCircle } from "lucide-r
 import { Button } from "@/components/ui/button";
 
 interface FreeCadDrawingProps {
-  springType: "compression" | "extension" | "torsion" | "conical";
+  springType: "compression" | "extension" | "torsion" | "conical" | "arc";
   geometry: {
     wireDiameter: number;
     meanDiameter?: number;
