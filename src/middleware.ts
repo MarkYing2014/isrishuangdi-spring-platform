@@ -3,6 +3,12 @@ import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
+    const ua = request.headers.get('user-agent') || '';
+
+    // Skip bots/crawlers to save Edge Middleware invocations
+    if (/bot|crawler|spider|crawling|googlebot|bingbot|duckduckbot|yandex|slurp|baidu/i.test(ua)) {
+        return NextResponse.next();
+    }
 
     // Skip if it's not a page request or specifically excluded
     if (
@@ -14,6 +20,7 @@ export function middleware(request: NextRequest) {
     ) {
         return NextResponse.next();
     }
+
 
     // Check if lang cookie already exists
     const langCookie = request.cookies.get("lang");
@@ -43,12 +50,13 @@ export function middleware(request: NextRequest) {
 export const config = {
     matcher: [
         /*
-         * Match all request paths except for the ones starting with:
-         * - api (API routes)
+         * Match all request paths except for:
+         * - api (API routes - including webhooks, should not be affected)
          * - _next/static (static files)
          * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
+         * - favicon.ico, robots.txt, sitemap.xml (static files)
          */
-        "/((?!api|_next/static|_next/image|favicon.ico).*)",
+        "/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)",
     ],
 };
+
