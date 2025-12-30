@@ -232,49 +232,62 @@ export function ArcSpringMesh({
     // 4. Phase Offset (Critical for visual separation of nested coils)
     const phaseOffsetRad = (packIndex * (packPhaseDeg ?? 0)) * (Math.PI / 180);
 
-    // 1. Turn Distribution Model (Intensity k blends between uniform and tight ends)
-    const sigma = Math.max(0.01, deadTightnessSigma || 0.08);
-    const expNegInvSigma = Math.exp(-1 / sigma);
-
-    // --- OVERLAP PROTECTION (SOLID HEIGHT LIMIT) ---
-    const arcLengthPhysical = r * (currentAlphaDeg * Math.PI / 180);
-    const maxDensity = d > 0 ? arcLengthPhysical / d : 1000;
-    const maxLambdaDeriv = totalCoils > 0 ? maxDensity / totalCoils : 1000;
-
-    // 1. Turn Distribution Model (Intensity k blends between uniform and tight ends)
-    const sL_solid = totalCoils > 0 && arcLengthPhysical > 0 ? ((deadCoilsStart || 0) * d) / arcLengthPhysical : 0;
-    const sR_solid = totalCoils > 0 && arcLengthPhysical > 0 ? ((deadCoilsEnd || 0) * d) / arcLengthPhysical : 0;
+    // --- HIGH-PRECISION BLENDED-ANCHOR ALGORITHM ---
     
-    // Safety: don't let dead zones overlap more than 90% of spring
-    const totalSDead = sL_solid + sR_solid;
-    const scaleS = totalSDead > 0.9 ? 0.9 / totalSDead : 1.0;
-    const finalSL = sL_solid * scaleS;
-    const finalSR = sR_solid * scaleS;
-
+    // 1. Calculate physical accumulated arc lengths along the backbone (Essential for BOW profile)
+    const cumulativeDistances = new Float32Array(backboneFrames.length);
+    let totalLength = 0;
+    for (let i = 1; i < backboneFrames.length; i++) {
+        totalLength += backboneFrames[i].p.distanceTo(backboneFrames[i-1].p);
+        cumulativeDistances[i] = totalLength;
+    }
+    
+    // 2. Define the "Proportion" of turns for each segment
     const propL = totalCoils > 0 ? (deadCoilsStart ?? 0) / totalCoils : 0;
     const propR = totalCoils > 0 ? (deadCoilsEnd ?? 0) / totalCoils : 0;
+    const propActive = Math.max(0, 1 - propL - propR);
 
-    const lambdaAt = (s: number) => {
-        // Idealized "Solid" distribution (Piecewise Linear)
-        // Maps segments [0, sL] -> [0, propL], [sL, 1-sR] -> [propL, 1-propR], [1-sR, 1] -> [1-propR, 1]
-        let solid = s;
-        if (s < finalSL) {
-            solid = s * (propL / Math.max(1e-6, finalSL));
-        } else if (s > (1 - finalSR)) {
-            const u = (s - (1 - finalSR)) / Math.max(1e-6, finalSR);
-            solid = (1 - propR) + propR * u;
+    // 3. Define the "Spatial Proportion" (s) for each segment
+    // Case Solid: Dead coils take minimum space (L = N*d)
+    const sL_solid = totalLength > 0 ? ((deadCoilsStart || 0) * d) / totalLength : 0;
+    const sR_solid = totalLength > 0 ? ((deadCoilsEnd || 0) * d) / totalLength : 0;
+    
+    // Case Uniform: Dead coils take their "fair share" of the total arc
+    const sL_uniform = propL;
+    const sR_uniform = propR;
+
+    // 4. Blend the ANCHORS based on kIntensity
+    // k=0 -> sL follows turns proportion (Uniform)
+    // k=1 -> sL follows physical wire limit (Solid)
+    const kIntensity = Math.max(0, Math.min(1.0, (deadTightnessK ?? 1.0)));
+    const anchorSL = sL_uniform * (1 - kIntensity) + sL_solid * kIntensity;
+    const anchorSR = sR_uniform * (1 - kIntensity) + sR_solid * kIntensity;
+
+    // Safety: ensure anchors don't cross and leave room for active coils
+    const maxAnchorSum = 0.95;
+    const currentSum = anchorSL + anchorSR;
+    const scaleAnchors = currentSum > maxAnchorSum ? maxAnchorSum / currentSum : 1.0;
+    const finalSL = anchorSL * scaleAnchors;
+    const finalSR = anchorSR * scaleAnchors;
+
+    const lambdaAt = (s_param: number) => {
+        // Find current physical progress along backbone
+        if (totalLength <= 0) return s_param;
+        const idx = Math.floor(s_param * (cumulativeDistances.length - 1));
+        const s_phys = cumulativeDistances[idx] / totalLength;
+
+        // Piecewise mapping of s_phys -> turns_prop
+        // This mapping has FIXED ANCHORS: turns(finalSL) is ALWAYS propL
+        // This guarantees "No Leakage".
+        if (s_phys <= finalSL) {
+            return s_phys * (propL / Math.max(1e-6, finalSL));
+        } else if (s_phys >= (1 - finalSR)) {
+            const u = (s_phys - (1 - finalSR)) / Math.max(1e-6, finalSR);
+            return (1 - propR) + propR * u;
         } else {
-            const midSRange = 1 - finalSL - finalSR;
-            const u = (s - finalSL) / Math.max(1e-6, midSRange);
-            solid = propL + (1 - propL - propR) * u;
+            const u = (s_phys - finalSL) / Math.max(1e-6, 1 - finalSL - finalSR);
+            return propL + propActive * u;
         }
-
-        // Intensity k blends between Uniform (s) and Solid (segmented)
-        // k=0 -> Uniform
-        // k=1 -> Dead coils are as tight as physically possible (touching)
-        // Higher values of k are clamped to 1.0 for physical realism.
-        const k = Math.max(0, Math.min(1.0, (deadTightnessK ?? 1.0)));
-        return s * (1 - k) + solid * k;
     };
 
     // Generate Coil Points
