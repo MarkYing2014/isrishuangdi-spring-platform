@@ -53,6 +53,7 @@ import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 import { SavedDesignManager } from "@/components/analysis/SavedDesignManager";
+import { MultiPointSection } from "./MultiPointSection";
 
 const formSchema = z
   .object({
@@ -1241,6 +1242,19 @@ export function CompressionCalculator() {
           />
         </div>
       )}
+
+      {/* Multi-Point Load Analysis - Step 1 Enhancement */}
+      <div className="md:col-span-2">
+        <MultiPointSection
+          d={watchedValues.wireDiameter ?? 3.2}
+          D={watchedValues.meanDiameter ?? 24}
+          n={watchedValues.activeCoils ?? 8}
+          H0={watchedValues.freeLength ?? 50}
+          Hb={solidHeight}  // Calculated: totalCoils * wireDiameter
+          totalCoils={watchedValues.totalCoils ?? 10}
+          G={form.getValues("shearModulus") ?? 79000}
+        />
+      </div>
 
       <div className="md:col-span-2">
         <Card>
