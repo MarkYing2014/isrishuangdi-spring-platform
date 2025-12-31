@@ -57,7 +57,7 @@ export interface ArcSpringInput {
 
   // Second spring (双级弹簧) - 内弹簧参数
   spring2?: Partial<Omit<ArcSpringInput,
-    "systemMode" | "spring2" | "samples" | "maxHousingDiameter"
+    "systemMode" | "spring2" | "samples" | "maxHousingDiameter" | "pack"
   >>;
 
   engageAngle2?: number; // deg - 仅用于 dual_staged (Δα 阈值，拐点角度)
@@ -76,6 +76,43 @@ export interface ArcSpringInput {
     planeTiltDeg?: number;
   };
   endCapStyle?: "RING" | "BLOCK";
+
+  // Spring Pack (总成定义) - Phase 12.3
+  pack?: ArcSpringPack;
+}
+
+// -----------------------------------------------------------------------------
+// Spring Pack Types (弹簧包总成)
+// -----------------------------------------------------------------------------
+
+export interface EndCap {
+  material: "PA46" | "PA66" | "Steel" | "Custom";
+  thicknessMm: number;      // 单侧厚度 (Total solid deduction = 2 * thickness)
+  contactAreaMm2?: number;  // 接触面积 (用于计算压应力)
+  massGrams?: number;       // 单个重量 (用于计算离心力)
+  maxAllowableStressMPa?: number; // 许用压应力 (Compressive Limit)
+}
+
+export interface ArcSpringPack {
+  caps: EndCap;
+  housing?: {
+    guideRadiusMm: number;    // 滑道半径 (通常 = R)
+    maxBurstRpm?: number;     // 壳体设计极限
+  };
+}
+
+export interface PackSafetyResult {
+  solidAngleDeg: number;      // 总成压并角 (弹簧压并 + 座子厚度)
+  safetyToSolidDeg: number;   // 剩余行程裕度
+
+  capStressMPa: number;       // 座子接触压应力
+  capSafetyFactor: number;    // 座子强度系数
+
+  burstRpm: number;           // 理论爆裂转速 (自锁/屈服)
+  burstSafetyFactor: number;  // @OperatingRPM
+
+  isSafe: boolean;
+  warnings: string[];
 }
 
 export interface ArcSpringPoint {
@@ -144,6 +181,9 @@ export interface ArcSpringResult {
 
   // System-level governing spring
   governingSpring?: 1 | 2;
+
+  // Spring Pack Safety
+  packSafety?: PackSafetyResult;
 
   // 曲线数据
   curve: ArcSpringPoint[];

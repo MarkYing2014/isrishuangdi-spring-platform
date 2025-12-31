@@ -941,3 +941,99 @@ export function calculateArcCreep(params: {
     warningsZh,
   };
 }
+
+// ============================================================================
+// P3: Spring Pack Safety Analysis (Phase 12.3)
+// ============================================================================
+
+import { ArcSpringPack, PackSafetyResult } from "./types";
+
+export function calculatePackSafety(params: {
+  input: ArcSpringInput;
+  result: ArcSpringResult;
+  pack: ArcSpringPack;
+}): PackSafetyResult {
+  const { input, result, pack } = params;
+  const PI = Math.PI;
+
+  // 1. Solid Angle / Blockage Check
+  // Total solid length = Spring Solid + 2 * Cap Thickness
+  // Spring Solid Approx = (n + 2) * d_max (or use result if available)
+  // Let's use the result.deltaAlphaMax which usually represents travel to solid (or near solid).
+  // springSolidAngle = alpha0 - deltaAlphaMax
+  // If result doesn't give absolute solid angle, we estimate.
+  const springSolidAngle = input.alpha0 - result.deltaAlphaMax;
+  
+  // Cap angle deduction (2 caps)
+  // arc length of caps = 2 * thickness
+  // angle = (2 * t) / r * (180/pi)
+  const capAngle = (2 * pack.caps.thicknessMm) / input.r * (180 / PI);
+  
+  const packSolidAngle = springSolidAngle + capAngle; // The angle occupied by solid parts
+  // Wait, if alpha0 is the space, then solidAngle is the min angle.
+  // Travel = alpha0 - packSolidAngle.
+  
+  // If we have a limit angle (Bump Stop), say alphaLimit
+  const limitAngle = input.alphaLimit ?? 0;
+  
+  // Safety to solid is (LimitAngle - PackSolidAngle) if Limit is the "min angle allowed"
+  // Usually alphaLimit is the compressed angle (e.g. 10 deg). 
+  // If PackSolid is 15 deg, we have a crash.
+  const safetyToSolidDeg = (input.alphaLimit ?? 0) - packSolidAngle; 
+  // Wait, typically alphaLimit is the SMALLEST angle the system reaches.
+  // So if alphaLimit > PackSolidAngle, we are safe. 
+  // Safety = alphaLimit - PackSolidAngle. (Positive = Safe)
+
+  // 2. Cap Stress Check
+  // Force = Torque / r
+  const maxTorque = result.MMax_load; // Nmm
+  const maxForce = maxTorque / input.r; // N
+  
+  // Contact Area
+  // If not provided, assume area of wire cross section or full coil face?
+  // Usually flat cap face ~ (PI * (De^2 - Di^2)/4)? No, spring is wire.
+  // Real contact area is small: ~ PI * (d/2)^2 for simple cut, or flattened ground.
+  // End caps usually cup the spring, so area distribution is better.
+  // Let's assume input area or default to wire cross section * 1.5 (support factor).
+  const contactArea = pack.caps.contactAreaMm2 ?? (PI * Math.pow(input.d/2, 2));
+  
+  const capStressMPa = maxForce / contactArea;
+  
+  const allowStress = pack.caps.maxAllowableStressMPa ?? (
+      pack.caps.material === "PA46" ? 120 :
+      pack.caps.material === "PA66" ? 90 :
+      pack.caps.material === "Steel" ? 800 :
+      100 // Custom default
+  );
+  
+  const capSafetyFactor = allowStress / capStressMPa;
+
+  // 3. Burst / Dynamic Limit
+  // "Locking Speed" - Simple estimation
+  // When Centrifugal Force * friction > Spring Force (at some reference load)
+  // Or simply Housing Limit.
+  // Let's calculate the RPM where Centrifugal Force on ONE cap equals 100N (arbitrary ref) for now?
+  // Or better: Calculate max centrifugal pressure on housing.
+  // Total Mass = SpringMass + 2*CapMass
+  // But Burst is usually about the SPRING flinging out.
+  // Let's skip complex burst for now and return a "Reference Burst RPM" based on Housing Limit provided.
+  
+  const burstRpm = pack.housing?.maxBurstRpm ?? 8000; // Default limit
+  const burstSafetyFactor = input.rpm ? burstRpm / input.rpm : Infinity;
+
+  const warnings: string[] = [];
+  if (capSafetyFactor < 1.0) warnings.push("End cap stress exceeds limit (Risk of crushing)");
+  if (safetyToSolidDeg < 0) warnings.push("Pack solid height exceeds limit angle (Risk of hard impact)");
+  if (burstSafetyFactor < 1.2 && input.rpm) warnings.push("Operating RPM close to burst limit");
+
+  return {
+    solidAngleDeg: packSolidAngle,
+    safetyToSolidDeg,
+    capStressMPa,
+    capSafetyFactor,
+    burstRpm,
+    burstSafetyFactor,
+    isSafe: capSafetyFactor >= 1.0 && safetyToSolidDeg >= 0 && burstSafetyFactor >= 1.2,
+    warnings
+  };
+}

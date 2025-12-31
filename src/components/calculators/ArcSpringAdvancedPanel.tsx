@@ -33,6 +33,8 @@ import {
   TrendingDown,
   Gauge,
   RotateCw,
+  ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
 import {
   checkArcManufacturability,
@@ -42,23 +44,26 @@ import {
   calculateArcTemperatureEffects,
   calculateArcCentrifugalEffects,
   calculateArcCreep,
+  calculatePackSafety, // Phase 12.3
   type ArcManufacturabilityResult,
   type ArcFatigueLifeResult,
   type ArcDesignScore,
   type ArcVibrationResult,
   type ArcTemperatureResult,
-  type ArcCentrifugalResult,
+  type ArcCentrifugalResult, // Restored this
   type ArcCreepResult,
 } from "@/lib/arcSpring/advanced";
-import type { ArcSpringInput, ArcSpringResult } from "@/lib/arcSpring/types";
+import type { ArcSpringInput, ArcSpringResult, EndCap, ArcSpringPack, PackSafetyResult } from "@/lib/arcSpring/types";
 
 interface ArcSpringAdvancedPanelProps {
   isZh?: boolean;
   input: ArcSpringInput;
   result: ArcSpringResult;
   allowableTau?: number;
-  packGroups?: any[]; // Integrating new platform pack groups
+  packGroups?: any[];
 }
+
+// ... Badges ...
 
 function SeverityBadge({ severity }: { severity: string }) {
   switch (severity) {
@@ -271,6 +276,28 @@ export function ArcSpringAdvancedPanel({
   const [operatingRpm, setOperatingRpm] = useState(0);
   const [duration, setDuration] = useState(1000);
   const [frictionCoeff, setFrictionCoeff] = useState(0.15);
+  const [capMaterial, setCapMaterial] = useState<EndCap["material"]>("PA46");
+  const [capThickness, setCapThickness] = useState(2.0); // mm
+  const [housingBurstRpm, setHousingBurstRpm] = useState(8000);
+
+  // P3: Pack Safety (Phase 12.3)
+  const packSafety = useMemo<PackSafetyResult>(() => {
+    return calculatePackSafety({
+        input,
+        result,
+        pack: input.pack ?? {
+            caps: {
+                material: capMaterial,
+                thicknessMm: capThickness,
+                contactAreaMm2: undefined // use default
+            },
+            housing: {
+                guideRadiusMm: input.r,
+                maxBurstRpm: housingBurstRpm
+            }
+        }
+    });
+  }, [input, result, capMaterial, capThickness, housingBurstRpm]);
 
   // P1: Manufacturability
   const manufacturability = useMemo<ArcManufacturabilityResult>(() => {
@@ -380,7 +407,7 @@ export function ArcSpringAdvancedPanel({
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="score">
-          <TabsList className="grid grid-cols-7 w-full">
+          <TabsList className="grid grid-cols-4 md:grid-cols-8 w-full h-auto">
             <TabsTrigger value="score" className="text-xs">
               <Gauge className="w-3 h-3 mr-1" />
               {isZh ? "评分" : "Score"}
@@ -408,6 +435,10 @@ export function ArcSpringAdvancedPanel({
             <TabsTrigger value="creep" className="text-xs">
               <Clock className="w-3 h-3 mr-1" />
               {isZh ? "蠕变" : "Creep"}
+            </TabsTrigger>
+            <TabsTrigger value="packSafety" className="text-xs">
+              <ShieldCheck className="w-3 h-3 mr-1" />
+              {isZh ? "总成安全" : "Pack Safety"}
             </TabsTrigger>
           </TabsList>
 
@@ -854,6 +885,95 @@ export function ArcSpringAdvancedPanel({
                 </ul>
               </div>
             )}
+          </TabsContent>
+
+          {/* P3: Pack Safety Tab (Phase 12.3) */}
+          <TabsContent value="packSafety" className="space-y-4">
+             <div className="flex items-center gap-2 mb-4">
+               {packSafety.isSafe ? (
+                 <Badge className="bg-green-600 flex gap-1"><ShieldCheck className="w-4 h-4"/> Safe Assembly</Badge>
+               ) : (
+                 <Badge variant="destructive" className="flex gap-1"><ShieldAlert className="w-4 h-4"/> Critical Risk</Badge>
+               )}
+               {packSafety.warnings.length > 0 && (
+                   <span className="text-sm text-red-600 font-medium">{packSafety.warnings[0]}</span>
+               )}
+             </div>
+
+             <div className="grid md:grid-cols-2 gap-6">
+                {/* Inputs */}
+                <Card className="border-muted bg-muted/20">
+                    <CardHeader className="p-4 pb-2"><CardTitle className="text-sm">End Cap Config</CardTitle></CardHeader>
+                    <CardContent className="p-4 pt-2 space-y-3">
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                            <Label className="text-xs">Material</Label>
+                            <select 
+                                className="h-8 rounded-md border border-input bg-background px-3 text-xs"
+                                value={capMaterial}
+                                onChange={e => setCapMaterial(e.target.value as any)}
+                            >
+                                <option value="PA46">PA46 (High Temp)</option>
+                                <option value="PA66">PA66 (Standard)</option>
+                                <option value="Steel">Steel</option>
+                            </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                            <Label className="text-xs">Thickness (mm)</Label>
+                            <Input 
+                                type="number" 
+                                className="h-8 text-xs font-mono"
+                                value={capThickness}
+                                onChange={e => setCapThickness(parseFloat(e.target.value) || 0)}
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 items-center">
+                            <Label className="text-xs">Housing Burst (RPM)</Label>
+                            <Input 
+                                type="number" 
+                                className="h-8 text-xs font-mono"
+                                value={housingBurstRpm}
+                                onChange={e => setHousingBurstRpm(parseFloat(e.target.value) || 0)}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Results Grid */}
+                <div className="space-y-2">
+                    {/* Solid Check */}
+                    <div className="flex justify-between items-center p-2 border rounded bg-white">
+                        <div className="flex flex-col">
+                            <span className="text-xs text-muted-foreground">Solid Angle Margin</span>
+                            <span className="font-mono text-sm">{packSafety.safetyToSolidDeg.toFixed(1)}°</span>
+                        </div>
+                        <CheckCircle className={`w-4 h-4 ${packSafety.safetyToSolidDeg >= 0 ? "text-green-500" : "text-red-500"}`} />
+                    </div>
+
+                    {/* Stress Check */}
+                    <div className="flex justify-between items-center p-2 border rounded bg-white">
+                        <div className="flex flex-col">
+                            <span className="text-xs text-muted-foreground">Cap Stress (SF)</span>
+                            <div className="flex gap-2 items-baseline">
+                                <span className="font-mono text-sm">{packSafety.capStressMPa.toFixed(1)} MPa</span>
+                                <span className="text-xs font-bold text-muted-foreground">(SF: {packSafety.capSafetyFactor.toFixed(2)})</span>
+                            </div>
+                        </div>
+                        <CheckCircle className={`w-4 h-4 ${packSafety.capSafetyFactor >= 1.0 ? "text-green-500" : "text-red-500"}`} />
+                    </div>
+
+                    {/* Burst Check */}
+                    <div className="flex justify-between items-center p-2 border rounded bg-white">
+                        <div className="flex flex-col">
+                            <span className="text-xs text-muted-foreground">Burst Check</span>
+                            <div className="flex gap-2 items-baseline">
+                                <span className="font-mono text-sm">{packSafety.burstRpm} RPM</span>
+                                <span className="text-xs font-bold text-muted-foreground">(SF: {packSafety.burstSafetyFactor === Infinity ? "∞" : packSafety.burstSafetyFactor.toFixed(2)})</span>
+                            </div>
+                        </div>
+                         <CheckCircle className={`w-4 h-4 ${packSafety.burstSafetyFactor >= 1.2 ? "text-green-500" : "text-yellow-500"}`} />
+                    </div>
+                </div>
+             </div>
           </TabsContent>
         </Tabs>
       </CardContent>
