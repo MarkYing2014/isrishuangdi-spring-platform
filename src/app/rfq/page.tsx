@@ -10,7 +10,7 @@ import { ManufacturingInputForm } from "@/components/rfq/manufacturing-input";
 import { SupportingFilesPanel } from "@/components/rfq/files";
 import { ContactPanel } from "@/components/rfq/contact";
 import { FooterCTA } from "@/components/rfq/cta";
-import { EngineeringSummary, RFQManufacturingInputs, RFQState, RFQContactInfo, ReviewVerdict } from "@/lib/rfq/types";
+import { EngineeringSummary, RFQManufacturingInputs, RFQState, RFQContactInfo, ReviewVerdict, RFQPackage } from "@/lib/rfq/types";
 import { LanguageText } from "@/components/language-context";
 
 // Helper to parse params
@@ -92,26 +92,56 @@ function RfqContent() {
     // 3. Actions
     const handleGeneratePackage = async () => {
         setIsSubmitting(true);
-        // Simulate API / Generation
-        await new Promise(r => setTimeout(r, 1500));
         
-        const packageData = {
-            metadata: {
-                rfqId: "RFQ-" + Date.now(),
-                generatedAt: new Date().toISOString(),
-                designVersion: summary.designVersion,
-                designHash: summary.designHash
-            },
-            engineering: summary,
-            manufacturing: mfgInputs,
-            contact
+        // 1. Generate Metadata
+        const packageData: RFQPackage = {
+            id: `RFQ-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            status: "SUBMITTED",
+            summary,
+            manufacturingInputs: mfgInputs,
+            contactInfo: contact,
+            attachments: [] 
         };
-        
-        console.log("Generated RFQ Package:", packageData);
-        alert("Engineering RFQ Package Generated! \n(Check Console for JSON output)");
-        
-        setRfqState(prev => ({ ...prev, status: "SUBMITTED" }));
-        setIsSubmitting(false);
+
+        // 2. Generate PDF (Client-side)
+        try {
+            const { pdf } = await import('@react-pdf/renderer');
+            const { RFQDocument } = await import('@/components/rfq/pdf-document');
+            
+            const blob = await pdf(
+                <RFQDocument 
+                    summary={summary} 
+                    mfgInputs={mfgInputs} 
+                    contact={contact} 
+                />
+            ).toBlob();
+            
+            const url = URL.createObjectURL(blob);
+            
+            // Open in new tab (Preview)
+            window.open(url, '_blank');
+            
+            // Optional: Auto-download
+            /*
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Engineering_RFQ_${summary.designHash.substring(0,8)}.pdf`;
+            link.click();
+            */
+            
+            console.log("Generated RFQ Package:", packageData);
+            setRfqState(prev => ({ ...prev, status: "SUBMITTED" }));
+            
+            // Notify user
+            // In a real app, this is where we'd POST to backend
+            
+        } catch (e) {
+            console.error("PDF Generation failed:", e);
+            alert("Failed to generate PDF. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (

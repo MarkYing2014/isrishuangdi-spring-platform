@@ -63,14 +63,11 @@ export interface RFQState {
 }
 
 export interface RFQPackage {
-    metadata: {
-        rfqId: string;
-        generatedAt: string;
-        designVersion: string;
-        designHash: string;
-    };
-    engineering: EngineeringSummary;
-    manufacturing: RFQManufacturingInputs;
-    contact: RFQContactInfo;
-    files: Array<{ name: string; purpose: string }>;
+    id: string;
+    timestamp: string;
+    status: RFQState["status"];
+    summary: EngineeringSummary;
+    manufacturingInputs: RFQManufacturingInputs;
+    contactInfo: RFQContactInfo;
+    attachments: Array<{ name: string; url: string }>;
 }
