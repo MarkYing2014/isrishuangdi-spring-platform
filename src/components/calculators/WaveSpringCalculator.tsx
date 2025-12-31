@@ -789,12 +789,12 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
           geometry={{
             id,
             od,
-            thickness_t,
-            radialWall_b,
-            turns_Nt,
-            wavesPerTurn_Nw,
-            freeHeight_Hf,
-            workingHeight_Hw,
+            t: thickness_t,
+            b: radialWall_b,
+            Nt: turns_Nt,
+            Nw: wavesPerTurn_Nw,
+            Hf: freeHeight_Hf,
+            Hw: workingHeight_Hw,
           }}
           material={{
             id: materialId,

@@ -57,6 +57,7 @@ interface ArcSpringAdvancedPanelProps {
   input: ArcSpringInput;
   result: ArcSpringResult;
   allowableTau?: number;
+  packGroups?: any[]; // Integrating new platform pack groups
 }
 
 function SeverityBadge({ severity }: { severity: string }) {
@@ -123,13 +124,57 @@ function SpringBreakdownTable({
   input, 
   result, 
   isZh,
-  allowableTau 
+  allowableTau,
+  packGroups 
 }: { 
   input: ArcSpringInput; 
   result: ArcSpringResult; 
   isZh: boolean;
   allowableTau: number;
+  packGroups?: any[];
 }) {
+  // Check if we are using the new Pack Group system
+  if (packGroups && packGroups.length > 0) {
+      // New Platform Mode (Pack Groups)
+      return (
+        <div className="overflow-x-auto border rounded-lg">
+          <table className="w-full text-xs text-left">
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr>
+                <th className="p-2 font-medium">{isZh ? "分组" : "Group"}</th>
+                <th className="p-2 font-medium">{isZh ? "数量" : "Count"}</th>
+                <th className="p-2 font-medium">Stage 1 (Nmm/°)</th>
+                <th className="p-2 font-medium">Stage 2</th>
+                <th className="p-2 font-medium">Stage 3</th>
+                <th className="p-2 font-medium">{isZh ? "拐点" : "Breaks"} (°)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {packGroups.map((group, idx) => (
+                <tr key={idx}>
+                    <td className="p-2 font-bold">
+                        <Badge variant="outline" className="mr-2">{idx + 1}</Badge>
+                        {group.name || `Pack ${idx + 1}`}
+                    </td>
+                    <td className="p-2 font-mono">{group.count}</td>
+                    <td className="p-2 font-mono">{group.kStages[0]?.toFixed(2)}</td>
+                    <td className="p-2 font-mono">{group.kStages[1]?.toFixed(2)}</td>
+                    <td className="p-2 font-mono">{group.kStages[2]?.toFixed(2)}</td>
+                    <td className="p-2 font-mono text-muted-foreground">
+                        {group.phiBreaksDeg?.map((b: number) => b.toFixed(1)).join(" / ")}
+                    </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="p-2 bg-slate-50 text-[10px] text-muted-foreground border-t">
+             {isZh ? "* 多级刚度由各分组叠加而成" : "* Multi-stage stiffness is a sum of all active packs based on angle."}
+          </div>
+        </div>
+      );
+  }
+
+  // Legacy Mode (S1/S2)
   const isDual = input.systemMode === "dual_parallel" || input.systemMode === "dual_staged";
   const s2 = input.spring2;
   const s2Res = result.spring2Result;
@@ -219,6 +264,7 @@ export function ArcSpringAdvancedPanel({
   input,
   result,
   allowableTau = 800,
+  packGroups,
 }: ArcSpringAdvancedPanelProps) {
   // User inputs for advanced analysis
   const [temperature, setTemperature] = useState(20);
@@ -415,6 +461,7 @@ export function ArcSpringAdvancedPanel({
                 result={result} 
                 isZh={isZh} 
                 allowableTau={allowableTau} 
+                packGroups={packGroups}
             />
 
             <div className="flex items-center gap-2 mb-4">

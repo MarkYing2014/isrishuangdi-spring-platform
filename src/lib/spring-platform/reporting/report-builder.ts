@@ -155,6 +155,40 @@ function extractGeometryParams(
                 category: "geometry",
             });
         }
+        if (geometry.packGroups && Array.isArray(geometry.packGroups)) {
+            geometry.packGroups.forEach((group: any, index: number) => {
+                const groupName = group.name || `Group ${index + 1}`;
+                params.push({
+                    key: `group_${index}_count`,
+                    labelEn: `${groupName} Count`,
+                    labelZh: `${groupName} 数量`,
+                    value: group.count,
+                    unit: "pcs",
+                    category: "geometry"
+                });
+
+                if (group.kStages) {
+                    params.push({
+                        key: `group_${index}_stiffness`,
+                        labelEn: `${groupName} Stiffness (k1/k2/k3)`,
+                        labelZh: `${groupName} 刚度 (k1/k2/k3)`,
+                        value: group.kStages.map((k: number) => k.toFixed(2)).join(" / "),
+                        unit: "N/mm", // or Nmm/deg, strictly it matches engine output
+                        category: "geometry"
+                    });
+                }
+
+                if (group.phiBreaksDeg) {
+                    params.push({
+                        key: `group_${index}_breaks`,
+                        labelEn: `${groupName} Break Points`,
+                        labelZh: `${groupName} 转折点`,
+                        value: group.phiBreaksDeg.map((b: number) => b.toFixed(1)).join("° / ") + "°",
+                        category: "geometry"
+                    });
+                }
+            });
+        }
     }
 
     // Disc spring specific
@@ -262,6 +296,31 @@ function extractGeometryParams(
                 labelEn: "Number of Turns",
                 labelZh: "圈数",
                 value: geometry.turns,
+                category: "geometry",
+            });
+        }
+    }
+
+    // Variable Pitch specific
+    if (springType === "variablePitch") {
+        if (geometry.segments !== undefined && Array.isArray(geometry.segments)) {
+            // Format segments as a comprehensive string or handle via custom rendering later.
+            // For now, let's summarize the count and maybe details in the value.
+            params.push({
+                key: "segments",
+                labelEn: "Pitch Segments",
+                labelZh: "节距分段",
+                value: `${geometry.segments.length} segments`, // Simplified for now
+                category: "geometry",
+            });
+            // We could add individual segment details if ReportParameter supported nested data or tables
+        }
+        if (geometry.activeCoils0 !== undefined) {
+            params.push({
+                key: "activeCoils0",
+                labelEn: "Initial Active Coils",
+                labelZh: "初始有效圈",
+                value: geometry.activeCoils0,
                 category: "geometry",
             });
         }

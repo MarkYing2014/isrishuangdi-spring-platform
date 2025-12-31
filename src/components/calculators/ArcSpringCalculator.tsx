@@ -1986,6 +1986,7 @@ export function ArcSpringCalculator() {
           input={input}
           result={result}
           allowableTau={allowableTau}
+          packGroups={packGroups}
         />
       )}
 
