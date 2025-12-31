@@ -49,6 +49,8 @@ interface MaterialSelectorProps {
   onMaterialChange: (material: SpringMaterial) => void;
   /** Wire diameter d (for calculation of allowable stress) */
   d?: number;
+  /** Optional styling */
+  className?: string;
 }
 
 // ============================================================================
@@ -59,6 +61,7 @@ export function MaterialSelector({
   selectedId,
   onMaterialChange,
   d = 2,
+  className,
 }: MaterialSelectorProps) {
   const groupedMaterials = useMemo(() => getGroupedMaterials(), []);
   const selectedMaterial = useMemo(() => getMaterialById(selectedId as any), [selectedId]);
@@ -71,7 +74,7 @@ export function MaterialSelector({
   };
 
   return (
-    <div className="space-y-2">
+    <div className={`space-y-2 ${className}`}>
       <div className="flex items-center justify-between">
         <Label className="text-sm font-medium">弹簧材料 / Spring Material</Label>
         {selectedMaterial && (

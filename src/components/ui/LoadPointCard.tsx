@@ -1,74 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, AlertTriangle } from "lucide-react";
+import { 
+  AlertCircle, 
+  CheckCircle2, 
+  AlertTriangle, 
+  Layers 
+} from "lucide-react";
 
-import {
-  type LoadPointResult,
-  type LoadPointStatus,
-  type InputMode,
-  type DisplayModules,
-  DEFAULT_MODULES,
-} from "@/lib/compressionSpringMultiPoint";
+import { 
+  type LoadCaseResult, 
+  type CaseStatus,
+  type PlatformSpringType,
+  type PlatformModules
+} from "@/lib/spring-platform/types";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface LoadPointCardProps {
+  /** Spring type for context */
+  springType: PlatformSpringType;
   /** Point index (0-based) */
   index: number;
   /** Calculated result for this point */
-  result: LoadPointResult;
-  /** Input mode: height or deflection */
-  inputMode: InputMode;
-  /** Current input value (H or δ depending on mode) */
+  result: LoadCaseResult;
+  /** Current input value */
   inputValue: number;
   /** Callback when input changes */
   onInputChange: (value: number) => void;
-  /** Free length H0 for validation */
-  H0: number;
-  /** Solid height Hb for validation */
-  Hb: number;
-  /** Whether this is the solid height display point */
-  isSolidPoint?: boolean;
+  /** Limits for validation (H0/Hb or freeAngle etc) */
+  limits?: {
+    min: number;
+    max: number;
+    minLabel: string;
+    maxLabel: string;
+  };
   /** Module display settings */
-  modules?: DisplayModules;
+  modules: PlatformModules;
 }
 
 // ============================================================================
-// Status Badge Component
+// Small Helpers
 // ============================================================================
 
-function StatusBadge({ status, message }: { status: LoadPointStatus; message?: string }) {
-  if (status === "ok") {
-    return (
-      <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
-        <CheckCircle2 className="h-3 w-3 mr-1" />
-        OK
-      </Badge>
-    );
-  }
-  
-  if (status === "warning") {
-    return (
-      <Badge variant="default" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-        <AlertTriangle className="h-3 w-3 mr-1" />
-        {message || "Warning"}
-      </Badge>
-    );
-  }
-  
-  return (
-    <Badge variant="destructive">
-      <AlertCircle className="h-3 w-3 mr-1" />
-      {message || "Error"}
-    </Badge>
-  );
+function StatusIcon({ status }: { status: CaseStatus }) {
+  if (status === "ok") return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+  if (status === "warning") return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+  return <AlertCircle className="h-4 w-4 text-red-500" />;
 }
 
 // ============================================================================
@@ -76,116 +60,94 @@ function StatusBadge({ status, message }: { status: LoadPointStatus; message?: s
 // ============================================================================
 
 export function LoadPointCard({
+  springType,
   index,
   result,
-  inputMode,
   inputValue,
   onInputChange,
-  H0,
-  Hb,
-  isSolidPoint = false,
-  modules = DEFAULT_MODULES,
+  limits,
+  modules,
 }: LoadPointCardProps) {
-  const label = result.label || `L${index + 1}`;
-  
-  // Determine which field is editable based on input mode
-  const isHeightMode = inputMode === "height";
-  
-  // Module visibility flags
-  const showLoad = modules.loadAnalysis;
-  const showStress = modules.stressCheck;
-  const showStatus = modules.stressCheck || modules.solidAnalysis;
-  
-  // Format helpers
+  const label = result.labelZh || `点位 ${index + 1}`;
   const fmt = (v: number, decimals = 2) => v.toFixed(decimals);
+
+  // Determine labels and units
+  const isRotation = springType === "torsion" || springType === "arc";
   
+  const inputLabel = result.inputMode === "height" ? "高度 H / Height H" : 
+                    result.inputMode === "deflection" ? (springType === "extension" ? "拉伸量 x / Extension x" : "压缩量 δ / Deflection δ") :
+                    result.inputMode === "angle" ? "角度 θ / Angle θ" : "扭矩 M / Torque M";
+  
+  const inputUnit = isRotation ? (result.inputMode === "angle" ? "deg" : "N·mm") : "mm";
+  const outputLabel = isRotation ? "扭矩 M / Torque M" : "负荷 P / Load P";
+  const outputUnit = isRotation ? "N·mm" : "N";
+  const stressLabel = isRotation ? "弯曲应力 σ / Stress σ" : "剪应力 τk / Stress τk";
+
   return (
-    <Card className={`${result.status === "error" && showStatus ? "border-red-300 bg-red-50" : result.status === "warning" && showStatus ? "border-yellow-300 bg-yellow-50" : ""}`}>
-      <CardHeader className="py-3 pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-medium">
-            {label}
-            {isSolidPoint && <span className="text-xs text-muted-foreground ml-2">(压并)</span>}
-          </CardTitle>
-          {showStatus && <StatusBadge status={result.status} message={result.statusMessage} />}
-        </div>
-      </CardHeader>
-      <CardContent className="py-2 space-y-3">
-        {/* Input Row */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* Height H */}
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">
-              高度 H (mm)
-            </Label>
-            {isHeightMode && !isSolidPoint ? (
-              <NumericInput
-                value={inputValue}
-                onChange={(v) => onInputChange(v ?? 0)}
-                step={0.5}
-                min={Hb}
-                max={H0}
-                className="h-8"
-              />
-            ) : (
-              <div className="h-8 px-3 py-1.5 bg-muted rounded-md text-sm">
-                {fmt(result.H)}
-              </div>
-            )}
-          </div>
+    <Card className={`overflow-hidden border-muted-foreground/10 ${result.status === "danger" ? "border-red-300 bg-red-50/30" : result.status === "warning" ? "border-yellow-300 bg-yellow-50/30" : ""}`}>
+      {/* Header */}
+      <CardHeader className="py-2 px-3 border-b bg-muted/5 flex flex-row items-center justify-between space-y-0">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-[10px] h-4 px-1 bg-muted font-mono">{result.id || `P${index+1}`}</Badge>
+          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tight">{label}</span>
           
-          {/* Deflection δ */}
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">
-              压缩量 δ (mm)
-            </Label>
-            {!isHeightMode && !isSolidPoint ? (
-              <NumericInput
-                value={inputValue}
-                onChange={(v) => onInputChange(v ?? 0)}
-                step={0.5}
-                min={0}
-                max={H0 - Hb}
-                className="h-8"
-              />
-            ) : (
-              <div className="h-8 px-3 py-1.5 bg-muted rounded-md text-sm">
-                {fmt(result.delta)}
-              </div>
-            )}
-          </div>
+          {/* Phase 7: Stage Badge for piecewise springs */}
+          {result.stage !== undefined && (
+            <Badge variant="secondary" className="text-[9px] h-4 px-1 bg-blue-500/10 text-blue-600 border-blue-200">
+              <Layers className="h-2.5 w-2.5 mr-0.5" /> Stage {result.stage}
+            </Badge>
+          )}
         </div>
-        
-        {/* Output Row - Conditional based on modules */}
-        {(showLoad || showStress) && (
-          <div className={`grid gap-3 ${showLoad && showStress ? "grid-cols-2" : "grid-cols-1"}`}>
-            {/* Load P */}
-            {showLoad && (
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">
-                  力 P (N)
-                </Label>
-                <div className="h-8 px-3 py-1.5 bg-blue-50 rounded-md text-sm font-medium text-blue-900">
-                  {fmt(result.P, 1)}
-                </div>
+        <StatusIcon status={result.status} />
+      </CardHeader>
+
+      <CardContent className="py-3 px-3 space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {/* Input Variable */}
+          <div className="space-y-1">
+            <Label className="text-[9px] text-muted-foreground font-bold uppercase">{inputLabel} ({inputUnit})</Label>
+            <NumericInput
+              value={inputValue}
+              onChange={(v) => onInputChange(v ?? 0)}
+              step={isRotation ? 1 : 0.5}
+              min={limits?.min}
+              max={limits?.max}
+              className="h-7 text-xs bg-background/50 focus:bg-background transition-colors"
+            />
+          </div>
+
+          {/* Load / Torque */}
+          {modules.loadAnalysis && (
+            <div className="space-y-1">
+              <Label className="text-[9px] text-muted-foreground font-bold uppercase">{outputLabel} ({outputUnit})</Label>
+              <div className="h-7 px-2 py-1 bg-blue-500/5 rounded-md text-xs font-bold text-blue-700 flex items-center border border-blue-200/50">
+                {result.load !== undefined ? fmt(result.load, isRotation ? 1 : 2) : "-"}
               </div>
-            )}
-            
-            {/* Stress τk */}
-            {showStress && (
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">
-                  应力 τk (MPa)
-                </Label>
-                <div className={`h-8 px-3 py-1.5 rounded-md text-sm font-medium ${
-                  showStatus && result.status === "error" ? "bg-red-100 text-red-900" :
-                  showStatus && result.status === "warning" ? "bg-yellow-100 text-yellow-900" :
-                  "bg-green-50 text-green-900"
-                }`}>
-                  {fmt(result.Tk, 0)}
-                </div>
+            </div>
+          )}
+
+          {/* Stress Variable */}
+          {modules.stressAnalysis && (
+            <div className="space-y-1">
+              <Label className="text-[9px] text-muted-foreground font-bold uppercase">{stressLabel} (MPa)</Label>
+              <div className={`h-7 px-2 py-1 rounded-md text-xs font-bold flex items-center border ${
+                result.status === "danger" ? "bg-red-500/10 text-red-700 border-red-200" :
+                result.status === "warning" ? "bg-yellow-500/10 text-yellow-700 border-yellow-200" :
+                "bg-green-500/5 text-green-700 border-green-200/50"
+              }`}>
+                {result.stress !== undefined ? fmt(result.stress, 0) : "-"}
               </div>
-            )}
+            </div>
+          )}
+        </div>
+
+        {/* Status Message / Audit feedback */}
+        {(result.messageEn || result.messageZh) && (
+          <div className={`text-[10px] p-1.5 rounded-md border flex items-start gap-1.5 ${
+            result.status === "danger" ? "bg-red-50 text-red-800 border-red-100" : "bg-yellow-50 text-yellow-800 border-yellow-100"
+          }`}>
+             <span className="font-bold opacity-70">[{result.statusReason?.toUpperCase()}]</span> 
+             <span>{result.messageZh || result.messageEn}</span>
           </div>
         )}
       </CardContent>
@@ -194,48 +156,43 @@ export function LoadPointCard({
 }
 
 // ============================================================================
-// Load Point List Component
+// List Component
 // ============================================================================
 
 interface LoadPointListProps {
-  /** Calculation results for all points */
-  results: LoadPointResult[];
-  /** Input mode */
-  inputMode: InputMode;
-  /** Current input values array */
+  springType: PlatformSpringType;
+  results: LoadCaseResult[];
   inputValues: number[];
-  /** Callback when an input changes */
   onInputChange: (index: number, value: number) => void;
-  /** Free length H0 */
-  H0: number;
-  /** Solid height Hb */
-  Hb: number;
-  /** Module display settings */
-  modules?: DisplayModules;
+  modules: PlatformModules;
+  limits?: {
+    min: number;
+    max: number;
+    minLabel: string;
+    maxLabel: string;
+  };
 }
 
 export function LoadPointList({
+  springType,
   results,
-  inputMode,
   inputValues,
   onInputChange,
-  H0,
-  Hb,
   modules,
+  limits,
 }: LoadPointListProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {results.map((result, index) => (
         <LoadPointCard
-          key={result.label}
+          key={result.id || index}
+          springType={springType}
           index={index}
           result={result}
-          inputMode={inputMode}
           inputValue={inputValues[index] ?? 0}
           onInputChange={(value) => onInputChange(index, value)}
-          H0={H0}
-          Hb={Hb}
           modules={modules}
+          limits={limits}
         />
       ))}
     </div>

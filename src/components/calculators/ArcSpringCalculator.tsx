@@ -25,6 +25,8 @@ import {
   SystemMode,
   MaterialKey,
   computeArcSpringCurve,
+  calculateTangentialDisplacement,
+  calculateAngleFromDisplacement,
   getDefaultArcSpringInput,
   ARC_SPRING_MATERIALS,
   downloadArcSpringPDF,
@@ -49,6 +51,8 @@ import {
 
 import { Calculator3DPreview } from "@/components/calculators/Calculator3DPreview";
 import { calculateFit, DEFAULT_RADIAL_CLEARANCE_MM } from "@/lib/spring3d/fitCheck";
+import { SpringPlatformSection } from "@/components/spring-platform/SpringPlatformSection";
+import { ArcPackGroup, ArcRLeverMode } from "@/lib/spring-platform/types";
 
 // Remove old ArcSpringVisualizer dynamic import as it's now wrapped in Calculator3DPreview
 
@@ -248,6 +252,17 @@ export function ArcSpringCalculator() {
   const [allowableTauFatigue, setAllowableTauFatigue] = useState(500);
   const [showStressColors, setShowStressColors] = useState(false);
   const [stressBeta, setStressBeta] = useState(0.25);
+  
+  // Phase 7B: OEM Scheme A state
+  const [packGroups, setPackGroups] = useState<ArcPackGroup[]>([
+    { id: "G1", count: 3, phi0Deg: 0, phiBreaksDeg: [8, 22], kStages: [120, 220, 380], enabledStages: [true, true, true] },
+    { id: "G2", count: 2, phi0Deg: 2, phiBreaksDeg: [10, 25], kStages: [90, 180, 320], enabledStages: [true, true, true] }
+  ]);
+  const [rLeverMode, setRLeverMode] = useState<ArcRLeverMode>("backbone");
+  const [rLeverCustom, setRLeverCustom] = useState<number>(120);
+  const [arcSpanDeg, setArcSpanDeg] = useState<number>(35);
+  const [stageSmoothing, setStageSmoothing] = useState<number>(0.15);
+  const [inputMode, setInputMode] = useState<"angle" | "displacement">("angle");
 
   const storedGeometry = useSpringDesignStore(state => state.geometry);
   const [forceRender, setForceRender] = useState(false);
@@ -916,60 +931,56 @@ export function ArcSpringCalculator() {
                     className="py-1"
                   />
                 </div>
-                <div
-                  ref={setFieldRef("alpha0")}
-                  className={highlightField === "alpha0" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
-                >
-                  <SliderNumberInput
-                    label={isZh ? "自由弧度角 θfree" : "Free Angle θfree"}
-                    value={input.alpha0}
-                    onChange={(v) => updateInput("alpha0", v)}
-                    unit="deg"
-                    min={10}
-                    max={180}
-                    step={0.1}
-                  />
+              </div>
+
+              {/* Phase 7B: Dual Input Mode φ ↔ s */}
+              <div className="pt-4 mt-4 border-t border-blue-100 bg-blue-50/20 p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <Label className="text-sm font-bold text-blue-700">Dual Input Mode / 双模输入 (φ ↔ s)</Label>
+                  <div className="flex items-center gap-2 bg-white rounded-full p-1 border shadow-sm">
+                    <Button 
+                      variant={inputMode === "angle" ? "default" : "ghost"} 
+                      size="sm" 
+                      className="h-7 text-[10px] rounded-full px-4"
+                      onClick={() => setInputMode("angle")}
+                    >
+                      Angle (deg)
+                    </Button>
+                    <Button 
+                      variant={inputMode === "displacement" ? "default" : "ghost"} 
+                      size="sm" 
+                      className="h-7 text-[10px] rounded-full px-4"
+                      onClick={() => setInputMode("displacement")}
+                    >
+                      Displacement (mm)
+                    </Button>
+                  </div>
                 </div>
-                <div
-                  ref={setFieldRef("alphaWork")}
-                  className={highlightField === "alphaWork" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
-                >
-                  <SliderNumberInput
-                    label={isZh ? "工作弧度角 θwork" : "Work Angle θwork"}
-                    value={input.alphaWork ?? input.alpha0}
-                    onChange={(v) => updateInput("alphaWork", v)}
-                    unit="deg"
-                    min={0}
-                    max={input.alpha0}
-                    step={0.1}
-                  />
-                </div>
-                <div
-                  ref={setFieldRef("alphaC")}
-                  className={highlightField === "alphaC" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
-                >
-                  <SliderNumberInput
-                    label={isZh ? "压并角度 αc" : "Coil Bind Angle αc"}
-                    value={input.alphaC}
-                    onChange={(v) => updateInput("alphaC", v)}
-                    unit="deg"
-                    min={0}
-                    max={Math.max(0, (input.alpha0 ?? 0) - 1)}
-                    step={0.1}
-                  />
-                </div>
-                <div
-                  ref={setFieldRef("countParallel")}
-                  className={highlightField === "countParallel" ? `arc-field-highlight arc-field-highlight-${highlightSeq}` : ""}
-                >
-                  <SliderNumberInput
-                    label={isZh ? "并联数量" : "Parallel Count"}
-                    value={input.countParallel ?? 1}
-                    onChange={(v) => updateInput("countParallel", Math.max(1, Math.round(v)))}
-                    min={1}
-                    max={12}
-                    step={1}
-                  />
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className={`space-y-2 transition-opacity ${inputMode === "displacement" ? "opacity-50 grayscale" : ""}`}>
+                    <Label className="text-xs font-medium">Input Angle (φ) [deg]</Label>
+                    <NumericInput
+                      value={input.alphaWork ?? input.alpha0}
+                      onChange={(v) => updateInput("alphaWork", v ?? 0)}
+                      disabled={inputMode === "displacement"}
+                      className="h-10 text-lg font-mono border-blue-200 focus:ring-blue-500"
+                    />
+                    <p className="text-[10px] text-muted-foreground italic">Current: {input.alphaWork?.toFixed(2)}°</p>
+                  </div>
+                  <div className={`space-y-2 transition-opacity ${inputMode === "angle" ? "opacity-50 grayscale" : ""}`}>
+                    <Label className="text-xs font-medium">Tangential Displacement (s) [mm]</Label>
+                    <NumericInput
+                      value={calculateTangentialDisplacement(input.alphaWork ?? input.alpha0, input.r)}
+                      onChange={(v) => {
+                        const newAngle = calculateAngleFromDisplacement(v ?? 0, input.r);
+                        updateInput("alphaWork", newAngle);
+                      }}
+                      disabled={inputMode === "angle"}
+                      className="h-10 text-lg font-mono border-blue-200 focus:ring-blue-500"
+                    />
+                    <p className="text-[10px] text-muted-foreground italic">Approx: {calculateTangentialDisplacement(input.alphaWork ?? input.alpha0, input.r).toFixed(2)} mm</p>
+                  </div>
                 </div>
               </div>
               
@@ -1397,6 +1408,154 @@ export function ArcSpringCalculator() {
                   <div className="text-muted-foreground">k (N/mm)</div>
                   <div className="font-medium">{isFinite(result.k) ? result.k.toFixed(2) : "—"}</div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Phase 7B: Pack Groups Configuration (OEM Scheme A) */}
+          <Card className="border-blue-200 bg-white">
+            <CardHeader className="pb-3 bg-blue-50/30">
+              <CardTitle className="text-base flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Settings2 className="w-4 h-4 text-blue-600" />
+                  <LanguageText en="OEM Pack Groups (Scheme A)" zh="OEM 弹簧包配置 (方案 A)" />
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 text-xs border-blue-200 text-blue-600"
+                  onClick={() => {
+                    const newId = `G${packGroups.length + 1}`;
+                    setPackGroups([...packGroups, { 
+                      id: newId, 
+                      count: 1, 
+                      phi0Deg: 0, 
+                      phiBreaksDeg: [10, 20], 
+                      kStages: [100, 200, 300], 
+                      enabledStages: [true, true, true] 
+                    }]);
+                  }}
+                >
+                  + Add Group
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-6">
+              {/* Global Specs */}
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b">
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Arc Span (Limit) [deg]</Label>
+                  <NumericInput value={arcSpanDeg} onChange={v => setArcSpanDeg(v ?? 35)} step={1} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Smoothing (0-1)</Label>
+                  <NumericInput value={stageSmoothing} onChange={v => setStageSmoothing(v ?? 0.15)} step={0.01} max={1} min={0} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Lever Arm Mode</Label>
+                  <Select value={rLeverMode} onValueChange={v => setRLeverMode(v as any)}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="backbone">Backbone (R)</SelectItem>
+                      <SelectItem value="meanDiameter">Mean Dia (D/2)</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {rLeverMode === "custom" && (
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Custom Lever (mm)</Label>
+                    <NumericInput value={rLeverCustom} onChange={v => setRLeverCustom(v ?? 120)} />
+                  </div>
+                )}
+              </div>
+
+              {/* Group Editor */}
+              <div className="space-y-4">
+                {packGroups.map((group, idx) => (
+                  <div key={group.id} className="p-3 border rounded-md relative bg-slate-50/50">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="absolute top-1 right-1 h-6 w-6 p-0 text-red-400 hover:text-red-600"
+                      onClick={() => setPackGroups(packGroups.filter(g => g.id !== group.id))}
+                    >
+                      ×
+                    </Button>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge variant="outline" className="bg-white">{group.id}</Badge>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-[10px] text-muted-foreground">Count:</Label>
+                        <Input 
+                          type="number" 
+                          className="w-12 h-6 text-[10px] p-1" 
+                          value={group.count}
+                          onChange={e => {
+                            const newGroups = [...packGroups];
+                            newGroups[idx].count = parseInt(e.target.value) || 1;
+                            setPackGroups(newGroups);
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 ml-auto mr-6">
+                        <Label className="text-[10px] text-muted-foreground">Gap φ0:</Label>
+                        <Input 
+                          type="number" 
+                          className="w-12 h-6 text-[10px] p-1" 
+                          value={group.phi0Deg}
+                          onChange={e => {
+                            const newGroups = [...packGroups];
+                            newGroups[idx].phi0Deg = parseFloat(e.target.value) || 0;
+                            setPackGroups(newGroups);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] block">Breaks (b1, b2) [deg]</Label>
+                        <div className="flex gap-1">
+                          <Input 
+                            className="h-6 text-[10px] p-1" 
+                            value={group.phiBreaksDeg[0]} 
+                            onChange={e => {
+                              const newGroups = [...packGroups];
+                              newGroups[idx].phiBreaksDeg = [parseFloat(e.target.value) || 0, group.phiBreaksDeg[1]];
+                              setPackGroups(newGroups);
+                            }}
+                          />
+                          <Input 
+                            className="h-6 text-[10px] p-1" 
+                            value={group.phiBreaksDeg[1]} 
+                            onChange={e => {
+                              const newGroups = [...packGroups];
+                              newGroups[idx].phiBreaksDeg = [group.phiBreaksDeg[0], parseFloat(e.target.value) || 0];
+                              setPackGroups(newGroups);
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] block">Stiffness (k1, k2, k3) [Nmm/deg]</Label>
+                        <div className="flex gap-1">
+                          {[0, 1, 2].map(kIdx => (
+                            <Input 
+                              key={kIdx}
+                              className="h-6 text-[10px] p-1" 
+                              value={group.kStages[kIdx]} 
+                              onChange={e => {
+                                const newGroups = [...packGroups];
+                                newGroups[idx].kStages[kIdx] = parseFloat(e.target.value) || 0;
+                                setPackGroups(newGroups);
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -1830,7 +1989,36 @@ export function ArcSpringCalculator() {
         />
       )}
 
-      {/* Engineering Specifications (SEC) & FAQ */}
+      {/* Spring Platform Section */}
+      <div className="md:col-span-2">
+        <SpringPlatformSection
+          springType="arc"
+          geometry={{
+            d: input.d,
+            Dm: input.D,
+            n: input.n,
+            R: input.r,
+            arcSpanDeg: arcSpanDeg,
+            rLeverMode: rLeverMode,
+            rLeverCustom: rLeverCustom,
+            G: input.G_override ?? 80000,
+            tauAllow: allowableTau,
+            packGroups: packGroups,
+            stageSmoothing: stageSmoothing,
+          }}
+          material={{
+            id: input.materialKey,
+            G: input.G_override ?? 80000,
+            tauAllow: allowableTau,
+          }}
+          onApplyParameters={(params) => {
+            console.log("Applying params to Arc:", params);
+            if (params.packGroups) setPackGroups(params.packGroups);
+          }}
+        />
+      </div>
+
+      {/* Engineering Specifications (SEC) & FAQ - placed at the very end */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 pb-20">
         {/* SEC Section */}
         <Card>

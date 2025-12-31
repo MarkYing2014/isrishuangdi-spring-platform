@@ -22,7 +22,7 @@ const GarterSpringVisualizer = dynamic(
   { ssr: false, loading: () => <div className="h-[200px] flex items-center justify-center bg-slate-50 text-slate-400"><Loader2 className="animate-spin" /></div> }
 );
 import { DimensionHint } from "./DimensionHint";
-import { MaterialSelector } from "./MaterialSelector";
+import { MaterialSelector } from "@/components/ui/MaterialSelector";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 import { buildGarterSpringDesignRuleReport } from "@/lib/designRules";
@@ -304,7 +304,11 @@ export function GarterSpringCalculator() {
         <CardContent>
           <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
             
-            <MaterialSelector value={selectedMaterial.id} onChange={handleMaterialChange} showDetails />
+            <MaterialSelector 
+              selectedId={selectedMaterial.id} 
+              onMaterialChange={handleMaterialChange} 
+              d={watchValues.wireDiameter} 
+            />
 
             {/* Geometry */}
             <div className="space-y-2">

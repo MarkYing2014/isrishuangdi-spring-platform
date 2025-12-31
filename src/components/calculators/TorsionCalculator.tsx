@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { DimensionHint } from "./DimensionHint";
-import { MaterialSelector } from "./MaterialSelector";
+import { MaterialSelector } from "@/components/ui/MaterialSelector";
 import { Calculator3DPreview } from "./Calculator3DPreview";
 import { 
   type SpringMaterialId, 
@@ -42,6 +42,7 @@ import { computeAngles, torsionAngles, type AngleDerived } from "@/lib/angle/Ang
 import { Info, AlertTriangle, CheckCircle2, Factory } from "lucide-react";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
+import { SpringPlatformSection } from "@/components/spring-platform/SpringPlatformSection";
 import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
 
 interface FormValues {
@@ -808,9 +809,10 @@ export function TorsionCalculator() {
             </div>
 
             {/* Material Selector */}
-            <MaterialSelector
-              value={materialId}
-              onChange={handleMaterialChange}
+            <MaterialSelector 
+              selectedId={materialId} 
+              onMaterialChange={handleMaterialChange} 
+              d={watchedValues.wireDiameter} 
             />
 
             <Button 
@@ -1084,6 +1086,29 @@ export function TorsionCalculator() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="md:col-span-2">
+        <SpringPlatformSection
+          springType="torsion"
+          geometry={{
+            d: watchedValues.wireDiameter ?? 1.5,
+            D: (watchedValues.outerDiameter ?? 15) - (watchedValues.wireDiameter ?? 1.5),
+            n: watchedValues.activeCoils ?? 6,
+            L1: watchedValues.armLength1 ?? 25,
+            L2: watchedValues.armLength2 ?? 25,
+            bodyLength: watchedValues.bodyLength ?? 10,
+          }}
+          material={{
+            id: materialId,
+            E: selectedMaterial?.elasticModulus ?? 207000,
+            tauAllow: selectedMaterial?.allowShearStatic ? selectedMaterial.allowShearStatic * 1.25 : undefined,
+          }}
+          onMaterialChange={handleMaterialChange}
+          onApplyParameters={(params) => {
+            if (params.n !== undefined) form.setValue("activeCoils", params.n);
+          }}
+        />
+      </div>
     </div>
   );
 }

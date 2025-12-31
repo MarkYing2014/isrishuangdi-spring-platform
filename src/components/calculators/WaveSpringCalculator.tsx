@@ -53,6 +53,7 @@ import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
 import { generateDesignCode } from "@/lib/stores/springDesignStore";
 
 import { Calculator3DPreview } from "./Calculator3DPreview";
+import { SpringPlatformSection } from "@/components/spring-platform/SpringPlatformSection";
 import { SavedDesignManager } from "@/components/analysis/SavedDesignManager";
 
 interface WaveSpringCalculatorProps {
@@ -781,6 +782,30 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
           </div>
         </CardContent>
       </Card>
+
+      <div className="mt-6">
+        <SpringPlatformSection
+          springType="wave"
+          geometry={{
+            id,
+            od,
+            thickness_t,
+            radialWall_b,
+            turns_Nt,
+            wavesPerTurn_Nw,
+            freeHeight_Hf,
+            workingHeight_Hw,
+          }}
+          material={{
+            id: materialId,
+            E: E_MPa,
+            tauAllow: (result as any).allowableStress_MPa || 1200,
+          }}
+          onApplyParameters={(params) => {
+            console.log("Applying params to Wave:", params);
+          }}
+        />
+      </div>
     </div>
   );
 }

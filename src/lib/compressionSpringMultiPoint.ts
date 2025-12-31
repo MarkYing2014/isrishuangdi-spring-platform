@@ -7,9 +7,7 @@
  * Step 1 Implementation: Core calculation engine for multi-point analysis.
  */
 
-// ============================================================================
-// Types
-// ============================================================================
+import { type PlatformModules } from "@/lib/spring-platform/types";
 
 /** Number of load points to analyze (3-5) */
 export type LoadPointCount = 3 | 4 | 5;
@@ -93,28 +91,15 @@ export interface CompressionMultiPointResult {
 // ============================================================================
 
 /** Module visibility and calculation control */
-export interface DisplayModules {
-    /** Always ON - basic geometry info */
-    geometry: true;
-    /** Load analysis at each point (P values) */
-    loadAnalysis: boolean;
-    /** Stress checking (τk values and stress warnings) */
-    stressCheck: boolean;
-    /** Solid height analysis (Hb comparison, coil bind detection) */
-    solidAnalysis: boolean;
-    /** Fatigue analysis (Advanced) */
-    fatigue: boolean;
-    /** Dynamic/frequency analysis (Advanced) */
-    dynamics: boolean;
-}
+export type DisplayModules = PlatformModules;
 
 /** Default module settings */
 export const DEFAULT_MODULES: DisplayModules = {
-    geometry: true,
+    basicGeometry: true,
     loadAnalysis: true,
-    stressCheck: true,
+    stressAnalysis: true,
     solidAnalysis: true,
-    fatigue: false,
+    fatigueAnalysis: false,
     dynamics: false,
 };
 
@@ -186,7 +171,7 @@ export function determineLoadPointStatus(
     modules?: DisplayModules
 ): { status: LoadPointStatus; message?: string } {
     const checkSolid = modules?.solidAnalysis ?? true;
-    const checkStress = modules?.stressCheck ?? true;
+    const checkStress = modules?.stressAnalysis ?? true;
 
     // Check for coil bind (solid) - only if solidAnalysis enabled
     if (checkSolid && H <= Hb) {
@@ -254,7 +239,7 @@ export function calculateMultiPointCompression(
         }
 
         // Clamp delta to non-negative
-        if (delta < 0) {
+        if (modules?.fatigueAnalysis) {
             delta = 0;
             H = H0;
         }

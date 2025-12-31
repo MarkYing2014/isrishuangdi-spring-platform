@@ -64,6 +64,7 @@ import {
 import { buildSpiralSpringDesignRuleReport } from "@/lib/designRules";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
+import { SpringPlatformSection } from "@/components/spring-platform/SpringPlatformSection";
 
 // ================================================================
 // Types
@@ -1492,6 +1493,28 @@ export function SpiralTorsionCalculator() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="md:col-span-2">
+        <SpringPlatformSection
+          springType="spiral"
+          geometry={{
+            stripWidth: watchedValues.stripWidth ?? 10,
+            stripThickness: watchedValues.stripThickness ?? 0.5,
+            activeLength: watchedValues.activeLength ?? 500,
+            innerDiameter: watchedValues.innerDiameter ?? 15,
+            outerDiameter: watchedValues.outerDiameter ?? 50,
+            activeCoils: watchedValues.activeCoils ?? 5,
+          }}
+          material={{
+            id: materialId,
+            E: results?.elasticModulus ?? 206000,
+            tauAllow: results?.allowableStress ?? 800,
+          }}
+          onApplyParameters={(params) => {
+            console.log("Applying params to Spiral:", params);
+          }}
+        />
+      </div>
     </div>
   );
 }

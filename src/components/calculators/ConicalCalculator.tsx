@@ -20,7 +20,7 @@ import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { DimensionHint } from "./DimensionHint";
-import { MaterialSelector } from "./MaterialSelector";
+import { MaterialSelector } from "@/components/ui/MaterialSelector";
 import { Calculator3DPreview } from "./Calculator3DPreview";
 import { 
   useSpringDesignStore,
@@ -47,6 +47,7 @@ import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
 import { Factory } from "lucide-react";
+import { SpringPlatformSection } from "@/components/spring-platform/SpringPlatformSection";
 
 interface FormValues {
   wireDiameter: number;
@@ -514,7 +515,11 @@ export function ConicalCalculator() {
               </Select>
             </div>
 
-            <MaterialSelector value={selectedMaterial.id} onChange={handleMaterialChange} showDetails={true} />
+            <MaterialSelector 
+              selectedId={selectedMaterial.id} 
+              onMaterialChange={handleMaterialChange} 
+              d={watchedValues.wireDiameter} 
+            />
 
             {/* Shear Modulus */}
             <div className="space-y-2">
@@ -901,6 +906,25 @@ export function ConicalCalculator() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="md:col-span-2">
+        <SpringPlatformSection
+          springType="conical"
+          geometry={{
+            d: watchedValues.wireDiameter ?? 3,
+            D1: watchedValues.largeDiameter ?? 30,
+            D2: watchedValues.smallDiameter ?? 15,
+            n: watchedValues.activeCoils ?? 6,
+            H0: watchedValues.freeLength ?? 50,
+          }}
+          material={{
+            id: selectedMaterial.id,
+            G: watchedValues.shearModulus ?? 79300,
+            tauAllow: selectedMaterial.tauAllow,
+          }}
+          onMaterialChange={handleMaterialChange}
+        />
+      </div>
     </div>
   );
 }

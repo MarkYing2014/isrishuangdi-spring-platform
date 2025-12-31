@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { DimensionHint } from "./DimensionHint";
-import { MaterialSelector } from "./MaterialSelector";
+import { MaterialSelector } from "@/components/ui/MaterialSelector";
 import { Calculator3DPreview } from "./Calculator3DPreview";
 import { 
   EXTENSION_HOOK_TYPES, 
@@ -38,6 +38,7 @@ import {
 } from "@/lib/stores/springDesignStore";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
+import { SpringPlatformSection } from "@/components/spring-platform/SpringPlatformSection";
 
 interface FormValues {
   outerDiameter: number;
@@ -503,7 +504,11 @@ export function ExtensionCalculator() {
               />
             </div>
 
-            <MaterialSelector value={selectedMaterial.id} onChange={handleMaterialChange} showDetails={true} />
+            <MaterialSelector 
+              selectedId={selectedMaterial.id} 
+              onMaterialChange={handleMaterialChange} 
+              d={watchedValues.wireDiameter} 
+            />
 
             {/* Shear Modulus */}
             <div className="space-y-2">
@@ -847,6 +852,30 @@ export function ExtensionCalculator() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="md:col-span-2">
+        <SpringPlatformSection
+          springType="extension"
+          geometry={{
+            d: watchedValues.wireDiameter ?? 2,
+            D: (watchedValues.outerDiameter ?? 20) - (watchedValues.wireDiameter ?? 2),
+            n: watchedValues.activeCoils ?? 10,
+            H0: watchedValues.freeLengthInsideHooks ?? 50,
+            P0: watchedValues.initialTension ?? 5,
+            hookType: watchedValues.hookType ?? "machine",
+          }}
+          material={{
+            id: selectedMaterial.id,
+            G: watchedValues.shearModulus ?? 79300,
+            tauAllow: selectedMaterial.tauAllow,
+          }}
+          onMaterialChange={handleMaterialChange}
+          onApplyParameters={(params) => {
+            if (params.n !== undefined) form.setValue("activeCoils", params.n);
+            if (params.P0 !== undefined) form.setValue("initialTension", params.P0);
+          }}
+        />
+      </div>
     </div>
   );
 }

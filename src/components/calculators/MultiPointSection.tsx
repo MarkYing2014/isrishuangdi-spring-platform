@@ -33,6 +33,24 @@ import {
   type SpringMaterial, 
   getSpringMaterial as getMaterialById 
 } from "@/lib/materials/springMaterials";
+import type { LoadCaseResult } from "@/lib/spring-platform/types";
+import type { LoadPointResult } from "@/lib/compressionSpringMultiPoint";
+
+// Adapter: Convert legacy LoadPointResult to LoadCaseResult
+function adaptLoadPointsToLoadCases(loadPoints: LoadPointResult[]): LoadCaseResult[] {
+  return loadPoints.map((lp, idx) => ({
+    id: lp.label ?? `L${idx + 1}`,
+    labelEn: `Point ${idx + 1}`,
+    labelZh: `点 ${idx + 1}`,
+    inputValue: lp.H,
+    load: lp.P,
+    stress: lp.Tk,
+    status: lp.status === "error" ? "danger" : lp.status === "warning" ? "warning" : "ok",
+    statusReason: lp.status === "ok" ? "none" : lp.status === "error" ? "coil_bind" : "stress_over_limit",
+    messageEn: lp.statusMessage ?? "",
+    messageZh: lp.statusMessage ?? "",
+  } as LoadCaseResult));
+}
 
 // ============================================================================
 // Types
@@ -411,6 +429,7 @@ export function MultiPointSection({
           
           {/* Step 3: Module Selector */}
           <ModuleSelector
+            springType="compression"
             modules={modules}
             onModulesChange={setModules}
             compact
@@ -432,13 +451,17 @@ export function MultiPointSection({
           {/* Load Points - only in verification mode */}
           {calcMode === "verification" && (
             <LoadPointList
-              results={result.loadPoints}
-              inputMode={inputMode}
+              springType="compression"
+              results={adaptLoadPointsToLoadCases(result.loadPoints)}
               inputValues={inputValues}
               onInputChange={handleInputChange}
-              H0={H0}
-              Hb={Hb}
               modules={modules}
+              limits={{
+                min: Hb,
+                max: H0,
+                minLabel: "Hb",
+                maxLabel: "H0"
+              }}
             />
           )}
           

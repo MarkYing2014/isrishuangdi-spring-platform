@@ -37,7 +37,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { MaterialSelector } from "@/components/calculators/MaterialSelector";
+import { MaterialSelector } from "@/components/ui/MaterialSelector";
 
 import {
   VariablePitchCurvesChart,
@@ -486,9 +486,9 @@ export function VariablePitchCompressionCalculator() {
             <div className="space-y-5">
               <div className="space-y-2">
                 <MaterialSelector
-                  value={selectedMaterial.id}
-                  onChange={handleMaterialChange}
-                  showDetails={true}
+                  selectedId={selectedMaterial.id}
+                  onMaterialChange={handleMaterialChange}
+                  d={wireDiameter}
                 />
               </div>
 

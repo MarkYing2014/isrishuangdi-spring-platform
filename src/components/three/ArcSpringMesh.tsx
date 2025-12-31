@@ -155,9 +155,18 @@ export function ArcSpringMesh({
     // Δα = (stroke / radius) * (180 / π)
     const deltaAlphaDeg = (previewStrokeMm / radius) * (180 / Math.PI);
 
-    // Current α = clamp(Free - Δα, Solid, Free)
-    return Math.max(alphaSolid, Math.min(alphaFree, alphaFree - deltaAlphaDeg));
-  }, [previewStrokeMm, alpha0Deg, alphaFreeDeg, alphaSolidDeg, arcRadiusMm, r]);
+    // Calculate minimum physical alpha based on coil geometry to prevent interference
+    // Minimum arc length needed = n * d (coils side-by-side touching)
+    // Arc length = radius * alpha * (π/180)
+    // So: alpha_min = (n * d) / radius * (180 / π)
+    const totalCoils = n + (deadCoilsStart ?? 0) + (deadCoilsEnd ?? 0);
+    const minArcLength = totalCoils * d * 1.05; // 5% margin for visual clarity
+    const minAlphaDeg = (minArcLength / radius) * (180 / Math.PI);
+
+    // Current α = clamp(Free - Δα, max(Solid, minPhysical), Free)
+    const effectiveMinAlpha = Math.max(alphaSolid, minAlphaDeg);
+    return Math.max(effectiveMinAlpha, Math.min(alphaFree, alphaFree - deltaAlphaDeg));
+  }, [previewStrokeMm, alpha0Deg, alphaFreeDeg, alphaSolidDeg, arcRadiusMm, r, n, d, deadCoilsStart, deadCoilsEnd]);
 
   const params: ArcSpringGeometryParams = useMemo(
     () => ({ d, D, n, r, alpha0Deg: currentAlphaDeg }),

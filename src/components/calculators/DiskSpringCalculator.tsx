@@ -30,6 +30,7 @@ import { computeAxialTravel, diskTravel } from "@/lib/travel/AxialTravelModel";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
 import { EngineeringAuditCard } from "@/components/audit/EngineeringAuditCard";
 import { getDefaultDiskSpringSample } from "@/lib/springPresets";
+import { SpringPlatformSection } from "@/components/spring-platform/SpringPlatformSection";
 
 import { useRouter } from "next/navigation";
 
@@ -543,6 +544,29 @@ export function DiskSpringCalculator() {
              </Button>
           </div>
         </div>
+      </div>
+
+      <div className="lg:col-span-12">
+        <SpringPlatformSection
+          springType="disc"
+          geometry={{
+            outerDiameter,
+            innerDiameter,
+            thickness,
+            freeConeHeight,
+            parallelCount,
+            seriesCount,
+            frictionCoeff,
+          }}
+          material={{
+            id: "custom",
+            E,
+            tauAllow: Sy,
+          }}
+          onApplyParameters={(params) => {
+            console.log("Applying params to Disc:", params);
+          }}
+        />
       </div>
     </div>
   );

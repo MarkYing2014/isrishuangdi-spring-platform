@@ -42,6 +42,17 @@ export function xFromDeltaDeg(r: number, deltaDeg: number): number {
   return r * deg2rad(deltaDeg);
 }
 
+/** Alias for OEM Scheme A */
+export function calculateTangentialDisplacement(deltaDeg: number, r: number): number {
+  return xFromDeltaDeg(r, deltaDeg);
+}
+
+/** Reverse conversion */
+export function calculateAngleFromDisplacement(s: number, r: number): number {
+  if (r <= 0) return 0;
+  return (s / r) * (180 / PI);
+}
+
 /**
  * 扭矩计算
  * M = F * r, F = k * x => M = k * r² * Δα(rad) [N·mm]
