@@ -163,6 +163,19 @@ const MATERIAL_COSTS: Record<SpringMaterialId, number> = {
   chrome_silicon: 1.5,
   chrome_vanadium: 1.3,
   phosphor_bronze: 3.0,
+  "65Mn": 0.8,
+  "60Si2Mn": 1.1,
+  swpb: 1.2,
+  sus304: 2.0,
+  sus316: 2.5,
+  custom: 1.0,
+  "70": 0.7,
+  "55CrSi": 1.6,
+  "50CrVA": 1.4,
+  sus631: 2.8,
+  swpa: 1.1,
+  "swo-v": 1.3,
+  swc: 0.6,
 };
 
 /**
@@ -174,8 +187,8 @@ function calculateSpringRate(
   activeCoils: number,
   shearModulus: number
 ): number {
-  return (shearModulus * Math.pow(wireDiameter, 4)) / 
-         (8 * Math.pow(meanDiameter, 3) * activeCoils);
+  return (shearModulus * Math.pow(wireDiameter, 4)) /
+    (8 * Math.pow(meanDiameter, 3) * activeCoils);
 }
 
 /**
@@ -198,7 +211,7 @@ function calculateMass(
  */
 function createRandomIndividual(constraints: DesignConstraints): Individual {
   const { wireDiameterRange, meanDiameterRange, activeCoilsRange, freeLengthRange, allowedMaterials } = constraints;
-  
+
   return {
     genes: {
       wireDiameter: wireDiameterRange[0] + Math.random() * (wireDiameterRange[1] - wireDiameterRange[0]),
@@ -226,13 +239,13 @@ function evaluateIndividual(
   const { wireDiameter, meanDiameter, activeCoils, freeLength, materialIndex } = individual.genes;
   const materialId = constraints.allowedMaterials[materialIndex];
   const material = SPRING_MATERIALS.find(m => m.id === materialId);
-  
+
   if (!material) {
     individual.fitness = -Infinity;
     individual.feasible = false;
     return;
   }
-  
+
   // Check spring index constraint
   const springIndex = meanDiameter / wireDiameter;
   if (springIndex < constraints.springIndexRange[0] || springIndex > constraints.springIndexRange[1]) {
@@ -240,7 +253,7 @@ function evaluateIndividual(
     individual.feasible = false;
     return;
   }
-  
+
   // Create geometry
   const totalCoils = activeCoils + 2;
   const geometry: CompressionSpringGeometry = {
@@ -252,20 +265,20 @@ function evaluateIndividual(
     freeLength,
     materialId,
   };
-  
+
   try {
     // Run analysis
     const result = SpringAnalysisEngine.analyze(geometry, workingConditions);
-    
+
     // Calculate spring rate
     const springRate = calculateSpringRate(wireDiameter, meanDiameter, activeCoils, material.shearModulus);
-    
+
     // Calculate mass
     const mass = calculateMass(wireDiameter, meanDiameter, totalCoils, material.density ?? 7850);
-    
+
     // Calculate cost factor
     const cost = mass * (MATERIAL_COSTS[materialId] ?? 1.0);
-    
+
     // Store objectives
     individual.objectives = {
       stress: result.stress.tauEffective / material.allowShearStatic,
@@ -275,44 +288,44 @@ function evaluateIndividual(
       mass,
       cost,
     };
-    
+
     // Check feasibility against targets
     individual.feasible = true;
     let penaltySum = 0;
-    
+
     if (targets.targetStiffness) {
       const stiffnessError = Math.abs(springRate - targets.targetStiffness) / targets.targetStiffness;
       penaltySum += stiffnessError * 10;
       if (stiffnessError > 0.1) individual.feasible = false;
     }
-    
+
     if (targets.maxStress && result.stress.tauEffective > targets.maxStress) {
       penaltySum += (result.stress.tauEffective - targets.maxStress) / targets.maxStress * 5;
       individual.feasible = false;
     }
-    
+
     if (targets.minSafetyFactor && result.safety.staticSafetyFactor < targets.minSafetyFactor) {
       penaltySum += (targets.minSafetyFactor - result.safety.staticSafetyFactor) * 3;
       individual.feasible = false;
     }
-    
+
     if (targets.minFatigueLife && result.fatigue.estimatedCycles < targets.minFatigueLife) {
       penaltySum += Math.log10(targets.minFatigueLife / Math.max(result.fatigue.estimatedCycles, 1));
       individual.feasible = false;
     }
-    
+
     if (targets.maxFreeLength && freeLength > targets.maxFreeLength) {
       penaltySum += (freeLength - targets.maxFreeLength) / targets.maxFreeLength * 2;
       individual.feasible = false;
     }
-    
+
     if (targets.maxOuterDiameter && (meanDiameter + wireDiameter) > targets.maxOuterDiameter) {
       penaltySum += ((meanDiameter + wireDiameter) - targets.maxOuterDiameter) / targets.maxOuterDiameter * 2;
       individual.feasible = false;
     }
-    
+
     // Calculate weighted fitness (lower is better)
-    const weightedCost = 
+    const weightedCost =
       weights.stressWeight * individual.objectives.stress +
       weights.safetyWeight * individual.objectives.safety +
       weights.fatigueWeight * individual.objectives.fatigue +
@@ -320,9 +333,9 @@ function evaluateIndividual(
       weights.massWeight * individual.objectives.mass +
       weights.costWeight * individual.objectives.cost +
       penaltySum;
-    
+
     individual.fitness = -weightedCost; // Negate because we maximize fitness
-    
+
   } catch {
     individual.fitness = -Infinity;
     individual.feasible = false;
@@ -334,7 +347,7 @@ function evaluateIndividual(
  */
 function tournamentSelect(population: Individual[], tournamentSize: number = 3): Individual {
   let best: Individual | null = null;
-  
+
   for (let i = 0; i < tournamentSize; i++) {
     const idx = Math.floor(Math.random() * population.length);
     const candidate = population[idx];
@@ -342,7 +355,7 @@ function tournamentSelect(population: Individual[], tournamentSize: number = 3):
       best = candidate;
     }
   }
-  
+
   return best!;
 }
 
@@ -362,7 +375,7 @@ function crossover(parent1: Individual, parent2: Individual, constraints: Design
     objectives: { stress: 0, safety: 0, fatigue: 0, buckling: 0, mass: 0, cost: 0 },
     feasible: false,
   };
-  
+
   // Blend crossover for continuous variables
   if (Math.random() < 0.3) {
     const alpha = Math.random();
@@ -370,15 +383,15 @@ function crossover(parent1: Individual, parent2: Individual, constraints: Design
     child.genes.meanDiameter = alpha * parent1.genes.meanDiameter + (1 - alpha) * parent2.genes.meanDiameter;
     child.genes.freeLength = alpha * parent1.genes.freeLength + (1 - alpha) * parent2.genes.freeLength;
   }
-  
+
   // Clamp to constraints
-  child.genes.wireDiameter = Math.max(constraints.wireDiameterRange[0], 
+  child.genes.wireDiameter = Math.max(constraints.wireDiameterRange[0],
     Math.min(constraints.wireDiameterRange[1], child.genes.wireDiameter));
-  child.genes.meanDiameter = Math.max(constraints.meanDiameterRange[0], 
+  child.genes.meanDiameter = Math.max(constraints.meanDiameterRange[0],
     Math.min(constraints.meanDiameterRange[1], child.genes.meanDiameter));
-  child.genes.freeLength = Math.max(constraints.freeLengthRange[0], 
+  child.genes.freeLength = Math.max(constraints.freeLengthRange[0],
     Math.min(constraints.freeLengthRange[1], child.genes.freeLength));
-  
+
   return child;
 }
 
@@ -387,31 +400,31 @@ function crossover(parent1: Individual, parent2: Individual, constraints: Design
  */
 function mutate(individual: Individual, constraints: DesignConstraints, mutationRate: number = 0.1): void {
   const { wireDiameterRange, meanDiameterRange, activeCoilsRange, freeLengthRange, allowedMaterials } = constraints;
-  
+
   if (Math.random() < mutationRate) {
     const delta = (wireDiameterRange[1] - wireDiameterRange[0]) * 0.1 * (Math.random() - 0.5);
-    individual.genes.wireDiameter = Math.max(wireDiameterRange[0], 
+    individual.genes.wireDiameter = Math.max(wireDiameterRange[0],
       Math.min(wireDiameterRange[1], individual.genes.wireDiameter + delta));
   }
-  
+
   if (Math.random() < mutationRate) {
     const delta = (meanDiameterRange[1] - meanDiameterRange[0]) * 0.1 * (Math.random() - 0.5);
-    individual.genes.meanDiameter = Math.max(meanDiameterRange[0], 
+    individual.genes.meanDiameter = Math.max(meanDiameterRange[0],
       Math.min(meanDiameterRange[1], individual.genes.meanDiameter + delta));
   }
-  
+
   if (Math.random() < mutationRate) {
     const delta = Math.round((Math.random() - 0.5) * 4);
-    individual.genes.activeCoils = Math.max(activeCoilsRange[0], 
+    individual.genes.activeCoils = Math.max(activeCoilsRange[0],
       Math.min(activeCoilsRange[1], individual.genes.activeCoils + delta));
   }
-  
+
   if (Math.random() < mutationRate) {
     const delta = (freeLengthRange[1] - freeLengthRange[0]) * 0.1 * (Math.random() - 0.5);
-    individual.genes.freeLength = Math.max(freeLengthRange[0], 
+    individual.genes.freeLength = Math.max(freeLengthRange[0],
       Math.min(freeLengthRange[1], individual.genes.freeLength + delta));
   }
-  
+
   if (Math.random() < mutationRate * 0.5) {
     individual.genes.materialIndex = Math.floor(Math.random() * allowedMaterials.length);
   }
@@ -423,15 +436,15 @@ function mutate(individual: Individual, constraints: DesignConstraints, mutation
 function dominates(a: Individual, b: Individual): boolean {
   const objA = a.objectives;
   const objB = b.objectives;
-  
+
   let dominated = false;
   let dominates = false;
-  
+
   for (const key of Object.keys(objA) as (keyof typeof objA)[]) {
     if (objA[key] < objB[key]) dominates = true;
     if (objA[key] > objB[key]) dominated = true;
   }
-  
+
   return dominates && !dominated;
 }
 
@@ -440,10 +453,10 @@ function dominates(a: Individual, b: Individual): boolean {
  */
 function extractParetoFront(population: Individual[]): Individual[] {
   const paretoFront: Individual[] = [];
-  
+
   for (const individual of population) {
     if (!individual.feasible) continue;
-    
+
     let dominated = false;
     for (const other of population) {
       if (other !== individual && dominates(other, individual)) {
@@ -451,12 +464,12 @@ function extractParetoFront(population: Individual[]): Individual[] {
         break;
       }
     }
-    
+
     if (!dominated) {
       paretoFront.push(individual);
     }
   }
-  
+
   return paretoFront;
 }
 
@@ -481,31 +494,31 @@ export function optimizeSpringDesign(
     eliteCount = 5,
     mutationRate = 0.15,
   } = options;
-  
+
   // Initialize population
   let population: Individual[] = [];
   for (let i = 0; i < populationSize; i++) {
     population.push(createRandomIndividual(constraints));
   }
-  
+
   // Evaluate initial population
   for (const individual of population) {
     evaluateIndividual(individual, targets, constraints, weights, workingConditions);
   }
-  
+
   const convergenceHistory: OptimizationResult['convergenceHistory'] = [];
   let bestEver: Individual | null = null;
-  
+
   // Evolution loop
   for (let gen = 0; gen < generations; gen++) {
     // Sort by fitness
     population.sort((a, b) => b.fitness - a.fitness);
-    
+
     // Track best
     if (!bestEver || population[0].fitness > bestEver.fitness) {
       bestEver = { ...population[0], genes: { ...population[0].genes } };
     }
-    
+
     // Record convergence
     const avgFitness = population.reduce((sum, ind) => sum + ind.fitness, 0) / populationSize;
     convergenceHistory.push({
@@ -513,15 +526,15 @@ export function optimizeSpringDesign(
       bestFitness: population[0].fitness,
       avgFitness,
     });
-    
+
     // Create next generation
     const nextGen: Individual[] = [];
-    
+
     // Elitism
     for (let i = 0; i < eliteCount; i++) {
       nextGen.push({ ...population[i], genes: { ...population[i].genes } });
     }
-    
+
     // Crossover and mutation
     while (nextGen.length < populationSize) {
       const parent1 = tournamentSelect(population);
@@ -531,39 +544,39 @@ export function optimizeSpringDesign(
       evaluateIndividual(child, targets, constraints, weights, workingConditions);
       nextGen.push(child);
     }
-    
+
     population = nextGen;
   }
-  
+
   // Final sort
   population.sort((a, b) => b.fitness - a.fitness);
-  
+
   // Extract Pareto front
   const paretoIndividuals = extractParetoFront(population);
-  
+
   // Build result
   const best = bestEver ?? population[0];
   const materialId = constraints.allowedMaterials[best.genes.materialIndex];
   const material = SPRING_MATERIALS.find(m => m.id === materialId)!;
-  
+
   const springRate = calculateSpringRate(
     best.genes.wireDiameter,
     best.genes.meanDiameter,
     best.genes.activeCoils,
     material.shearModulus
   );
-  
+
   const mass = calculateMass(
     best.genes.wireDiameter,
     best.genes.meanDiameter,
     best.genes.activeCoils + 2,
     material.density ?? 7850
   );
-  
+
   // Determine status
   let status: OptimizationResult['status'] = 'success';
   let message: { en: string; zh: string };
-  
+
   if (!best.feasible) {
     status = 'partial';
     message = {
@@ -582,7 +595,7 @@ export function optimizeSpringDesign(
       zh: `优化成功。最佳适应度：${best.fitness.toFixed(3)}`,
     };
   }
-  
+
   return {
     bestSolution: {
       wireDiameter: Math.round(best.genes.wireDiameter * 100) / 100,
@@ -634,18 +647,18 @@ export function inverseDesignSolve(
     ...DEFAULT_CONSTRAINTS,
     ...constraints,
   };
-  
+
   const targets: DesignTargets = {
     targetStiffness,
     targetForce: { deflection: targetDeflection, force: targetForce },
     minSafetyFactor: 1.5,
     minFatigueLife: 1e6,
   };
-  
+
   const workingConditions: WorkingConditions = {
     minDeflection: 0,
     maxDeflection: targetDeflection,
   };
-  
+
   return optimizeSpringDesign(targets, workingConditions, fullConstraints);
 }

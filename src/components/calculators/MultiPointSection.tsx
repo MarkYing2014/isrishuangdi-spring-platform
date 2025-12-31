@@ -8,6 +8,7 @@ import { ChevronDown } from "lucide-react";
 
 import { LoadPointCard, LoadPointList } from "@/components/ui/LoadPointCard";
 import { ModuleSelector } from "@/components/ui/ModuleSelector";
+import { MaterialSelector } from "@/components/ui/MaterialSelector";
 import {
   CalcModeSelector,
   TargetLoadPanel,
@@ -28,6 +29,10 @@ import {
   DEFAULT_MODULES,
   DEFAULT_CANDIDATE_STIFFNESSES,
 } from "@/lib/compressionSpringMultiPoint";
+import { 
+  type SpringMaterial, 
+  getSpringMaterial as getMaterialById 
+} from "@/lib/materials/springMaterials";
 
 // ============================================================================
 // Types
@@ -50,6 +55,12 @@ interface MultiPointSectionProps {
   G: number;
   /** Optional allowable stress for warning detection */
   tau_allow?: number;
+  /** Material ID for sync */
+  materialId?: string;
+  /** Callback when material changes */
+  onMaterialChange?: (material: SpringMaterial) => void;
+  /** Callback to apply parameters (n, H0, etc.) back to main form */
+  onApplyParameters?: (params: { n?: number, H0?: number }) => void;
   /** Callback when calculation result changes */
   onResultChange?: (result: CompressionMultiPointResult) => void;
 }
@@ -155,8 +166,11 @@ export function MultiPointSection({
   H0,
   Hb: providedHb,
   totalCoils,
-  G,
-  tau_allow,
+  G: propsG,
+  tau_allow: propsTauAllow,
+  materialId: propsMaterialId,
+  onMaterialChange: propsOnMaterialChange,
+  onApplyParameters,
   onResultChange,
 }: MultiPointSectionProps) {
   // Calculate solid height if not provided
@@ -176,6 +190,24 @@ export function MultiPointSection({
   const [candidateStiffnesses, setCandidateStiffnesses] = useState<number[]>(
     DEFAULT_CANDIDATE_STIFFNESSES
   );
+  
+  // Material state - controlled if props provided, otherwise local
+  const [localMaterialId, setLocalMaterialId] = useState<string>("65Mn");
+  const materialId = propsMaterialId ?? localMaterialId;
+  const material = useMemo(() => getMaterialById(materialId as any), [materialId]);
+  
+  // Handle material change
+  const handleMaterialChange = useCallback((m: SpringMaterial) => {
+    if (propsOnMaterialChange) {
+      propsOnMaterialChange(m);
+    } else {
+      setLocalMaterialId(m.id);
+    }
+  }, [propsOnMaterialChange]);
+
+  // Effective G and tau_allow
+  const effectiveG = (material && material.id !== "custom") ? (material.G ?? material.shearModulus) : propsG;
+  const effectiveTauAllow = (material && material.id !== "custom") ? (material.tauAllow ?? material.allowShearStatic) : propsTauAllow;
   
   // Initialize input values with defaults (stored as H values by default)
   const [inputValues, setInputValues] = useState<number[]>(() =>
@@ -213,6 +245,13 @@ export function MultiPointSection({
     
     setInputMode(newMode);
   }, [inputMode, H0, Hb]);
+
+  // Handle applying results
+  const handleApplyResults = useCallback((params: { n?: number; H0?: number }) => {
+    if (onApplyParameters) {
+      onApplyParameters(params);
+    }
+  }, [onApplyParameters]);
   
   // ========================================
   // Auto-update when H0 changes
@@ -279,12 +318,12 @@ export function MultiPointSection({
         n,
         H0,
         Hb,
-        G,
+        G: effectiveG,
         loadPointCount,
         inputMode,
         loadPointInputs: inputValues,
       },
-      tau_allow,
+      effectiveTauAllow,
       modules  // Step 3: pass modules for conditional status checking
     );
     
@@ -292,22 +331,22 @@ export function MultiPointSection({
     onResultChange?.(res);
     
     return res;
-  }, [d, D, n, H0, Hb, G, loadPointCount, inputMode, inputValues, tau_allow, modules, onResultChange]);
+  }, [d, D, n, H0, Hb, effectiveG, loadPointCount, inputMode, inputValues, effectiveTauAllow, modules, onResultChange]);
   
   // Step 4: Reverse solve result (for targetLoad mode)
   const reverseResult = useMemo(() => {
     if (calcMode !== "targetLoad") return null;
-    return solveActiveCoilsForTarget(d, D, G, H0, targetLoad);
-  }, [calcMode, d, D, G, H0, targetLoad]);
+    return solveActiveCoilsForTarget(d, D, effectiveG, H0, targetLoad);
+  }, [calcMode, d, D, effectiveG, H0, targetLoad]);
   
   // Step 4: Stiffness options (for stiffnessSelection mode)
   const stiffnessOptions = useMemo(() => {
     if (calcMode !== "stiffnessSelection") return [];
     return generateStiffnessOptions(
-      d, D, G, H0, totalCoils ?? n + 2,
+      d, D, effectiveG, H0, totalCoils ?? n + 2,
       candidateStiffnesses, inputValues, inputMode, modules
     );
-  }, [calcMode, d, D, G, H0, totalCoils, n, candidateStiffnesses, inputValues, inputMode, modules]);
+  }, [calcMode, d, D, effectiveG, H0, totalCoils, n, candidateStiffnesses, inputValues, inputMode, modules]);
   
   return (
     <Card>
@@ -328,12 +367,24 @@ export function MultiPointSection({
           {/* Step 4: Calculation Mode Selector */}
           <CalcModeSelector value={calcMode} onChange={setCalcMode} />
           
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Material Selector */}
+            <MaterialSelector
+              selectedId={materialId}
+              onMaterialChange={handleMaterialChange}
+              d={d}
+            />
+
+            {/* Mode-specific panels within the grid if needed, or separately */}
+          </div>
+
           {/* Mode-specific panels */}
           {calcMode === "targetLoad" && (
             <TargetLoadPanel
               target={targetLoad}
               onTargetChange={setTargetLoad}
               solveResult={reverseResult ?? undefined}
+              onApply={(n) => handleApplyResults({ n })}
             />
           )}
           
@@ -367,7 +418,10 @@ export function MultiPointSection({
           
           {/* Stiffness Comparison Table - only in stiffnessSelection mode */}
           {calcMode === "stiffnessSelection" && (
-            <StiffnessComparisonTable options={stiffnessOptions} />
+            <StiffnessComparisonTable 
+              options={stiffnessOptions} 
+              onSelect={(opt) => handleApplyResults({ n: opt.n })}
+            />
           )}
           
           {/* Summary - only in verification mode */}
@@ -391,7 +445,7 @@ export function MultiPointSection({
           {/* Solid Height Reference - only show if solidAnalysis enabled */}
           {modules.solidAnalysis && (
             <div className="text-xs text-muted-foreground border-t pt-2">
-              压并高度 Hb = {Hb.toFixed(2)} mm | 自由长度 H0 = {H0.toFixed(2)} mm
+              压并高度 / Solid Height: Hb = {Hb.toFixed(2)} mm | 自由长度 / Free Length: H0 = {H0.toFixed(2)} mm
             </div>
           )}
         </CardContent>

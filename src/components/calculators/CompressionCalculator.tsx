@@ -38,7 +38,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { DesignRulePanel } from "@/components/design-rules/DesignRulePanel";
 import { buildCompressionPpapReport } from "@/lib/reports/compressionPpapReport";
 import { DimensionHint } from "./DimensionHint";
-import { MaterialSelector } from "./MaterialSelector";
+import { MaterialSelector } from "@/components/ui/MaterialSelector";
 import { StressAnalysisCard } from "./StressAnalysisCard";
 import { Calculator3DPreview } from "./Calculator3DPreview";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -257,10 +257,24 @@ export function CompressionCalculator() {
   const handleMaterialChange = (material: SpringMaterial) => {
     setSelectedMaterial(material);
     form.setValue("shearModulus", material.shearModulus);
-
     if (result) {
       form.handleSubmit(onSubmit)();
     }
+  };
+
+  // Handle applying parameters from sub-components
+  const handleApplyParameters = (params: { n?: number; H0?: number }) => {
+    if (params.n !== undefined) {
+      form.setValue("activeCoils", params.n);
+      // Automatically update total coils assuming 2 dead coils if not explicitly handled
+      form.setValue("totalCoils", params.n + 2);
+    }
+    if (params.H0 !== undefined) {
+      form.setValue("freeLength", params.H0);
+    }
+    
+    // Trigger submit if we're applying a valid design
+    form.handleSubmit(onSubmit)();
   };
 
   // Trigger initial calculation on mount if no result exists (to populate store)
@@ -334,7 +348,7 @@ export function CompressionCalculator() {
         freeLength: values.freeLength,
         topGround: values.topGround,
         bottomGround: values.bottomGround,
-        materialId: selectedMaterial.id,
+        materialId: selectedMaterial.id as any,
       });
 
       const eds =
@@ -355,7 +369,7 @@ export function CompressionCalculator() {
       // Perform stress analysis
       const sizeFactor = getSizeFactor(values.wireDiameter);
       const analysis = performStressAnalysis({
-        materialId: selectedMaterial.id,
+        materialId: selectedMaterial.id as any,
         tauNominal: calc.shearStress / calc.wahlFactor, // Remove Wahl to get nominal
         wahlFactor: calc.wahlFactor,
         surfaceFactor: selectedMaterial.surfaceFactor,
@@ -392,7 +406,7 @@ export function CompressionCalculator() {
       };
       
       const materialInfo: MaterialInfo = {
-        id: selectedMaterial.id,
+        id: selectedMaterial.id as any,
         name: selectedMaterial.nameEn,
         shearModulus: design.shearModulus,
         elasticModulus: selectedMaterial.elasticModulus ?? 200000,
@@ -508,9 +522,9 @@ export function CompressionCalculator() {
           <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
             {/* Material Selector */}
             <MaterialSelector
-              value={selectedMaterial.id}
-              onChange={handleMaterialChange}
-              showDetails={true}
+              selectedId={selectedMaterial.id}
+              onMaterialChange={handleMaterialChange}
+              d={watchedValues.wireDiameter}
             />
 
             {/* Wire Diameter */}
@@ -1152,7 +1166,7 @@ export function CompressionCalculator() {
                     springType: "compression",
                     geometry: geom,
                     material: {
-                      id: selectedMaterial.id,
+                      id: selectedMaterial.id as any,
                       name: selectedMaterial.nameEn,
                       shearModulus: selectedMaterial.shearModulus,
                       elasticModulus: selectedMaterial.elasticModulus ?? 200000,
@@ -1253,6 +1267,9 @@ export function CompressionCalculator() {
           Hb={solidHeight}  // Calculated: totalCoils * wireDiameter
           totalCoils={watchedValues.totalCoils ?? 10}
           G={form.getValues("shearModulus") ?? 79000}
+          materialId={selectedMaterial.id}
+          onMaterialChange={handleMaterialChange}
+          onApplyParameters={handleApplyParameters}
         />
       </div>
 

@@ -14,7 +14,20 @@ export type SpringMaterialId =
   | "ss_302"
   | "chrome_silicon"
   | "chrome_vanadium"
-  | "phosphor_bronze";
+  | "phosphor_bronze"
+  | "65Mn"
+  | "60Si2Mn"
+  | "swpb"
+  | "sus304"
+  | "sus316"
+  | "custom"
+  | "70"
+  | "55CrSi"
+  | "50CrVA"
+  | "sus631"
+  | "swpa"
+  | "swo-v"
+  | "swc";
 
 export interface SNcurveData {
   /** Reference cycle count 1 (typically 1e3 or 1e4) */
@@ -35,6 +48,8 @@ export interface SpringMaterial {
   standard?: string;
   /** Shear modulus G, MPa */
   shearModulus: number;
+  /** Alias for shearModulus */
+  G?: number;
   /** Elastic modulus E, MPa */
   elasticModulus?: number;
   /** Density, kg/m³ */
@@ -43,6 +58,8 @@ export interface SpringMaterial {
   // Strength and fatigue parameters
   /** Static allowable shear stress, MPa */
   allowShearStatic: number;
+  /** Alias for allowShearStatic */
+  tauAllow?: number;
   /** Ultimate tensile strength (approximate), MPa */
   tensileStrength?: number;
   /** S-N curve data for fatigue life estimation */
@@ -191,6 +208,169 @@ export const SPRING_MATERIALS: SpringMaterial[] = [
     tempFactor: 1.0,
     notes: "Non-magnetic, corrosion resistant. Electrical applications.",
   },
+  {
+    id: "65Mn" as SpringMaterialId,
+    nameEn: "65Mn Spring Steel",
+    nameZh: "65Mn 弹簧钢",
+    standard: "GB/T 1222",
+    shearModulus: 79000,
+    G: 79000,
+    elasticModulus: 206000,
+    density: 7850,
+    allowShearStatic: 720,
+    tauAllow: 720,
+    snCurve: { N1: 1e4, tau1: 650, N2: 1e6, tau2: 450 },
+    notes: "Common spring steel in China. Good cost-performance ratio.",
+  },
+  {
+    id: "60Si2Mn" as SpringMaterialId,
+    nameEn: "60Si2Mn Alloy Steel",
+    nameZh: "60Si2Mn 硅锰弹簧钢",
+    standard: "GB/T 1222",
+    shearModulus: 79000,
+    G: 79000,
+    elasticModulus: 206000,
+    density: 7850,
+    allowShearStatic: 880,
+    tauAllow: 880,
+    snCurve: { N1: 1e4, tau1: 750, N2: 1e6, tau2: 520 },
+    notes: "High strength alloy steel for heavy duty springs.",
+  },
+  {
+    id: "swpb" as SpringMaterialId,
+    nameEn: "Piano Wire (JIS SWPB)",
+    nameZh: "琴钢丝 (JIS SWPB)",
+    standard: "JIS G 3522",
+    shearModulus: 83000,
+    G: 83000,
+    elasticModulus: 210000,
+    density: 7850,
+    allowShearStatic: 1000,
+    tauAllow: 1000,
+    snCurve: { N1: 1e4, tau1: 850, N2: 1e6, tau2: 580 },
+    notes: "Highest strength precision spring wire.",
+  },
+  {
+    id: "sus304" as SpringMaterialId,
+    nameEn: "Stainless Steel 304 (JIS)",
+    nameZh: "SUS304 不锈钢",
+    standard: "JIS G 4314",
+    shearModulus: 69000,
+    G: 69000,
+    elasticModulus: 193000,
+    density: 7930,
+    allowShearStatic: 500,
+    tauAllow: 500,
+    snCurve: { N1: 1e4, tau1: 450, N2: 1e6, tau2: 300 },
+    notes: "Excellent corrosion resistance.",
+  },
+  {
+    id: "70" as SpringMaterialId,
+    nameEn: "70 Carbon Steel",
+    nameZh: "70# 碳素钢",
+    standard: "GB/T 1222",
+    shearModulus: 79000,
+    G: 79000,
+    elasticModulus: 206000,
+    density: 7850,
+    allowShearStatic: 680,
+    tauAllow: 680,
+    snCurve: { N1: 1e4, tau1: 600, N2: 1e6, tau2: 400 },
+    notes: "Economy steel for general use.",
+  },
+  {
+    id: "55CrSi" as SpringMaterialId,
+    nameEn: "55CrSi Alloy Steel",
+    nameZh: "55CrSi 铬硅弹簧钢",
+    standard: "GB/T 1222",
+    shearModulus: 79000,
+    G: 79000,
+    elasticModulus: 206000,
+    density: 7850,
+    allowShearStatic: 980,
+    tauAllow: 980,
+    snCurve: { N1: 1e4, tau1: 850, N2: 1e6, tau2: 600 },
+    notes: "Good performance at elevated temperatures.",
+  },
+  {
+    id: "50CrVA" as SpringMaterialId,
+    nameEn: "50CrVA Chrome Vanadium",
+    nameZh: "50CrVA 铬钒弹簧钢",
+    standard: "GB/T 1222",
+    shearModulus: 79000,
+    G: 79000,
+    elasticModulus: 206000,
+    density: 7850,
+    allowShearStatic: 920,
+    tauAllow: 920,
+    snCurve: { N1: 1e4, tau1: 800, N2: 1e6, tau2: 550 },
+    notes: "Excellent shock and fatigue resistance.",
+  },
+  {
+    id: "sus631" as SpringMaterialId,
+    nameEn: "SUS631 (17-7PH)",
+    nameZh: "SUS631 沉淀硬化不锈钢",
+    standard: "JIS G 4314",
+    shearModulus: 75000,
+    G: 75000,
+    elasticModulus: 200000,
+    density: 7800,
+    allowShearStatic: 820,
+    tauAllow: 820,
+    snCurve: { N1: 1e4, tau1: 700, N2: 1e6, tau2: 480 },
+    notes: "High strength stainless steel.",
+  },
+  {
+    id: "swpa" as SpringMaterialId,
+    nameEn: "Piano Wire (JIS SWPA)",
+    nameZh: "琴钢丝 (JIS SWPA)",
+    standard: "JIS G 3522",
+    shearModulus: 83000,
+    G: 83000,
+    elasticModulus: 210000,
+    density: 7850,
+    allowShearStatic: 950,
+    tauAllow: 950,
+    snCurve: { N1: 1e4, tau1: 800, N2: 1e6, tau2: 550 },
+    notes: "Standard grade piano wire.",
+  },
+  {
+    id: "swo-v" as SpringMaterialId,
+    nameEn: "Oil Tempered (JIS SWO-V)",
+    nameZh: "油淬回火钢丝 (SWO-V)",
+    standard: "JIS G 3561",
+    shearModulus: 79000,
+    G: 79000,
+    elasticModulus: 206000,
+    density: 7850,
+    allowShearStatic: 820,
+    tauAllow: 820,
+    snCurve: { N1: 1e4, tau1: 720, N2: 1e6, tau2: 500 },
+    notes: "Valve spring quality wire.",
+  },
+  {
+    id: "swc" as SpringMaterialId,
+    nameEn: "Hard Drawn (JIS SWC)",
+    nameZh: "硬钢丝 (JIS SWC)",
+    standard: "JIS G 3521",
+    shearModulus: 79000,
+    G: 79000,
+    elasticModulus: 206000,
+    density: 7850,
+    allowShearStatic: 620,
+    tauAllow: 620,
+    snCurve: { N1: 1e4, tau1: 520, N2: 1e6, tau2: 350 },
+    notes: "Low stress applications.",
+  },
+  {
+    id: "custom" as SpringMaterialId,
+    nameEn: "Custom",
+    nameZh: "自定义",
+    shearModulus: 79000,
+    allowShearStatic: 700,
+    snCurve: { N1: 1e4, tau1: 600, N2: 1e6, tau2: 400 },
+    notes: "User-defined properties.",
+  },
 ];
 
 /**
@@ -220,7 +400,7 @@ export function getMaterialOptions(): Array<{
   labelZh: string;
 }> {
   return SPRING_MATERIALS.map((m) => ({
-    value: m.id,
+    value: m.id as SpringMaterialId,
     labelEn: m.nameEn,
     labelZh: m.nameZh,
   }));
