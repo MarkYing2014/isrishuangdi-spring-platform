@@ -10,7 +10,8 @@ export type PlatformSpringType =
     | "arc"
     | "disc"
     | "spiral"
-    | "wave";
+    | "wave"
+    | "variablePitch";
 
 /** Input modes vary by spring type */
 export type PlatformInputMode =

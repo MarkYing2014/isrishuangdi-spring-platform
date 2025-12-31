@@ -55,6 +55,8 @@ import {
   printVariablePitchCompressionReport,
 } from "@/lib/reports/variablePitchCompressionReportGenerator";
 
+import { SpringPlatformSection } from "@/components/spring-platform/SpringPlatformSection";
+
 function ResultRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 text-sm">
@@ -1012,6 +1014,30 @@ export function VariablePitchCompressionCalculator() {
         currentSpringRate={result.springRate}
         currentShearStress={result.shearStress}
         allowableShearStress={selectedMaterial.allowShearStatic}
+      />
+
+      {/* Spring Platform Section - Unified Engineering Design Platform */}
+      <SpringPlatformSection
+        springType="variablePitch"
+        geometry={{
+          d: wireDiameter,
+          D: meanDiameter,
+          activeCoils0: activeCoils0,
+          totalCoils: totalCoils,
+          L0: freeLength,
+          segments: segments,
+          G: shearModulus,
+        }}
+        material={{
+          id: selectedMaterial.id,
+          G: shearModulus,
+          tauAllow: selectedMaterial.allowShearStatic,
+        }}
+        onMaterialChange={handleMaterialChange}
+        onApplyParameters={(params) => {
+          if (params.activeCoils0 !== undefined) setActiveCoils0(params.activeCoils0);
+          if (params.n !== undefined) setActiveCoils0(params.n);
+        }}
       />
     </div>
   );

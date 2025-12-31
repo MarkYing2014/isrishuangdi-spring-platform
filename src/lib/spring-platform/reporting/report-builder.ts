@@ -31,6 +31,7 @@ const SPRING_TYPE_LABELS: Record<PlatformSpringType, { en: string; zh: string }>
     arc: { en: "Arc Spring", zh: "弧形弹簧" },
     spiral: { en: "Spiral Spring", zh: "涡卷弹簧" },
     wave: { en: "Wave Spring", zh: "波形弹簧" },
+    variablePitch: { en: "Variable Pitch Spring", zh: "变节距弹簧" },
 };
 
 // =============================================================================

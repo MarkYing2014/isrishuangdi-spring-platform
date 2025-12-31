@@ -41,5 +41,9 @@ export const PLATFORM_AXIS_MAP: Record<PlatformSpringType, AxisDefinition> = {
     wave: {
         xLabelEn: "Height H", xLabelZh: "高度 H", xUnit: "mm",
         yLabelEn: "Load P", yLabelZh: "负荷 P", yUnit: "N"
+    },
+    variablePitch: {
+        xLabelEn: "Height H", xLabelZh: "高度 H", xUnit: "mm",
+        yLabelEn: "Load P", yLabelZh: "负荷 P", yUnit: "N"
     }
 };
