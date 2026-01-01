@@ -21,7 +21,8 @@ export function DesignSpacePanel({ springType, initialParams, onGenerate, isGene
          return {
              d: initialParams.wireDia?.mid || 10,
              D: initialParams.meanDia?.mid || 50,
-             n: initialParams.totalTurns || 8
+             n: initialParams.totalTurns || 8,
+             H0: initialParams.H0 || 0
          };
      }
      return initialParams;
@@ -90,6 +91,16 @@ export function DesignSpacePanel({ springType, initialParams, onGenerate, isGene
                 </div>
               </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-[10px]">总圈数 n (Min/Max)</Label>
+                <div className="flex gap-1">
+                  <NumericInput value={ranges.n[0]} min={1} onChange={v => setRanges({...ranges, n: [v || 2, ranges.n[1]]})} className="h-7 text-xs" />
+                  <NumericInput value={ranges.n[1]} min={1} onChange={v => setRanges({...ranges, n: [ranges.n[0], v || 20]})} className="h-7 text-xs" />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Target */}
@@ -100,11 +111,11 @@ export function DesignSpacePanel({ springType, initialParams, onGenerate, isGene
             
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <Label className="text-[10px]">目标高度 H (mm)</Label>
+                <Label className="text-[10px]">{springType === "torsion" ? "目标扭转角 (deg)" : "目标高度 H (mm)"}</Label>
                 <NumericInput value={target.inputValue} onChange={v => setTarget({...target, inputValue: v || 0})} className="h-7 text-xs" />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px]">目标负荷 P (N)</Label>
+                <Label className="text-[10px]">{springType === "torsion" ? "目标扭矩 (Nmm)" : "目标负荷 P (N)"}</Label>
                 <NumericInput value={target.targetValue} onChange={v => setTarget({...target, targetValue: v || 0})} className="h-7 text-xs" />
               </div>
             </div>

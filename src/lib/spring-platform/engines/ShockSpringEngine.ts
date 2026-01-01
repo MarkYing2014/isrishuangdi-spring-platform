@@ -6,7 +6,9 @@ import {
     PlatformInputMode,
     PlatformSpringType,
     ShockSpringInput,
-    LoadCaseResult
+    LoadCaseResult,
+    SolveForTargetInput,
+    SolveForTargetResult
 } from "../types";
 
 import {
@@ -133,6 +135,54 @@ export class ShockSpringEngine implements ISpringEngine {
             ...platformResultSkeleton,
             designRules,
             rawResult: result
+        };
+    }
+
+    /**
+     * Reverse Solver (Seed Generation)
+     * Solves for 'n' given d, D, H_target, P_target
+     */
+    solveForTarget(
+        context: { geometry: any; material: any },
+        input: SolveForTargetInput
+    ): SolveForTargetResult {
+        const { d, D, H0 } = context.geometry;
+        const material = context.material;
+        const target = input.target1;
+
+        if (!target || target.y <= 0) return { ok: false, errors: ["Invalid target"] };
+
+        // Target: x = Height, y = Force
+        // Shock is usually height-based
+        const hTarget = target.x;
+        const pTarget = target.y;
+
+        // H0 estimation (if not provided, we can't solve properly, but H0 is usually in context)
+        const freeLen = H0 || (hTarget * 1.5);
+        const deflection = freeLen - hTarget;
+
+        if (deflection <= 0) return { ok: false, errors: ["Target height above free length"] };
+
+        // Linearized Na = G*d^4 * delta / (8*D^3 * P)
+        const G = material.G || 79000;
+        const nSolved = (G * Math.pow(d, 4) * deflection) / (8 * Math.pow(D, 3) * pTarget);
+
+        // Clamp to range
+        const nRange = input.clamps?.nRange || [2, 50];
+        const nClamped = Math.max(nRange[0], Math.min(nRange[1], nSolved));
+
+        return {
+            ok: true,
+            solvedParams: {
+                n: Number(nClamped.toFixed(2)),
+                d,
+                D,
+                H0: freeLen
+            },
+            derived: {
+                k_est: pTarget / deflection,
+                n_raw: nSolved
+            }
         };
     }
 }

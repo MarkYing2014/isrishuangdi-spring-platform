@@ -643,7 +643,7 @@ export function SpringPlatformSection({
                 <div className="space-y-6">
                     <DesignSpacePanel 
                         springType={springType}
-                        initialParams={geometry}
+                        initialParams={{ ...geometry, H0: result.H0 }}
                         onGenerate={handleGenerateDesigns}
                         isGenerating={isGenerating}
                     />
