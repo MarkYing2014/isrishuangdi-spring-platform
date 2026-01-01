@@ -41,8 +41,15 @@ export class CandidateGenerator {
 
         // 3. Evaluate and Filter
         const solutions: CandidateSolution[] = [];
+        let processed = 0;
+        const total = uniqueParams.length;
 
         for (const params of uniqueParams) {
+            processed++;
+            // Yield every 20 candidates to keep UI responsive
+            if (processed % 20 === 0) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
             try {
                 let geometry: any = { ...params, Hb: 0 };
 

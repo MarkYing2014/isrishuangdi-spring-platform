@@ -80,12 +80,12 @@ export class DiscreteEnumerator {
                         candidates.push(params);
                     }
 
-                    // Safety cap for a single generator (increased for better coverage)
-                    if (candidates.length > 5000) break;
+                    // Safety cap for a single generator (balanced for speed vs coverage)
+                    if (candidates.length > 2000) break;
                 }
-                if (candidates.length > 5000) break;
+                if (candidates.length > 2000) break;
             }
-            if (candidates.length > 5000) break;
+            if (candidates.length > 2000) break;
         }
 
         return candidates;
