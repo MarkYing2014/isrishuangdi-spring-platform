@@ -19,6 +19,16 @@ export function ParetoSelectionView({ solutions, onApply, onUndo, hasHistory }: 
     return a.metrics.massProxy - b.metrics.massProxy;
   });
 
+  if (solutions.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 bg-muted/20 border border-dashed rounded-xl space-y-2">
+        <Zap className="h-8 w-8 text-muted-foreground/30" />
+        <div className="text-sm font-bold text-muted-foreground">未找到满足条件的方案 / No suitable designs found</div>
+        <div className="text-[10px] text-muted-foreground">请尝试扩大设计空间或放宽性能目标范围。 / Try expanding the design space or loosening performance targets.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Undo / History Bar */}

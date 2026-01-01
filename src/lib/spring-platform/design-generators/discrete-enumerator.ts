@@ -42,50 +42,54 @@ export class DiscreteEnumerator {
         }
 
         // Default d, D, n generation
-        const dStep = 0.1;
-        const DStep = 2.0; // Increased D step to cover more ground
-        const nStep = 0.5; // Finer n step for better target matching
+        const dStep = 0.2; // Slightly coarser d to allow more H0/D variation
+        const DStep = 4.0; // Coarser D to save cycles
+        const nStep = 0.5; // Keep n fine
 
         for (let d = dRange[0]; d <= dRange[1]; d += dStep) {
             for (let D = DRange[0]; D <= DRange[1]; D += DStep) {
                 for (let n = nRange[0]; n <= nRange[1]; n += nStep) {
-                    const params: any = {
+                    const baseParams: any = {
                         d: Number(d.toFixed(2)),
                         D: Number(D.toFixed(2)),
                         n: Number(n.toFixed(2))
                     };
 
-                    // Carry over fixed parameters like H0 if they are ranges with min==max
-                    if (space.ranges.H0) {
-                        // If it's a range, pick the center or boundaries
-                        // For now, let's just pick the mean to keep it simple
-                        params.H0 = (space.ranges.H0[0] + space.ranges.H0[1]) / 2;
-                    }
-                    if (space.ranges.L0 && space.ranges.L0[0] === space.ranges.L0[1]) {
-                        params.L0 = space.ranges.L0[0];
-                    }
+                    // Sample H0 if range exists
+                    const h0Steps = space.ranges.H0
+                        ? (space.ranges.H0[0] === space.ranges.H0[1] ? [space.ranges.H0[0]] : [space.ranges.H0[0], (space.ranges.H0[0] + space.ranges.H0[1]) / 2, space.ranges.H0[1]])
+                        : [undefined];
 
-                    // Pitch Loop (Shock specific)
-                    const pRange = space.ranges.p;
-                    if (pRange) {
-                        const pStep = 0.5;
-                        // Avoid infinite loop if range is [0,0] provided
-                        const effectiveMax = Math.max(pRange[0], pRange[1]);
-                        for (let p = pRange[0]; p <= effectiveMax; p += pStep) {
-                            candidates.push({ ...params, p: Number(p.toFixed(2)) });
-                            if (candidates.length > 500) break;
-                            if (p >= effectiveMax && pStep > 0) break; // Ensure execution once if min==max
+                    for (const H0 of h0Steps) {
+                        const params = { ...baseParams };
+                        if (H0 !== undefined) params.H0 = Number(H0.toFixed(2));
+
+                        if (space.ranges.L0 && space.ranges.L0[0] === space.ranges.L0[1]) {
+                            params.L0 = space.ranges.L0[0];
                         }
-                    } else {
-                        candidates.push(params);
+
+                        // Pitch Loop (Shock specific)
+                        const pRange = space.ranges.p;
+                        if (pRange) {
+                            const pStep = 0.5;
+                            const effectiveMax = Math.max(pRange[0], pRange[1]);
+                            for (let p = pRange[0]; p <= effectiveMax; p += pStep) {
+                                candidates.push({ ...params, p: Number(p.toFixed(2)) });
+                                if (candidates.length > 5000) break;
+                                if (p >= effectiveMax && pStep > 0) break;
+                            }
+                        } else {
+                            candidates.push(params);
+                        }
+                        if (candidates.length > 5000) break;
                     }
 
-                    // Safety cap for a single generator (balanced for speed vs coverage)
-                    if (candidates.length > 2000) break;
+                    // Safety cap for a single generator (increased for better coverage)
+                    if (candidates.length > 5000) break;
                 }
-                if (candidates.length > 2000) break;
+                if (candidates.length > 5000) break;
             }
-            if (candidates.length > 2000) break;
+            if (candidates.length > 5000) break;
         }
 
         return candidates;

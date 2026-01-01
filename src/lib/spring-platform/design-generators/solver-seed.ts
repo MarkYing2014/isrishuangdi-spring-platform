@@ -23,21 +23,28 @@ export class SolverSeedGenerator {
             const dOptions = [dRange[0], (dRange[0] + dRange[1]) / 2, dRange[1]];
 
             for (const d of dOptions) {
-                const result = engine.solveForTarget(
-                    { geometry: { d, D, H0: designSpace.ranges.H0?.[0] }, material },
-                    {
-                        mode: "singlePoint",
-                        target1: { x: target.inputValue, y: target.targetValue },
-                        clamps: { nRange: designSpace.ranges.n }
-                    }
-                );
+                // Try min and max H0 for seeds
+                const h0Options = designSpace.ranges.H0
+                    ? [designSpace.ranges.H0[0], designSpace.ranges.H0[1]]
+                    : [undefined];
 
-                if (result.ok && result.solvedParams) {
-                    candidates.push({
-                        d,
-                        D,
-                        ...result.solvedParams
-                    });
+                for (const H0 of h0Options) {
+                    const result = engine.solveForTarget(
+                        { geometry: { d, D, H0 }, material },
+                        {
+                            mode: "singlePoint",
+                            target1: { x: target.inputValue, y: target.targetValue },
+                            clamps: { nRange: designSpace.ranges.n }
+                        }
+                    );
+
+                    if (result.ok && result.solvedParams) {
+                        candidates.push({
+                            d,
+                            D,
+                            ...result.solvedParams
+                        });
+                    }
                 }
             }
         }

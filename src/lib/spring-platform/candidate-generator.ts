@@ -121,8 +121,8 @@ export class CandidateGenerator {
                 continue; // Skip failed calculations
             }
 
-            // Performance cap for UI responsiveness
-            if (solutions.length > 300) break;
+            // Performance cap for UI responsiveness (increased since we have yields)
+            if (solutions.length > 1000) break;
         }
 
         console.log(`CandidateGenerator: Found ${solutions.length} valid solutions.`);
