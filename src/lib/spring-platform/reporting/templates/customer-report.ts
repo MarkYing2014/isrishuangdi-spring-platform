@@ -115,6 +115,12 @@ export function generateCustomerReportHTML(
                 <div class="meta-label">${t(report, "Status", "状态")}</div>
                 <div class="meta-value">${getStatusBadge(report.review.overallStatus, lang)}</div>
             </div>
+            <div class="meta-item">
+                <div class="meta-label">${t(report, "Phase", "阶段")}</div>
+                <div class="meta-value">
+                   ${report.meta.workflowStatus ? `<span class="status-badge" style="background:#1e293b; color:white;">${report.meta.workflowStatus}</span>` : "-"}
+                </div>
+            </div>
         </div>
         
         <!-- Key Results -->

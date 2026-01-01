@@ -94,6 +94,8 @@ export class WaveSpringEngine implements ISpringEngine {
             springIndex: meanDiameter / t,
             wahlFactor: 1.0,
             isValid: results.every(r => r.isValid),
+            maxStress: Math.max(...results.map(r => r.stress || 0)),
+            tauAllow: tauAllow * 1.5, // Bending limit proxy
             totalEnergy: results[results.length - 1]?.energy || 0,
             H0: Hf,
             Hb: solidHeight

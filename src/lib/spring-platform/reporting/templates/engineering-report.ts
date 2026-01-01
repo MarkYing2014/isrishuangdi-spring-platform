@@ -118,13 +118,35 @@ export function generateEngineeringReportHTML(
                 <div class="meta-label">${t(report, "Status", "状态")}</div>
                 <div class="meta-value">${getStatusBadge(report.review.overallStatus, lang)}</div>
             </div>
+            <div class="meta-item">
+                <div class="meta-label">${t(report, "Workflow", "阶段")}</div>
+                <div class="meta-value">
+                    ${report.meta.workflowStatus ? `<span class="status-badge" style="background:#1e293b; color:white;">${report.meta.workflowStatus}</span>` : "-"}
+                </div>
+            </div>
         </div>
         
-        <!-- Version Hash -->
         <div style="text-align: right; margin-bottom: 16px;">
             <span style="font-size: 8pt; color: #6b7280;">${t(report, "Version Hash", "版本哈希")}:</span>
             <code class="version-hash">${report.meta.versionHash}</code>
         </div>
+
+        <!-- Engineering Assumptions (Phase 14.2) -->
+        ${report.assumptions && report.assumptions.length > 0 ? `
+        <section class="section avoid-break">
+            <h2 class="section-title">${t(report, "Engineering Assumptions", "工程假设与模型说明")}</h2>
+            <div style="background: #f8fafc; padding: 12px; border: 1.5px dashed #cbd5e1; border-radius: 6px;">
+                <ul style="margin: 0; padding-left: 14px; font-size: 8.5pt; color: #475569; line-height: 1.5;">
+                    ${report.assumptions.map(a => `
+                        <li style="margin-bottom: 4px;">
+                            <strong style="color: #1e293b;">${lang === 'zh' ? a.titleZh : a.titleEn}:</strong>
+                            ${lang === 'zh' ? a.contentZh : a.contentEn}
+                        </li>
+                    `).join("")}
+                </ul>
+            </div>
+        </section>
+        ` : ""}
         
         <!-- Key Results -->
         <section class="section">
@@ -325,6 +347,62 @@ export function generateEngineeringReportHTML(
         </section>
         ` : ""}
         
+        <!-- Design Evolution Summary (Phase 15) -->
+        ${report.evolution && report.evolution.pinned.length > 0 ? `
+        <section class="section page-break avoid-break">
+            <h2 class="section-title">${t(report, "Design Evolution Summary", "设计演进与审核回放")}</h2>
+            <div style="font-size: 8.5pt; color: #4b5563; margin-bottom: 12px; font-style: italic;">
+                ${t(report, "The following design milestones capture the engineering convergence process and key decision logic.", "以下审计记录捕获了工程设计收敛过程及关键决策逻辑。")}
+            </div>
+            <table class="data-table" style="font-size: 8.5pt;">
+                <thead>
+                    <tr>
+                        <th style="width: 15%">${t(report, "Timestamp", "时间")}</th>
+                        <th style="width: 15%">${t(report, "Label", "版本")}</th>
+                        <th style="width: 10%">${t(report, "Status", "状态")}</th>
+                        <th style="width: 25%">${t(report, "Key Metrics (KPIs)", "关键指标")}</th>
+                        <th style="width: 35%">${t(report, "Reasoning & Insights", "决策分析与备注")}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${report.evolution.pinned.map(e => `
+                    <tr>
+                        <td>${new Date(e.meta.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td><strong>${e.meta.label ?? "v"}</strong></td>
+                        <td>${getStatusBadge(e.summary.status, lang)}</td>
+                        <td>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 7.5pt;">
+                                ${Object.entries(e.summary.kpi).filter(([_, v]) => v !== null).map(([k, v]) => `
+                                    <div style="border-bottom: 0.5px solid #e5e7eb;">
+                                        <span style="font-weight: bold; opacity: 0.6;">${k}:</span> ${fmt(v as number, 2)}
+                                    </div>
+                                `).join("")}
+                            </div>
+                        </td>
+                        <td>
+                            ${e.insights.length > 0 ? `
+                                <ul style="margin: 0; padding-left: 12px; list-style-type: none;">
+                                    ${e.insights.map(i => `
+                                        <li style="margin-bottom: 2px; position: relative;">
+                                            <span style="color: #2563eb; position: absolute; left: -10px;">•</span>
+                                            ${i.text}
+                                        </li>
+                                    `).join("")}
+                                </ul>
+                            ` : ""}
+                            ${e.meta.comment ? `
+                                <div style="margin-top: 6px; padding: 4px 8px; background: #fff; border-left: 2px solid #cbd5e1; font-style: italic;">
+                                    "${e.meta.comment}"
+                                </div>
+                            ` : ""}
+                        </td>
+                    </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        </section>
+        ` : ""}
+
         <!-- Signature Block -->
         <section class="section avoid-break">
             <div class="signature-block">

@@ -10,9 +10,10 @@ interface ParetoSelectionViewProps {
   onApply: (solution: CandidateSolution) => void;
   onUndo: () => void;
   hasHistory: boolean;
+  baselineMetrics?: any;
 }
 
-export function ParetoSelectionView({ solutions, onApply, onUndo, hasHistory }: ParetoSelectionViewProps) {
+export function ParetoSelectionView({ solutions, onApply, onUndo, hasHistory, baselineMetrics }: ParetoSelectionViewProps) {
   // Sort by Pareto Rank then Mass
   const sorted = [...solutions].sort((a, b) => {
     if (a.paretoRank !== b.paretoRank) return a.paretoRank - b.paretoRank;
@@ -43,7 +44,12 @@ export function ParetoSelectionView({ solutions, onApply, onUndo, hasHistory }: 
       {/* Solutions Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {sorted.slice(0, 12).map((sol) => (
-          <SolutionCard key={sol.id} solution={sol} onApply={() => onApply(sol)} />
+          <SolutionCard 
+            key={sol.id} 
+            solution={sol} 
+            onApply={() => onApply(sol)} 
+            baselineMetrics={baselineMetrics}
+          />
         ))}
       </div>
       
@@ -56,7 +62,7 @@ export function ParetoSelectionView({ solutions, onApply, onUndo, hasHistory }: 
   );
 }
 
-function SolutionCard({ solution, onApply }: { solution: CandidateSolution, onApply: () => void }) {
+function SolutionCard({ solution, onApply, baselineMetrics }: { solution: CandidateSolution, onApply: () => void, baselineMetrics?: any }) {
   const { params, metrics, paretoRank } = solution;
   
   return (
@@ -91,14 +97,28 @@ function SolutionCard({ solution, onApply }: { solution: CandidateSolution, onAp
             <div className="flex items-center gap-1 text-[9px] text-muted-foreground uppercase font-bold">
               <Scale className="h-2.5 w-2.5 text-blue-500" /> 质量 / Mass
             </div>
-            <div className="text-xs font-bold text-primary">{(metrics.massProxy / 100).toFixed(1)}</div>
+            <div className="flex items-baseline gap-1">
+              <div className="text-xs font-bold text-primary">{(metrics.massProxy / 100).toFixed(1)}</div>
+              {baselineMetrics && baselineMetrics.massProxy > metrics.massProxy && (
+                <div className="text-[8px] text-green-600 font-bold">
+                  -{((1 - metrics.massProxy / baselineMetrics.massProxy) * 100).toFixed(0)}%
+                </div>
+              )}
+            </div>
           </div>
           <div className="bg-white/50 dark:bg-black/20 p-1.5 rounded border border-muted-foreground/10">
             <div className="flex items-center gap-1 text-[9px] text-muted-foreground uppercase font-bold">
               <Zap className="h-2.5 w-2.5 text-orange-500" /> 应力比 / Stress
             </div>
-            <div className={`text-xs font-bold ${metrics.maxStressRatio > 0.9 ? "text-orange-500" : "text-green-600"}`}>
-              {(metrics.maxStressRatio * 100).toFixed(1)}%
+            <div className="flex items-baseline gap-1">
+                <div className={`text-xs font-bold ${metrics.maxStressRatio > 0.9 ? "text-orange-500" : "text-green-600"}`}>
+                {(metrics.maxStressRatio * 100).toFixed(1)}%
+                </div>
+                {baselineMetrics && baselineMetrics.maxStressRatio > metrics.maxStressRatio && (
+                    <div className="text-[8px] text-green-600 font-bold">
+                    -{((baselineMetrics.maxStressRatio - metrics.maxStressRatio) / baselineMetrics.maxStressRatio * 100).toFixed(0)}%
+                    </div>
+                )}
             </div>
           </div>
           
@@ -107,11 +127,37 @@ function SolutionCard({ solution, onApply }: { solution: CandidateSolution, onAp
                 <div className="flex items-center gap-1 text-[9px] text-muted-foreground uppercase font-bold">
                   <Zap className="h-2.5 w-2.5 text-yellow-500" /> 储能 / Energy
                 </div>
-                <div className="text-xs font-bold text-yellow-600">
-                  {metrics.totalEnergy.toFixed(3)} J
+                <div className="flex items-baseline gap-1">
+                    <div className="text-xs font-bold text-yellow-600">
+                    {metrics.totalEnergy.toFixed(3)} J
+                    </div>
+                    {baselineMetrics && baselineMetrics.totalEnergy < metrics.totalEnergy && (
+                        <div className="text-[8px] text-green-600 font-bold">
+                        +{((metrics.totalEnergy / baselineMetrics.totalEnergy - 1) * 100).toFixed(0)}%
+                        </div>
+                    )}
                 </div>
              </div>
           )}
+        </div>
+
+        {/* Semantic Reasoning (Phase 14.2) */}
+        <div className="flex flex-wrap gap-1 min-h-[1.25rem]">
+           {baselineMetrics && metrics.massProxy < baselineMetrics.massProxy * 0.9 && (
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-[8px] border-blue-200">
+                 更轻量 / Lighter
+              </Badge>
+           )}
+           {baselineMetrics && metrics.maxStressRatio < baselineMetrics.maxStressRatio * 0.9 && (
+              <Badge variant="secondary" className="bg-green-100 text-green-800 text-[8px] border-green-200">
+                 应力优化 / Lower Stress
+              </Badge>
+           )}
+           {!baselineMetrics && metrics.maxStressRatio < 0.7 && (
+              <Badge variant="secondary" className="bg-green-100 text-green-800 text-[8px] border-green-200">
+                 低应力 / Safe
+              </Badge>
+           )}
         </div>
 
         {/* Apply Button */}

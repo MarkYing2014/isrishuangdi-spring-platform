@@ -188,6 +188,8 @@ export class VariablePitchEngine implements ISpringEngine {
             Hb,
             cases: loadCases,
             totalEnergy,
+            maxStress: Math.max(...loadCases.map(c => c.stress || 0)),
+            tauAllow: tauAllow,
             isValid: loadCases.every((c) => c.status !== "danger"),
         };
     }

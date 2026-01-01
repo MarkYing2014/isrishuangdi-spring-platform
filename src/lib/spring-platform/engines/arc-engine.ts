@@ -162,6 +162,8 @@ export class ArcSpringEngine implements ISpringEngine {
             springIndex: geo.Dm / geo.d,
             wahlFactor: (4 * (geo.Dm / geo.d) - 1) / (4 * (geo.Dm / geo.d) - 4) + 0.615 / (geo.Dm / geo.d),
             isValid: results.every(r => r.isValid),
+            maxStress: Math.max(...results.map(r => r.stress || 0)),
+            tauAllow: tauAllow,
             totalEnergy: results.length > 0 ? (results[results.length - 1]?.energy ?? 0) : 0 // J
         };
     }

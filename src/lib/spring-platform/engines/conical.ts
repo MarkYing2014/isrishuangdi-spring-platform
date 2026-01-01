@@ -113,7 +113,9 @@ export class ConicalEngine implements ISpringEngine {
             wahlFactor,
             H0,
             Hb,
-            isValid: caseResults.every(c => c.isValid)
+            isValid: caseResults.every(c => c.isValid),
+            maxStress: Math.max(...caseResults.map(c => c.stress || 0)),
+            tauAllow: tauAllow
         };
     }
 

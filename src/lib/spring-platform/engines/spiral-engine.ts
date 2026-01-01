@@ -83,6 +83,8 @@ export class SpiralSpringEngine implements ISpringEngine {
             springIndex: L / t, // Reference only
             wahlFactor: 1.0,
             isValid: results.every(r => r.isValid),
+            maxStress: Math.max(...results.map(r => r.stress || 0)),
+            tauAllow: tauAllow * 1.8, // Bending limit proxy
             totalEnergy: results[results.length - 1]?.energy || 0
         };
     }

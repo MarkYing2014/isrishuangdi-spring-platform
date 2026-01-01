@@ -122,6 +122,8 @@ export class ShockSpringEngine implements ISpringEngine {
             H0: result.derived.freeLength,
             Hb: result.derived.solidHeight,
             isValid: !result.errors || result.errors.length === 0,
+            maxStress: Math.max(...result.kxCurve.map(p => p.stress)),
+            tauAllow: material.tauAllow,
             totalEnergy: energyCurve.length > 0 ? energyCurve[energyCurve.length - 1].y : 0,
             mass: result.derived.mass,
             wireLength: result.derived.wireLength,

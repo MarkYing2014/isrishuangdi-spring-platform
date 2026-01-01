@@ -119,7 +119,9 @@ export class TorsionEngine implements ISpringEngine {
             springRate: k,
             springIndex,
             wahlFactor: calculateTorsionBendingStress(1, d, meanDiameter).correctionFactor,
-            isValid: caseResults.every(c => c.isValid)
+            isValid: caseResults.every(c => c.isValid),
+            maxStress: Math.max(...caseResults.map(c => c.stress || 0)),
+            tauAllow: sigmaAllow
         };
     }
 

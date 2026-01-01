@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, FileText, Download } from "lucide-react";
+import { ChevronDown, FileText, Download, Clock } from "lucide-react";
 
 import { LoadPointList } from "@/components/ui/LoadPointCard";
 import { ModuleSelector, DEFAULT_PLATFORM_MODULES } from "@/components/ui/ModuleSelector";
@@ -18,7 +18,8 @@ import {
   PlatformModules, 
   PlatformResult,
   PlatformDesignMode,
-  SolveForTargetInput
+  SolveForTargetInput,
+  PlatformWorkflowStatus
 } from "@/lib/spring-platform/types";
 import { getEngine } from "@/lib/spring-platform/engine-registry";
 import { 
@@ -34,6 +35,7 @@ import { ParetoOptimizer } from "@/lib/spring-platform/pareto-optimizer";
 import { CandidateSolution } from "@/lib/spring-platform/candidate-solution";
 import { DesignSpace } from "@/lib/spring-platform/design-space-types";
 import { PLATFORM_AXIS_MAP } from "@/lib/spring-platform/axis-definition";
+import { EngineeringAssumptionPanel } from "@/components/ui/EngineeringAssumptionPanel";
 
 // Phase 9 Report Imports
 import {
@@ -42,6 +44,15 @@ import {
     downloadReportHTML,
     type ReportOptions,
 } from "@/lib/spring-platform/reporting";
+
+// Phase 15 Evolution
+import { DesignEvolutionHub } from "./DesignEvolutionHub";
+import { 
+  DesignSnapshot, 
+  EvolutionState, 
+  SnapshotPin 
+} from "@/lib/spring-platform/types";
+import { saveEvolution, loadEvolution } from "@/lib/spring-platform/evolution-storage";
 
 // ============================================================================
 // Types
@@ -114,6 +125,22 @@ export function SpringPlatformSection({
   const [modules, setModules] = useState<PlatformModules>(DEFAULT_PLATFORM_MODULES);
   const [expanded, setExpanded] = useState(true);
   const [designMode, setDesignMode] = useState<PlatformDesignMode>("verification");
+  const [workflowStatus, setWorkflowStatus] = useState<PlatformWorkflowStatus>("CONCEPT");
+  
+  // Phase 15: Evolution State
+  const [evolution, setEvolution] = useState<EvolutionState>({ snapshots: [] });
+  const projectId = useMemo(() => `${springType}_${geometry.H0}_${geometry.d}`, [springType, geometry.H0, geometry.d]);
+
+  // Load persistence
+  useEffect(() => {
+    const saved = loadEvolution(projectId);
+    setEvolution(saved);
+  }, [projectId]);
+
+  // Save persistence
+  useEffect(() => {
+    saveEvolution(projectId, evolution);
+  }, [evolution, projectId]);
   
   // Input Mode state
   const defaultMode: PlatformInputMode = (springType === "torsion" || springType === "spiral") 
@@ -305,9 +332,12 @@ export function SpringPlatformSection({
   // Phase 7: Sync result to parent
   useEffect(() => {
     if (result) {
-      onResultChange?.(result);
+      onResultChange?.({
+        ...result,
+        workflowStatus
+      });
     }
-  }, [result, onResultChange]);
+  }, [result, onResultChange, workflowStatus]);
 
   // Solver Wrap
   const handleSolve = useCallback((input: SolveForTargetInput) => {
@@ -399,6 +429,7 @@ export function SpringPlatformSection({
         includePareto: type === "engineering",
         includeVersionHash: type === "engineering",
       },
+      evolutionState: evolution,
     });
 
     if (method === "print") {
@@ -409,6 +440,66 @@ export function SpringPlatformSection({
     
     setShowExportMenu(false);
   }, [result, springType, geometry, materialId, material, propsMaterial]);
+
+
+  // Phase 14.2: Baseline Metrics for comparative reasoning
+  const baselineMetrics = useMemo(() => {
+    if (!result) return null;
+    const g = geometry;
+    const isDisc = springType === 'disc';
+    
+    return {
+      massProxy: isDisc 
+        ? (g.D * g.D - (g.D * 0.5) * (g.D * 0.5)) * g.t * (g.series || 1) * (g.parallel || 1)
+        : (g.d * g.d * (g.D || 30) * Math.max(1, g.n || 5)),
+      maxStressRatio: result.maxStress / result.tauAllow,
+      totalEnergy: result.totalEnergy
+    };
+  }, [result, geometry, springType]);
+
+  // Phase 15: Snapshot Capture
+  const takeSnapshot = useCallback((label?: string) => {
+    if (!result) return;
+
+    const fatigueRule = result.designRules?.find(r => r.id === "fatigueSF" || r.id === "f_safety");
+    const fatigueSF = typeof fatigueRule?.value === "number" ? fatigueRule.value : null;
+
+    const newSnapshot: DesignSnapshot = {
+        meta: {
+            id: Math.random().toString(36).substr(2, 9),
+            createdAt: new Date().toISOString(),
+            label: label || `迭代 ${evolution.snapshots.length + 1}`
+        },
+        payload: {
+            springType,
+            input: { ...geometry, materialId },
+            modules: modules as unknown as Record<string, boolean>,
+            axisMode: inputMode
+        },
+        summary: {
+            status: result.isValid ? "pass" : "fail",
+            kpi: {
+                springRate: result.springRate,
+                maxStress: result.maxStress,
+                fatigueSF: fatigueSF,
+                mass: baselineMetrics?.massProxy || null
+            },
+            loadCases: result.cases.map(c => ({
+                name: c.id,
+                x: c.inputValue,
+                y: c.load || 0,
+                stress: c.stress || null,
+                status: c.status as any
+            }))
+        }
+    };
+
+    setEvolution(prev => ({
+        ...prev,
+        snapshots: [newSnapshot, ...prev.snapshots],
+        selectedSnapshotId: newSnapshot.meta.id
+    }));
+  }, [result, geometry, materialId, modules, inputMode, springType, evolution.snapshots, baselineMetrics]);
 
   if (!result) return null;
 
@@ -517,7 +608,8 @@ export function SpringPlatformSection({
                   { id: "verification", labelZh: "核算", labelEn: "Verify" },
                   { id: "targetLoad", labelZh: "反算", labelEn: "Design" },
                   { id: "stiffnessSelection", labelZh: "对比", labelEn: "Compare" },
-                  { id: "designOpt", labelZh: "优化", labelEn: "Optimize" }
+                  { id: "designOpt", labelZh: "优化", labelEn: "Optimize" },
+                  { id: "evolution", labelZh: "审核", labelEn: "Audit" }
                 ].map(m => (
                   <button
                     key={m.id}
@@ -527,6 +619,27 @@ export function SpringPlatformSection({
                     {m.labelZh} / {m.labelEn}
                   </button>
                 ))}
+            </div>
+
+            {/* Phase 14.3: Workflow Status */}
+            <div className="flex items-center gap-2 px-2 py-1 bg-slate-50 border rounded-lg">
+                <Label className="text-[9px] font-black text-muted-foreground uppercase opacity-70">Status / 状态</Label>
+                <select 
+                    className="bg-transparent text-[10px] font-bold outline-none cursor-pointer text-primary"
+                    value={workflowStatus}
+                    onChange={(e) => setWorkflowStatus(e.target.value as PlatformWorkflowStatus)}
+                >
+                    <option value="CONCEPT">草图 / CONCEPT</option>
+                    <option value="REVIEW">评审 / REVIEW</option>
+                    <option value="APPROVED">批准 / APPROVED</option>
+                    <option value="RFQ">询价 / RFQ</option>
+                </select>
+                <Badge 
+                    variant="outline" 
+                    className={`text-[8px] h-4 ${workflowStatus === 'APPROVED' ? 'bg-green-500 text-white' : (workflowStatus === 'REVIEW' ? 'bg-orange-500 text-white' : 'bg-blue-500 text-white')}`}
+                >
+                    {workflowStatus}
+                </Badge>
             </div>
 
             <div className="flex-1 opacity-80 hover:opacity-100 transition-opacity">
@@ -654,10 +767,50 @@ export function SpringPlatformSection({
                             onApply={handleApplyDesign}
                             onUndo={handleUndo}
                             hasHistory={history.length > 0}
+                            baselineMetrics={baselineMetrics}
                         />
                     )}
                 </div>
             )}
+
+            {designMode === ("evolution" as any) && (
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center bg-primary/5 p-4 rounded-lg border border-primary/20">
+                        <div className="space-y-1">
+                            <h4 className="text-xs font-black uppercase text-primary">工程审计回放 / Evolution Hub</h4>
+                            <p className="text-[10px] text-muted-foreground italic">记录每一个关键决策，生成可追溯的工程故事。</p>
+                        </div>
+                        <Button 
+                            className="h-8 text-[10px] font-bold gap-2"
+                            onClick={() => takeSnapshot()}
+                        >
+                            <Clock className="h-3.5 w-3.5" /> 保存当前快照 / Snapshot
+                        </Button>
+                    </div>
+                    
+                    <DesignEvolutionHub 
+                        state={evolution}
+                        onView={(id) => setEvolution(prev => ({ ...prev, selectedSnapshotId: id }))}
+                        onPin={(id, pin) => setEvolution(prev => ({
+                            ...prev,
+                            snapshots: prev.snapshots.map(s => s.meta.id === id ? { ...s, meta: { ...s.meta, pinned: pin } } : s)
+                        }))}
+                        onDelete={(id) => setEvolution(prev => ({
+                            ...prev,
+                            snapshots: prev.snapshots.filter(s => s.meta.id !== id)
+                        }))}
+                        onUpdateComment={(id, comment) => setEvolution(prev => ({
+                            ...prev,
+                            snapshots: prev.snapshots.map(s => s.meta.id === id ? { ...s, meta: { ...s.meta, comment } } : s)
+                        }))}
+                    />
+                </div>
+            )}
+          </div>
+
+          {/* Phase 14.2: Assumption Panel */}
+          <div className="pt-4 border-t border-dashed">
+            <EngineeringAssumptionPanel springType={springType} />
           </div>
         </CardContent>
       )}

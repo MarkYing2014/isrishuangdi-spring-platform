@@ -31,6 +31,8 @@ export interface ReportMeta {
     companyName?: string;
     /** Report language */
     language: "en" | "zh" | "bilingual";
+    /** Workflow status (Phase 14.3) */
+    workflowStatus?: string;
 }
 
 /**
@@ -151,6 +153,24 @@ export interface ReportParetoResults {
     };
 }
 
+/**
+ * Evolution entry for the report (Phase 15)
+ */
+export interface EvolutionReportEntry {
+    meta: {
+        id: string;
+        createdAt: string;
+        label?: string;
+        comment?: string;
+        pinned?: string;
+    };
+    summary: {
+        status: string;
+        kpi: Record<string, number | null>;
+    };
+    insights: { text: string; severity: string }[];
+}
+
 // =============================================================================
 // Main Report Interface
 // =============================================================================
@@ -200,6 +220,16 @@ export interface SpringDesignReport {
 
     /** Pareto optimization results (optional) */
     pareto?: ReportParetoResults;
+
+    /** Engineering Assumptions (Phase 14.2) */
+    assumptions?: { titleEn: string; titleZh: string; contentEn: string; contentZh: string }[];
+
+    /** Design Evolution (Phase 15) */
+    evolution?: {
+        pinned: EvolutionReportEntry[];
+        baselineId?: string;
+        finalId?: string;
+    };
 }
 
 // =============================================================================

@@ -145,7 +145,9 @@ export class ExtensionEngine implements ISpringEngine {
             wahlFactor,
             H0,
             P0,
-            isValid: caseResults.every(c => c.isValid)
+            isValid: caseResults.every(c => c.isValid),
+            maxStress: Math.max(...caseResults.map(c => c.stress || 0)),
+            tauAllow: tauAllow
         };
     }
 

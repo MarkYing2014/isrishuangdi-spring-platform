@@ -21,10 +21,59 @@ export type PlatformInputMode =
 
 export type PlatformDesignMode = "verification" | "targetLoad" | "stiffnessSelection" | "designOpt";
 
+export type PlatformWorkflowStatus = "CONCEPT" | "REVIEW" | "APPROVED" | "RFQ" | "PRODUCTION";
+
 export interface PlatformDesignSummary {
     title: string;
     details: { label: string; value: string; unit?: string }[];
     warnings?: string[];
+}
+
+// =============================================================================
+// Phase 15: Engineering Evolution & Snapshots
+// =============================================================================
+
+export type SnapshotPin = "baseline" | "milestone" | "final";
+
+export interface SnapshotMeta {
+    id: string;                 // uuid
+    createdAt: string;          // ISO
+    author?: string;            // optional
+    label?: string;             // e.g., "Fix fatigue", "OEM target"
+    comment?: string;           // human note
+    pinned?: SnapshotPin;       // controls report inclusion
+}
+
+export interface SnapshotPayload {
+    springType: PlatformSpringType;
+    input: any;                 // engine input (geometry + material params)
+    modules: Record<string, boolean>;  // platform module toggles at time of capture
+    axisMode?: string;          // height/deflection/angle etc
+}
+
+export interface SnapshotSummary {
+    status: "pass" | "warning" | "fail";
+    kpi: Record<string, number | null>; // fatigueSF, maxStress, energy, etc
+    loadCases: Array<{
+        name: string;             // L1/L2/Stage1/ride/bump
+        x: number;                // deflection/angle
+        y: number;                // load/torque
+        stress?: number | null;
+        status?: "ok" | "warning" | "danger" | "invalid";
+    }>;
+    assumptions?: string[];     // from getSummary or engine summary
+}
+
+export interface DesignSnapshot {
+    meta: SnapshotMeta;
+    payload: SnapshotPayload;
+    summary: SnapshotSummary;
+}
+
+export interface EvolutionState {
+    snapshots: DesignSnapshot[];
+    selectedSnapshotId?: string;      // for viewing
+    compareWithId?: string;           // diff anchor
 }
 
 /** Shock Spring Specific Input (GEN-2) */
@@ -165,6 +214,9 @@ export interface PlatformResult {
 
     // Overall status
     isValid: boolean;
+    maxStress: number;        // Peak stress across all cases
+    tauAllow: number;         // Material allowable stress
+    workflowStatus?: PlatformWorkflowStatus;
 
     // Phase 7: Energy metric
     totalEnergy?: number;

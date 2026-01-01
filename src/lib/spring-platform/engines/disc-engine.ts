@@ -82,6 +82,8 @@ export class DiscSpringEngine implements ISpringEngine {
             springIndex: delta,
             wahlFactor: 1,
             isValid: results.every(r => r.isValid),
+            maxStress: Math.max(...results.map(r => r.stress || 0)),
+            tauAllow: tauAllow * 1.5,
             totalEnergy: results.reduce((acc, r) => acc + (r.energy || 0), 0)
         };
     }

@@ -5,18 +5,10 @@
  * Converts Spring Platform engine outputs into SpringDesignReport format.
  */
 
-import type {
-    SpringDesignReport,
-    ReportMeta,
-    ReportParameter,
-    ReportLoadCase,
-    ReportCurve,
-    ReportReview,
-    ReportIssue,
-    ReportOptions,
-} from "./report-types";
+import type { SpringDesignReport, ReportMeta, ReportParameter, ReportLoadCase, ReportCurve, ReportReview, ReportIssue, ReportOptions, EvolutionReportEntry } from "./report-types";
 import { DEFAULT_REPORT_OPTIONS } from "./report-types";
-import type { PlatformResult, PlatformSpringType, LoadCaseResult } from "../types";
+import type { PlatformResult, PlatformSpringType, LoadCaseResult, EvolutionState, DesignSnapshot } from "../types";
+import { buildInsights } from "../evolution-logic";
 
 // =============================================================================
 // Spring Type Labels
@@ -548,6 +540,8 @@ export interface ReportBuilderInput {
     paretoResults?: any;
     /** Report options */
     options?: Partial<ReportOptions>;
+    /** Phase 15: Evolution State */
+    evolutionState?: EvolutionState;
 }
 
 /**
@@ -582,6 +576,7 @@ export function buildSpringDesignReport(input: ReportBuilderInput): SpringDesign
         versionHash: generateVersionHash(inputsForHash),
         companyName: opts.companyName,
         language: opts.language,
+        workflowStatus: result.workflowStatus,
     };
 
     // Build parameters
@@ -635,6 +630,31 @@ export function buildSpringDesignReport(input: ReportBuilderInput): SpringDesign
     // Build review
     const review = buildReview(result, designRuleIssues);
 
+    // Build Assumptions (Phase 14.2)
+    const assumptions = [
+        {
+            titleEn: "Fatigue Model",
+            titleZh: "疲劳模型",
+            contentEn: "Modified Goodman Criterion with surface factor correction.",
+            contentZh: "采用修正古德曼判据并计入表面质量修正因子。"
+        },
+        {
+            titleEn: "Linearity & Stacking",
+            titleZh: "线性与堆叠特性",
+            contentEn: "Assumes nominal geometry without manufacturing tolerances.",
+            contentZh: "基于理论名义几何尺寸，未计入制造公差导致的性能离散。"
+        }
+    ];
+
+    if (springType === 'shock') {
+        assumptions.push({
+            titleEn: "Pitch Transition",
+            titleZh: "节距过渡",
+            contentEn: "Piecewise aggregation used for progressive stiffness modeling.",
+            contentZh: "采用分段聚合数值积分模拟渐进式刚度变化。"
+        });
+    }
+
     // Build report
     const report: SpringDesignReport = {
         meta,
@@ -643,11 +663,52 @@ export function buildSpringDesignReport(input: ReportBuilderInput): SpringDesign
         curves,
         keyResults,
         review,
+        assumptions
     };
 
     // Add Pareto results if available
     if (paretoResults && opts.includePareto) {
         report.pareto = paretoResults;
+    }
+
+    // Build Evolution (Phase 15)
+    if (input.evolutionState && input.evolutionState.snapshots.length > 0) {
+        const sorted = [...input.evolutionState.snapshots].sort(
+            (a, b) => new Date(a.meta.createdAt).getTime() - new Date(b.meta.createdAt).getTime()
+        );
+        const pinned = sorted.filter(s => s.meta.pinned);
+
+        if (pinned.length > 0) {
+            const pinnedEntries: EvolutionReportEntry[] = pinned.map((snap, idx) => {
+                const globalIdx = sorted.findIndex(s => s.meta.id === snap.meta.id);
+                const prev = globalIdx > 0 ? sorted[globalIdx - 1] : null;
+                const insights = prev ? buildInsights(prev, snap) : [];
+
+                return {
+                    meta: {
+                        id: snap.meta.id,
+                        createdAt: snap.meta.createdAt,
+                        label: snap.meta.label,
+                        comment: snap.meta.comment,
+                        pinned: snap.meta.pinned
+                    },
+                    summary: {
+                        status: snap.summary.status,
+                        kpi: snap.summary.kpi
+                    },
+                    insights: insights.map(i => ({
+                        text: `${i.textEn} / ${i.textZh}`,
+                        severity: i.severity
+                    }))
+                };
+            });
+
+            report.evolution = {
+                pinned: pinnedEntries,
+                baselineId: sorted.find(s => s.meta.pinned === "baseline")?.meta.id,
+                finalId: sorted.find(s => s.meta.pinned === "final")?.meta.id
+            };
+        }
     }
 
     return report;

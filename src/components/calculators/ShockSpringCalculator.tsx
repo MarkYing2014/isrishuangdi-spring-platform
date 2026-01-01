@@ -86,6 +86,7 @@ import { CandidateSolution } from "@/lib/spring-platform/candidate-solution";
 import { DesignSpace } from "@/lib/spring-platform/design-space-types";
 import { getEngine } from "@/lib/spring-platform/engine-registry";
 import { SpringPlatformSection } from "@/components/spring-platform/SpringPlatformSection";
+import { GlobalEngineeringStatus } from "@/components/ui/GlobalEngineeringStatus";
 
 // ============================================================================
 // Charts Component
@@ -541,13 +542,22 @@ export function ShockSpringCalculator() {
                    </p>
                  </div>
                  <Badge variant="outline" className="h-fit">GEN-2 Platform</Badge>
-            {isOverSampled && (
-              <Badge variant="destructive" className="h-fit animate-pulse">
-                Interactive mode: sampling reduced ({effectiveSamplesPerTurn}/turn)
-              </Badge>
-            )}
                </div>
              </div>
+
+      {platformResult && (
+        <GlobalEngineeringStatus 
+          result={platformResult} 
+          onJumpToRules={() => {
+            const reviewTrigger = document.querySelector('[value="review"]');
+            if (reviewTrigger) {
+              (reviewTrigger as any).click();
+              reviewTrigger.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }}
+        />
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Left Column: Parameters */}
         <div className="space-y-4">
