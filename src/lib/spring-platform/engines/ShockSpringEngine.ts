@@ -28,6 +28,7 @@ export class ShockSpringEngine implements ISpringEngine {
         };
         modules: PlatformModules;
     }): PlatformResult {
+        console.count("ShockSpringEngine.calculate");
         const input = params.geometry as ShockSpringInput;
         const material = params.material;
 

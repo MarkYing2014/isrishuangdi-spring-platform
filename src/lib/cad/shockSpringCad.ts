@@ -12,7 +12,7 @@
  * This ensures Three.js and FreeCAD produce matching geometry.
  */
 
-import type { ShockSpringParams } from '@/lib/spring3d/shock';
+import type { ShockSpringParams } from '../spring3d/shock/types';
 
 /**
  * Generate a FreeCAD Python script for the shock absorber spring

@@ -11,7 +11,7 @@
  */
 
 import React, { useMemo, useRef, useState, useCallback, useEffect } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { Center } from "@react-three/drei";
 import * as THREE from "three";
 import { AutoFitControls } from "./AutoFitControls";
@@ -89,8 +89,6 @@ function buildTubeGeometryFromFrames(
   normals: THREE.Vector3[],
   binormals: THREE.Vector3[],
   circleSegments: number = 32,
-  grinding: { start: boolean; end: boolean; zStart?: number; zEnd?: number },
-  compressionRatio: number = 1.0, 
   stressCalc?: StressCalculator
 ): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
@@ -104,12 +102,6 @@ function buildTubeGeometryFromFrames(
   const n = points.length;
   if (n < 2) return geometry;
 
-  let zMin = grinding.start && grinding.zStart !== undefined ? grinding.zStart : -Infinity;
-  let zMax = grinding.end && grinding.zEnd !== undefined ? grinding.zEnd : Infinity;
-  
-  if (grinding.end && grinding.zEnd !== undefined) {
-      zMax = grinding.zEnd * compressionRatio;
-  }
 
   const tempColor = new THREE.Color();
 
@@ -120,8 +112,6 @@ function buildTubeGeometryFromFrames(
     const binormal = binormals[i];
     const u = i / (n - 1);
     
-    const pZ = p.z * compressionRatio; 
-    
     for (let j = 0; j <= circleSegments; j++) {
       const angle = (j / circleSegments) * Math.PI * 2;
       const cosA = Math.cos(angle);
@@ -129,32 +119,20 @@ function buildTubeGeometryFromFrames(
       
       let vx = p.x + normal.x * cosA * r + binormal.x * sinA * r;
       let vy = p.y + normal.y * cosA * r + binormal.y * sinA * r;
-      let vz = pZ + normal.z * cosA * r + binormal.z * sinA * r;
-      
-      let clamped = false;
-      if (vz < zMin) { vz = zMin; clamped = true; }
-      if (vz > zMax) { vz = zMax; clamped = true; }
+      let vz = p.z + normal.z * cosA * r + binormal.z * sinA * r;
       
       positions.push(vx, vy, vz);
       
-      if (clamped) {
-          if (vz <= zMin + 0.001) normalsArray.push(0, 0, -1);
-          else normalsArray.push(0, 0, 1);
-      } else {
-          const nx = normal.x * cosA + binormal.x * sinA;
-          const ny = normal.y * cosA + binormal.y * sinA;
-          const nz = normal.z * cosA + binormal.z * sinA;
-          const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-          normalsArray.push(nx / len, ny / len, nz / len);
-      }
+      const nx = normal.x * cosA + binormal.x * sinA;
+      const ny = normal.y * cosA + binormal.y * sinA;
+      const nz = normal.z * cosA + binormal.z * sinA;
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      normalsArray.push(nx / len, ny / len, nz / len);
+      
       uvs.push(u, j / circleSegments);
 
-      // Vertex Colors with Stress Gradient
-      if (stressCalc) {
-          const stressNorm = stressCalc(i, cosA);
-          const [r, g, b] = stressToRGB(stressNorm);
-          colorsArray.push(r, g, b);
-      }
+      // Initialize with Neutral Color
+      colorsArray.push(1, 1, 1);
     }
   }
   
@@ -173,12 +151,12 @@ function buildTubeGeometryFromFrames(
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normalsArray, 3));
   geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-  if (colorsArray.length > 0) {
-      geometry.setAttribute("color", new THREE.Float32BufferAttribute(colorsArray, 3));
-  }
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colorsArray, 3));
+  
   geometry.setIndex(indices);
   geometry.computeBoundingSphere();
   
+  console.log("ShockSpringVisualizer: Geometry Rebuilt (Structural)");
   return geometry;
 }
 
@@ -213,76 +191,142 @@ function ShockSpringMesh({
      }
   }, [stressResult, showStress, setStressStats]);
 
-  const geometry = useMemo(() => {
-    const { centerline, frames, grindingPlanes, freeLength } = result.derived;
-    if (freeLength <= 0) return new THREE.BufferGeometry();
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  // Clipping Planes for Grinding
+  const basePlanes = useMemo(() => {
+    const planes: THREE.Plane[] = [];
+    const { grindingPlanes } = result.derived;
+    const isClip = input.grinding.mode === "visualClip" || input.grinding.mode === "exportCut";
+    
+    if (isClip) {
+        if (input.grinding.grindStart && grindingPlanes.startZ !== null) {
+            planes.push(new THREE.Plane(new THREE.Vector3(0, 0, 1), -grindingPlanes.startZ));
+        }
+        if (input.grinding.grindEnd && grindingPlanes.endZ !== null) {
+            planes.push(new THREE.Plane(new THREE.Vector3(0, 0, -1), grindingPlanes.endZ));
+        }
+    }
+    return planes;
+  }, [result.derived.grindingPlanes, input.grinding.mode, input.grinding.grindStart, input.grinding.grindEnd]);
+
+  // Scaled clipping planes for the material
+  const [clippingPlanes, setClippingPlanes] = useState<THREE.Plane[]>([]);
+
+  // Apply compression via Scale and clipping plane update
+  useFrame(() => {
+    if (!meshRef.current) return;
+    const { freeLength } = result.derived;
+    if (freeLength <= 0) return;
 
     const currentLen = Math.max(0.1, freeLength - compression);
     const ratio = currentLen / freeLength;
     
+    // Scale Z to compress
+    meshRef.current.scale.set(1, 1, ratio);
+
+    // Compensate Clipping Planes: planeZLocal = zCutFree / scaleZ
+    // This keeps the cut fixed in world space while the geometry scales.
+    if (basePlanes.length > 0) {
+        const scaledPlanes = basePlanes.map(p => {
+             const newP = p.clone();
+             // Normal is (0,0,1) or (0,0,-1). 
+             // ax + by + cz + d = 0 => cz + d = 0 => z = -d/c
+             // If we scale Z by 'ratio', the local coordinate effectively expands.
+             // We need the world cut position to remain constant.
+             // newD = oldD / ratio?
+             // Actually, if we use local clipping, Three.js applies projection.
+             // Let's use the requested formula: planeZLocal = zCutFree / scaleZ
+             newP.constant = p.constant / ratio;
+             return newP;
+        });
+        // Avoid state updates in useFrame if possible, but for clipping it's often needed unless using ref
+        if (clippingPlanes.length !== scaledPlanes.length || Math.abs(clippingPlanes[0]?.constant - scaledPlanes[0]?.constant) > 0.001) {
+            setClippingPlanes(scaledPlanes);
+        }
+    } else if (clippingPlanes.length > 0) {
+        setClippingPlanes([]);
+    }
+  });
+
+  const geometry = useMemo(() => {
+    // Structural Rebuild Only
+    const { centerline, frames, freeLength } = result.derived;
+    if (freeLength <= 0) return new THREE.BufferGeometry();
+
     const points = centerline.map(p => new THREE.Vector3(p.x, p.y, p.z));
     const radii = result.derived.radii;
     
+    if (!centerline || !frames) return new THREE.BufferGeometry();
+    if (!frames.tangents || !frames.normals || !frames.binormals) return new THREE.BufferGeometry();
+
     const tangents = frames.tangents.map(f => new THREE.Vector3(f.x, f.y, f.z));
     const normals = frames.normals.map(f => new THREE.Vector3(f.x, f.y, f.z));
     const binormals = frames.binormals.map(f => new THREE.Vector3(f.x, f.y, f.z));
     
-    const isClip = input.grinding.mode === "visualClip" || input.grinding.mode === "exportCut";
-    
-    // Stress Logic
-    let stressCalc: StressCalculator | undefined;
-    
-    if (showStress && stressResult) {
-        stressCalc = (i: number, cosTheta: number) => {
-             // 1. Get centerline tau(i) from pre-computed Beam Result
-             const tauCenter = stressResult.tau[i];
-             const tauAllow = stressResult.tauAllow;
-             
-             // 2. Map to ID/OD surface using simple approximation
-             // ID (cosTheta=1) -> slightly higher stress?
-             // Actually, Wahl factor ALREADY accounts for ID stress concentration.
-             // So tauCenter IS the MAX stress at the ID.
-             // At OD (cosTheta=-1), stress is lower.
-             // Approx: Tau(OD) approx Tau(ID) / Kw * K_shear? 
-             // Let's assume Tau(OD) is approx 0.7 * Tau(ID) for visual gradient.
-             // Interpolate: ID=1.0, OD=0.7
-             
-             const t = (cosTheta + 1) / 2; // 0(OD) to 1(ID)
-             const distribution = 0.7 + 0.3 * t; 
-             
-             const localTau = tauCenter * distribution;
-             
-             // Normalize against Allowable
-             return Math.min(1.5, localTau / tauAllow); // Allow slightly over 1.0 (Red)
-        };
-    }
-
     return buildTubeGeometryFromFrames(
       points,
       radii,
       tangents,
       normals,
       binormals,
-      32, 
-      { 
-        start: input.grinding.grindStart && isClip, 
-        end: input.grinding.grindEnd && isClip,
-        zStart: grindingPlanes.startZ ?? undefined,
-        zEnd: grindingPlanes.endZ ?? undefined
-      },
-      ratio, 
-      stressCalc
+      32
     );
-  }, [result, input, compression, showStress, stressResult]); // Re-build when stress changes
+  }, [
+      result.derived.centerline, 
+      result.derived.radii, 
+      result.derived.freeLength,
+      // Strictly structural parameters
+  ]);
+
+  // Dynamic Stress Color Update (Ring-Based)
+  useEffect(() => {
+      if (!meshRef.current || !geometry) return;
+      const colorAttr = geometry.getAttribute("color") as THREE.BufferAttribute;
+      if (!colorAttr) return;
+
+      const n = result.derived.centerline.length;
+      const circleSegments = 32;
+      const ringSize = circleSegments + 1;
+
+      if (showStress && stressResult) {
+          for (let i = 0; i < n; i++) {
+              const tauCenter = stressResult.tau[i];
+              const tauAllow = stressResult.tauAllow;
+              
+              // Simplest: one color per ring. 
+              // ID/OD gradient can be added if needed, but ring-based is safer for O(1) slider.
+              const stressNorm = Math.min(1.5, tauCenter / (tauAllow || 1));
+              const [r, g, b] = stressToRGB(stressNorm);
+
+              for (let j = 0; j < ringSize; j++) {
+                  const idx = (i * ringSize + j) * 3;
+                  colorAttr.array[idx] = r;
+                  colorAttr.array[idx+1] = g;
+                  colorAttr.array[idx+2] = b;
+              }
+          }
+          console.log("ShockSpringVisualizer: Dynamic Colors Updated (Buffer Only)");
+          colorAttr.needsUpdate = true;
+      } else {
+          // Reset to neutral
+          const neutral = new THREE.Color(SPRING_COLOR);
+          for (let i = 0; i < colorAttr.count; i++) {
+              colorAttr.setXYZ(i, neutral.r, neutral.g, neutral.b);
+          }
+          colorAttr.needsUpdate = true;
+      }
+  }, [showStress, stressResult, geometry, result.derived.centerline.length]); // Added result.derived.centerline.length to dependencies for safety
   
   return (
-    <mesh geometry={geometry}>
+    <mesh ref={meshRef} geometry={geometry}>
       <meshStandardMaterial
-        key={showStress ? "fea-material" : "std-material"}
         color={showStress ? "#ffffff" : SPRING_COLOR}
-        vertexColors={showStress}
-        metalness={showStress ? previewTheme.material.fea.metalness : previewTheme.material.spring.metalness}
-        roughness={showStress ? previewTheme.material.fea.roughness : previewTheme.material.spring.roughness}
+        vertexColors={true}
+        roughness={0.3}
+        metalness={0.8}
+        clippingPlanes={clippingPlanes}
+        clipShadows={true}
         side={THREE.DoubleSide}
       />
     </mesh>
@@ -442,7 +486,7 @@ export function ShockSpringVisualizer({
         <Canvas
             shadows
             camera={{ position: [50, 40, 60], fov: 45 }}
-            gl={{ preserveDrawingBuffer: true }}
+            gl={{ preserveDrawingBuffer: true, localClippingEnabled: true }}
         >
             <CameraController viewType={currentView} controlsRef={controlsRef} />
             <color attach="background" args={[previewTheme.background]} />

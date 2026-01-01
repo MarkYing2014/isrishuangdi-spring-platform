@@ -36,7 +36,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { AlertCircle, AlertTriangle, CheckCircle2, Copy, ChevronDown, Info } from "lucide-react";
+import { 
+  AlertCircle, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Copy, 
+  ChevronDown, 
+  Info, 
+  Sparkles, 
+  X 
+} from "lucide-react";
 
 // Recharts
 import { 
@@ -68,7 +77,7 @@ import {
 import { generateShockSpringFreeCADScript as generateCAD } from "@/lib/cad/shockSpringCad";
 import { checkShockSpringDesignRules, DesignRuleResult } from "@/lib/spring-platform/rules/shock-rules";
 import { PlatformResult, PlatformMaterialModel } from "@/lib/spring-platform/types";
-import { Sparkles, X } from "lucide-react";
+
 import { DesignSpacePanel } from "@/components/design/DesignSpacePanel";
 import { ParetoSelectionView } from "@/components/design/ParetoSelectionView";
 import { CandidateGenerator } from "@/lib/spring-platform/candidate-generator";
@@ -370,13 +379,22 @@ export function ShockSpringCalculator() {
 
   const [platformResult, setPlatformResult] = useState<PlatformResult | null>(null);
 
+  // Performance Guardrails: Sampling Clamp
+  const MAX_SAMPLES = 400;
+  const totalSamplesPossible = Math.floor(totalTurns * samplesPerTurn) + 1;
+  const isOverSampled = totalSamplesPossible > MAX_SAMPLES;
+  const effectiveSamplesPerTurn = isOverSampled
+    ? Math.max(10, Math.floor((MAX_SAMPLES - 1) / Math.max(totalTurns, 1)))
+    : samplesPerTurn;
+
+
   // ========================================
   // Build Parameters
   // ========================================
 
   const input: ShockSpringInput = useMemo(() => ({
     totalTurns,
-    samplesPerTurn,
+    samplesPerTurn: effectiveSamplesPerTurn,
     meanDia: {
       start: meanDiaStart,
       mid: meanDiaMid,
@@ -468,7 +486,7 @@ export function ShockSpringCalculator() {
   // Legacy params for CAD export compatibility (until CAD is updated)
   const legacyParams: ShockSpringParams = useMemo(() => ({
     totalTurns,
-    samplesPerTurn,
+    samplesPerTurn: effectiveSamplesPerTurn,
     meanDia: { start: meanDiaStart, mid: meanDiaMid, end: meanDiaEnd, shape: meanDiaShape },
     wireDia: { start: wireDiaStart, mid: wireDiaMid, end: wireDiaEnd },
     pitch: { 
@@ -523,6 +541,11 @@ export function ShockSpringCalculator() {
                    </p>
                  </div>
                  <Badge variant="outline" className="h-fit">GEN-2 Platform</Badge>
+            {isOverSampled && (
+              <Badge variant="destructive" className="h-fit animate-pulse">
+                Interactive mode: sampling reduced ({effectiveSamplesPerTurn}/turn)
+              </Badge>
+            )}
                </div>
              </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

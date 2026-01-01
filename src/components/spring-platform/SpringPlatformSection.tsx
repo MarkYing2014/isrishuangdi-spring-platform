@@ -139,6 +139,21 @@ export function SpringPlatformSection({
   // this prevents rounding drift when toggling between Height and Deflection.
   const [canonicalValues, setCanonicalValues] = useState<number[]>([]);
 
+  // Performance Guardrails: Debounce calculation inputs
+  const [debouncedGeometry, setDebouncedGeometry] = useState(geometry);
+  const [debouncedCanonical, setDebouncedCanonical] = useState(canonicalValues);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedGeometry(geometry), 200);
+    return () => clearTimeout(timer);
+  }, [geometry]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedCanonical(canonicalValues), 150);
+    return () => clearTimeout(timer);
+  }, [canonicalValues]);
+
+
   // Initialize canonical values when spring type or H0 changes
   useEffect(() => {
     const H0 = geometry.H0 || 50;
@@ -263,7 +278,7 @@ export function SpringPlatformSection({
       const engine = getEngine(springType);
       
       const res = engine.calculate({
-        geometry,
+        geometry: debouncedGeometry,
         material: {
           ...propsMaterial,
           id: materialId as any,
@@ -273,7 +288,7 @@ export function SpringPlatformSection({
         },
         cases: {
           mode: springType === "torsion" ? "angle" : "height",
-          values: canonicalValues,
+          values: debouncedCanonical,
         },
         modules,
         springType,
@@ -284,7 +299,8 @@ export function SpringPlatformSection({
       console.error("Platform calculation failed", e);
       return null;
     }
-  }, [springType, geometry, propsMaterial, materialId, material, canonicalValues, modules]);
+  }, [springType, debouncedGeometry, propsMaterial, materialId, material, debouncedCanonical, modules]);
+
 
   // Phase 7: Sync result to parent
   useEffect(() => {
