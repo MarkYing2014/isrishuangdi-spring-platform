@@ -28,6 +28,7 @@ export function StiffnessSelectionPanel({
   const [kInput, setKInput] = useState<string>("0.8, 1.0, 1.2");
   const isRotation = springType === "torsion" || springType === "arc";
   const isArc = springType === "arc";
+  const isShock = springType === "shock";
 
   // Parse candidate values
   const candidates = useMemo(() => {
@@ -54,6 +55,13 @@ export function StiffnessSelectionPanel({
           // For arc, 'k' in input actually represents a scaling factor (kScale)
           const baseKScales = geometry.kScales || [1, 1.5, 2.5];
           solvedGeo.kScales = baseKScales.map((ks: number) => ks * k);
+      } else if (isShock) {
+          // For shock, we calculate required turns (n) to achieve candidate stiffness k
+          // Using helical approximation as a baseline for the solver
+          const Dm = geometry.meanDia?.mid || 50;
+          const d = geometry.wireDia?.mid || 10;
+          n = (G * Math.pow(d, 4)) / (8 * Math.pow(Dm, 3) * k);
+          solvedGeo.totalTurns = n;
       } else if (springType === "torsion") {
           // kt = (E * d^4 * PI) / (D * n * 64 * 180) -> n = (E * d^4 * PI) / (64 * 180 * D * k)
           n = (E * Math.pow(d, 4) * Math.PI) / (64 * 180 * D * k);
@@ -115,7 +123,9 @@ export function StiffnessSelectionPanel({
         <p className="text-[10px] text-muted-foreground italic px-1">
           {isArc 
             ? "提示：输入刚度倍数（如 0.8 表示当前刚度的 80%）进行多级曲线方案对比。"
-            : "提示：输入多个刚度值进行方案对比，系统将自动计算所需圈数及性能。"}
+            : (isShock 
+                ? "提示：输入候选刚度 (N/mm)，系统将自动调整圈数进行方案对比。"
+                : "提示：输入多个刚度值进行方案对比，系统将自动计算所需圈数及性能。")}
         </p>
       </div>
 
@@ -179,6 +189,8 @@ export function StiffnessSelectionPanel({
                             if (isArc) {
                                 const baseKScales = geometry.kScales || [1, 1.5, 2.5];
                                 onApply({ kScales: baseKScales.map((ks: number) => ks * item.k) });
+                            } else if (isShock) {
+                                onApply({ totalTurns: Number(item.n?.toFixed(2) || geometry.totalTurns) });
                             } else {
                                 onApply({ n: Number(item.n?.toFixed(2) || geometry.n) });
                             }

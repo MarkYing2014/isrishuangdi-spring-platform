@@ -304,17 +304,15 @@ function extractGeometryParams(
 
     // Variable Pitch specific
     if (springType === "variablePitch") {
+        // ...Existing variablePitch logic...
         if (geometry.segments !== undefined && Array.isArray(geometry.segments)) {
-            // Format segments as a comprehensive string or handle via custom rendering later.
-            // For now, let's summarize the count and maybe details in the value.
             params.push({
                 key: "segments",
                 labelEn: "Pitch Segments",
                 labelZh: "节距分段",
-                value: `${geometry.segments.length} segments`, // Simplified for now
+                value: `${geometry.segments.length} segments`,
                 category: "geometry",
             });
-            // We could add individual segment details if ReportParameter supported nested data or tables
         }
         if (geometry.activeCoils0 !== undefined) {
             params.push({
@@ -322,6 +320,60 @@ function extractGeometryParams(
                 labelEn: "Initial Active Coils",
                 labelZh: "初始有效圈",
                 value: geometry.activeCoils0,
+                category: "geometry",
+            });
+        }
+    }
+
+    // Shock spring specific
+    if (springType === "shock") {
+        if (geometry.totalTurns !== undefined) {
+            params.push({
+                key: "totalTurns",
+                labelEn: "Total Turns",
+                labelZh: "总圈数",
+                value: geometry.totalTurns,
+                category: "geometry",
+            });
+        }
+        if (geometry.meanDia?.mid !== undefined) {
+            params.push({
+                key: "meanDiaMid",
+                labelEn: "Mean Diameter (Mid)",
+                labelZh: "中径 (中间)",
+                value: geometry.meanDia.mid,
+                unit: "mm",
+                category: "geometry",
+            });
+        }
+        if (geometry.wireDia?.mid !== undefined) {
+            params.push({
+                key: "wireDiaMid",
+                labelEn: "Wire Diameter (Mid)",
+                labelZh: "线径 (中间)",
+                value: geometry.wireDia.mid,
+                unit: "mm",
+                category: "geometry",
+            });
+        }
+        if (geometry.pitch?.workingMax !== undefined) {
+            params.push({
+                key: "pitchMax",
+                labelEn: "Working Pitch (Max)",
+                labelZh: "工作节距 (最大)",
+                value: geometry.pitch.workingMax,
+                unit: "mm",
+                category: "geometry",
+            });
+        }
+        if (geometry.pitch?.closedTurns !== undefined) {
+            const ct = geometry.pitch.closedTurns;
+            const val = typeof ct === "number" ? ct : (ct.start + ct.end) / 2;
+            params.push({
+                key: "closedTurns",
+                labelEn: "Closed Turns",
+                labelZh: "并圈数",
+                value: val,
                 category: "geometry",
             });
         }
@@ -542,11 +594,20 @@ export function buildSpringDesignReport(input: ReportBuilderInput): SpringDesign
 
     // Build curves
     const isRotational = ["arc", "spiral", "torsion"].includes(springType);
+    let primaryPoints = result.cases.map(c => ({ x: c.inputValue, y: c.load ?? 0 }));
+
+    // Prefer high-fidelity curve from engine if available
+    if (result.curves?.px) {
+        primaryPoints = result.curves.px;
+    } else if (curveData) {
+        primaryPoints = curveData;
+    }
+
     const curves = {
         primary: {
             name: isRotational ? "Torque" : "Load",
             color: "#2563eb",
-            points: curveData ?? result.cases.map(c => ({ x: c.inputValue, y: c.load ?? 0 })),
+            points: primaryPoints,
         },
         xAxisLabel: isRotational ? "θ (°)" : "H (mm)",
         yAxisLabel: isRotational ? "M (N·mm)" : "P (N)",
