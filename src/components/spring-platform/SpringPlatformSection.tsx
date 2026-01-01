@@ -116,7 +116,10 @@ export function SpringPlatformSection({
   const [designMode, setDesignMode] = useState<PlatformDesignMode>("verification");
   
   // Input Mode state
-  const defaultMode: PlatformInputMode = springType === "torsion" ? "angle" : "height";
+  const defaultMode: PlatformInputMode = (springType === "torsion" || springType === "spiral") 
+    ? "angle" 
+    : ((springType === "arc" || springType === "disc" || springType === "shock") ? "deflection" : "height");
+    
   const [inputMode, setInputMode] = useState<PlatformInputMode>(defaultMode);
 
   // Material handling
@@ -142,8 +145,12 @@ export function SpringPlatformSection({
     const Hb = geometry.Hb || 10;
     
     let defaults: number[] = [];
-    if (springType === "torsion") {
+    if (springType === "torsion" || springType === "spiral" || springType === "arc") {
       defaults = [15, 30, 45, 60, 75].slice(0, loadPointCount);
+    } else if (springType === "shock" || springType === "disc") {
+      // Deflection based (0, 10, 20...)
+      // Assume some safe defaults if we don't know max stroke
+      defaults = Array.from({ length: loadPointCount }, (_, i) => (i + 1) * 10);
     } else {
       const step = (H0 - Hb) / (loadPointCount + 1);
       defaults = Array.from({ length: loadPointCount }, (_, i) => H0 - step * (i + 1));
@@ -164,14 +171,14 @@ export function SpringPlatformSection({
           E: material?.elasticModulus ?? propsMaterial.E ?? 206000,
           tauAllow: material?.allowShearStatic ?? propsMaterial.tauAllow ?? 700,
         },
-        cases: { mode: "height", values: [geometry.H0] }, // dummy point
+        cases: { mode: defaultMode, values: [0] }, // dummy point, safe for all modes
         modules: DEFAULT_PLATFORM_MODULES,
         springType,
       });
     } catch (e) {
       return null;
     }
-  }, [springType, geometry, propsMaterial, material, materialId]);
+  }, [springType, geometry, propsMaterial, material, materialId, defaultMode]);
 
   // Convert canonical to active input
   const inputValues = useMemo(() => {
@@ -182,12 +189,20 @@ export function SpringPlatformSection({
       if (inputMode === "deflection") {
           // For Arc: s = R * phi(rad)
           if (springType === "arc") return R_arc * (v * Math.PI / 180);
-          return v; // For Disc, canonical IS stroke (deflection), so just return it
+          return v; // For Disc/Shock, canonical IS stroke (deflection), so just return it
       }
       if ((inputMode as string) === "height") {
           if (springType === "disc") {
               const H_free = (geometry.t + geometry.h0) * (geometry.series || 1);
               return H_free - v; // H = H_free - s
+          }
+          if (springType === "shock") {
+             // For shock, canonical 'v' is deflection x.
+             // H = H0 - x.
+             // But we need H0. If geometry.H0 is missing, assume 0?
+             // Actually ShockSpringEngine.calculate returns H0. We can use baseResult.
+             const freeLen = baseResult?.H0 || geometry.H0 || 100;
+             return freeLen - v;
           }
           if (springType === "compression" || springType === "extension" || springType === "conical") {
               return geometry.H0 - v; // For these, canonical is deflection (delta)
@@ -211,6 +226,9 @@ export function SpringPlatformSection({
       if (springType === "disc") {
           const H_free = (geometry.t + geometry.h0) * (geometry.series || 1);
           next[index] = H_free - val; // s = H_free - H
+      } else if (springType === "shock") {
+          const freeLen = baseResult?.H0 || geometry.H0 || 100;
+          next[index] = Math.max(0, freeLen - val); // x = H0 - H, clamp >= 0
       } else {
           next[index] = H0 - val; // delta = H0 - H
       }
@@ -221,7 +239,7 @@ export function SpringPlatformSection({
           // phi(deg) = (s / R) * 180 / pi
           next[index] = (val / R_arc) * 180 / Math.PI;
       } else {
-          next[index] = val; // Canonical is deflection
+          next[index] = Math.max(0, val); // Canonical is deflection, clamp 0
       }
     } else if (inputMode === "torque" && baseResult && baseResult.springRate > 0) {
       // theta = M / k
@@ -229,6 +247,15 @@ export function SpringPlatformSection({
     }
     setCanonicalValues(next);
   };
+
+  // ... (Calculation code redundant in snippet, keeping context)
+
+  // Helper for dynamic labels
+  const axis = PLATFORM_AXIS_MAP[springType] || PLATFORM_AXIS_MAP.compression;
+
+  // ...
+  
+
 
   // Perform Calculation for display
   const result = useMemo(() => {
@@ -252,13 +279,19 @@ export function SpringPlatformSection({
         springType,
       });
       
-      onResultChange?.(res);
       return res;
     } catch (e) {
       console.error("Platform calculation failed", e);
       return null;
     }
-  }, [springType, geometry, propsMaterial, materialId, material, canonicalValues, modules, onResultChange]);
+  }, [springType, geometry, propsMaterial, materialId, material, canonicalValues, modules]);
+
+  // Phase 7: Sync result to parent
+  useEffect(() => {
+    if (result) {
+      onResultChange?.(result);
+    }
+  }, [result, onResultChange]);
 
   // Solver Wrap
   const handleSolve = useCallback((input: SolveForTargetInput) => {
@@ -397,58 +430,52 @@ export function SpringPlatformSection({
             <div className="space-y-1">
               <Label className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Mode / 输入方式</Label>
               <div className="flex rounded-lg overflow-hidden border border-input h-8 shadow-sm">
-                {springType === "arc" ? (
-                  <>
-                    <button
-                      type="button"
-                      className={`px-2 py-1 text-[10px] font-bold transition-all ${inputMode === "angle" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted text-muted-foreground"}`}
-                      onClick={() => setInputMode("angle")}
-                    >
-                      转角 φ / Angle φ
-                    </button>
-                    <button
-                      type="button"
-                      className={`px-2 py-1 text-[10px] font-bold border-l transition-all ${inputMode === "deflection" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted text-muted-foreground"}`}
-                      onClick={() => setInputMode("deflection")}
-                    >
-                      位移 s / Arc Disp s
-                    </button>
-                  </>
-                ) : springType === "torsion" ? (
-                  <>
-                    <button
-                      type="button"
-                      className={`px-2 py-1 text-[10px] font-bold transition-all ${inputMode === "angle" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted text-muted-foreground"}`}
-                      onClick={() => setInputMode("angle")}
-                    >
-                      角度 θ / Angle θ
-                    </button>
-                    <button
-                      type="button"
-                      className={`px-2 py-1 text-[10px] font-bold border-l transition-all ${inputMode === "torque" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted text-muted-foreground"}`}
-                      onClick={() => setInputMode("torque")}
-                    >
-                      扭矩 M / Torque M
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className={`px-2 py-1 text-[10px] font-bold transition-all ${inputMode === "height" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted text-muted-foreground"}`}
-                      onClick={() => setInputMode("height")}
-                    >
-                      高度 H / Height H
-                    </button>
-                    <button
-                      type="button"
-                      className={`px-2 py-1 text-[10px] font-bold border-l transition-all ${inputMode === "deflection" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted text-muted-foreground"}`}
-                      onClick={() => setInputMode("deflection")}
-                    >
-                      行程 s / Stroke s
-                    </button>
-                  </>
-                )}
+                 {(springType === "torsion" || springType === "spiral" || springType === "arc") ? (
+                    <>
+                         <button
+                           type="button"
+                           className={`px-2 py-1 text-[10px] font-bold transition-all ${inputMode === "angle" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted text-muted-foreground"}`}
+                           onClick={() => setInputMode("angle")}
+                         >
+                           {axis.xLabelZh} / {axis.xLabelEn}
+                         </button>
+                         {(springType === "torsion") && (
+                             <button
+                               type="button"
+                               className={`px-2 py-1 text-[10px] font-bold border-l transition-all ${inputMode === "torque" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted text-muted-foreground"}`}
+                               onClick={() => setInputMode("torque")}
+                             >
+                               {axis.yLabelZh} / {axis.yLabelEn}
+                             </button>
+                         )}
+                         {(springType === "arc") && (
+                             <button
+                               type="button"
+                               className={`px-2 py-1 text-[10px] font-bold border-l transition-all ${inputMode === "deflection" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted text-muted-foreground"}`}
+                               onClick={() => setInputMode("deflection")}
+                             >
+                               位移 s / Arc Disp s
+                             </button>
+                         )}
+                    </>
+                 ) : (
+                    <>
+                     <button
+                       type="button"
+                       className={`px-2 py-1 text-[10px] font-bold transition-all ${inputMode === "height" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted text-muted-foreground"}`}
+                       onClick={() => setInputMode("height")}
+                     >
+                       高度 H / Height H
+                     </button>
+                     <button
+                       type="button"
+                       className={`px-2 py-1 text-[10px] font-bold border-l transition-all ${inputMode === "deflection" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted text-muted-foreground"}`}
+                       onClick={() => setInputMode("deflection")}
+                     >
+                       {springType === "shock" ? "行程 x / Stroke x" : "挠度 f / Deflection f"}
+                     </button>
+                    </>
+                 )}
               </div>
             </div>
 

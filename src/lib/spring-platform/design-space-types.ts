@@ -21,6 +21,7 @@ export interface DesignSpace {
         d: [number, number];       // Wire Diameter (mm)
         D: [number, number];       // Mean Diameter (mm)
         n: [number, number];       // Active Coils
+        p?: [number, number];      // Pitch (mm)
         H0?: [number, number];     // Free Length (mm)
         L0?: [number, number];     // Free Length (mm)
         P0?: [number, number];     // Initial Tension (N)

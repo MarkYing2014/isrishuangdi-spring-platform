@@ -4,518 +4,299 @@
  * Shock Absorber Spring Visualizer
  * 减震器弹簧 3D 可视化组件
  * 
- * This component renders a shock absorber spring using Three.js with:
- * - Custom BufferGeometry (NOT TubeGeometry) to avoid Frenet frame flipping
- * - Parallel Transport Frames for stable tube orientation
- * - Debug overlays: centerline, PTF frames, section circles
+ * Update: Added Phase 5.1 Beam Stress Preview (Wahl Field)
+ * - Computes real-time stress tau = Kw * 8PD / pi*d^3
+ * - Displays Safety Factor and Max Stress
+ * - Visualizes stress gradient ID-OD (Wahl distribution)
  */
 
-import React, { useMemo, useRef } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Environment, Center } from "@react-three/drei";
+import React, { useMemo, useRef, useState, useCallback, useEffect } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
+import { Center } from "@react-three/drei";
 import * as THREE from "three";
+import { AutoFitControls } from "./AutoFitControls";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RotateCcw, Play, Pause } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 
-import {
-  type ShockSpringParams,
-  DEFAULT_SHOCK_SPRING_PARAMS,
-  buildShockSpringCenterline,
-  computeParallelTransportFrames,
-  getTrimmedCenterline,
-} from "@/lib/spring3d/shock";
-
+import type { ShockSpringInput, ShockSpringResult } from "@/lib/spring3d/shock";
 import { previewTheme } from "@/lib/three/previewTheme";
+import { computeBeamStress, type BeamStressResult } from "@/lib/spring3d/shock/beamStressPreview";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface ShockSpringVisualizerProps {
-  params: ShockSpringParams;
+  input: ShockSpringInput;
+  result: ShockSpringResult | null;
   className?: string;
 }
 
 // ============================================================================
-// Custom Tube Geometry Builder (PTF-based, NOT TubeGeometry)
+// Constants & Presets
 // ============================================================================
 
-/**
- * Build a tube mesh using PTF frames (no Frenet flipping)
- * 
- * Algorithm:
- * 1. For each centerline point, create a circle of vertices
- * 2. Position: point + normal*cos(angle)*radius + binormal*sin(angle)*radius
- * 3. Normal: normalized(normal*cos + binormal*sin)
- * 4. Connect rings with triangle indices
- * 5. Add end caps (flat circular faces)
- */
-function buildPTFTubeGeometry(
+import { stressToRGB } from "@/lib/three/stressColor";
+
+// ============================================================================
+// Constants & Presets
+// ============================================================================
+
+const VIEW_PRESETS = {
+  perspective: { position: [50, 40, 60], target: [0, 0, 0] },
+  front: { position: [0, 0, 100], target: [0, 0, 0] },
+  top: { position: [0, 100, 0], target: [0, 0, 0] },
+  side: { position: [100, 0, 0], target: [0, 0, 0] },
+} as const;
+
+type ViewType = keyof typeof VIEW_PRESETS;
+
+const SPRING_COLOR = "#3b82f6"; // Blue for active coils
+
+// ============================================================================
+// Components
+// ============================================================================
+
+function CameraController({ viewType, controlsRef }: { viewType: ViewType; controlsRef: React.RefObject<any> }) {
+  const { camera } = useThree();
+  useEffect(() => {
+    const preset = VIEW_PRESETS[viewType];
+    camera.position.set(...(preset.position as [number, number, number]));
+    camera.lookAt(...(preset.target as [number, number, number]));
+    camera.updateProjectionMatrix();
+    setTimeout(() => {
+      if (controlsRef.current) {
+        controlsRef.current.target.set(...(preset.target as [number, number, number]));
+        controlsRef.current.update();
+      }
+    }, 10);
+  }, [viewType, camera, controlsRef]);
+  return null;
+}
+
+// ============================================================================
+// Custom Tube Geometry Builder
+// ============================================================================
+
+type StressCalculator = (index: number, cosTheta: number) => number; // Returns normalized stress 0..1 relative to tauAllow
+
+function buildTubeGeometryFromFrames(
   points: THREE.Vector3[],
   radii: number[],
   tangents: THREE.Vector3[],
   normals: THREE.Vector3[],
   binormals: THREE.Vector3[],
-  circleSegments: number = 16,
-  addEndCaps: boolean = true
+  circleSegments: number = 32,
+  grinding: { start: boolean; end: boolean; zStart?: number; zEnd?: number },
+  compressionRatio: number = 1.0, 
+  stressCalc?: StressCalculator
 ): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
   
   const positions: number[] = [];
   const normalsArray: number[] = [];
   const uvs: number[] = [];
+  const colorsArray: number[] = [];
   const indices: number[] = [];
   
   const n = points.length;
+  if (n < 2) return geometry;
+
+  let zMin = grinding.start && grinding.zStart !== undefined ? grinding.zStart : -Infinity;
+  let zMax = grinding.end && grinding.zEnd !== undefined ? grinding.zEnd : Infinity;
   
-  // Generate vertices for each ring
+  if (grinding.end && grinding.zEnd !== undefined) {
+      zMax = grinding.zEnd * compressionRatio;
+  }
+
+  const tempColor = new THREE.Color();
+
   for (let i = 0; i < n; i++) {
     const p = points[i];
     const r = radii[i];
     const normal = normals[i];
     const binormal = binormals[i];
-    
-    // U coordinate for texture mapping (along length)
     const u = i / (n - 1);
     
+    const pZ = p.z * compressionRatio; 
+    
     for (let j = 0; j <= circleSegments; j++) {
-      // Angle around the tube
       const angle = (j / circleSegments) * Math.PI * 2;
       const cosA = Math.cos(angle);
       const sinA = Math.sin(angle);
       
-      // Position: point + normal*cos*r + binormal*sin*r
-      const vx = p.x + normal.x * cosA * r + binormal.x * sinA * r;
-      const vy = p.y + normal.y * cosA * r + binormal.y * sinA * r;
-      const vz = p.z + normal.z * cosA * r + binormal.z * sinA * r;
+      let vx = p.x + normal.x * cosA * r + binormal.x * sinA * r;
+      let vy = p.y + normal.y * cosA * r + binormal.y * sinA * r;
+      let vz = pZ + normal.z * cosA * r + binormal.z * sinA * r;
+      
+      let clamped = false;
+      if (vz < zMin) { vz = zMin; clamped = true; }
+      if (vz > zMax) { vz = zMax; clamped = true; }
       
       positions.push(vx, vy, vz);
       
-      // Normal: normalized(normal*cos + binormal*sin)
-      const nx = normal.x * cosA + binormal.x * sinA;
-      const ny = normal.y * cosA + binormal.y * sinA;
-      const nz = normal.z * cosA + binormal.z * sinA;
-      const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-      
-      normalsArray.push(nx / len, ny / len, nz / len);
-      
-      // UV coordinates
-      const v = j / circleSegments;
-      uvs.push(u, v);
+      if (clamped) {
+          if (vz <= zMin + 0.001) normalsArray.push(0, 0, -1);
+          else normalsArray.push(0, 0, 1);
+      } else {
+          const nx = normal.x * cosA + binormal.x * sinA;
+          const ny = normal.y * cosA + binormal.y * sinA;
+          const nz = normal.z * cosA + binormal.z * sinA;
+          const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+          normalsArray.push(nx / len, ny / len, nz / len);
+      }
+      uvs.push(u, j / circleSegments);
+
+      // Vertex Colors with Stress Gradient
+      if (stressCalc) {
+          const stressNorm = stressCalc(i, cosA);
+          const [r, g, b] = stressToRGB(stressNorm);
+          colorsArray.push(r, g, b);
+      }
     }
   }
   
-  // Generate indices (connect rings)
   const ringSize = circleSegments + 1;
-  
   for (let i = 0; i < n - 1; i++) {
     for (let j = 0; j < circleSegments; j++) {
       const a = i * ringSize + j;
       const b = i * ringSize + j + 1;
       const c = (i + 1) * ringSize + j;
       const d = (i + 1) * ringSize + j + 1;
-      
-      // Two triangles per quad
       indices.push(a, c, b);
       indices.push(b, c, d);
     }
   }
   
-  // Add horizontal end caps (flat grinding - facing up/down)
-  // Unlike tangent-aligned caps, these face +Z and -Z for true industrial grinding
-  if (addEndCaps && n >= 2) {
-    const currentVertexCount = positions.length / 3;
-    
-    // ============ Bottom Cap (horizontal, facing -Z) ============
-    const startP = points[0];
-    const startR = radii[0];
-    
-    // Center vertex for bottom cap - at the first point but on horizontal plane
-    const bottomCenterIdx = currentVertexCount;
-    positions.push(startP.x, startP.y, startP.z);
-    // Normal points straight down (-Z) for horizontal grinding
-    normalsArray.push(0, 0, -1);
-    uvs.push(0.5, 0.5);
-    
-    // Ring vertices for bottom cap - horizontal circle
-    const bottomRingStartIdx = bottomCenterIdx + 1;
-    for (let j = 0; j <= circleSegments; j++) {
-      const angle = (j / circleSegments) * Math.PI * 2;
-      const cosA = Math.cos(angle);
-      const sinA = Math.sin(angle);
-      
-      // Horizontal circle at the start point's z-level
-      const vx = startP.x + cosA * startR;
-      const vy = startP.y + sinA * startR;
-      const vz = startP.z; // Same z as start point
-      
-      positions.push(vx, vy, vz);
-      normalsArray.push(0, 0, -1);
-      uvs.push(0.5 + 0.5 * cosA, 0.5 + 0.5 * sinA);
-    }
-    
-    // Triangles for bottom cap (winding for -Z facing)
-    for (let j = 0; j < circleSegments; j++) {
-      indices.push(bottomCenterIdx, bottomRingStartIdx + j + 1, bottomRingStartIdx + j);
-    }
-    
-    // ============ Top Cap (horizontal, facing +Z) ============
-    const endP = points[n - 1];
-    const endR = radii[n - 1];
-    
-    // Center vertex for top cap
-    const topCenterIdx = positions.length / 3;
-    positions.push(endP.x, endP.y, endP.z);
-    // Normal points straight up (+Z) for horizontal grinding
-    normalsArray.push(0, 0, 1);
-    uvs.push(0.5, 0.5);
-    
-    // Ring vertices for top cap - horizontal circle
-    const topRingStartIdx = topCenterIdx + 1;
-    for (let j = 0; j <= circleSegments; j++) {
-      const angle = (j / circleSegments) * Math.PI * 2;
-      const cosA = Math.cos(angle);
-      const sinA = Math.sin(angle);
-      
-      // Horizontal circle at the end point's z-level
-      const vx = endP.x + cosA * endR;
-      const vy = endP.y + sinA * endR;
-      const vz = endP.z; // Same z as end point
-      
-      positions.push(vx, vy, vz);
-      normalsArray.push(0, 0, 1);
-      uvs.push(0.5 + 0.5 * cosA, 0.5 + 0.5 * sinA);
-    }
-    
-    // Triangles for top cap (winding for +Z facing)
-    for (let j = 0; j < circleSegments; j++) {
-      indices.push(topCenterIdx, topRingStartIdx + j, topRingStartIdx + j + 1);
-    }
-  }
-  
-  // Set attributes
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normalsArray, 3));
   geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  if (colorsArray.length > 0) {
+      geometry.setAttribute("color", new THREE.Float32BufferAttribute(colorsArray, 3));
+  }
   geometry.setIndex(indices);
+  geometry.computeBoundingSphere();
   
   return geometry;
 }
 
 // ============================================================================
-// Compute scale factor for consistent sizing
+// Spring Mesh
 // ============================================================================
 
-function useSpringScale(params: ShockSpringParams): number {
-  return useMemo(() => {
-    const fullCenterline = buildShockSpringCenterline(params);
-    const centerline = (params.grind.bottom || params.grind.top)
-      ? getTrimmedCenterline(params, fullCenterline)
-      : fullCenterline;
-    
-    if (centerline.points.length < 2) return 1;
-    
-    // Compute bounding box
-    const bbox = new THREE.Box3().setFromPoints(centerline.points);
-    const size = new THREE.Vector3();
-    bbox.getSize(size);
-    
-    // Add wire radius to size
-    const maxRadius = centerline.radii.length > 0 ? Math.max(...centerline.radii) : 0;
-    const maxDim = Math.max(size.x + maxRadius * 2, size.y + maxRadius * 2, size.z);
-    
-    // Target size ~30 units
-    const targetSize = 30;
-    return maxDim > 0 ? targetSize / maxDim : 1;
-  }, [params]);
-}
+function ShockSpringMesh({ 
+    input, 
+    result, 
+    compression = 0,
+    showStress = false,
+    currentLoad = 0,
+    stressResult,
+    setStressStats
+}: { 
+    input: ShockSpringInput, 
+    result: ShockSpringResult,
+    compression: number,
+    showStress: boolean,
+    currentLoad: number,
+    stressResult: BeamStressResult | null,
+    setStressStats: (s: BeamStressResult | null) => void
+}) {
 
-// ============================================================================
-// Spring Mesh Component (no internal scale)
-// ============================================================================
+  // Update parent stats whenever stressResult changes
+  useEffect(() => {
+     if (showStress) {
+         setStressStats(stressResult);
+     } else {
+         setStressStats(null);
+     }
+  }, [stressResult, showStress, setStressStats]);
 
-function ShockSpringMesh({ params }: { params: ShockSpringParams }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  
-  // Build geometry using memoization
   const geometry = useMemo(() => {
-    // Generate centerline
-    const fullCenterline = buildShockSpringCenterline(params);
+    const { centerline, frames, grindingPlanes, freeLength } = result.derived;
+    if (freeLength <= 0) return new THREE.BufferGeometry();
+
+    const currentLen = Math.max(0.1, freeLength - compression);
+    const ratio = currentLen / freeLength;
     
-    // Apply trimming if grinding is enabled
-    const centerline = (params.grind.bottom || params.grind.top)
-      ? getTrimmedCenterline(params, fullCenterline)
-      : fullCenterline;
+    const points = centerline.map(p => new THREE.Vector3(p.x, p.y, p.z));
+    const radii = result.derived.radii;
     
-    if (centerline.points.length < 2) {
-      return new THREE.BufferGeometry();
+    const tangents = frames.tangents.map(f => new THREE.Vector3(f.x, f.y, f.z));
+    const normals = frames.normals.map(f => new THREE.Vector3(f.x, f.y, f.z));
+    const binormals = frames.binormals.map(f => new THREE.Vector3(f.x, f.y, f.z));
+    
+    const isClip = input.grinding.mode === "visualClip" || input.grinding.mode === "exportCut";
+    
+    // Stress Logic
+    let stressCalc: StressCalculator | undefined;
+    
+    if (showStress && stressResult) {
+        stressCalc = (i: number, cosTheta: number) => {
+             // 1. Get centerline tau(i) from pre-computed Beam Result
+             const tauCenter = stressResult.tau[i];
+             const tauAllow = stressResult.tauAllow;
+             
+             // 2. Map to ID/OD surface using simple approximation
+             // ID (cosTheta=1) -> slightly higher stress?
+             // Actually, Wahl factor ALREADY accounts for ID stress concentration.
+             // So tauCenter IS the MAX stress at the ID.
+             // At OD (cosTheta=-1), stress is lower.
+             // Approx: Tau(OD) approx Tau(ID) / Kw * K_shear? 
+             // Let's assume Tau(OD) is approx 0.7 * Tau(ID) for visual gradient.
+             // Interpolate: ID=1.0, OD=0.7
+             
+             const t = (cosTheta + 1) / 2; // 0(OD) to 1(ID)
+             const distribution = 0.7 + 0.3 * t; 
+             
+             const localTau = tauCenter * distribution;
+             
+             // Normalize against Allowable
+             return Math.min(1.5, localTau / tauAllow); // Allow slightly over 1.0 (Red)
+        };
     }
-    
-    // Compute PTF frames
-    const frames = computeParallelTransportFrames(centerline.points);
-    
-    // Build custom tube geometry WITHOUT horizontal caps
-    // Caps will be handled separately at the correct z-planes
-    const geo = buildPTFTubeGeometry(
-      centerline.points,
-      centerline.radii,
-      frames.tangents,
-      frames.normals,
-      frames.binormals,
-      16, // circle segments
-      false // NO end caps - grinding creates flat ends via geometry clipping
+
+    return buildTubeGeometryFromFrames(
+      points,
+      radii,
+      tangents,
+      normals,
+      binormals,
+      32, 
+      { 
+        start: input.grinding.grindStart && isClip, 
+        end: input.grinding.grindEnd && isClip,
+        zStart: grindingPlanes.startZ ?? undefined,
+        zEnd: grindingPlanes.endZ ?? undefined
+      },
+      ratio, 
+      stressCalc
     );
-    
-    return geo;
-  }, [params]);
+  }, [result, input, compression, showStress, stressResult]); // Re-build when stress changes
   
   return (
-    <mesh ref={meshRef} geometry={geometry}>
+    <mesh geometry={geometry}>
       <meshStandardMaterial
-        color="#4a90d9"
-        metalness={previewTheme.material.spring.metalness}
-        roughness={previewTheme.material.spring.roughness}
+        key={showStress ? "fea-material" : "std-material"}
+        color={showStress ? "#ffffff" : SPRING_COLOR}
+        vertexColors={showStress}
+        metalness={showStress ? previewTheme.material.fea.metalness : previewTheme.material.spring.metalness}
+        roughness={showStress ? previewTheme.material.fea.roughness : previewTheme.material.spring.roughness}
         side={THREE.DoubleSide}
       />
     </mesh>
   );
 }
 
-// ============================================================================
-// Debug Overlays
-// ============================================================================
-
-function CenterlineOverlay({ params }: { params: ShockSpringParams }) {
+function CenterlineOverlay({ result }: { result: ShockSpringResult }) {
   const lineObj = useMemo(() => {
-    const centerline = buildShockSpringCenterline(params);
-    const geo = new THREE.BufferGeometry();
-    const positions = centerline.points.flatMap(p => [p.x, p.y, p.z]);
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    const points = result.derived.centerline.map(p => new THREE.Vector3(p.x, p.y, p.z));
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
     const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
     return new THREE.Line(geo, material);
-  }, [params]);
-  
+  }, [result]);
   return <primitive object={lineObj} />;
-}
-
-function FramesOverlay({ params }: { params: ShockSpringParams }) {
-  const { tangentGeo, normalGeo, binormalGeo } = useMemo(() => {
-    const centerline = buildShockSpringCenterline(params);
-    const frames = computeParallelTransportFrames(centerline.points);
-    
-    const step = Math.max(1, Math.floor(centerline.points.length / 20));
-    const axisLength = Math.min(...centerline.radii) * 3;
-    
-    const tangentPositions: number[] = [];
-    const normalPositions: number[] = [];
-    const binormalPositions: number[] = [];
-    
-    for (let i = 0; i < centerline.points.length; i += step) {
-      const p = centerline.points[i];
-      const t = frames.tangents[i];
-      const n = frames.normals[i];
-      const b = frames.binormals[i];
-      
-      // Tangent (red)
-      tangentPositions.push(p.x, p.y, p.z);
-      tangentPositions.push(p.x + t.x * axisLength, p.y + t.y * axisLength, p.z + t.z * axisLength);
-      
-      // Normal (green)
-      normalPositions.push(p.x, p.y, p.z);
-      normalPositions.push(p.x + n.x * axisLength, p.y + n.y * axisLength, p.z + n.z * axisLength);
-      
-      // Binormal (blue)
-      binormalPositions.push(p.x, p.y, p.z);
-      binormalPositions.push(p.x + b.x * axisLength, p.y + b.y * axisLength, p.z + b.z * axisLength);
-    }
-    
-    const tangentGeo = new THREE.BufferGeometry();
-    tangentGeo.setAttribute("position", new THREE.Float32BufferAttribute(tangentPositions, 3));
-    
-    const normalGeo = new THREE.BufferGeometry();
-    normalGeo.setAttribute("position", new THREE.Float32BufferAttribute(normalPositions, 3));
-    
-    const binormalGeo = new THREE.BufferGeometry();
-    binormalGeo.setAttribute("position", new THREE.Float32BufferAttribute(binormalPositions, 3));
-    
-    return { tangentGeo, normalGeo, binormalGeo };
-  }, [params]);
-  
-  return (
-    <group>
-      <lineSegments geometry={tangentGeo}>
-        <lineBasicMaterial color="#ff0000" />
-      </lineSegments>
-      <lineSegments geometry={normalGeo}>
-        <lineBasicMaterial color="#00ff00" />
-      </lineSegments>
-      <lineSegments geometry={binormalGeo}>
-        <lineBasicMaterial color="#0000ff" />
-      </lineSegments>
-    </group>
-  );
-}
-
-function SectionsOverlay({ params }: { params: ShockSpringParams }) {
-  const lineObj = useMemo(() => {
-    const centerline = buildShockSpringCenterline(params);
-    const frames = computeParallelTransportFrames(centerline.points);
-    
-    const step = Math.max(1, Math.floor(centerline.points.length / 15));
-    const circleSegments = 24;
-    
-    const positions: number[] = [];
-    
-    for (let i = 0; i < centerline.points.length; i += step) {
-      const p = centerline.points[i];
-      const r = centerline.radii[i];
-      const n = frames.normals[i];
-      const b = frames.binormals[i];
-      
-      // Draw circle
-      for (let j = 0; j <= circleSegments; j++) {
-        const angle = (j / circleSegments) * Math.PI * 2;
-        const cosA = Math.cos(angle);
-        const sinA = Math.sin(angle);
-        
-        const vx = p.x + n.x * cosA * r + b.x * sinA * r;
-        const vy = p.y + n.y * cosA * r + b.y * sinA * r;
-        const vz = p.z + n.z * cosA * r + b.z * sinA * r;
-        
-        positions.push(vx, vy, vz);
-      }
-    }
-    
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    const material = new THREE.LineBasicMaterial({ color: 0xffaa00 });
-    return new THREE.Line(geo, material);
-  }, [params]);
-  
-  return <primitive object={lineObj} />;
-}
-
-// ============================================================================
-// Grinding Planes Helper and Overlay
-// ============================================================================
-
-/**
- * Compute z-coordinates for grinding cut planes based on centerline points
- */
-function computeGrindingPlanesZFromCenterline(
-  points: THREE.Vector3[],
-  totalTurns: number,
-  offsetTurns: number
-) {
-  const n = points.length;
-  if (n < 2) return { zBot: 0, zTop: 0, iBot: 0, iTop: n - 1 };
-
-  // normalized cut fraction (clamp to avoid crossing mid)
-  const sCut = THREE.MathUtils.clamp(offsetTurns / Math.max(totalTurns, 1e-6), 0, 0.4999);
-
-  const iBot = THREE.MathUtils.clamp(Math.round(sCut * (n - 1)), 0, n - 1);
-  const iTop = THREE.MathUtils.clamp(Math.round((1 - sCut) * (n - 1)), 0, n - 1);
-
-  let zBot = points[iBot].z;
-  let zTop = points[iTop].z;
-  if (zTop < zBot) [zBot, zTop] = [zTop, zBot];
-
-  return { zBot, zTop, iBot, iTop };
-}
-
-function GrindingPlanesOverlay({ params }: { params: ShockSpringParams }) {
-  const { planeSize, zBot, zTop, botPoint, topPoint } = useMemo(() => {
-    const centerline = buildShockSpringCenterline(params); // full, untrimmed
-    const pts = centerline.points;
-
-    const { zBot, zTop, iBot, iTop } = computeGrindingPlanesZFromCenterline(
-      pts,
-      params.totalTurns,
-      params.grind.offsetTurns
-    );
-
-    // plane size: based on centerline XY bbox (in spring local coordinates)
-    const bbox = new THREE.Box3().setFromPoints(pts);
-    const size = new THREE.Vector3();
-    bbox.getSize(size);
-
-    // XY coverage; add margin (diameter + extra)
-    const rMax = centerline.radii.length ? Math.max(...centerline.radii) : 0;
-    const margin = Math.max(rMax * 6, 5);
-    const planeW = Math.max(size.x + margin, 5);
-    const planeH = Math.max(size.y + margin, 5);
-    const planeSizeVal = Math.max(planeW, planeH);
-
-    return {
-      planeSize: planeSizeVal,
-      zBot,
-      zTop,
-      botPoint: pts[iBot] ?? new THREE.Vector3(),
-      topPoint: pts[iTop] ?? new THREE.Vector3(),
-    };
-  }, [params]);
-
-  // These planes are XY planes at z=const in spring-local coordinates.
-  // They are inside the same rotated group, so they match spring orientation.
-  return (
-    <group>
-      {/* Bottom plane */}
-      {params.grind.bottom && (
-        <mesh position={[0, 0, zBot]}>
-          <planeGeometry args={[planeSize, planeSize]} />
-          <meshBasicMaterial color="#ff4444" transparent opacity={0.18} side={THREE.DoubleSide} />
-        </mesh>
-      )}
-
-      {/* Top plane */}
-      {params.grind.top && (
-        <mesh position={[0, 0, zTop]}>
-          <planeGeometry args={[planeSize, planeSize]} />
-          <meshBasicMaterial color="#44ff44" transparent opacity={0.18} side={THREE.DoubleSide} />
-        </mesh>
-      )}
-
-      {/* Cut points as spheres */}
-      {params.grind.bottom && (
-        <mesh position={[botPoint.x, botPoint.y, botPoint.z]}>
-          <sphereGeometry args={[Math.max(0.3, params.wireDia.start * 0.15), 12, 12]} />
-          <meshBasicMaterial color="#ff4444" />
-        </mesh>
-      )}
-      {params.grind.top && (
-        <mesh position={[topPoint.x, topPoint.y, topPoint.z]}>
-          <sphereGeometry args={[Math.max(0.3, params.wireDia.end * 0.15), 12, 12]} />
-          <meshBasicMaterial color="#44ff44" />
-        </mesh>
-      )}
-    </group>
-  );
-}
-
-// ============================================================================
-// Scene Setup (no auto-rotation to avoid confusion)
-// ============================================================================
-
-function SceneSetup() {
-  return null;
-}
-
-// ============================================================================
-// Scaled Spring Group (applies uniform scale to mesh + overlays)
-// ============================================================================
-
-function ScaledSpringGroup({ params }: { params: ShockSpringParams }) {
-  const scale = useSpringScale(params);
-  
-  return (
-    <group scale={[scale, scale, scale]}>
-      <ShockSpringMesh params={params} />
-      
-      {/* Debug overlays - now at same scale as mesh */}
-      {params.debug.showCenterline && <CenterlineOverlay params={params} />}
-      {params.debug.showFrames && <FramesOverlay params={params} />}
-      {params.debug.showSections && <SectionsOverlay params={params} />}
-      {params.debug.showGrindingPlanes && <GrindingPlanesOverlay params={params} />}
-    </group>
-  );
 }
 
 // ============================================================================
@@ -523,58 +304,259 @@ function ScaledSpringGroup({ params }: { params: ShockSpringParams }) {
 // ============================================================================
 
 export function ShockSpringVisualizer({
-  params = DEFAULT_SHOCK_SPRING_PARAMS,
+  input,
+  result,
   className = "",
 }: ShockSpringVisualizerProps) {
+  const [currentView, setCurrentView] = useState<ViewType>("perspective");
+  const controlsRef = useRef<any>(null);
+  const groupRef = useRef<THREE.Group>(null);
+  
+  // State
+  const [simX, setSimX] = useState(0);
+  const [showStress, setShowStress] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [stressStats, setStressStats] = useState<BeamStressResult | null>(null);
+
+  // Animation Loop
+  useEffect(() => {
+      let rafId: number;
+      let startTime: number | null = null;
+      
+      const animate = (time: number) => {
+          if (!isPlaying || !result) return;
+          if (!startTime) startTime = time;
+          const elapsed = (time - startTime) / 1000;
+          const max = Math.max(0, result.derived.freeLength - result.derived.solidHeight);
+          if (max <= 0) return;
+          const cycleDuration = 2.0; 
+          const phase = (elapsed % cycleDuration) / cycleDuration;
+          const t = 0.5 - 0.5 * Math.cos(2 * Math.PI * phase);
+          setSimX(t * max);
+          rafId = requestAnimationFrame(animate);
+      };
+      
+      if (isPlaying) {
+          rafId = requestAnimationFrame(animate);
+      } else {
+          startTime = null;
+      }
+      return () => cancelAnimationFrame(rafId);
+  }, [isPlaying, result]);
+
+  useEffect(() => {
+    if (result && !isPlaying) setSimX(result.ride.x);
+  }, [result]);
+
+  const handleViewChange = useCallback((view: ViewType) => setCurrentView(view), []);
+
+  const stats = useMemo(() => {
+    if (!result) return null;
+    const { freeLength: L0, solidHeight: Hs } = result.derived;
+    const maxDeflection = Math.max(0, L0 - Hs);
+    const curve = result.kxCurve;
+    let force = 0;
+    
+    // Fast Linear Interpolation
+    if (curve.length > 0) {
+        if (simX <= 0) force = 0;
+        else if (simX >= curve[curve.length-1].x) force = curve[curve.length-1].force;
+        else {
+             // Binary search is better but array is small (<100)
+             for(let i=1; i<curve.length; i++) {
+                 if (curve[i].x >= simX) {
+                     const p1 = curve[i-1];
+                     const p2 = curve[i];
+                     const t = (simX - p1.x)/(p2.x - p1.x);
+                     force = p1.force + (p2.force - p1.force) * t;
+                     break;
+                 }
+             }
+        }
+    }
+    return { Hs, Stroke: simX, Load: force, MaxStroke: maxDeflection };
+  }, [result, simX]);
+
+  // Compute Stress Result in Real-time (using useMemo for performance per P change)
+  // We extract geometry once
+  const beamConfig = useMemo(() => {
+      if (!result) return null;
+      const n = result.derived.centerline.length;
+      const D = new Float32Array(n);
+      const d = new Float32Array(n);
+      
+      for(let i=0; i<n; i++) {
+          const p = result.derived.centerline[i];
+          // Mean Diameter D = 2 * Mean Radius (Helix Radius)
+          // R = sqrt(x^2 + y^2)
+          D[i] = 2 * Math.sqrt(p.x*p.x + p.y*p.y);
+          // Wire Diameter d = 2 * Wire Radius
+          d[i] = 2 * result.derived.radii[i];
+      }
+      return { 
+          D, 
+          d, 
+          tensileStrength: input.material.tensileStrength 
+      };
+  }, [result, input.material.tensileStrength]);
+
+  const beamResult = useMemo(() => {
+     if (!beamConfig || !stats) return null;
+     if (!showStress) return null; // Avoid computation if off
+     return computeBeamStress(stats.Load, beamConfig);
+  }, [beamConfig, stats?.Load, showStress]);
+
+
+  if (!result) return <div className="flex items-center justify-center p-4 text-muted-foreground">Generating Preview...</div>;
+
   return (
-    <div className={`w-full h-full ${className}`}>
-      <Canvas
-        shadows
-        camera={{ position: [50, 30, 50], fov: 50 }}
-        onCreated={({ gl }) => {
-          gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        }}
-      >
-        <color attach="background" args={[previewTheme.background]} />
-        
-        {/* Lighting */}
-        <ambientLight intensity={previewTheme.lights.ambient} />
-        <directionalLight
-          position={previewTheme.lights.key.position}
-          intensity={previewTheme.lights.key.intensity}
-          castShadow
-        />
-        <directionalLight
-          position={previewTheme.lights.fill.position}
-          intensity={previewTheme.lights.fill.intensity}
-        />
-        
-        <Environment preset="studio" />
-        
-        {/* Spring with shared scale */}
-        <Center>
-          <group rotation={[-Math.PI / 2, 0, 0]}>
-            <ScaledSpringGroup params={params} />
-          </group>
-        </Center>
-        
-        <SceneSetup />
-        
-        {/* Controls */}
-        <OrbitControls
-          enablePan={true}
-          enableZoom={true}
-          enableRotate={true}
-          minDistance={20}
-          maxDistance={200}
-        />
-        
-        {/* Grid */}
-        <gridHelper
-          args={[100, 20, previewTheme.grid.major, previewTheme.grid.minor]}
-          position={[0, -20, 0]}
-        />
-      </Canvas>
+    <div className={`relative w-full h-full ${className} bg-slate-50/50 rounded-lg overflow-hidden border border-slate-200 flex flex-col`}>
+      {/* Top Bar Controls */}
+      <div className="absolute top-3 left-3 z-10 flex gap-2">
+         {/* Stress Toggle */}
+         <div className="bg-white/90 p-1.5 px-3 rounded-md shadow-sm backdrop-blur-sm border border-slate-100/50 flex items-center gap-2">
+            <Checkbox 
+                id="stress-mode" 
+                checked={showStress} 
+                onCheckedChange={(c) => setShowStress(!!c)}
+                className="h-4 w-4"
+            />
+            <label htmlFor="stress-mode" className="text-xs font-medium text-slate-700 cursor-pointer select-none">
+                Stress Colors / 应力伪色
+            </label>
+         </div>
+
+         {/* Play Button */}
+         <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 bg-white/90 shadow-sm backdrop-blur-sm border-slate-100/50"
+            onClick={() => setIsPlaying(!isPlaying)}
+         >
+            {isPlaying ? <Pause className="h-3.5 w-3.5 fill-slate-700 text-slate-700" /> : <Play className="h-3.5 w-3.5 fill-slate-700 text-slate-700 ml-0.5" />}
+         </Button>
+      </div>
+
+
+      <div className="flex-1 relative min-h-0">
+        <Canvas
+            shadows
+            camera={{ position: [50, 40, 60], fov: 45 }}
+            gl={{ preserveDrawingBuffer: true }}
+        >
+            <CameraController viewType={currentView} controlsRef={controlsRef} />
+            <color attach="background" args={[previewTheme.background]} />
+            <ambientLight intensity={previewTheme.lights.ambient} />
+            <directionalLight position={previewTheme.lights.key.position} intensity={previewTheme.lights.key.intensity} castShadow />
+            <directionalLight position={previewTheme.lights.fill.position} intensity={previewTheme.lights.fill.intensity} />
+            
+            <Center ref={groupRef}>
+            <group rotation={[-Math.PI / 2, 0, 0]}>
+                <ShockSpringMesh 
+                    input={input} 
+                    result={result} 
+                    compression={simX} 
+                    showStress={showStress}
+                    currentLoad={stats?.Load || 0}
+
+                    stressResult={beamResult}
+                    setStressStats={setStressStats}
+                />
+                {(input as any).debug?.showCenterline && <CenterlineOverlay result={result} />}
+            </group>
+            </Center>
+            
+            <mesh position={[0, -0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[40, 32]} />
+            <meshBasicMaterial color="#000000" transparent opacity={0.1} />
+            </mesh>
+
+            <AutoFitControls ref={controlsRef} targetRef={groupRef} minDistance={10} maxDistance={300} />
+            <gridHelper args={[100, 20, previewTheme.grid.major, previewTheme.grid.minor]} position={[0, -0.1, 0]} />
+        </Canvas>
+
+        {/* View Selector */}
+        <div className="absolute bottom-3 left-3 flex gap-1 bg-white/80 p-1 rounded-md shadow-sm backdrop-blur-sm z-10 transition-colors">
+            {(Object.keys(VIEW_PRESETS) as ViewType[]).map((view) => (
+                <Button key={view} variant={currentView === view ? "default" : "ghost"} size="sm" className="h-7 px-2 text-xs capitalize" onClick={() => handleViewChange(view)}>
+                    {view === "perspective" ? <RotateCcw className="h-3 w-3 mr-1" /> : null}
+                    {view === "perspective" ? "3D" : view}
+                </Button>
+            ))}
+        </div>
+
+        {/* Status Overlay */}
+        {stats && (
+        <div className="absolute top-3 right-3 bg-white/90 px-3 py-2 rounded-md shadow-sm backdrop-blur-sm text-xs min-w-[140px] border border-slate-100/50 pointer-events-none">
+            {/* Basic Stats */}
+            <div className="space-y-1 pb-2 border-b border-slate-200/60 mb-2">
+            <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-semibold tracking-tight">STROKE</span>
+                <span className="font-mono font-medium text-blue-600">{stats.Stroke.toFixed(2)} mm</span>
+            </div>
+            <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-semibold tracking-tight">LOAD (P)</span>
+                <span className="font-mono font-medium text-emerald-600">{stats.Load.toFixed(1)} N</span>
+            </div>
+            </div>
+            
+            {/* Stress Stats (Only when enabled) */}
+            {stressStats && (
+            <div className="space-y-1 pb-2 border-b border-slate-200/60 mb-2 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-semibold tracking-tight">MAX τ</span>
+                    <span className={`font-mono font-medium ${stressStats.maxTau > stressStats.tauAllow ? 'text-red-600' : 'text-slate-700'}`}>
+                        {stressStats.maxTau.toFixed(0)} MPa
+                    </span>
+                </div>
+                {/* DEBUG: Show Tau[0] */}
+                <div className="flex justify-between items-center text-[10px] text-slate-400">
+                    <span>τ[0]</span>
+                    <span className="font-mono">{stressStats.tau[0]?.toFixed(0)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-semibold tracking-tight">MIN SF</span>
+                    <span className={`font-mono font-bold ${stressStats.minSF < 1.0 ? 'text-red-600' : stressStats.minSF < 1.2 ? 'text-amber-500' : 'text-emerald-600'}`}>
+                        {stressStats.minSF > 10 ? ">10" : stressStats.minSF.toFixed(2)}
+                    </span>
+                </div>
+            </div>
+            )}
+
+            <div className="space-y-0.5">
+              <div className="flex justify-between text-slate-600">
+                <span>Solid (Hs):</span>
+                <span className="font-mono">{stats.Hs?.toFixed(1) ?? "-"} mm</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Max Stroke:</span>
+                <span className="font-mono">{stats.MaxStroke?.toFixed(1) ?? "-"} mm</span>
+              </div>
+            </div>
+        </div>
+        )}
+      </div>
+
+      {/* Simulation Slider Control */}
+      {stats && (
+        <div className="bg-white border-t border-slate-200 p-2 px-4 shadow-sm z-20">
+            <div className="flex items-center gap-4">
+                <span className="text-xs font-semibold text-slate-500 w-12 text-right">0 mm</span>
+                <Slider 
+                    value={[simX]} 
+                    min={0} 
+                    max={stats.MaxStroke > 0 ? stats.MaxStroke : 100} 
+                    step={0.1}
+                    onValueChange={([val]) => {
+                        setSimX(val);
+                        setIsPlaying(false);
+                    }}
+                    className="flex-1 cursor-grab active:cursor-grabbing"
+                />
+                <span className="text-xs font-semibold text-slate-500 w-12">{stats.MaxStroke > 0 ? stats.MaxStroke.toFixed(0) : 0} mm</span>
+            </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -63,7 +63,20 @@ export class DiscreteEnumerator {
                         params.L0 = space.ranges.L0[0];
                     }
 
-                    candidates.push(params);
+                    // Pitch Loop (Shock specific)
+                    const pRange = space.ranges.p;
+                    if (pRange) {
+                        const pStep = 0.5;
+                        // Avoid infinite loop if range is [0,0] provided
+                        const effectiveMax = Math.max(pRange[0], pRange[1]);
+                        for (let p = pRange[0]; p <= effectiveMax; p += pStep) {
+                            candidates.push({ ...params, p: Number(p.toFixed(2)) });
+                            if (candidates.length > 500) break;
+                            if (p >= effectiveMax && pStep > 0) break; // Ensure execution once if min==max
+                        }
+                    } else {
+                        candidates.push(params);
+                    }
 
                     // Safety cap for a single generator
                     if (candidates.length > 500) break;

@@ -99,7 +99,10 @@ export function computeApproximateSpringRate(
     const avgMeanDia = (params.meanDia.start + params.meanDia.mid + params.meanDia.end) / 3;
 
     // Estimate active coils (total - closed turns at each end)
-    const activeCoils = params.totalTurns - 2 * params.pitch.closedTurns;
+    const closedTotal = typeof params.pitch.closedTurns === 'number'
+        ? params.pitch.closedTurns * 2
+        : params.pitch.closedTurns.start + params.pitch.closedTurns.end;
+    const activeCoils = params.totalTurns - closedTotal;
 
     // Standard compression spring formula: k = G × d⁴ / (8 × D³ × Na)
     const d = avgWireDia;

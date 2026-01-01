@@ -29,7 +29,7 @@ const navItems = [
   { href: "/quality", label: { en: "Quality Management", zh: "质量管理" } },
   { href: "/tools/cad-export", label: { en: "CAD Export", zh: "CAD 导出" } },
   { href: "/about", label: { en: "About", zh: "关于" } },
-  { href: "/engineering", label: { en: "Engineering", zh: "工程核心" } },
+  { href: "/engineering", label: { en: "Shock Spring Design", zh: "减震弹簧参数化设计" } },
   { href: "/rfq", label: { en: "RFQ", zh: "询价" } },
   { href: "/catalog", label: { en: "Catalog", zh: "产品目录" } },
 ];

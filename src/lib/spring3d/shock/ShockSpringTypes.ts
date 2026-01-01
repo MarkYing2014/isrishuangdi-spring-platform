@@ -50,8 +50,12 @@ export interface ShockSpringParams {
     pitch: {
         /** Pitch style (symmetric, progressive, regressive) */
         style?: PitchStyle;
-        /** Number of closed (dead) turns at each end (for symmetric style) */
-        closedTurns: number;
+        /** 
+         * Number of closed (dead) turns at each end 
+         * - number: same for both ends (symmetric)
+         * - object: specific for each end { start: number, end: number }
+         */
+        closedTurns: number | { start: number; end: number };
         /** Minimum working pitch (mm/turn) */
         workingMin: number;
         /** Maximum working pitch (mm/turn) */
@@ -70,6 +74,35 @@ export interface ShockSpringParams {
         bottom: boolean;
         /** Grinding offset in TURNS (not height!) */
         offsetTurns: number;
+    };
+
+    /** Material properties */
+    material: {
+        name: string;
+        shearModulus: number; // MPa (G)
+        tensileStrength: number; // MPa (Rm)
+        density: number; // g/cm3
+    };
+
+    /** Load requirements (for validation) */
+    loadcase: {
+        length1: number; // mm
+        force1: number;  // N
+        length2?: number; // mm
+        force2?: number;  // N
+        freeLength?: number; // mm (target)
+    };
+
+    /** Guide / Assembly constraints */
+    guide: {
+        type: "rod" | "tube" | "none"; // Rod (Inner) or Tube (Outer)
+        diameter: number; // mm
+    };
+
+    /** Dynamic properties (optional) */
+    dynamics: {
+        mass?: number; // g
+        naturalFrequency?: number; // Hz
     };
 
     /** Debug visualization options */
@@ -185,6 +218,28 @@ export const DEFAULT_SHOCK_SPRING_PARAMS: ShockSpringParams = {
         bottom: true,
         offsetTurns: 0.6,  // grind about 0.6 turn from each end
     },
+
+    // Default Material: Chrome Silicon (Cr-Si)
+    material: {
+        name: "Chrome Silicon (Cr-Si)",
+        shearModulus: 79000,
+        tensileStrength: 1600,
+        density: 7.85,
+    },
+
+    // Default Loadcase (Empty/Placeholder)
+    loadcase: {
+        length1: 100,
+        force1: 500,
+    },
+
+    // Default Guide (None)
+    guide: {
+        type: "none",
+        diameter: 0,
+    },
+
+    dynamics: {},
 
     debug: {
         showCenterline: false,

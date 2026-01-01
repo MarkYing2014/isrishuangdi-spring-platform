@@ -172,9 +172,12 @@ export function pitchLaw(params: ShockSpringParams, s: number): number {
     // Progressive: pitch increases from min to max
     // ========================================
     if (style === "progressive") {
+        const closedTurnsStart = (typeof closedTurns === 'number') ? closedTurns : closedTurns.start;
+        const closedTurnsEnd = (typeof closedTurns === 'number') ? closedTurns : closedTurns.end;
+
         // Apply smoothstep at the very beginning for smooth start
-        const startTransition = closedTurns / totalTurns;
-        const endTransition = 1 - closedTurns / totalTurns;
+        const startTransition = closedTurnsStart / totalTurns;
+        const endTransition = 1 - closedTurnsEnd / totalTurns;
 
         // Closed pitch at bottom (wire diameter)
         const closedPitch = closedPitchFactor * wireDia.start;
@@ -201,8 +204,11 @@ export function pitchLaw(params: ShockSpringParams, s: number): number {
     // Regressive: pitch decreases from max to min
     // ========================================
     if (style === "regressive") {
-        const startTransition = closedTurns / totalTurns;
-        const endTransition = 1 - closedTurns / totalTurns;
+        const closedTurnsStart = (typeof closedTurns === 'number') ? closedTurns : closedTurns.start;
+        const closedTurnsEnd = (typeof closedTurns === 'number') ? closedTurns : closedTurns.end;
+
+        const startTransition = closedTurnsStart / totalTurns;
+        const endTransition = 1 - closedTurnsEnd / totalTurns;
 
         const closedPitch = closedPitchFactor * wireDia.start;
 
@@ -223,15 +229,20 @@ export function pitchLaw(params: ShockSpringParams, s: number): number {
     // ========================================
     // Symmetric: closed at both ends, open in middle (default)
     // ========================================
-    const closedFrac = closedTurns / totalTurns;
+    // Handle asymmetric closed turns if object provided
+    const closedTurnsStart = (typeof closedTurns === 'number') ? closedTurns : closedTurns.start;
+    const closedTurnsEnd = (typeof closedTurns === 'number') ? closedTurns : closedTurns.end;
+
+    const closedFracStart = closedTurnsStart / totalTurns;
+    const closedFracEnd = closedTurnsEnd / totalTurns;
 
     // Closed pitch = factor * wire diameter at that end
     const closedPitchStart = closedPitchFactor * wireDia.start;
     const closedPitchEnd = closedPitchFactor * wireDia.end;
 
     // Calculate weights for closed zones (0 = fully closed, 1 = fully working)
-    const leftWeight = smoothstep(0, closedFrac, s);
-    const rightWeight = smoothstep(1, 1 - closedFrac, s);
+    const leftWeight = smoothstep(0, closedFracStart, s);
+    const rightWeight = 1.0 - smoothstep(1 - closedFracEnd, 1, s);
     const workingWeight = Math.min(leftWeight, rightWeight);
 
     // Working zone pitch with variable profile
@@ -239,9 +250,9 @@ export function pitchLaw(params: ShockSpringParams, s: number): number {
     const workingPitch = workingMin + (workingMax - workingMin) * sinBlend;
 
     // Closed pitch (blend based on position)
-    const closedPitch = lerp(closedPitchStart, closedPitchEnd, s);
+    const closedPitchSymmetric = lerp(closedPitchStart, closedPitchEnd, s);
 
-    return lerp(closedPitch, workingPitch, workingWeight);
+    return lerp(closedPitchSymmetric, workingPitch, workingWeight);
 }
 
 // ============================================================================
@@ -268,11 +279,11 @@ export function validateParams(params: ShockSpringParams): ShockSpringValidation
     }
 
     // Closed turns validation
-    if (params.pitch.closedTurns * 2 >= params.totalTurns) {
-        errors.push("Closed turns (×2) must be less than total turns");
-    }
+    const closedTurnsValue = typeof params.pitch.closedTurns === 'number'
+        ? params.pitch.closedTurns
+        : Math.min(params.pitch.closedTurns.start, params.pitch.closedTurns.end);
 
-    if (params.pitch.closedTurns < 0.5) {
+    if (closedTurnsValue < 0.5) {
         warnings.push("Closed turns < 0.5 may not provide stable end support");
     }
 
@@ -281,7 +292,7 @@ export function validateParams(params: ShockSpringParams): ShockSpringValidation
         errors.push("Grinding offset must be positive");
     }
 
-    if (params.grind.offsetTurns > params.pitch.closedTurns) {
+    if (params.grind.offsetTurns > closedTurnsValue) {
         warnings.push("Grinding offset exceeds closed turns – will cut into working zone");
     }
 
@@ -353,6 +364,10 @@ export function normalizeParams(params: Partial<ShockSpringParams>): ShockSpring
             closedPitchFactor: 1.05,
         },
         grind: { top: true, bottom: true, offsetTurns: 0.6 },
+        material: { name: "Chrome Silicon (Cr-Si)", shearModulus: 79000, tensileStrength: 1600, density: 7.85 },
+        loadcase: { length1: 100, force1: 500 },
+        guide: { type: "none", diameter: 0 },
+        dynamics: {},
         debug: { showCenterline: false, showFrames: false, showSections: false, showGrindingPlanes: false },
     };
 
@@ -372,7 +387,12 @@ export function normalizeParams(params: Partial<ShockSpringParams>): ShockSpring
         },
         pitch: {
             style: params.pitch?.style ?? defaults.pitch.style,
-            closedTurns: Math.max(0, params.pitch?.closedTurns ?? defaults.pitch.closedTurns),
+            closedTurns: (typeof (params.pitch?.closedTurns ?? defaults.pitch.closedTurns) === 'number')
+                ? Math.max(0, (params.pitch?.closedTurns ?? defaults.pitch.closedTurns) as number)
+                : {
+                    start: Math.max(0, ((params.pitch?.closedTurns as any)?.start ?? (defaults.pitch.closedTurns as any).start ?? 0)),
+                    end: Math.max(0, ((params.pitch?.closedTurns as any)?.end ?? (defaults.pitch.closedTurns as any).end ?? 0))
+                },
             workingMin: Math.max(0.1, params.pitch?.workingMin ?? defaults.pitch.workingMin),
             workingMax: Math.max(0.1, params.pitch?.workingMax ?? defaults.pitch.workingMax),
             transitionSharpness: clamp(params.pitch?.transitionSharpness ?? defaults.pitch.transitionSharpness, 0.1, 2.0),
@@ -382,6 +402,27 @@ export function normalizeParams(params: Partial<ShockSpringParams>): ShockSpring
             top: params.grind?.top ?? defaults.grind.top,
             bottom: params.grind?.bottom ?? defaults.grind.bottom,
             offsetTurns: Math.max(0, params.grind?.offsetTurns ?? defaults.grind.offsetTurns),
+        },
+        material: {
+            name: params.material?.name ?? defaults.material.name,
+            shearModulus: Math.max(1, params.material?.shearModulus ?? defaults.material.shearModulus),
+            tensileStrength: Math.max(1, params.material?.tensileStrength ?? defaults.material.tensileStrength),
+            density: Math.max(0.1, params.material?.density ?? defaults.material.density),
+        },
+        loadcase: {
+            length1: Math.max(0, params.loadcase?.length1 ?? defaults.loadcase.length1),
+            force1: Math.max(0, params.loadcase?.force1 ?? defaults.loadcase.force1),
+            length2: params.loadcase?.length2,
+            force2: params.loadcase?.force2,
+            freeLength: params.loadcase?.freeLength,
+        },
+        guide: {
+            type: params.guide?.type ?? defaults.guide.type,
+            diameter: Math.max(0, params.guide?.diameter ?? defaults.guide.diameter),
+        },
+        dynamics: {
+            mass: params.dynamics?.mass,
+            naturalFrequency: params.dynamics?.naturalFrequency,
         },
         debug: {
             showCenterline: params.debug?.showCenterline ?? defaults.debug.showCenterline,

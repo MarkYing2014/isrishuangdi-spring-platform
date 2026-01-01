@@ -43,9 +43,24 @@ export class CandidateGenerator {
 
         for (const params of uniqueParams) {
             try {
+                let geometry: any = { ...params, Hb: 0 };
+
+                if (designSpace.springType === "shock") {
+                    const pitchVal = params.p || (params.H0 ? params.H0 / params.n : (params.D / 3)); // Fallback logic
+                    geometry = {
+                        totalTurns: params.n,
+                        meanDia: { start: params.D, mid: params.D, end: params.D, shape: "linear" },
+                        wireDia: { start: params.d, mid: params.d, end: params.d },
+                        pitch: { style: "symmetric", closedTurns: 1.5, workingMin: pitchVal, workingMax: pitchVal },
+                        grinding: { mode: "visualClip", grindStart: true, grindEnd: true, offsetTurns: 0.6 },
+                        installation: { guided: false, guideType: "none", guideDia: 0 },
+                        loadCase: { solidMargin: 3.0 }
+                    };
+                }
+
                 // Forward calculation
                 const result = engine.calculate({
-                    geometry: { ...params, Hb: 0 }, // Pass draft Hb
+                    geometry,
                     material,
                     cases: {
                         mode: designSpace.targets[0].inputMode,
@@ -135,7 +150,7 @@ export class CandidateGenerator {
         }
 
         return {
-            massProxy: MetricUtils.calculateMassProxy(params.d, params.D, params.n),
+            massProxy: result.mass || MetricUtils.calculateMassProxy(params.d, params.D, params.n),
             maxStressRatio: MetricUtils.calculateStressRatio(maxStress, material.tauAllow),
             solidMarginMin: result.H0 && result.Hb ? (result.H0 - result.Hb) / result.H0 : 0.5
         };

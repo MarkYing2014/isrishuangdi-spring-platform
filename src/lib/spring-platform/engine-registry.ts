@@ -8,6 +8,7 @@ import { DiscSpringEngine } from "./engines/disc-engine";
 import { SpiralSpringEngine } from "./engines/spiral-engine";
 import { WaveSpringEngine } from "./engines/wave-engine";
 import { VariablePitchEngine } from "./engines/variable-pitch-engine";
+import { ShockSpringEngine } from "./engines/ShockSpringEngine";
 
 const registry: Record<string, ISpringEngine> = {
     compression: new CompressionEngine(),
@@ -19,6 +20,7 @@ const registry: Record<string, ISpringEngine> = {
     spiral: new SpiralSpringEngine() as any,
     wave: new WaveSpringEngine() as any,
     variablePitch: new VariablePitchEngine(),
+    shock: new ShockSpringEngine(),
 };
 
 export function getEngine(type: PlatformSpringType): ISpringEngine {

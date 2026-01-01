@@ -15,10 +15,22 @@ interface DesignSpacePanelProps {
 }
 
 export function DesignSpacePanel({ springType, initialParams, onGenerate, isGenerating }: DesignSpacePanelProps) {
+  // Helper to extract base params
+  const defaults = React.useMemo(() => {
+     if (springType === "shock") {
+         return {
+             d: initialParams.wireDia?.mid || 10,
+             D: initialParams.meanDia?.mid || 50,
+             n: initialParams.totalTurns || 8
+         };
+     }
+     return initialParams;
+  }, [initialParams, springType]);
+
   const [ranges, setRanges] = useState({
-    d: [initialParams.d * 0.8, initialParams.d * 1.2],
-    D: [initialParams.D * 0.8, initialParams.D * 1.2],
-    n: [Math.max(2, initialParams.n - 5), initialParams.n + 5],
+    d: [defaults.d * 0.8, defaults.d * 1.2],
+    D: [defaults.D * 0.8, defaults.D * 1.2],
+    n: [Math.max(2, defaults.n - 5), defaults.n + 5],
   });
 
   const [target, setTarget] = useState({

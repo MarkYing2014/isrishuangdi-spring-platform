@@ -11,24 +11,58 @@ export type PlatformSpringType =
     | "disc"
     | "spiral"
     | "wave"
-    | "variablePitch";
+    | "variablePitch"
+    | "shock";
 
 /** Input modes vary by spring type */
 export type PlatformInputMode =
-    | "height" | "deflection" // Compression / Extension / Conical
+    | "height" | "deflection" // Compression / Extension / Conical / Shock
     | "angle" | "torque";     // Torsion / Spiral
 
-/** Design mode for the platform */
-export type PlatformDesignMode =
-    | "verification"       // Standard analysis (Input X -> Calc P)
-    | "targetLoad"         // Reverse solve (Input P -> Solve Geometry)
-    | "stiffnessSelection" // Compare candidates
-    | "designOpt";        // Phase 6: Automated Design & Pareto Optimization
+export type PlatformDesignMode = "verification" | "targetLoad" | "stiffnessSelection" | "designOpt";
 
 export interface PlatformDesignSummary {
     title: string;
     details: { label: string; value: string; unit?: string }[];
     warnings?: string[];
+}
+
+/** Shock Spring Specific Input (GEN-2) */
+export interface ShockSpringInput {
+    totalTurns: number;
+    samplesPerTurn: number;
+
+    meanDia: { start: number; mid: number; end: number; shape: "linear" | "bulge" | "hourglass" };
+    wireDia: { start: number; mid: number; end: number; shape?: "olive" | "linear" };
+
+    pitch: {
+        style: "symmetric" | "progressive" | "regressive";
+        closedTurns: number | { start: number; end: number };
+        workingMin: number;
+        workingMax: number;
+        transitionSharpness: number;
+        closedPitchFactor?: number;
+    };
+
+    ends?: {
+        closedTop?: boolean;
+        closedBottom?: boolean;
+        groundTop?: boolean; // Using boolean for simplicity in Platform
+        groundBottom?: boolean;
+        grindOffsetTurns?: number;
+    };
+
+    materialId?: string;
+
+    installation?: {
+        guided: boolean;
+        endCondition?: "open" | "closed" | "ground";
+        // optional clearance checks
+        rodDia?: number;
+        tubeId?: number;
+        seatODTop?: number;
+        seatODBottom?: number;
+    };
 }
 
 /** Input for the reverse solver */
@@ -93,6 +127,8 @@ export interface LoadCaseResult {
     // Output values
     load?: number;            // P (N) or M (Nmm)
     stress?: number;          // tau (MPa) or bending sigma (MPa)
+    kInstant?: number;        // Stiffness at this point
+    sfMin?: number;           // Safety Factor
 
     // Status
     status: CaseStatus;
@@ -100,10 +136,14 @@ export interface LoadCaseResult {
     isValid: boolean;
     messageEn?: string;
     messageZh?: string;
+    warnings?: string[];
 
     // Phase 7: Metadata for complex springs
     stage?: number;           // 1/2/3 for piecewise non-linear
     energy?: number;          // Accumulated energy at this point (J)
+
+    // Shock specific
+    tauMax?: number;          // Alias for stress if needed, but stress field is standard
 }
 
 /** Full calculation result from an engine */
@@ -128,6 +168,30 @@ export interface PlatformResult {
 
     // Phase 7: Energy metric
     totalEnergy?: number;
+
+    // Curves (Optional, added for Shock/Non-linear)
+    curves?: {
+        kx: { x: number; y: number; meta?: any }[];
+        px: { x: number; y: number }[];
+        energy: { x: number; y: number }[];
+    };
+
+    mass?: number;
+    wireLength?: number;
+    maxStroke?: number; // Limit
+
+    // Phase 8: Design Rules Checklist
+    designRules?: {
+        id: string;
+        label: string;
+        status: "pass" | "fail" | "warning";
+        message: string;
+        value?: number | string;
+        limit?: number | string;
+    }[];
+
+    /** Raw engine result (for 3D visualizers or specific tools) */
+    rawResult?: any;
 }
 
 /** Detailed Material Model for advanced calculations */
@@ -141,6 +205,7 @@ export interface PlatformMaterialModel {
     getTauAllow?: (params: any) => number;
     getSigmaAllow?: (params: any) => number;
 }
+
 
 /** Base interface for a spring calculating engine */
 export interface ISpringEngine {
