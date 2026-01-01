@@ -10,12 +10,12 @@ import {
 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
-interface EngineeringAssumptionPanelProps {
+interface EngineeringAssumptionsPanelProps {
   className?: string;
   springType: string;
 }
 
-export function EngineeringAssumptionPanel({ className, springType }: EngineeringAssumptionPanelProps) {
+export function EngineeringAssumptionsPanel({ className, springType }: EngineeringAssumptionsPanelProps) {
   const commonAssumptions = [
     {
       title: "物理模型 / Physics Models",

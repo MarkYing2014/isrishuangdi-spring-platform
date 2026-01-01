@@ -16,6 +16,7 @@ import {
     HookType
 } from "@/lib/engine/hookStress";
 import { SpringMaterialId } from "@/lib/materials/springMaterials";
+import { buildExtensionDesignRuleReport } from "@/lib/designRules/extensionRules";
 
 export class ExtensionEngine implements ISpringEngine {
     type = "extension" as const;
@@ -137,6 +138,72 @@ export class ExtensionEngine implements ISpringEngine {
             };
         });
 
+        // 1. Reconstruct Geometry for Rule Builder
+        const geometry: any = {
+            type: "extension",
+            wireDiameter: d,
+            outerDiameter: params.geometry.D + d, // D is mean, OD = D + d
+            meanDiameter: D,
+            activeCoils: n,
+            bodyLength: n * d, // Estimated or need separate input? Extension usually Close Wound Na*d
+            freeLength: H0,
+            initialTension: P0,
+            hookType: hookType || "machine",
+            shearModulus: G,
+        };
+
+        // 2. Reconstruct Analysis for Rule Builder
+        const analysisResult: any = {
+            springRate: k,
+            springRateUnit: "N/mm",
+            initialTension: P0,
+            springIndex: springIndex,
+            wahlFactor: wahlFactor,
+            // Extract Deflection x regardless of input mode
+            // If mode="height", input=L, alt=x. If mode="deflection", input=x, alt=L.
+            maxDeflection: Math.max(...caseResults.map(c => c.inputMode === "deflection" ? c.inputValue : (c.altInputValue || 0))),
+            workingDeflection: Math.max(...caseResults.map(c => c.inputMode === "deflection" ? c.inputValue : (c.altInputValue || 0))),
+        };
+
+        // 3. Generate Report
+        const report = buildExtensionDesignRuleReport({ geometry, analysisResult });
+
+        // 4. Map findings to Platform format
+        // 4. Map findings to Platform format
+        const designRules = report.findings.map((f: any) => ({
+            id: f.id,
+            label: f.titleEn,
+            status: (f.level === "error" ? "fail" : f.level === "warning" ? "warning" : "pass") as "pass" | "fail" | "warning",
+            message: (f.detailZh || f.detailEn || "") as string,
+            value: f.evidence ? String(Object.values(f.evidence)[0]) : "-",
+            limit: "-"
+        }));
+
+        // Add Metrics as passing rules (to show Green "OK" items like Index)
+        if (report.metrics.spring_index) {
+            designRules.unshift({
+                id: "spring_index",
+                label: "Spring Index C",
+                status: "pass",
+                message: "Within manufacturing range",
+                value: String(report.metrics.spring_index.value),
+                limit: "4 - 16"
+            });
+        }
+
+        // 5. Explicitly Flag Engine Validation Failures (e.g. Negative Extension) as Rules
+        const firstInvalid = caseResults.find(c => !c.isValid);
+        if (firstInvalid) {
+            designRules.unshift({
+                id: "ENG_INVALID_TRAVEL",
+                label: "Operating Range / 工作行程",
+                status: "fail",
+                message: firstInvalid.messageZh || firstInvalid.messageEn || "Invalid operating point",
+                value: typeof firstInvalid.inputValue === "number" ? String(firstInvalid.inputValue.toFixed(2)) : "-",
+                limit: "≥ 0"
+            });
+        }
+
         return {
             springType: "extension",
             cases: caseResults,
@@ -147,7 +214,8 @@ export class ExtensionEngine implements ISpringEngine {
             P0,
             isValid: caseResults.every(c => c.isValid),
             maxStress: Math.max(...caseResults.map(c => c.stress || 0)),
-            tauAllow: tauAllow
+            tauAllow: tauAllow,
+            designRules // <--- Added
         };
     }
 

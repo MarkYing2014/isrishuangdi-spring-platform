@@ -86,6 +86,9 @@ export class AuditEngine {
             }
         }
 
+        // Check for degraded signals (Missing Limits)
+        const isDegraded = stress.notes?.includes("Material limits missing") || false;
+
         return {
             status: overallStatus,
             summary: {
@@ -102,6 +105,7 @@ export class AuditEngine {
                 fatigue,
             },
             notes: this.generateNotes(input, { overallStatus, governingMode }),
+            degraded: isDegraded
         };
     }
 
@@ -163,67 +167,78 @@ export class AuditEngine {
         return audit;
     }
 
+    private static resolveAllowableStress(results: any, limits: any): number | null {
+        // Engineering Rationale:
+        // Explicit Limits (Contract) > Implicit Results (Legacy) > NULL
+        // We DO NOT fallback to arbitrary defaults (like 1000MPa) to avoid false confidence.
+
+        // 1. Explicit EngineeringLimits Contract
+        if (limits?.stressLimit) return limits.stressLimit;
+        if (limits?.tauAllow) return limits.tauAllow;
+        if (limits?.sigmaAllow) return limits.sigmaAllow;
+
+        // 2. Result/Legacy fields
+        if (results?.allowableStress) return results.allowableStress; // Calculator-provided
+        if (results?.tauAllow) return results.tauAllow;               // Legacy DB field
+
+        return null; // Signal for Degraded Mode
+    }
+
     private static evaluateLoadcase(input: AuditEvaluationInput, policy: any): LoadcaseAudit {
         const { springType, results, geometry } = input;
+        const limits = results.limits;
 
-        // Normalize travel
+        // 1. Determine Usage & Capacity
         let used = 0;
-        let maxAllowed = 1;
+        let limit = 0;
         let unit = "mm";
 
-        if (springType === "torsion" || springType === "arc") {
-            used = results.angles?.deltaDeg || results.workingDeflection || 0;
-            maxAllowed = input.policy?.travelFailThreshold || 180; // Placeholder
-            unit = "°";
-        } else if (springType === "spiralTorsion") {
-            used = results.maxWorkingAngle || results.workingDeflection || 0;
-            maxAllowed = results.maxDeflection || results.closeOutAngle || 360;
-            unit = "°";
-        } else if (springType === "compression" || springType === "extension" || springType === "conical" || springType === "variablePitchCompression") {
+        // Strategy: Use limits contract if available, else fallback to legacy (with strict type checks)
+        if (limits && limits.maxDeflection !== undefined) {
             used = results.workingDeflection || results.delta || 0;
-            maxAllowed = results.maxDeflection || results.usableTravel || results.totalDeflectionCapacity || 10;
+            limit = limits.maxDeflection;
             unit = "mm";
-        } else if (springType === "garter") {
-            // Check ΔD / D_free (User requirement: > 10% give WARN)
-            const D_free = geometry.ringFreeDiameter ?? 100;
-            const deltaD = Math.abs((geometry.ringInstalledDiameter ?? D_free) - D_free);
-            used = deltaD;
-
-            // Factory limit: Min(10%, 8mm)
-            maxAllowed = deltaDLimitMM(D_free);
-            unit = "mm (ΔD)";
-
-            // Override ratio calc slightly for custom message? 
-            // Standard ratio logic below works if we define maxAllowed correctly as the limit.
+        } else if (limits && limits.maxAngle !== undefined) {
+            used = results.workingAngle || results.maxWorkingAngle || 0;
+            limit = limits.maxAngle;
+            unit = "°";
         } else {
-            used = results.travel_mm || results.delta || 0;
-            maxAllowed = results.maxTravel || results.maxDeflection || 10;
-            unit = "mm";
+            // Fallback Logic (Legacy)
+            if (springType === "torsion" || springType === "arc") {
+                // FIXED: Do not read workingDeflection for angles
+                used = results.workingAngle ?? results.maxWorkingAngle ?? results.angles?.deltaDeg ?? 0;
+                limit = input.policy?.travelFailThreshold || 180;
+                unit = "°";
+            } else if (springType === "spiralTorsion") {
+                used = results.maxWorkingAngle || results.workingDeflection || 0;
+                limit = results.maxDeflection || results.closeOutAngle || 360;
+                unit = "°";
+            } else if (springType === "garter") {
+                const D_free = geometry.ringFreeDiameter ?? 100;
+                const deltaD = Math.abs((geometry.ringInstalledDiameter ?? D_free) - D_free);
+                return {
+                    travel: { used: deltaD, maxAllowed: deltaDLimitMM(D_free), unit: "mm (ΔD)", ratio: (deltaD / deltaDLimitMM(D_free)) * 100, status: (deltaD / deltaDLimitMM(D_free)) * 100 > 100 ? "WARN" : "PASS" },
+                    directionCheck: { expected: "extend", actual: "neutral", status: "PASS" }
+                };
+            } else {
+                used = results.workingDeflection || results.delta || 0;
+                limit = results.maxDeflection || results.usableTravel || results.totalDeflectionCapacity || 10;
+            }
         }
 
-        const ratio = (used / maxAllowed) * 100;
+        const ratio = limit > 0 ? (used / limit) * 100 : 0;
         let status: AuditStatus = "PASS";
 
-        if (springType === "garter") {
-            // Garter limit: > 100% of maxAllowed (which is Min(10%, 8mm)) is WARN/FAIL?
-            // User policy says: |ΔD| > limit => WARN "Over-stretch risk"
-            if (ratio > 100) status = "WARN";
+        // Unified Thresholds (Eliminate Double Standards)
+        // Strictly use limits or standard engineering defaults (0.8 / 1.1)
+        const warnThresh = (limits?.warnRatio ?? 0.80) * 100;
+        const failThresh = (limits?.failRatio ?? 1.10) * 100;
 
-            // Direction Check: Tension install required?
-            // D_installed < D_free => "Reverse/Slack"
-            if ((geometry.ringInstalledDiameter ?? 0) < (geometry.ringFreeDiameter ?? 0)) {
-                return {
-                    travel: { used, maxAllowed, unit, ratio, status: "FAIL" }, // Fail on reverse install
-                    directionCheck: { expected: "extend", actual: "compress", status: "FAIL" }
-                };
-            }
-        } else {
-            if (ratio >= (policy.travelFailThreshold)) status = "FAIL";
-            else if (ratio >= (policy.travelWarnThreshold)) status = "WARN";
-        }
+        if (ratio > failThresh) status = "FAIL";
+        else if (ratio > warnThresh) status = "WARN";
 
         return {
-            travel: { used, maxAllowed, unit, ratio, status },
+            travel: { used, maxAllowed: limit, unit, ratio, status },
             directionCheck: {
                 expected: "compress", // Default
                 actual: results.direction || "neutral",
@@ -234,6 +249,7 @@ export class AuditEngine {
 
     private static evaluateStress(input: AuditEvaluationInput, policy: any): StressAudit {
         const { springType, results } = input;
+        const limits = results.limits;
 
         const mapping: Record<string, { en: string, zh: string }> = {
             torsion: { en: "Leg + Body Torsion", zh: "支腿与簧体扭转" },
@@ -251,72 +267,56 @@ export class AuditEngine {
         const mode = mapping[springType] || { en: "Helical Shear", zh: "螺旋切应力" };
 
         let maxStress = results.maxStress || results.stress || 0;
-        if (springType === "garter") {
-            maxStress = results.tauMax ?? 0;
-        }
+        if (springType === "garter") maxStress = results.tauMax ?? 0;
 
-        const allowableStress = results.allowableStress || 1000;
-        // Garter logic: ratio in result is already computed, but let's recompute or use it.
-        // User: FAIL ratio > 1.0, WARN 0.8-1.0
-
-        // If result has it, use it?
-        // Let's stick to standard re-calc here for uniformity or use what's passed if simpler.
-        // results.tauMax should be there.
-        // results.safetyFactor might be there.
-
-        // We need an allowable. In garter math we calculated ratio.
-        // Let's try to infer allowable from ratio if absent.
-        let localAllowable = allowableStress;
-        if (springType === "garter" && results.stressRatio > 0) {
-            localAllowable = maxStress / results.stressRatio;
-        }
-
-        const ratio = (maxStress / localAllowable) * 100;
-        const sf = localAllowable / (maxStress || 1);
+        // 1. Resolve Allowable Stress (Strict)
+        const allowableStress = this.resolveAllowableStress(results, limits);
 
         let status: AuditStatus = "PASS";
+        let resolvedAllowable = allowableStress ?? 0;
+        let isDegraded = false;
+        let notesStr: string | undefined = undefined;
 
-        if (springType === "garter") {
-            // Policy allows 0.65 * Sy (Clamped), but we usually pass allowableStressRatio
-            // If we really want to check "Result Ratio" against "Policy Ratio Thresholds":
-            // Policy says: Warn > 0.8, Fail > 1.0.
-            // We need to ensure the `results.stressRatio` is calculated against the Policy Allowable.
-
-            // If the Calculator used the Policy Allowable Factor, then results.stressRatio is correct.
-            // We just enforce the thresholds here.
-            const { ratioWarn, ratioFail } = GARTER_SPRING_FACTORY_POLICY;
-
-            // Recalculate ratio to be safe? 
-            // Calculator: res.stressRatio = tauMax / (allowableStressRatio * tensileStrength ? OR Sy)
-            // Let's assume Calculator did it right.
-            // Wait, calculator uses `allowableStressRatio * tensileStrength` usually? Or Sy?
-            // Standard `calculateGarterSpring` likely uses `tensileStrength`.
-            // If our Policy is `0.65 * Sy`, we need to know Sy. 
-            // IF inputs don't have Sy, we might be off.
-            // But for now, let's stick to the ratio returned by calculator if we passed the right factor.
-
-            // Actually, if we want to be robust:
-            // Let's rely on the ratio passed in, assuming calculator used the Policy Factor correctly.
-
-            const ratioVal = results.stressRatio; // e.g. 0.85
-            if (ratioVal > ratioFail) status = "FAIL";
-            else if (ratioVal > ratioWarn) status = "WARN";
-
-            // Note: Stress variable allows overriding "allowable" for display
-            localAllowable = maxStress / (ratioVal || 1);
+        if (allowableStress === null) {
+            // DEGRADED MODE: Limits Missing
+            // We cannot PASS or FAIL reliably. We must WARN.
+            isDegraded = true;
+            status = "WARN";
+            notesStr = "Material limits missing. Audit reliability degraded.";
+            // Safety factors are undefined/Infinite
         } else {
-            if (ratio >= policy.stressFailThreshold) status = "FAIL";
-            else if (ratio >= policy.stressWarnThreshold) status = "WARN";
+            // Normal Evaluation
+            resolvedAllowable = allowableStress;
+
+            // Unified Thresholds
+            const warnRatio = limits?.warnRatio ?? 0.80; // 80%
+            const failRatio = limits?.failRatio ?? 1.10; // 110%
+
+            const ratio = (maxStress / resolvedAllowable);
+
+            if (ratio > failRatio) status = "FAIL";
+            else if (ratio > warnRatio) status = "WARN";
+
+            // Garter exception (retained for safety)
+            if (springType === "garter") {
+                const ratioVal = results.stressRatio ?? ratio;
+                if (ratioVal > 1.0) status = "FAIL";
+                else if (ratioVal > 0.8) status = "WARN";
+            }
         }
+
+        const ratioPercentage = resolvedAllowable > 0 ? (maxStress / resolvedAllowable) * 100 : 0;
+        const sf = resolvedAllowable / (maxStress || 1);
 
         return {
             governingMode: mode.en,
             governingModeZh: mode.zh,
             maxStress,
-            allowableStress: localAllowable,
-            stressRatio: ratio,
+            allowableStress: resolvedAllowable,
+            stressRatio: ratioPercentage,
             safetyFactor: sf,
             status,
+            notes: notesStr
         };
     }
 

@@ -58,6 +58,7 @@ export interface StressAudit {
 
     stressRatio: number;      // percentage 0-100
     safetyFactor: number;
+    notes?: string;
 
     status: AuditStatus;
 }
@@ -93,5 +94,6 @@ export interface SpringAuditResult {
         fatigue?: FatigueAudit;
     };
 
-    notes: string[];
+    notes?: string[];
+    degraded?: boolean; // Indicates reliability issues (e.g. missing material limits)
 }

@@ -11,6 +11,7 @@ import {
     ArcSpringParams,
     ArcPackGroup
 } from "../types";
+import { buildArcSpringDesignRuleReport } from "@/lib/designRules/arcSpringRules";
 
 /**
  * ArcSpringEngine handles curved damper springs (clutch/flywheel).
@@ -155,6 +156,43 @@ export class ArcSpringEngine implements ISpringEngine {
             };
         });
 
+        // Generate Design Rules
+        const ruleInput: any = {
+            D: geo.Dm,
+            d: geo.d,
+            n: geo.n,
+            r: geo.R,
+            alpha0: geo.arcSpanDeg,
+            alphaC: 0
+        }
+        const report = buildArcSpringDesignRuleReport(ruleInput);
+
+        const designRules = report.findings.map((f: any) => ({
+            id: f.id,
+            label: f.titleEn,
+            status: (f.level === "error" ? "fail" : f.level === "warning" ? "warning" : "pass") as "pass" | "fail" | "warning",
+            message: (f.detailZh || f.detailEn || "") as string,
+            value: f.evidence ? String(Object.values(f.evidence)[0]) : "-",
+            limit: "-"
+        }));
+
+        // Inject Engine Runtime Checks (Travel, Stress, Stage)
+        const firstFail = results.find(r => r.status === "danger");
+        const firstWarn = results.find(r => r.status === "warning");
+        const priorityIssue = firstFail || firstWarn;
+
+        if (priorityIssue) {
+            // Avoid duplicates if possible, or just prepend as runtime checks are important
+            designRules.unshift({
+                id: "ENG_RUNTIME_CHECK",
+                label: priorityIssue.statusReason === "travel" ? "Travel / 行程" : "Stress / 应力",
+                status: priorityIssue.status === "danger" ? "fail" : "warning",
+                message: priorityIssue.messageZh || priorityIssue.messageEn || "Runtime Warning",
+                value: priorityIssue.inputValue.toFixed(1) + "deg",
+                limit: priorityIssue.statusReason === "travel" ? geo.arcSpanDeg.toFixed(1) : (priorityIssue.statusReason === "stress" ? "100%" : "-")
+            });
+        }
+
         return {
             springType: "arc",
             cases: results,
@@ -164,7 +202,8 @@ export class ArcSpringEngine implements ISpringEngine {
             isValid: results.every(r => r.isValid),
             maxStress: Math.max(...results.map(r => r.stress || 0)),
             tauAllow: tauAllow,
-            totalEnergy: results.length > 0 ? (results[results.length - 1]?.energy ?? 0) : 0 // J
+            totalEnergy: results.length > 0 ? (results[results.length - 1]?.energy ?? 0) : 0, // J
+            designRules // <--- Added
         };
     }
 

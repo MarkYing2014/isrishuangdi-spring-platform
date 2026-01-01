@@ -1,11 +1,9 @@
 import { LanguageText } from "@/components/language-context";
-
 import Link from "next/link";
 import {
   ArrowRight,
   BarChart3,
   ClipboardCheck,
-  Box,
   Calculator,
   FileCog,
   Mail,
@@ -27,8 +25,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { HomeRiskRadar } from "@/components/home/HomeRiskRadar";
 import { HoverGlassCard } from "@/components/home/HoverGlassCard";
-import { HeroSpline } from "@/components/home/hero-spline";
 import { ManufacturingAlignment } from "@/components/home/ManufacturingAlignment";
+
+// New Hero Component
+import { Frame1Hero } from "@/components/landing/Frame1Hero";
 
 const features = [
   {
@@ -106,50 +106,11 @@ type HomeFeature = {
 export default function Home() {
   return (
     <div className="space-y-12">
-      <Card className="rounded-3xl">
-        <div className="grid gap-10 px-6 py-8 md:grid-cols-[1.2fr_0.8fr] md:items-center md:px-10 md:py-10">
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-primary/80">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-              <span>ISRI-SHUANGDI • Industry 4.0</span>
-            </div>
-            <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-              <LanguageText
-                en="Engineering-Grade Spring Analysis & Manufacturing Platform"
-                zh="面向制造的工程级弹簧分析与设计平台"
-              />
-            </h1>
-            <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
-              <LanguageText
-                en="Factory-Calibrated. Design-Ready. Not just a calculator, but a complete decision system from Geometry → Risk → Production."
-                zh="与工厂报告对齐，为真实设计而生。从几何验证到生产评审的全链路决策系统。"
-              />
-            </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <Button asChild size="lg" className="rounded-full">
-                <Link href="/tools/calculator">
-                  <Calculator className="mr-2 size-4" />
-                  <LanguageText en="Try Engineering Calculator" zh="使用工程计算器" />
-                  <ArrowRight className="ml-2 size-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="rounded-full">
-                <Link href="/production">
-                  <Activity className="mr-2 size-4" />
-                  <LanguageText en="See Manufacturing Dashboard Demo" zh="查看制造看板演示" />
-                </Link>
-              </Button>
-            </div>
-          </div>
+      
+      {/* 1. New SEOS Hero */}
+      <Frame1Hero />
 
-          <div className="relative">
-            <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl border bg-muted/30 shadow-sm">
-              <HeroSpline />
-            </div>
-          </div>
-        </div>
-      </Card>
-
+      {/* 2. Original Engineering Risk Radar Section */}
       <section className="rounded-3xl border bg-background p-6 sm:p-10">
         <div className="grid gap-10 md:grid-cols-[1.1fr_0.9fr] md:items-start">
           <div>
@@ -256,8 +217,10 @@ export default function Home() {
         </div>
       </section>
 
+      {/* 3. Original Manufacturing Alignment */}
       <ManufacturingAlignment />
 
+      {/* 4. Original Live Risk Brain Section */}
       <section className="rounded-3xl border bg-background p-6 sm:p-10">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-primary/80">
@@ -463,6 +426,7 @@ export default function Home() {
         </div>
       </section>
 
+      {/* 5. Original Feature Cards */}
       <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-4 sm:p-6">
         <div className="pointer-events-none absolute inset-0 opacity-70" aria-hidden={true}>
           <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-indigo-200/40 blur-3xl" />

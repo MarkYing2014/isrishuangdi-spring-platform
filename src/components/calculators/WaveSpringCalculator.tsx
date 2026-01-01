@@ -190,25 +190,44 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
     );
   }, [freeHeight_Hf, workingHeight_Hw, turns_Nt, thickness_t]);
 
+  // Unified Analysis Result with Engineering Limits
+  const analysisResultData = useMemo(() => {
+      if (!result) return null;
+      const solidHeight = turns_Nt * thickness_t;
+      const maxDeflection = Math.max(0, freeHeight_Hf - solidHeight);
+      const allowableStress = (result as any).allowableStress_MPa || 1200; // Default if not computed
+      
+      return {
+          springRate: result.springRate_Nmm,
+          springRateUnit: "N/mm" as const,
+          workingLoad: result.loadAtWorkingHeight_N,
+          maxStress: result.stressMax_MPa,
+          springIndex: result.meanDiameter_mm / thickness_t,
+          workingDeflection: travelDerived.delta, // Use unified travel
+          maxDeflection: maxDeflection,
+          allowableStress,
+          limits: {
+            stressLimit: allowableStress,
+            stressLimitType: "bending" as const, // Crest-to-crest is bending
+            maxDeflection: maxDeflection,
+            warnRatio: 0.85,
+            failRatio: 1.05 // Wave springs can take some set? Strict to 1.05
+          }
+      };
+  }, [result, freeHeight_Hf, turns_Nt, thickness_t, travelDerived.delta]);
+
   const unifiedAudit = useMemo(() => {
-    if (!result) return null;
+    if (!analysisResultData) return null;
     return AuditEngine.evaluate({
       springType: "wave",
       geometry: input.geometry,
-      results: {
-        ...result,
-        travel_mm: travelDerived.delta,
-        maxTravel: freeHeight_Hf - (turns_Nt * thickness_t),
-        // Map wave specific terms to audit engine expectations
-        maxStress: result.stressMax_MPa,
-        allowableStress: (result as any).allowableStress_MPa || 1200, // Fallback
-      }
+      results: analysisResultData
     });
-  }, [result, input.geometry, travelDerived.delta, freeHeight_Hf, turns_Nt, thickness_t]);
+  }, [analysisResultData, input.geometry]);
 
   // Phase 5: Auto-sync to global store to enable Save/Export/Analysis
   useEffect(() => {
-    if (result && result.isValid) {
+    if (result && result.isValid && analysisResultData) {
       setDesign({
         springType: "wave",
         geometry: {
@@ -222,18 +241,10 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
           shearModulus: E_MPa / (2 * (1 + 0.3)), // estimate
           density: 7800,
         },
-        analysisResult: {
-          springRate: result.springRate_Nmm,
-          springRateUnit: "N/mm",
-          workingLoad: result.loadAtWorkingHeight_N,
-          maxStress: result.stressMax_MPa,
-          springIndex: result.meanDiameter_mm / thickness_t,
-          workingDeflection: result.travel_mm,
-          maxDeflection: result.travel_mm, // Synchronize for unified audit
-        }
+        analysisResult: analysisResultData,
       });
     }
-  }, [result, input.geometry, materialId, E_MPa, input.material?.name, thickness_t, setDesign]);
+  }, [result, input.geometry, materialId, E_MPa, input.material?.name, thickness_t, setDesign, analysisResultData]);
 
   // Build URLs for pipeline navigation
   const designParams = useMemo(() => ({
@@ -260,6 +271,7 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
   );
 
   const handleSendToEngineering = () => {
+    if (!analysisResultData) return;
     setDesign({
       springType: "wave",
       geometry: {
@@ -273,19 +285,13 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
         shearModulus: E_MPa / (2 * (1 + 0.3)), // estimate
         density: 7800,
       },
-      analysisResult: {
-        springRate: result.springRate_Nmm,
-        springRateUnit: "N/mm",
-        workingLoad: result.loadAtWorkingHeight_N,
-        maxStress: result.stressMax_MPa,
-        springIndex: result.meanDiameter_mm / thickness_t,
-        workingDeflection: result.travel_mm,
-      }
+      analysisResult: analysisResultData,
     });
     router.push(analysisUrl);
   };
 
   const handleExportCad = () => {
+    if (!analysisResultData) return;
     setDesign({
       springType: "wave",
       geometry: {
@@ -299,14 +305,7 @@ export function WaveSpringCalculator({ isZh: propIsZh }: WaveSpringCalculatorPro
         shearModulus: E_MPa / (2 * (1 + 0.3)), // estimate
         density: 7800,
       },
-      analysisResult: {
-        springRate: result.springRate_Nmm,
-        springRateUnit: "N/mm",
-        workingLoad: result.loadAtWorkingHeight_N,
-        maxStress: result.stressMax_MPa,
-        springIndex: result.meanDiameter_mm / thickness_t,
-        workingDeflection: result.travel_mm,
-      }
+      analysisResult: analysisResultData,
     });
     router.push(cadExportUrl);
   };

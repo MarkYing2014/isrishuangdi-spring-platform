@@ -11,6 +11,7 @@ import {
     SolveForTargetInput,
     SolveForTargetResult
 } from "../types";
+import { buildCompressionDesignRuleReport } from "@/lib/designRules/compressionRules";
 import { SpringMaterialId } from "@/lib/materials/springMaterials";
 
 export class CompressionEngine implements ISpringEngine {
@@ -96,6 +97,62 @@ export class CompressionEngine implements ISpringEngine {
             };
         });
 
+        // Generate Design Rules
+        const geometry: any = {
+            d, D, n, H0, Hb
+        };
+
+        const analysisResult: any = {
+            maxDeflection: H0 - Hb, // Approx max
+            // Extract Deflection regardless of input mode
+            // If mode="height", input=H, alt=delta. If mode="deflection", input=delta, alt=H.
+            workingDeflection: Math.max(...caseResults.map(c => c.inputMode === "deflection" ? c.inputValue : (c.altInputValue || 0))),
+            shearStress: Math.max(...caseResults.map(c => c.stress || 0)),
+            staticSafetyFactor: tauAllow / Math.max(...caseResults.map(c => c.stress || 0.001)),
+            springRate: k
+        };
+
+        const mockEds: any = {
+            geometry: { totalCoils: { nominal: n + 2 } }, // Assume closed ends
+            material: { materialId: params.material.id }
+        };
+        const mockResolved: any = {
+            design: {
+                wireDiameter: d,
+                meanDiameter: D,
+                activeCoils: n,
+                freeLength: H0
+            }
+        };
+
+        const report = buildCompressionDesignRuleReport({
+            eds: mockEds,
+            resolved: mockResolved,
+            analysisResult
+        });
+
+        const designRules = report.findings.map((f: any) => ({
+            id: f.id,
+            label: f.titleEn,
+            status: (f.level === "error" ? "fail" : f.level === "warning" ? "warning" : "pass") as "pass" | "fail" | "warning",
+            message: (f.detailZh || f.detailEn || "") as string,
+            value: f.evidence ? String(Object.values(f.evidence)[0]) : "-",
+            limit: "-"
+        }));
+
+        // Inject Engine Runtime Checks (Solid Height, Stress)
+        const firstFail = caseResults.find(c => c.status === "danger" || !c.isValid);
+        if (firstFail) {
+            designRules.unshift({
+                id: "ENG_RUNTIME_FAILURE",
+                label: firstFail.statusReason === "solid" ? "Solid Height / 压并" : (firstFail.statusReason === "stress" ? "Stress / 应力" : "Runtime Error"),
+                status: "fail",
+                message: firstFail.messageZh || firstFail.messageEn || "Runtime Failure",
+                value: firstFail.altInputValue?.toFixed(2) ?? "-",
+                limit: firstFail.statusReason === "solid" ? Hb.toFixed(2) : (firstFail.statusReason === "stress" ? tauAllow.toFixed(0) : "-")
+            });
+        }
+
         return {
             springType: "compression",
             cases: caseResults,
@@ -106,7 +163,8 @@ export class CompressionEngine implements ISpringEngine {
             Hb,
             isValid: caseResults.every(c => c.isValid),
             maxStress: Math.max(...caseResults.map(c => c.stress || 0)),
-            tauAllow: tauAllow
+            tauAllow: tauAllow,
+            designRules // <--- Added
         };
     }
 

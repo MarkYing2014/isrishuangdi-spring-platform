@@ -11,6 +11,7 @@ import {
     SolveForTargetInput,
     SolveForTargetResult
 } from "../types";
+import { buildTorsionDesignRuleReport } from "@/lib/designRules/torsionRules";
 import {
     calculateTorsionSpringRate,
     calculateTorsionBendingStress,
@@ -113,6 +114,47 @@ export class TorsionEngine implements ISpringEngine {
             };
         });
 
+        // Generate Design Rules
+        // Generate Design Rules
+        const geometry: any = {
+            wireDiameter: d,
+            meanDiameter: D,
+            activeCoils: n,
+            legLength1: params.geometry.legLength1,
+            legLength2: params.geometry.legLength2,
+            // Extracts Angle: if mode is "angle", input is Angle. If mode is "torque", alt is Angle.
+            workingAngle: Math.max(...caseResults.map(c => Math.abs(c.inputMode === "angle" ? c.inputValue : (c.altInputValue || 0))))
+        };
+
+        const analysisResult: any = {
+            shearStress: Math.max(...caseResults.map(c => c.stress || 0)), // Torsion usually uses sigma (bending) but rules map to stress field
+            maxStress: Math.max(...caseResults.map(c => c.stress || 0))
+        };
+
+        const report = buildTorsionDesignRuleReport({ geometry, analysisResult });
+
+        const designRules = report.findings.map((f: any) => ({
+            id: f.id,
+            label: f.titleEn,
+            status: (f.level === "error" ? "fail" : f.level === "warning" ? "warning" : "pass") as "pass" | "fail" | "warning",
+            message: (f.detailZh || f.detailEn || "") as string,
+            value: f.evidence ? String(Object.values(f.evidence)[0]) : "-",
+            limit: "-"
+        }));
+
+        // Inject Engine Runtime Checks (Travel, Stress, Geometry)
+        const firstFail = caseResults.find(c => c.status === "danger" || c.status === "warning");
+        if (firstFail) {
+            designRules.unshift({
+                id: "ENG_RUNTIME_CHECK",
+                label: firstFail.statusReason === "stress" ? "Stress / 应力" : (firstFail.statusReason === "geometry" ? "Geometry / 几何" : "Oper. Range / 行程"),
+                status: firstFail.status === "danger" ? "fail" : "warning",
+                message: firstFail.messageZh || firstFail.messageEn || "Runtime Warning",
+                value: firstFail.altInputValue?.toFixed(1) ?? "-",
+                limit: "-"
+            });
+        }
+
         return {
             springType: "torsion",
             cases: caseResults,
@@ -121,7 +163,8 @@ export class TorsionEngine implements ISpringEngine {
             wahlFactor: calculateTorsionBendingStress(1, d, meanDiameter).correctionFactor,
             isValid: caseResults.every(c => c.isValid),
             maxStress: Math.max(...caseResults.map(c => c.stress || 0)),
-            tauAllow: sigmaAllow
+            tauAllow: sigmaAllow,
+            designRules // <--- Added
         };
     }
 

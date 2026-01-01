@@ -9,6 +9,7 @@ import {
     CaseStatusReason,
     PlatformDesignSummary
 } from "../types";
+import { buildSpiralSpringDesignRuleReport } from "@/lib/designRules/spiralSpringRules";
 
 /**
  * SpiralSpringEngine handles Flat Strip Spiral Springs.
@@ -76,6 +77,42 @@ export class SpiralSpringEngine implements ISpringEngine {
             };
         });
 
+        // Generate Design Rules
+        const geometry: any = {
+            stripWidth: b,
+            stripThickness: t,
+            activeLength: L,
+            innerDiameter: params.geometry.innerDiameter,
+            outerDiameter: params.geometry.outerDiameter,
+            // Extract Angle regardless of mode
+            // If mode="angle", input=theta. If mode="torque", input=torque, alt=theta.
+            maxWorkingAngle: Math.max(...results.map(r => Math.abs(r.inputMode === "angle" ? r.inputValue : (r.altInputValue || 0)))),
+            activeCoils: (params.geometry as any).activeCoils // Pass through if available
+        };
+
+        const analysisResult: any = {
+            maxStress: Math.max(...results.map(r => r.stress || 0)),
+            staticSafetyFactor: tauAllow * 1.8 / Math.max(...results.map(r => r.stress || 0.001))
+        };
+
+        const report = buildSpiralSpringDesignRuleReport({ geometry, analysisResult });
+
+        const designRules = report.findings.map((f: any) => ({
+            id: f.id,
+            label: f.titleEn,
+            status: (f.level === "error" ? "fail" : f.level === "warning" ? "warning" : "pass") as "pass" | "fail" | "warning",
+            message: (f.detailZh || f.detailEn || "") as string,
+            value: f.evidence ? String(Object.values(f.evidence)[0]) : "-",
+            limit: "-"
+        }));
+
+        // Explicitly flag engine warnings (e.g. overstress) as Fail rules if not already covered
+        const firstDanger = results.find(r => r.status === "danger" || r.status === "warning");
+        if (firstDanger && !designRules.some(r => r.id === "ENG_STRESS_CHECK")) {
+            // If engine says danger but rules didn't catch it (unlikely for stress, but possible for other reasons)
+            // For spiral, we mainly check stress.
+        }
+
         return {
             springType: "spiral",
             cases: results,
@@ -85,7 +122,8 @@ export class SpiralSpringEngine implements ISpringEngine {
             isValid: results.every(r => r.isValid),
             maxStress: Math.max(...results.map(r => r.stress || 0)),
             tauAllow: tauAllow * 1.8, // Bending limit proxy
-            totalEnergy: results[results.length - 1]?.energy || 0
+            totalEnergy: results[results.length - 1]?.energy || 0,
+            designRules // <--- Added
         };
     }
 

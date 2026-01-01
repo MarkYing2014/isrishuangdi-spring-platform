@@ -9,6 +9,7 @@ import {
     CaseStatusReason,
     PlatformDesignSummary
 } from "../types";
+import { buildWaveSpringDesignRuleReport } from "@/lib/designRules/waveSpringRules";
 
 /**
  * WaveSpringEngine handles Crest-to-Crest Wave Springs.
@@ -87,6 +88,56 @@ export class WaveSpringEngine implements ISpringEngine {
             };
         });
 
+        // Generate Design Rules
+        const input: any = {
+            geometry: {
+                od: od,
+                id: id_in,
+                thickness_t: t,
+                radialWall_b: b,
+                turns_Nt: Nt,
+                wavesPerTurn_Nw: Nw,
+                freeHeight_Hf: Hf
+            },
+            material: {
+                yieldStrength_MPa: 1400, // Should come from material model
+                modulus_MPa: E
+            }
+        };
+
+        const result: any = {
+            springRate_Nmm: springRate,
+            stressMax_MPa: Math.max(...results.map(r => r.stress || 0)),
+            travel_mm: Math.max(...results.map(r => r.altInputValue && params.cases.mode === "height" ? r.altInputValue : (params.cases.mode === "deflection" ? r.inputValue : 0))),
+            loadAtWorkingHeight_N: Math.max(...results.map(r => r.load || 0)),
+            errors: [],
+            warnings: []
+        };
+
+        const report = buildWaveSpringDesignRuleReport({ input, result });
+
+        const designRules = report.findings.map((f: any) => ({
+            id: f.id,
+            label: f.titleEn,
+            status: (f.level === "error" ? "fail" : f.level === "warning" ? "warning" : "pass") as "pass" | "fail" | "warning",
+            message: (f.detailZh || f.detailEn || "") as string,
+            value: f.evidence ? String(Object.values(f.evidence)[0]) : "-",
+            limit: "-"
+        }));
+
+        // Inject Engine Runtime Checks (Travel, Stress)
+        const firstFail = results.find(r => r.status === "danger" || r.status === "warning");
+        if (firstFail) {
+            designRules.unshift({
+                id: "ENG_RUNTIME_CHECK",
+                label: firstFail.statusReason === "travel" ? "Travel / 行程" : "Stress / 应力",
+                status: firstFail.status === "danger" ? "fail" : "warning",
+                message: firstFail.messageZh || firstFail.messageEn || "Runtime Warning",
+                value: firstFail.altInputValue?.toFixed(2) ?? "-",
+                limit: "-"
+            });
+        }
+
         return {
             springType: "wave",
             cases: results,
@@ -98,7 +149,8 @@ export class WaveSpringEngine implements ISpringEngine {
             tauAllow: tauAllow * 1.5, // Bending limit proxy
             totalEnergy: results[results.length - 1]?.energy || 0,
             H0: Hf,
-            Hb: solidHeight
+            Hb: solidHeight,
+            designRules // <--- Added
         };
     }
 

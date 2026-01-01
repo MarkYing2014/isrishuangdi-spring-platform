@@ -5,6 +5,7 @@ import type React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/components/language-context"; // Import useLanguage
 
 import type { DesignRuleFinding, DesignRuleReport } from "@/lib/designRules/types";
 
@@ -41,16 +42,43 @@ export function DesignRulePanel({ report, title = "Design Rules / 设计规则",
   const findings = report.findings ?? [];
   const metrics = report.metrics ?? {};
 
+  const { language } = useLanguage();
+  const isZh = language === "zh";
+
+  const statusConfig = {
+      OK: {
+          text: { en: "Geometry rules satisfied", zh: "几何设计规则通过" },
+          color: "text-emerald-600"
+      },
+      WARN: {
+          text: { en: "Geometry is acceptable but outside recommended range", zh: "几何可接受，但超出推荐范围" },
+          color: "text-amber-600"
+      },
+      FAIL: {
+          text: { en: "Geometry rules violated", zh: "几何设计规则未通过" },
+          color: "text-rose-600"
+      }
+  }
+  const currentStatus = statusConfig[report.summary.status] || statusConfig.OK;
+
   return (
-    <Card className={cn("", className)}>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center justify-between">
-          <span>{title}</span>
-          <div className="flex items-center gap-2">
-            {headerRight}
-            <StatusBadge status={report.summary.status} />
-          </div>
-        </CardTitle>
+    <Card className={cn("overflow-hidden border border-slate-200 shadow-sm", className)}>
+      <CardHeader className="pb-3 bg-slate-50/40">
+        <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-bold text-slate-800">
+                {isZh ? "设计规则（几何与比例）" : "Design Rules (Geometry & Proportion)"}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+                {headerRight}
+                <StatusBadge status={report.summary.status} />
+            </div>
+        </div>
+        
+        {/* Descriptive Status Line */}
+        <p className={cn("text-xs font-medium mt-1", currentStatus.color)}>
+            {isZh ? currentStatus.text.zh : currentStatus.text.en}
+        </p>
+
         {subheader && <div className="mt-2">{subheader}</div>}
       </CardHeader>
       <CardContent className="space-y-4">
@@ -120,6 +148,10 @@ export function DesignRulePanel({ report, title = "Design Rules / 设计规则",
             })}
           </div>
         )}
+        {/* Fixed Disclaimer */}
+        <div className="pt-3 mt-2 border-t border-slate-100 text-[10px] text-slate-400 italic text-center">
+            {isZh ? "设计规则仅评估几何可行性，不代表工程安全或可交付性。" : "Design rules evaluate geometric feasibility only. They do not guarantee engineering safety."}
+        </div>
       </CardContent>
     </Card>
   );

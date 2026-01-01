@@ -78,7 +78,9 @@ export class DiscSpringEngine implements ISpringEngine {
         return {
             springType: "disc",
             cases: results,
-            springRate: (results[0].load || 0) / (results[0].inputValue || 1), // Secant rate
+            springRate: (results.length > 0 && results[0].load && results[0].inputValue)
+                ? (results[0].load / results[0].inputValue)
+                : 0, // Prevent crash if empty or zero input
             springIndex: delta,
             wahlFactor: 1,
             isValid: results.every(r => r.isValid),

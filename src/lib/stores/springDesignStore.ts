@@ -290,6 +290,27 @@ export interface MaterialInfo {
 // 分析结果
 // ============================================================================
 
+
+// ============================================================================
+// 工程极限定义 (Engineering Limits Contract)
+// ============================================================================
+
+export interface EngineeringLimits {
+  // Stress Limits (MPa)
+  stressLimit: number;       // The governing limit (Shear or Bending)
+  stressLimitType: "shear" | "bending" | "tensile";
+
+  // Mechanical Limits
+  maxDeflection?: number;    // Absolute kinematic limit (e.g., Solid Height)
+  maxAngle?: number;         // Max angular travel
+  maxLoad?: number;          // Max safe load
+  solidHeight?: number; // Added for explicit solid bind check
+
+  // Thresholds (Overrides)
+  warnRatio?: number;        // Default 0.80
+  failRatio?: number;        // Default 1.10 (Hard Failure)
+}
+
 export interface AnalysisResult {
   // 基本计算结果
   springRate: number;  // 刚度 (N/mm 或 N·mm/deg)
@@ -318,6 +339,12 @@ export interface AnalysisResult {
   workingDeflection?: number;  // 工作变形 (mm)
   maxDeflection?: number;  // 最大变形 (mm)
   solidHeight?: number;  // 并紧高度 (mm)
+
+  // 强度极限 (Deprecated: use limits.stressLimit instead)
+  allowableStress?: number; // 许用应力 (MPa) - 用于 Audit
+
+  // Unified Engineering Limits Contract
+  limits?: EngineeringLimits;
 }
 
 // ============================================================================

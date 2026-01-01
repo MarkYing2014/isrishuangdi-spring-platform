@@ -28,6 +28,7 @@ import {
   getSpringMaterial,
   type SpringMaterial,
 } from "@/lib/materials/springMaterials";
+import { EngineeringPolicy } from "@/lib/policy/EngineeringPolicy"; // Added Policy
 import { getDefaultExtensionSample } from "@/lib/springPresets";
 import { 
   useSpringDesignStore,
@@ -180,16 +181,29 @@ export function ExtensionCalculator() {
         density: selectedMaterial.density ?? 7850,
       };
 
+      const allowableStress = EngineeringPolicy.getAllowableStress(selectedMaterial, "shear") || 1000;
+      
       const analysisResult: AnalysisResult = {
         springRate: calc.springRate,
         springRateUnit: "N/mm",
         workingLoad: calc.totalLoad,
         initialTension: calc.initialTension,
         workingDeflection: calc.workingDeflection,
-        maxDeflection: values.workingDeflection,
+        // Calculate theoretical max deflection based on stress limit (if stress > 0)
+        maxDeflection: calc.shearStress > 0 
+           ? (calc.workingDeflection * (allowableStress / calc.shearStress)) 
+           : (values.workingDeflection * 2.0),
         shearStress: calc.shearStress,
+        allowableStress,
         springIndex: calc.springIndex,
         wahlFactor: calc.wahlFactor,
+        limits: {
+            stressLimit: allowableStress,
+            stressLimitType: "shear",
+            maxDeflection: 9999, // Extension springs limit is usually geometric (Hook/Body separation) or stress.
+            warnRatio: 0.85, 
+            failRatio: 1.05
+        }
       };
 
       // Calculate audit synchronously for immediate button update

@@ -133,6 +133,13 @@ export function DiskSpringCalculator() {
         // Map disk specific terms to audit engine expectations
         maxStress: result.points.max.sigma_eq,
         allowableStress: Sy,
+        limits: {
+            stressLimit: Sy,
+            stressLimitType: "shear", // Disk uses sigma_eq (Von Mises) but usually compared to tensile/yield directly. "tensile" might be better but let's stick to generic stress limit logic.
+            maxDeflection: freeConeHeight * seriesCount,
+            warnRatio: 0.75, // Disk springs typically nonlinear and shouldn't go flat. 75% is standard warning.
+            failRatio: 1.00 // Hard Limit: Cannot compress past flat (h0 * nS).
+        }
       }
     });
   }, [result, input, travelDerived.delta, freeConeHeight, seriesCount, Sy]);
@@ -168,6 +175,14 @@ export function DiskSpringCalculator() {
         staticSafetyFactor: 1 / (result.points.max.ratio || 1),
         workingDeflection: travelDerived.delta,
         maxDeflection: sMax,
+        allowableStress: Sy,
+        limits: {
+            stressLimit: Sy,
+            stressLimitType: "shear", 
+            maxDeflection: freeConeHeight * seriesCount,
+            warnRatio: 0.75,
+            failRatio: 1.00 
+        }
       }
     });
   }, [outerDiameter, innerDiameter, thickness, freeConeHeight, group, parallelCount, seriesCount, frictionCoeff, E, nu, result, sOperating, sMax]);

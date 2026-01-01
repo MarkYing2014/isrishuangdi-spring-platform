@@ -22,6 +22,7 @@ import {
   type SpringMaterial,
   type SpringMaterialId,
 } from "@/lib/materials/springMaterials";
+import { EngineeringPolicy } from "@/lib/policy/EngineeringPolicy"; // Added Policy Import
 import { SpringDesign } from "@/lib/springTypes";
 import { getDefaultCompressionSample } from "@/lib/springPresets";
 import { resolveCompressionNominal } from "@/lib/eds/compressionResolver";
@@ -416,6 +417,30 @@ export function CompressionCalculator() {
         tempFactor: selectedMaterial.tempFactor,
       };
       
+      // Use Engineering Policy for proper Allowable Stress
+      // If undefined, fallback to 1000 with "Degraded" status in Audit will occur if Audit checks this.
+      // Actually audit checks AnalysisResult limits.
+      const allowableStress = EngineeringPolicy.getAllowableStress(selectedMaterial, "shear") || 1000;
+      
+      const calcSolidHeight = (design.totalCoils ?? values.totalCoils) * design.wireDiameter;
+
+      // Calculate limitations
+      // 1. Stress Based
+      const stressLimitDeflection = calc.shearStress > 0 
+           ? (values.deflection * (allowableStress / calc.shearStress)) 
+           : 99999;
+      
+      // 2. Solid Height Based (Hard Stopping)
+      const freeLength = values.freeLength ?? (calcSolidHeight ? calcSolidHeight * 1.5 : 50);
+      const solidHeightDeflection = Math.max(0, freeLength - calcSolidHeight);
+
+      // 3. Contact Model (Placeholder for Variable Pitch)
+      // For standard compression, Contact is synonymous with Solid Height.
+      const contactDerivedDeflection = 99999; 
+
+      // Governing Limit: Strict Minimum
+      const maxDeflection = Math.min(stressLimitDeflection, solidHeightDeflection, contactDerivedDeflection);
+
       const analysisResultData: AnalysisResult = {
         springRate: calc.k,
         springRateUnit: "N/mm",
@@ -427,7 +452,17 @@ export function CompressionCalculator() {
         fatigueSafetyFactor: analysis.fatigueLife?.sfInfiniteLife,
         fatigueLife: analysis.fatigueLife?.estimatedCycles,
         workingDeflection: values.deflection,
-        maxDeflection: values.deflection,
+        solidHeight: calcSolidHeight,
+        maxDeflection,
+        allowableStress,
+        limits: {
+            stressLimit: allowableStress,
+            stressLimitType: "shear",
+            maxDeflection, 
+            solidHeight: calcSolidHeight, // Explicitly pass solid height for Audit checks
+            warnRatio: 0.85, 
+            failRatio: 1.0 // Strict 100% fail at limit (Solid or Stress)
+        }
       };
       
       // Calculate audit synchronously for immediate button update

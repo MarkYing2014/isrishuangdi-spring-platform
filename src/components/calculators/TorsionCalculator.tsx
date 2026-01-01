@@ -11,6 +11,7 @@
  * - Stress correction factor: Ki = (4C² - C - 1) / (4C(C - 1)) (inner fiber)
  */
 
+import { EngineeringPolicy } from "@/lib/policy/EngineeringPolicy";
 import { useState, useMemo, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -494,15 +495,38 @@ export function TorsionCalculator() {
       material
     );
     
+    // Torsion Limit Logic
+    const allowableStress = EngineeringPolicy.getAllowableStress(material, "bending");
+    // Max Angle based on Stress
+    const stressLimitAngle = calcResults.correctedStress > 0 
+        ? (angleDerivedLocal.deltaDeg * (allowableStress / calcResults.correctedStress))
+        : 360;
+    // Max Angle based on Geometry (ID closeout)
+    // ID_new = ID_old - (theta/360)*d. Max theta when ID_new = 0? Or Mandrel?
+    // Let's assume safe limit is 360 degrees per coil? Or just stress governed.
+    // For now, let's stick to Stress or arbitrary high kinematic limit if not analyzing mandrel.
+    const maxAngle = stressLimitAngle; 
+
     const analysisResult: AnalysisResult = {
       springRate: calcResults.springRate,
       springRateUnit: "N·mm/deg",
       workingLoad: calcResults.workingForce,
-      shearStress: calcResults.bendingStress,
+      shearStress: calcResults.bendingStress, // Note: This is Bending Stress actually
       maxStress: calcResults.correctedStress,
       springIndex: calcResults.springIndex,
       staticSafetyFactor: calcResults.safetyFactor,
       workingDeflection: angleDerivedLocal.deltaDeg,
+      maxDeflection: maxAngle, // Storing Angle in maxDeflection slot for generic audit? 
+      // Audit engine for Torsion uses 'maxAngle' in limits, but legacy reads 'maxDeflection' sometimes?
+      // Let's rely on limits.maxAngle
+      allowableStress,
+      limits: {
+          stressLimit: allowableStress,
+          stressLimitType: "bending",
+          maxAngle: maxAngle,
+          warnRatio: 0.85,
+          failRatio: 1.10
+      }
     };
     
     setDesign({

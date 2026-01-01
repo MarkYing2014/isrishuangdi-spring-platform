@@ -35,7 +35,7 @@ import { ParetoOptimizer } from "@/lib/spring-platform/pareto-optimizer";
 import { CandidateSolution } from "@/lib/spring-platform/candidate-solution";
 import { DesignSpace } from "@/lib/spring-platform/design-space-types";
 import { PLATFORM_AXIS_MAP } from "@/lib/spring-platform/axis-definition";
-import { EngineeringAssumptionPanel } from "@/components/ui/EngineeringAssumptionPanel";
+import { EngineeringAssumptionsPanel } from "@/components/ui/engineering/EngineeringAssumptionsPanel";
 
 // Phase 9 Report Imports
 import {
@@ -53,6 +53,7 @@ import {
   SnapshotPin 
 } from "@/lib/spring-platform/types";
 import { saveEvolution, loadEvolution } from "@/lib/spring-platform/evolution-storage";
+import { GlobalEngineeringStatusPanel } from "@/components/ui/engineering/GlobalEngineeringStatusPanel";
 
 // ============================================================================
 // Types
@@ -511,8 +512,8 @@ export function SpringPlatformSection({
       >
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Badge variant="outline" className="text-[10px] h-5 px-1 bg-primary/10 border-primary/20 text-primary font-bold">GEN 2</Badge>
-            工程设计平台 / Engineering Design Platform
+            <Badge variant="outline" className="text-[10px] h-5 px-1 bg-primary/10 border-primary/20 text-primary font-bold">SEOS</Badge>
+            工程操作系统 / Spring Engineering Operating System
           </CardTitle>
           <ChevronDown className={`h-4 w-4 transition-all duration-300 ${expanded ? "rotate-180" : ""}`} />
         </div>
@@ -520,6 +521,14 @@ export function SpringPlatformSection({
       
       {expanded && (
         <CardContent className="px-4 pb-4 pt-4 space-y-4">
+          <GlobalEngineeringStatusPanel 
+            result={result} 
+            onJumpToRules={() => {
+              const rulesElement = document.getElementById("design-rules-panel");
+              if (rulesElement) rulesElement.scrollIntoView({ behavior: "smooth" });
+            }}
+          />
+
           <div className="flex flex-wrap gap-4 items-end">
             {/* Point Count Selector */}
             <div className="space-y-1">
@@ -810,7 +819,7 @@ export function SpringPlatformSection({
 
           {/* Phase 14.2: Assumption Panel */}
           <div className="pt-4 border-t border-dashed">
-            <EngineeringAssumptionPanel springType={springType} />
+            <EngineeringAssumptionsPanel springType={springType} />
           </div>
         </CardContent>
       )}

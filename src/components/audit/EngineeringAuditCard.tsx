@@ -54,14 +54,17 @@ export function EngineeringAuditCard({ audit, governingVariable }: EngineeringAu
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2 font-bold tracking-tight text-slate-800">
             {statusIcons[audit.status]}
-            {isZh ? "工程审计 / Engineering Audit" : "Engineering Audit"}
+            {isZh ? "工程审计结果" : "Engineering Audit Result"}
           </CardTitle>
           <Badge variant="outline" className="font-mono text-[10px] bg-white text-slate-500 border-slate-200 uppercase tracking-widest px-2 py-0.5">
             PLATFORM STANDARD V1.0
           </Badge>
         </div>
         <p className="text-[11px] text-slate-500 font-medium mt-1 pl-7">
-          {isZh ? "基于主失效模式确定的全局状态" : "Status is determined by the governing failure mode only."}
+          {audit.status === "FAIL" 
+             ? (isZh ? "工程条件未满足：该方案几何合理，但已超出工程允许范围。" : "Engineering conditions not met. Design is geometrically valid but exceeds allowable limits.")
+             : (isZh ? "基于主失效模式确定的全局状态" : "Status is determined by the governing failure mode only.")
+          }
         </p>
       </CardHeader>
       
@@ -176,9 +179,12 @@ export function EngineeringAuditCard({ audit, governingVariable }: EngineeringAu
             </div>
         </div>
 
-        {/* Notes */}
-        {audit.notes.length > 0 && (
+        {/* Notes / Action Hints */}
+        {audit.notes && audit.notes.length > 0 && (
             <div className="pt-2">
+                <h4 className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-2">
+                    {isZh ? "工程调整建议" : "Suggested Engineering Actions"}
+                </h4>
                 <div className="flex gap-2 text-[11px] text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
                     <Info className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
                     <ul className="space-y-1">

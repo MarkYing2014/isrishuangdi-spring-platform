@@ -236,8 +236,8 @@ export function Calculator3DPreview({
   }, [isAnimating, strokeMaxForPlay, isPlayable]);
 
 
-  // Use animated value if playing, else static working deflection
-  const displayStrokeMm = isAnimating ? previewStrokeMm : (analysis?.workingDeflection ?? 0);
+  // Use animated value if playing, default to 0 (Free State) for manufacturing view
+  const displayStrokeMm = isAnimating ? previewStrokeMm : 0;
   
   // Handlers
   const toggleAnimation = () => setIsAnimating(p => !p);
