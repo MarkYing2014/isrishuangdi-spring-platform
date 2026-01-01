@@ -32,6 +32,7 @@ export function DesignSpacePanel({ springType, initialParams, onGenerate, isGene
     d: [defaults.d * 0.8, defaults.d * 1.2],
     D: [defaults.D * 0.8, defaults.D * 1.2],
     n: [Math.max(2, defaults.n - 5), defaults.n + 5],
+    H0: [defaults.H0 > 0 ? defaults.H0 * 0.9 : 50, defaults.H0 > 0 ? defaults.H0 * 1.1 : 150],
   });
 
   const [target, setTarget] = useState({
@@ -46,7 +47,7 @@ export function DesignSpacePanel({ springType, initialParams, onGenerate, isGene
         d: [ranges.d[0], ranges.d[1]],
         D: [ranges.D[0], ranges.D[1]],
         n: [ranges.n[0], ranges.n[1]],
-        H0: initialParams.H0 ? [initialParams.H0, initialParams.H0] : undefined
+        H0: [ranges.H0[0], ranges.H0[1]]
       },
       targets: [
         {
@@ -98,6 +99,13 @@ export function DesignSpacePanel({ springType, initialParams, onGenerate, isGene
                 <div className="flex gap-1">
                   <NumericInput value={ranges.n[0]} min={1} onChange={v => setRanges({...ranges, n: [v || 2, ranges.n[1]]})} className="h-7 text-xs" />
                   <NumericInput value={ranges.n[1]} min={1} onChange={v => setRanges({...ranges, n: [ranges.n[0], v || 20]})} className="h-7 text-xs" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px]">自由长度 H0 (Min/Max)</Label>
+                <div className="flex gap-1">
+                  <NumericInput value={ranges.H0[0]} onChange={v => setRanges({...ranges, H0: [v || 0, ranges.H0[1]]})} className="h-7 text-xs" />
+                  <NumericInput value={ranges.H0[1]} onChange={v => setRanges({...ranges, H0: [ranges.H0[0], v || 0]})} className="h-7 text-xs" />
                 </div>
               </div>
             </div>

@@ -43,8 +43,8 @@ export class DiscreteEnumerator {
 
         // Default d, D, n generation
         const dStep = 0.1;
-        const DStep = 1.0;
-        const nStep = 1.0;
+        const DStep = 2.0; // Increased D step to cover more ground
+        const nStep = 0.5; // Finer n step for better target matching
 
         for (let d = dRange[0]; d <= dRange[1]; d += dStep) {
             for (let D = DRange[0]; D <= DRange[1]; D += DStep) {
@@ -56,8 +56,10 @@ export class DiscreteEnumerator {
                     };
 
                     // Carry over fixed parameters like H0 if they are ranges with min==max
-                    if (space.ranges.H0 && space.ranges.H0[0] === space.ranges.H0[1]) {
-                        params.H0 = space.ranges.H0[0];
+                    if (space.ranges.H0) {
+                        // If it's a range, pick the center or boundaries
+                        // For now, let's just pick the mean to keep it simple
+                        params.H0 = (space.ranges.H0[0] + space.ranges.H0[1]) / 2;
                     }
                     if (space.ranges.L0 && space.ranges.L0[0] === space.ranges.L0[1]) {
                         params.L0 = space.ranges.L0[0];
@@ -78,12 +80,12 @@ export class DiscreteEnumerator {
                         candidates.push(params);
                     }
 
-                    // Safety cap for a single generator
-                    if (candidates.length > 500) break;
+                    // Safety cap for a single generator (increased for better coverage)
+                    if (candidates.length > 5000) break;
                 }
-                if (candidates.length > 500) break;
+                if (candidates.length > 5000) break;
             }
-            if (candidates.length > 500) break;
+            if (candidates.length > 5000) break;
         }
 
         return candidates;

@@ -108,6 +108,10 @@ export class ShockSpringEngine implements ISpringEngine {
 
         const maxStroke = (result.derived.freeLength - result.derived.solidHeight);
 
+        if (result.errors && result.errors.length > 0) {
+            // console.log(`ShockSpringEngine: Invalid candidate. Errors:`, result.errors);
+        }
+
         // 4. Construct PlatformResult Skeleton
         const platformResultSkeleton: PlatformResult = {
             springType: "shock",

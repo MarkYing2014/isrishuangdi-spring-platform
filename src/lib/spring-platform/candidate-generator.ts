@@ -37,6 +37,7 @@ export class CandidateGenerator {
 
         // 2. De-duplicate based on d, D, n
         const uniqueParams = this.deduplicate(rawParams);
+        console.log(`CandidateGenerator: Generated ${rawParams.length} raw, ${uniqueParams.length} unique candidates.`);
 
         // 3. Evaluate and Filter
         const solutions: CandidateSolution[] = [];
@@ -46,12 +47,30 @@ export class CandidateGenerator {
                 let geometry: any = { ...params, Hb: 0 };
 
                 if (designSpace.springType === "shock") {
-                    const pitchVal = params.p || (params.H0 ? params.H0 / params.n : (params.D / 3)); // Fallback logic
+                    const n_total = params.n || 8;
+                    const n_closed = 3.0; // Standard 1.5 each end
+                    const n_active = Math.max(0.5, n_total - n_closed);
+
+                    // Estimate pitch to match H0 if provided
+                    let pitchVal = params.p || (params.D / 3);
+                    if (params.H0) {
+                        const d = params.d || 10;
+                        const h_closed = n_closed * d * 1.05; // Approx height contribution from closed ends
+                        pitchVal = Math.max(d * 1.1, (params.H0 - h_closed) / n_active);
+                    }
+
                     geometry = {
-                        totalTurns: params.n,
+                        totalTurns: n_total,
+                        samplesPerTurn: 64, // Added to prevent crash
                         meanDia: { start: params.D, mid: params.D, end: params.D, shape: "linear" },
                         wireDia: { start: params.d, mid: params.d, end: params.d },
-                        pitch: { style: "symmetric", closedTurns: 1.5, workingMin: pitchVal, workingMax: pitchVal },
+                        pitch: {
+                            style: "symmetric",
+                            closedTurns: n_closed / 2,
+                            workingMin: pitchVal,
+                            workingMax: pitchVal,
+                            closedPitchFactor: 1.0
+                        },
                         grinding: { mode: "visualClip", grindStart: true, grindEnd: true, offsetTurns: 0.6 },
                         installation: { guided: false, guideType: "none", guideDia: 0 },
                         loadCase: { solidMargin: 3.0 }
@@ -71,7 +90,10 @@ export class CandidateGenerator {
                 });
 
                 // Apply Filters
-                if (!this.isValid(result, ctx)) continue;
+                if (!this.isValid(result, ctx)) {
+                    // console.log(`Candidate failed validation: d=${params.d}, D=${params.D}, n=${params.n}, H0=${result.H0?.toFixed(2)}, TargetHeight=${ctx.designSpace.targets[0].inputValue}`);
+                    continue;
+                }
 
                 // Calculate Metrics
                 const metrics = this.calculateMetrics(params, result, material);
@@ -96,6 +118,7 @@ export class CandidateGenerator {
             if (solutions.length > 300) break;
         }
 
+        console.log(`CandidateGenerator: Found ${solutions.length} valid solutions.`);
         return solutions;
     }
 
@@ -115,10 +138,11 @@ export class CandidateGenerator {
      * Basic validation: Envelope and primary error checks.
      */
     private isValid(result: PlatformResult, ctx: CandidateContext): boolean {
-        const { envelope } = ctx.designSpace;
-
         // 1. Engineering check
-        if (!result.isValid) return false;
+        if (!result.isValid) {
+            // console.log(`Candidate invalid: ${result.springType} engine returned isValid=false. DesignRules failing?`);
+            return false;
+        }
 
         // 2. Envelope check
         if (result.springType !== "torsion") {
@@ -131,7 +155,10 @@ export class CandidateGenerator {
             const target = ctx.designSpace.targets[i];
             const actual = result.cases[i].load || 0;
             const error = Math.abs(actual - target.targetValue) / target.targetValue;
-            if (error > (target.tolerance || 0.15)) return false;
+            if (error > (target.tolerance || 0.15)) {
+                console.log(`Target mismatch: target=${target.targetValue}, actual=${actual.toFixed(2)}, error=${error.toFixed(4)}`);
+                return false;
+            }
         }
 
         return true;

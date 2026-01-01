@@ -241,11 +241,17 @@ export function generateCenterline(input: ShockSpringInput): ShockSpringDerived 
     // Normal N and Binormal B (Parallel Transport)
     let normal = new THREE.Vector3(1, 0, 0); // Initial guess
     // Ensure initial normal is orthogonal to initial tangent
-    const t0 = frames.tangents[0];
+    const t0 = frames.tangents.length > 0 ? frames.tangents[0] : new THREE.Vector3(0, 0, 1);
     const proj = t0.clone().multiplyScalar(normal.dot(t0));
-    normal.sub(proj).normalize();
+    normal.sub(proj);
+    if (normal.lengthSq() < 0.0001) {
+        normal.set(0, 1, 0); // Alternate if tangent is along X
+        const proj2 = t0.clone().multiplyScalar(normal.dot(t0));
+        normal.sub(proj2);
+    }
+    normal.normalize();
 
-    frames.normals.push(normal);
+    frames.normals.push(normal.clone());
     frames.binormals.push(new THREE.Vector3().crossVectors(t0, normal).normalize());
 
     for (let i = 1; i < points.length; i++) {
