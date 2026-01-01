@@ -531,15 +531,22 @@ export function SpringPlatformSection({
 
           <div className="flex flex-wrap gap-4 items-end">
             {/* Point Count Selector */}
+            {/* Point Count Selector */}
             <div className="space-y-1">
               <Label className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">Points / 点数</Label>
-              <select
-                className="h-8 px-2 py-1 rounded-lg border border-input bg-background text-xs w-24 focus:ring-2 focus:ring-primary/20 outline-none"
+              <input
+                type="number"
+                min={1}
+                max={20}
+                className="h-8 px-2 py-1 rounded-lg border border-input bg-background text-xs w-24 focus:ring-2 focus:ring-primary/20 outline-none transition-shadow"
                 value={loadPointCount}
-                onChange={(e) => setLoadPointCount(Number(e.target.value))}
-              >
-                {[3, 4, 5].map(v => <option key={v} value={v}>{v} 点位</option>)}
-              </select>
+                onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    if (!isNaN(val) && val >= 1 && val <= 20) {
+                        setLoadPointCount(val);
+                    }
+                }}
+              />
             </div>
 
             {/* Input Mode Selector */}

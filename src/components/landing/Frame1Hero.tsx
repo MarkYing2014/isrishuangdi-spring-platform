@@ -41,7 +41,7 @@ export function Frame1Hero() {
             </Link>
           </Button>
           <Button asChild variant="ghost" size="lg" className="rounded-full px-8 text-base text-muted-foreground hover:text-primary">
-            <Link href="/tools/calculator">
+            <Link href="/quality">
               <FileText className="mr-2 h-4 w-4" />
               <LanguageText en="View Sample OEM Report" zh="查看 OEM 报告样本" />
             </Link>
