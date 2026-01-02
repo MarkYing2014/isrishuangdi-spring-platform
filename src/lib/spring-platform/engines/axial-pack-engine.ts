@@ -242,3 +242,8 @@ export class AxialPackEngine implements ISpringEngine {
         };
     }
 }
+// } removed
+
+export function generateAxialPackEngine() {
+    return new AxialPackEngine();
+}

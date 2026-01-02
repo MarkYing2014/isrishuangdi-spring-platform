@@ -12,13 +12,15 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Copy, AlertTriangle, CheckCircle2, ShieldAlert, Activity } from "lucide-react";
+import { Copy, AlertTriangle, CheckCircle2, ShieldAlert, Activity, Wand2 } from "lucide-react";
 
 import { AxialPackInput, PlatformResult, AxialPackResult } from "@/lib/spring-platform/types";
 import { getEngine } from "@/lib/spring-platform/engine-registry";
 import { AxialPackVisualizer } from "@/components/three/AxialPackVisualizer";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
+import { DesignOptimizerDialog } from "@/components/calculators/DesignOptimizerDialog";
 import { AxialSystemReport } from "@/components/axial/AxialSystemReport";
+import { AxialOptimizerSection } from "@/components/calculators/optimizer/AxialOptimizerSection";
 
 const MATERIALS: Record<string, { label: string; labelZh: string; G: number; E: number; tauAllow: number }> = {
     "ferrous-carbon-music": { label: "Music Wire (ASTM A228)", labelZh: "琴钢丝 (SWC)", G: 79000, E: 206000, tauAllow: 800 },
@@ -83,6 +85,7 @@ export function AxialPackCalculator() {
     // --- State ---
     const [input, setInput] = useState<AxialPackInput>(DEFAULT_PACK_INPUT);
     const [stroke, setStroke] = useState(0); // Live visual stroke
+    const [optimizerOpen, setOptimizerOpen] = useState(false);
     
     // --- Engine Calculation ---
     const result = useMemo(() => {
@@ -144,6 +147,16 @@ export function AxialPackCalculator() {
     return (
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 xl:h-[calc(100vh-140px)] min-h-[800px] h-auto pb-8">
             
+            <DesignOptimizerDialog 
+                open={optimizerOpen} 
+                onOpenChange={setOptimizerOpen}
+                baseTemplate={input}
+                onApply={(newInput) => {
+                    setInput(newInput);
+                    setOptimizerOpen(false);
+                }}
+            />
+
             {/* LEFT PANEL: INPUTS */}
             <Card className="xl:col-span-3 h-full overflow-y-auto border-slate-200 shadow-sm flex flex-col gap-4">
                 
@@ -181,8 +194,17 @@ export function AxialPackCalculator() {
 
                 {/* Definitions Card */}
                 <Card className="flex-1 border-slate-200 shadow-sm flex flex-col">
-                    <CardHeader>
+                    <CardHeader className="flex flex-row items-center justify-between py-4">
                         <CardTitle className="text-lg">{isZh ? "参数定义" : "Definitions"}</CardTitle>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-8 gap-2 bg-gradient-to-r from-indigo-50 to-blue-50 border-blue-200 text-blue-700 hover:text-blue-800"
+                            onClick={() => setOptimizerOpen(true)}
+                        >
+                            <Wand2 className="w-3.5 h-3.5" />
+                            {isZh ? "自动设计" : "Auto Design"}
+                        </Button>
                     </CardHeader>
                     <CardContent className="space-y-6 flex-1">
                     
@@ -446,6 +468,16 @@ Clearance: ${(result.rawResult?.pack?.clearance?.ssMin ?? 0).toFixed(2)}mm`}
             {/* NEW PANEL: ADVANCED ANALYSIS (OEM REPORT) */}
             <div className="xl:col-span-3 h-full overflow-y-auto border-slate-200 shadow-sm flex flex-col">
                  <AxialSystemReport input={input} result={result} stroke={stroke} />
+            </div>
+
+            {/* OPTIMIZER SECTION - Full Width at Bottom */}
+            <div className="xl:col-span-12">
+                <AxialOptimizerSection 
+                    baseTemplate={input}
+                    onApply={(newInput) => {
+                        setInput(newInput);
+                    }}
+                />
             </div>
 
         </div>

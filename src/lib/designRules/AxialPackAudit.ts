@@ -132,3 +132,26 @@ export function auditAxialPack(
         }
     };
 }
+
+export class AxialPackAudit {
+    static evaluate(params: { input: any; result: { rawResult: import("@/lib/spring-platform/types").AxialPackResult["rawResult"] } }) {
+
+        const inp = params.input;
+        const res = params.result;
+
+        const tauAllow = (res as any).tauAllow || 800;
+        const currentStroke = (res as any).workingDeflection || 0;
+        const L0 = inp.baseSpring.L0;
+        const plateThickness = inp.pack.plateThickness || 0;
+
+        const auditRes = auditAxialPack(res.rawResult, { tauAllow, currentStroke, L0, plateThickness });
+
+        return {
+            status: auditRes.governingOverride?.status || "PASS",
+            kpi: { safetyFactor: (res as any).stressAnalysis?.correctionFactor ? (tauAllow / (res as any).stressAnalysis.tauCorrected) : 99 },
+            summary: { safetyFactor: (res as any).stressAnalysis?.correctionFactor ? (tauAllow / (res as any).stressAnalysis.tauCorrected) : 99 },
+            limits: auditRes.limits,
+            governingMode: auditRes.governingMode
+        };
+    }
+}
