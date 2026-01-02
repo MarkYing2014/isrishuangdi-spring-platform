@@ -759,7 +759,18 @@ export function buildSpringDesignReport(input: ReportBuilderInput): SpringDesign
             })),
             primaryImpacts: audit.summary?.primaryImpacts,
             recommendation: audit.overallRecommendation,
-            waiver: input.deliverabilityWaiver
+            supplierAssessment: {
+                coverage: audit.supplierCoverage,
+                matches: audit.supplierMatches?.map((m: any) => ({
+                    supplierName: m.supplierName,
+                    matchLevel: m.matchLevel,
+                    gaps: m.gaps
+                }))
+            },
+            waiver: audit.waiverRequired ? {
+                required: true,
+                items: audit.waiverItems
+            } : input.deliverabilityWaiver
         };
     }
 

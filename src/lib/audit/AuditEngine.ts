@@ -21,6 +21,8 @@ import {
     ClearanceClass
 } from "./engineeringRequirements";
 import { GARTER_SPRING_FACTORY_POLICY, deltaDLimitMM, calcAllowableShearFromSy } from "../policy/garterSpringPolicy";
+import { SUPPLIER_SEED_DATA } from "../supplier/supplierCapability";
+import { matchSupplier, DesignSummary } from "../supplier/supplierMatchEngine";
 
 export interface AuditEvaluationInput {
     springType: string;
@@ -61,8 +63,12 @@ export class AuditEngine {
         const stability = this.evaluateStability(input);
         const fatigue = this.evaluateFatigue(input);
 
-        // Phase 6: Deliverability Audit (Engineering Requirements)
-        const deliverability = this.evaluateDeliverability(input);
+        // P3-3 Rules: Engineering FAIL -> Deliverability FAIL
+        const isEngineeringFail = [loadcase.travel.status, stress.status, stability?.status, fatigue?.status]
+            .some(s => s === "FAIL");
+
+        // Phase 6: Deliverability Audit (Engineering Requirements + Supplier Matching)
+        const deliverability = this.evaluateDeliverability(input, isEngineeringFail);
 
         // 2. Determine Overall Status & Governing Mode
         // P0 FIX: Deliverability is separate track, NEVER part of safety governing mode
@@ -386,17 +392,13 @@ export class AuditEngine {
     // =========================================================================
 
     /**
-     * Evaluate deliverability based on Engineering Requirements.
+     * Evaluate deliverability based on Engineering Requirements and Supplier Capabilities.
      * This checks if a design can be manufactured, assembled, and delivered reliably.
      * 
      * CRITICAL: This does NOT affect calculations - purely for audit judgment.
      */
-    private static evaluateDeliverability(input: AuditEvaluationInput): DeliverabilityAudit | undefined {
-        const requirements = input.engineeringRequirements;
-
-        // If no requirements specified, skip deliverability audit
-        if (!requirements) return undefined;
-
+    private static evaluateDeliverability(input: AuditEvaluationInput, isEngineeringFail: boolean): DeliverabilityAudit {
+        const requirements = input.engineeringRequirements || { tolerances: {}, assembly: { guideType: "NONE" }, surface: { finish: "NONE" }, environment: { operatingTempRange: "STANDARD" }, lifespan: { cycleClass: "STATIC" } };
         const findings: DeliverabilityFinding[] = [];
 
         // 1. Check Assembly Clearance
@@ -411,48 +413,80 @@ export class AuditEngine {
         // 4. Check Tolerance Feasibility
         this.checkToleranceFeasibility(requirements, findings);
 
-        // Calculate summary
-        const failCount = findings.filter(f => f.severity === "FAIL").length;
-        const warnCount = findings.filter(f => f.severity === "WARN").length;
-        const passCount = findings.length - failCount - warnCount;
+        // Calculate summary for engineering requirements
+        const engFailCount = findings.filter(f => f.severity === "FAIL").length;
+        const engWarnCount = findings.filter(f => f.severity === "WARN").length;
 
-        // Determine overall status
+        // P3-3 PART 2: Supplier Capability Match
+        const geometry = input.geometry;
+        const springOD = geometry.OD || geometry.outerDiameter || (geometry.Dm + geometry.d) || 0;
+        const freeLength = geometry.L0 || geometry.H0 || geometry.freeLength || 0;
+
+        const designSummary: DesignSummary = {
+            wireDiameter: geometry.d || 0,
+            outerDiameter: springOD,
+            freeLength: freeLength,
+            springType: input.springType
+        };
+
+        const supplierMatches = SUPPLIER_SEED_DATA.map(s => matchSupplier(designSummary, requirements, s));
+
+        const fullMatches = supplierMatches.filter(m => m.matchLevel === "FULL").length;
+        const partialMatches = supplierMatches.filter(m => m.matchLevel === "PARTIAL").length;
+        const totalSuppliers = SUPPLIER_SEED_DATA.length;
+
+        // Determine waiver requirements (from PARTIAL matches)
+        const waiverItemsSet = new Set<string>();
+        supplierMatches.forEach(m => {
+            if (m.matchLevel === "PARTIAL") {
+                m.gaps.forEach(g => waiverItemsSet.add(g.gapId));
+            }
+        });
+        const waiverItems = Array.from(waiverItemsSet);
+        const waiverRequired = fullMatches === 0 && partialMatches > 0;
+
+        // P3-3 Rules logic:
+        // 1. Engineering FAIL -> Deliverability FAIL
+        // 2. Engineering PASS:
+        //    - >=1 FULL supplier -> PASS
+        //    - >=1 PARTIAL, no FULL -> WARN
+        //    - ALL NO_MATCH -> FAIL
+
         let status: AuditStatus = "PASS";
-        if (failCount > 0) status = "FAIL";
-        else if (warnCount > 0) status = "WARN";
 
-        // P1: Deterministic Deliverability Level Logic
-        // Strict mapping for consistent behavior across UI, reports, work orders:
-        // - Any finding severity = FAIL → level = HIGH_RISK
-        // - WARN count ≥ 2 → level = CHALLENGING
-        // - Else → level = STANDARD
+        if (isEngineeringFail || engFailCount > 0) {
+            status = "FAIL";
+        } else if (fullMatches > 0) {
+            status = "PASS";
+        } else if (partialMatches > 0) {
+            status = "WARN";
+        } else {
+            status = "FAIL"; // NO_MATCH suppliers
+        }
+
+        // P1 Remnant: Maintain deterministic levels
         let level: DeliverabilityLevel = "STANDARD";
-        if (failCount > 0) {
+        if (status === "FAIL") {
             level = "HIGH_RISK";
-        } else if (warnCount >= 2) {
+        } else if (status === "WARN" || engWarnCount >= 2) {
             level = "CHALLENGING";
         }
 
         // Collect primary impacts (OpenAI enhancement)
-        const primaryImpacts: DeliverabilityImpact[] = [];
         const impactSet = new Set<DeliverabilityImpact>();
         for (const f of findings) {
             if (f.impact && (f.severity === "FAIL" || f.severity === "WARN")) {
                 impactSet.add(f.impact);
             }
         }
-        primaryImpacts.push(...Array.from(impactSet));
+        const primaryImpacts = Array.from(impactSet);
 
-        // Determine overall recommendation (OpenAI enhancement)
+        // Determine overall recommendation
         let overallRecommendation: DeliverabilityRecommendation | undefined;
-        if (failCount > 0) {
-            // Check if any finding requires design change
-            const hasDesignChange = findings.some(f => f.recommendation === "DESIGN_CHANGE");
-            const hasSupplierIssue = findings.some(f => f.recommendation === "SUPPLIER_SELECTION");
-            if (hasDesignChange) overallRecommendation = "DESIGN_CHANGE";
-            else if (hasSupplierIssue) overallRecommendation = "SUPPLIER_SELECTION";
-            else overallRecommendation = "CUSTOMER_REVIEW";
-        } else if (warnCount > 0) {
+        if (status === "FAIL") {
+            if (isEngineeringFail || engFailCount > 0) overallRecommendation = "DESIGN_CHANGE";
+            else overallRecommendation = "SUPPLIER_SELECTION";
+        } else if (status === "WARN") {
             overallRecommendation = "PROCESS_CONTROL";
         }
 
@@ -461,11 +495,19 @@ export class AuditEngine {
             level,
             findings,
             summary: {
-                passCount,
-                warnCount,
-                failCount,
+                passCount: findings.length - engFailCount - engWarnCount,
+                warnCount: engWarnCount,
+                failCount: engFailCount,
                 primaryImpacts
             },
+            supplierCoverage: {
+                full: fullMatches,
+                partial: partialMatches,
+                total: totalSuppliers
+            },
+            supplierMatches,
+            waiverRequired,
+            waiverItems,
             overallRecommendation
         };
     }

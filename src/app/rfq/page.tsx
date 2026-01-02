@@ -47,6 +47,9 @@ function RfqContent() {
         const verdict: ReviewVerdict = utilization > 95 ? "FAIL" : utilization > 85 ? "CONDITIONAL" : "PASS";
         const issues = verdict === "CONDITIONAL" ? ["Stage 3 stress utilization > 85%", "Coil index near manufacturing limit"] : [];
 
+        // P3: Mock Deliverability & Supplier Matches
+        const deliverabilityStatus = searchParams.get("deliverability") || "PASS";
+        
         return {
             springType: type as any,
             material: searchParams.get("material") || "50CrV4",
@@ -63,6 +66,17 @@ function RfqContent() {
             packGroups,
             reviewVerdict: verdict,
             reviewIssues: issues,
+            deliverability: {
+                status: deliverabilityStatus as any,
+                level: "STANDARD",
+                waiverRequired: deliverabilityStatus === "WARN",
+                waiverItems: deliverabilityStatus === "WARN" ? ["TOLERANCE_GRADE_UNSUPPORTED"] : [],
+                supplierMatches: [
+                    { supplierId: "S1", matchLevel: "FULL", waiverRequired: false, waiverItems: [] },
+                    { supplierId: "S2", matchLevel: "PARTIAL", waiverRequired: true, waiverItems: ["TOLERANCE_GRADE_UNSUPPORTED"] },
+                    { supplierId: "S3", matchLevel: "NO_MATCH", waiverRequired: false, waiverItems: ["WIRE_D_OUT_OF_RANGE"] }
+                ] as any
+            }
         };
     }, [searchParams]);
 
@@ -92,13 +106,28 @@ function RfqContent() {
     // 3. Actions
     const handleGeneratePackage = async () => {
         setIsSubmitting(true);
-        
-        // 1. Generate Metadata
+
+        // P3 Enforcement: Hard Gate
+        if (summary.reviewVerdict === "FAIL" || summary.deliverability?.status === "FAIL") {
+            alert("RFQ Generation Blocked: Design failed engineering audit or has no capable suppliers.");
+            setIsSubmitting(false);
+            return;
+        }
+
+        // 1. Generate Metadata with filtered suppliers (Exclude NO_MATCH)
+        const filteredSummary = {
+            ...summary,
+            deliverability: summary.deliverability ? {
+                ...summary.deliverability,
+                supplierMatches: summary.deliverability.supplierMatches.filter((m: any) => (m.matchLevel as string) !== "NO_MATCH")
+            } : undefined
+        };
+
         const packageData: RFQPackage = {
             id: `RFQ-${Date.now()}`,
             timestamp: new Date().toISOString(),
             status: "SUBMITTED",
-            summary,
+            summary: filteredSummary as any,
             manufacturingInputs: mfgInputs,
             contactInfo: contact,
             attachments: [] 

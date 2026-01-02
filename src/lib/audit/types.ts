@@ -164,6 +164,22 @@ export interface DeliverabilityAudit {
         primaryImpacts: DeliverabilityImpact[];
     };
 
+    /**
+     * P3: Supplier Capability Assessment
+     */
+    supplierCoverage: {
+        full: number;
+        partial: number;
+        total: number;
+    };
+
+    /** P3: List of individual supplier matches */
+    supplierMatches: any[];
+
+    /** P3: Waiver flags */
+    waiverRequired: boolean;
+    waiverItems: string[]; // gapId[]
+
     /** Overall recommendation for engineering action (OpenAI enhancement) */
     overallRecommendation?: DeliverabilityRecommendation;
 }

@@ -153,6 +153,24 @@ export function GlobalEngineeringStatusPanel({
                 status="normal" 
                 className="min-w-[120px] flex-1 border shadow-none"
              />
+             
+             {/* P3: Supplier Coverage KPIs */}
+             {deliverabilityAudit?.supplierCoverage && (
+               <>
+                 <KpiCard 
+                    title={language === "en" ? "Full Coverage" : "全覆盖率"} 
+                    value={`${deliverabilityAudit.supplierCoverage.full}/${deliverabilityAudit.supplierCoverage.total}`} 
+                    status={deliverabilityAudit.supplierCoverage.full > 0 ? "normal" : "warning"} 
+                    className="min-w-[120px] flex-1 border shadow-none"
+                 />
+                 <KpiCard 
+                    title={language === "en" ? "Total Coverage" : "含特采覆盖"} 
+                    value={`${deliverabilityAudit.supplierCoverage.full + deliverabilityAudit.supplierCoverage.partial}/${deliverabilityAudit.supplierCoverage.total}`} 
+                    status={deliverabilityAudit.supplierCoverage.full + deliverabilityAudit.supplierCoverage.partial > 0 ? "normal" : "critical"} 
+                    className="min-w-[120px] flex-1 border shadow-none"
+                 />
+               </>
+             )}
           </div>
 
         </div>

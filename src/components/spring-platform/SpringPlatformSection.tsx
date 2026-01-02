@@ -38,8 +38,11 @@ import { DesignSpace } from "@/lib/spring-platform/design-space-types";
 import { PLATFORM_AXIS_MAP } from "@/lib/spring-platform/axis-definition";
 import { EngineeringAssumptionsPanel } from "@/components/ui/engineering/EngineeringAssumptionsPanel";
 import { EngineeringRequirementsPanel } from "@/components/ui/engineering/EngineeringRequirementsPanel";
+import { SupplierCapabilityPanel } from "@/components/ui/engineering/SupplierCapabilityPanel";
 import { EngineeringRequirements, DEFAULT_ENGINEERING_REQUIREMENTS } from "@/lib/audit/engineeringRequirements";
 import { AuditEngine } from "@/lib/audit/AuditEngine";
+import { InspectionAndGaugePanel } from "@/components/ui/quality/InspectionAndGaugePanel";
+import { EngineeringDecisionPanel } from "@/components/ui/engineering/EngineeringDecisionPanel";
 
 // Phase 9 Report Imports
 import {
@@ -354,6 +357,28 @@ export function SpringPlatformSection({
   }, [result, springType, debouncedGeometry, engineeringRequirements]);
 
   const deliverabilityAudit = useMemo(() => auditResult?.audits.deliverability, [auditResult]);
+
+  // Consolidate Design Summary for Engineering OS (Q1 + Q2)
+  const designSummary = useMemo(() => ({
+    OD: geometry?.OD ?? (geometry?.Dm && geometry?.d ? geometry.Dm + geometry.d : undefined),
+    ID: geometry?.ID ?? (geometry?.Dm && geometry?.d ? geometry.Dm - geometry.d : undefined),
+    L0: geometry?.L0 ?? geometry?.freeLength ?? result?.H0,
+    Dm: geometry?.Dm,
+    d: geometry?.d,
+    n: geometry?.n,
+    mass: result?.mass,
+    material: material?.nameEn || materialId,
+    toleranceGrade: engineeringRequirements.tolerances?.wireDiameter || "GRADE_2",
+    partNo: "SPRING-" + (projectId?.substring(0, 6) || "TMP"),
+    designVersion: projectId || "ARC-2024-TMP",
+    performance: {
+       maxLoad: result?.cases?.find((c: any) => c.id === "Lmax" || c.id === "L2")?.load || result?.cases[result.cases.length - 1]?.load,
+       utilization: result?.tauAllow ? (result.maxStress / result.tauAllow) * 100 : undefined
+    },
+    reviewVerdict: auditResult?.safetyStatus === "FAIL" ? "FAIL" : (auditResult?.safetyStatus === "WARN" ? "WARN" : "PASS"),
+    reviewIssues: result?.designRules?.filter((r: any) => r.status !== "pass").map((r: any) => r.label) || [],
+    deliverability: deliverabilityAudit
+  }), [geometry, result, material, materialId, engineeringRequirements, projectId, auditResult, deliverabilityAudit]);
 
 
   // Phase 7: Sync result to parent
@@ -904,13 +929,30 @@ export function SpringPlatformSection({
           </div>
 
           {/* Phase 6 Deliverability: Engineering Requirements Panel */}
-          <div className="pt-4">
+          <div className="pt-4 space-y-4">
             <EngineeringRequirementsPanel
-              language={language}
+              language={language as any}
               value={engineeringRequirements}
               onChange={setEngineeringRequirements}
               deliverabilityAudit={deliverabilityAudit}
             />
+            <InspectionAndGaugePanel
+              language={language as any}
+              deliverabilityAudit={deliverabilityAudit}
+              designSummary={designSummary}
+            />
+            <SupplierCapabilityPanel 
+              language={language as any}
+              deliverabilityAudit={deliverabilityAudit}
+            />
+            
+            <div className="pt-2">
+                <EngineeringDecisionPanel 
+                    language={language as any}
+                    summary={designSummary}
+                    deliverabilityAudit={deliverabilityAudit}
+                />
+            </div>
           </div>
         </CardContent>
       )}

@@ -3,6 +3,21 @@ import { PlatformSpringType } from "@/lib/spring-platform/types";
 
 export type ReviewVerdict = "PASS" | "CONDITIONAL" | "FAIL";
 
+export interface SupplierMatchRecord {
+    supplierId: string;
+    matchLevel: "FULL" | "PARTIAL";
+    waiverRequired: boolean;
+    waiverItems: string[]; // gapId[]
+}
+
+export interface DeliverabilitySummary {
+    status: "PASS" | "WARN" | "FAIL";
+    level: string;
+    supplierMatches: SupplierMatchRecord[];
+    waiverRequired: boolean;
+    waiverItems: string[];
+}
+
 export interface EngineeringSummary {
     springType: PlatformSpringType | "conical" | "compression"; // Extended for legacy support
     material: string;
@@ -31,6 +46,9 @@ export interface EngineeringSummary {
     // Review
     reviewVerdict: ReviewVerdict;
     reviewIssues: string[]; // High level risks
+
+    // P3: Deliverability & Suppliers
+    deliverability?: DeliverabilitySummary;
 }
 
 export interface RFQManufacturingInputs {

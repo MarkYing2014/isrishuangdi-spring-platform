@@ -255,15 +255,31 @@ export interface SpringDesignReport {
             messageZh: string;
             impact?: string;
         }>;
+        /** P3: Supplier Assessment */
+        supplierAssessment?: {
+            coverage: { full: number; partial: number; total: number };
+            matches: Array<{
+                supplierName: string;
+                matchLevel: "FULL" | "PARTIAL" | "NO_MATCH";
+                gaps: Array<{
+                    gapId: string;
+                    severity: string;
+                    requirement: string;
+                    capability: string;
+                }>;
+            }>;
+        };
         /** Primary impact drivers */
         primaryImpacts?: string[];
         /** Recommendation */
         recommendation?: string;
-        /** P2 Waiver: Approved deviation / engineering waiver */
+        /** P2/P3 Waiver: Approved deviation / engineering waiver */
         waiver?: {
-            approvedBy: string;
-            reason: string;
-            date: string;
+            approvedBy?: string;
+            reason?: string;
+            date?: string;
+            required?: boolean;
+            items?: string[];
         };
     };
 }
