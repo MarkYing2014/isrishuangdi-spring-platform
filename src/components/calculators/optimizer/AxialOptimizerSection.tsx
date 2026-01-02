@@ -136,6 +136,19 @@ export function AxialOptimizerSection({ baseTemplate, onApply }: Props) {
       {/* Expandable Content */}
       {isExpanded && (
         <CardContent className="pt-0">
+          {/* Template Info Banner */}
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+            <div className="text-xs">
+              <span className="text-blue-600 font-medium">Using Template:</span>
+              <span className="ml-2 font-mono font-bold text-blue-800">
+                d={baseTemplate.baseSpring.d}mm, Dm={baseTemplate.baseSpring.Dm}mm, N={baseTemplate.pack.N}
+              </span>
+            </div>
+            <div className="text-[10px] text-blue-500">
+              Select a different sample from the Case Library to change
+            </div>
+          </div>
+          
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             {/* Left: Requirements */}
