@@ -26,19 +26,22 @@ interface Props {
 export function AxialOptimizerSection({ baseTemplate, onApply }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
   
-  const [req, setReq] = useState<AxialOptimizerRequest>(() => ({
-    baseTemplate,
-    target: { type: "loadAtStroke", pReq: 1200, stroke: 10, tolerancePct: 10 },
-    envelope: { maxOD: 350, minID: 20, maxSolidHeight: 100 },
-    constraints: { 
-        minSafetyFactor: 1.1,
-        indexRange: [4, 12],
-        packNRange: [4, 20],
-        NaRange: [3, 20],
-        maxCandidates: 60,
-        requireAuditPass: false  // More lenient default
-    },
-  }));
+  // Only store user-configurable options, use baseTemplate directly from props
+  const [target, setTarget] = useState({
+    type: "loadAtStroke" as "loadAtStroke" | "k",
+    pReq: 1200,
+    stroke: 10,
+    kReq: 50,
+    tolerancePct: 10
+  });
+  
+  const [envelope, setEnvelope] = useState({
+    maxOD: 350,
+    minID: 20,
+    maxSolidHeight: 100
+  });
+  
+  const [requireAuditPass, setRequireAuditPass] = useState(false);
 
   const [candidates, setCandidates] = useState<AxialOptimizerCandidate[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState<AxialOptimizerCandidate | null>(null);
@@ -55,6 +58,22 @@ export function AxialOptimizerSection({ baseTemplate, onApply }: Props) {
     setAppliedMessage(null);
     
     await new Promise(r => setTimeout(r, 50));
+
+    // Build request with CURRENT baseTemplate from props (not stale state)
+    const req: AxialOptimizerRequest = {
+      baseTemplate, // Always use latest from props
+      target: target.type === "k" 
+        ? { type: "k", kReq: target.kReq, tolerancePct: target.tolerancePct }
+        : { type: "loadAtStroke", pReq: target.pReq, stroke: target.stroke, tolerancePct: target.tolerancePct },
+      envelope,
+      constraints: {
+        requireAuditPass,
+        minSafetyFactor: 1.1,
+        maxCandidates: 60
+      }
+    };
+
+    console.log("[Optimizer] Using template d =", baseTemplate.baseSpring.d, "mm");
 
     try {
       const res = optimizeAxialPack(req);
@@ -127,13 +146,11 @@ export function AxialOptimizerSection({ baseTemplate, onApply }: Props) {
                 <div>
                   <Label className="text-xs font-medium">Target Mode</Label>
                   <Select
-                    value={req.target.type}
+                    value={target.type}
                     onValueChange={(v) => {
-                      setReq((r) => ({
-                        ...r,
-                        target: v === "k"
-                          ? { type: "k", kReq: 50, tolerancePct: 10 }
-                          : { type: "loadAtStroke", pReq: 1200, stroke: 10, tolerancePct: 10 },
+                      setTarget(t => ({
+                        ...t,
+                        type: v as "loadAtStroke" | "k"
                       }));
                     }}
                   >
@@ -145,27 +162,27 @@ export function AxialOptimizerSection({ baseTemplate, onApply }: Props) {
                   </Select>
                 </div>
 
-                {req.target.type === "loadAtStroke" ? (
+                {target.type === "loadAtStroke" ? (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs text-slate-500">Load (N)</Label>
-                      <Input className="h-9 text-xs font-mono mt-1" type="number" value={req.target.pReq} onChange={e => setReq(r => ({...r, target: {...r.target, pReq: Number(e.target.value)} as any}))} />
+                      <Input className="h-9 text-xs font-mono mt-1" type="number" value={target.pReq} onChange={e => setTarget(t => ({...t, pReq: Number(e.target.value)}))} />
                     </div>
                     <div>
                       <Label className="text-xs text-slate-500">Stroke (mm)</Label>
-                      <Input className="h-9 text-xs font-mono mt-1" type="number" value={req.target.stroke} onChange={e => setReq(r => ({...r, target: {...r.target, stroke: Number(e.target.value)} as any}))} />
+                      <Input className="h-9 text-xs font-mono mt-1" type="number" value={target.stroke} onChange={e => setTarget(t => ({...t, stroke: Number(e.target.value)}))} />
                     </div>
                   </div>
                 ) : (
                   <div>
                     <Label className="text-xs text-slate-500">Stiffness (N/mm)</Label>
-                    <Input className="h-9 text-xs font-mono mt-1" type="number" value={req.target.kReq} onChange={e => setReq(r => ({...r, target: {...r.target, kReq: Number(e.target.value)} as any}))} />
+                    <Input className="h-9 text-xs font-mono mt-1" type="number" value={target.kReq} onChange={e => setTarget(t => ({...t, kReq: Number(e.target.value)}))} />
                   </div>
                 )}
 
                 <div>
                   <Label className="text-xs text-slate-500">Tolerance ±%</Label>
-                  <Input className="h-9 text-xs font-mono mt-1" type="number" value={req.target.tolerancePct} onChange={e => setReq(r => ({...r, target: {...r.target, tolerancePct: Number(e.target.value)} as any}))} />
+                  <Input className="h-9 text-xs font-mono mt-1" type="number" value={target.tolerancePct} onChange={e => setTarget(t => ({...t, tolerancePct: Number(e.target.value)}))} />
                 </div>
               </div>
 
@@ -175,24 +192,24 @@ export function AxialOptimizerSection({ baseTemplate, onApply }: Props) {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs text-slate-500">Max OD (mm)</Label>
-                    <Input className="h-9 text-xs font-mono mt-1" type="number" value={req.envelope.maxOD || ""} onChange={e => setReq(r => ({...r, envelope: {...r.envelope, maxOD: Number(e.target.value)}}))} />
+                    <Input className="h-9 text-xs font-mono mt-1" type="number" value={envelope.maxOD || ""} onChange={e => setEnvelope(env => ({...env, maxOD: Number(e.target.value)}))} />
                   </div>
                   <div>
                     <Label className="text-xs text-slate-500">Min ID (mm)</Label>
-                    <Input className="h-9 text-xs font-mono mt-1" type="number" value={req.envelope.minID || ""} onChange={e => setReq(r => ({...r, envelope: {...r.envelope, minID: Number(e.target.value)}}))} />
+                    <Input className="h-9 text-xs font-mono mt-1" type="number" value={envelope.minID || ""} onChange={e => setEnvelope(env => ({...env, minID: Number(e.target.value)}))} />
                   </div>
                 </div>
                 <div>
                   <Label className="text-xs text-slate-500">Max Solid Height (mm)</Label>
-                  <Input className="h-9 text-xs font-mono mt-1" type="number" value={req.envelope.maxSolidHeight || ""} onChange={e => setReq(r => ({...r, envelope: {...r.envelope, maxSolidHeight: Number(e.target.value)}}))} />
+                  <Input className="h-9 text-xs font-mono mt-1" type="number" value={envelope.maxSolidHeight || ""} onChange={e => setEnvelope(env => ({...env, maxSolidHeight: Number(e.target.value)}))} />
                 </div>
               </div>
 
               <div className="flex items-center gap-2 bg-white rounded-xl p-3 border border-slate-100">
                 <Checkbox 
                   id="auditPass" 
-                  checked={req.constraints?.requireAuditPass}
-                  onCheckedChange={(c) => setReq(r => ({...r, constraints: {...r.constraints, requireAuditPass: !!c} as any}))}
+                  checked={requireAuditPass}
+                  onCheckedChange={(c) => setRequireAuditPass(!!c)}
                 />
                 <Label htmlFor="auditPass" className="text-xs font-medium cursor-pointer">Strict Audit (PASS only)</Label>
               </div>
