@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { SpringType } from "@/lib/springTypes";
 import { useLanguage } from "@/components/language-context";
@@ -136,6 +136,7 @@ function CalculatorContent() {
   );
   const { language } = useLanguage();
   const isZh = language === "zh";
+  const router = useRouter();
 
   // Read type from URL query parameter on mount
   useEffect(() => {
@@ -146,6 +147,12 @@ function CalculatorContent() {
   }, [searchParams]);
 
   const handleTypeSelect = (type: SpringType) => {
+    // Special Redirect: Spring Pack Hub
+    if (type === "torsionalSpringSystem") {
+      router.push("/tools/spring-pack");
+      return;
+    }
+
     setSelectedType(type);
     // Scroll to Step 2
     const step2Element = document.getElementById("step-2");

@@ -45,6 +45,13 @@ const TorsionalSystemVisualizer = dynamic(
   { ssr: false }
 );
 
+const MATERIALS: Record<string, { label: string; labelZh: string; G: number; E: number; tauAllow: number }> = {
+    "ferrous-carbon-music": { label: "Music Wire (ASTM A228)", labelZh: "琴钢丝 (SWC)", G: 79000, E: 206000, tauAllow: 800 },
+    "stainless-302": { label: "Stainless 302 (ASTM A313)", labelZh: "不锈钢 302 (SUS)", G: 69000, E: 193000, tauAllow: 550 },
+    "chrome-silicon": { label: "Chrome Silicon (ASTM A401)", labelZh: "铬硅钢丝 (SWOSC-V)", G: 79300, E: 206000, tauAllow: 900 },
+    "oil-tempered": { label: "Oil Tempered (ASTM A229)", labelZh: "油淬火钢丝 (SWO)", G: 79000, E: 206000, tauAllow: 650 },
+};
+
 export function TorsionalSystemCalculator() {
   const { language } = useLanguage();
   const isZh = language === "zh";
@@ -53,7 +60,17 @@ export function TorsionalSystemCalculator() {
   const [exploded, setExploded] = useState(false);
 
   // Analysis
-  const result = useMemo(() => calculateTorsionalSystem(design), [design]);
+  const result = useMemo(() => {
+    // Inject material properties into groups for calculation
+    const analyzedDesign = {
+        ...design,
+        groups: design.groups.map(g => {
+            const mat = MATERIALS[g.materialId || "ferrous-carbon-music"] || MATERIALS["ferrous-carbon-music"];
+            return { ...g, G: mat.G, tauAllow: mat.tauAllow };
+        })
+    };
+    return calculateTorsionalSystem(analyzedDesign);
+  }, [design]);
 
   // Actions
   const addGroup = () => {
@@ -217,6 +234,24 @@ export function TorsionalSystemCalculator() {
                             <div className="space-y-1">
                                 <Label className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">Start (θ, deg)</Label>
                                 <NumericInput value={group.theta_start} onChange={v => updateGroup(group.id, { theta_start: v ?? 0 })} min={0} className="h-8 text-xs font-mono border-blue-400/30" />
+                            </div>
+                            <div className="space-y-1 col-span-2">
+                                <Label className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">Material</Label>
+                                <Select 
+                                    value={group.materialId || "ferrous-carbon-music"}
+                                    onValueChange={(v) => updateGroup(group.id, { materialId: v })}
+                                >
+                                    <SelectTrigger className="h-8 text-xs font-mono bg-slate-50/50">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Object.entries(MATERIALS).map(([id, info]) => (
+                                            <SelectItem key={id} value={id}>
+                                                {isZh ? info.labelZh : info.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
 

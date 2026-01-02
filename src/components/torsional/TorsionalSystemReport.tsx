@@ -67,9 +67,9 @@ function ReportHeader({ design }: { design: TorsionalSpringSystemDesign }) {
             {isZh ? "离合器弹簧包工程报告" : "Torsional Spring Pack – Engineering Report"}
           </h1>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400 font-mono uppercase">
-            <span>Part: TSP-{Date.now().toString().slice(-6)}</span>
+            <span>Part: TSP-048728</span>
             <span>Rev: 1.0.1</span>
-            <span>Date: {new Date().toLocaleDateString()}</span>
+            <span>Date: 2026-01-01</span>
           </div>
         </div>
         <div className="flex gap-2">

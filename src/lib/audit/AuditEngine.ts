@@ -68,7 +68,30 @@ export class AuditEngine {
             candidates.push({ name: "Stability", nameZh: "稳定性", status: stability.status, ratio: 100 - stability.margin, sf: stability.margin / 10 });
         }
 
-        // Search for highest severity
+        // Consolidate Candidates
+        // Phase 4.2: Governing Override Priority
+        // If override exists, it is treated as a high-priority finding (usually "Assembly Hard Constraint")
+        if (input.results.governingOverride) {
+            const ov = input.results.governingOverride;
+            // Add as a candidate, but note that "FAIL" here should often win
+            candidates.push({
+                name: ov.mode,
+                nameZh: ov.modeZh || ov.zh || ov.mode,
+                status: ov.status || "FAIL", // Default to FAIL if missing in legacy
+                ratio: ov.ratio,
+                sf: ov.sf
+            });
+        }
+
+        // Search for highest severity (with Phase 4.2 Priority Logic)
+        // Order of severity: FAIL (3) > WARN (2) > PASS (1)
+        // If Tie: Override > Stress > Loadcase (Implicitly handled by candidates order? No, loop finds last max? 
+        // Let's rely on Severity Score. If tie, we want Override to win.
+        // Current candidate order: [Stress, Loadcase, Stability, Override]
+        // If Override is FAIL and Stress is FAIL, which wins? 
+        // We want Override (Assembly issues usually fundamental). 
+        // So putting Override last in array and using >= updates works.
+
         let maxSeverity = 0;
         for (const c of candidates) {
             const sev = statusMap[c.status as AuditStatus];

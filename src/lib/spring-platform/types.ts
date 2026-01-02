@@ -12,7 +12,8 @@ export type PlatformSpringType =
     | "spiral"
     | "wave"
     | "variablePitch"
-    | "shock";
+    | "shock"
+    | "axialPack";
 
 /** Input modes vary by spring type */
 export type PlatformInputMode =
@@ -323,4 +324,84 @@ export interface ArcSpringParams {
 
     // smoothing (optional but recommended)
     stageSmoothing?: number;    // 0..1 (default 0.15)
+}
+
+// --- Axial Pack Specific Types ---
+
+export interface AxialPackInput {
+    baseSpring: {
+        d: number;
+        Dm: number;
+        Na: number;
+        Nt: number;
+        L0: number;
+        materialId: string;
+        endCondition?: "open" | "closed" | "ground";
+    };
+    pack: {
+        N: number;
+        Rbc: number;
+        ringOD?: number;
+        ringID?: number;
+        plateThickness?: number;
+        seatPocketOD?: number;
+        guided?: boolean;
+    };
+    loadcase: {
+        stroke: number;
+        preload?: number;
+    };
+    options?: {
+        units?: "mm" | "in";
+        samplingClamp?: { samplesMin: number; samplesMax: number };
+        nClamp?: { Nmax: number };
+        coordConvention?: "Z_UP_AXIAL"; // Default contract: Z=Axial, XY=Plate
+    };
+}
+
+export interface AxialPackResult extends PlatformResult {
+    single: {
+        k: number;
+        F: (x: number) => number;
+        Hs: number;
+        OD: number;
+        maxStress: number;
+    };
+    pack: {
+        k_total: number;
+        F_total: (x: number) => number;
+        Hs_pack: number;
+        maxStroke: number;
+        clearance: {
+            ssMin: number;
+            boundaryMin: number;
+            seatPocketMin: number;
+        };
+    };
+
+    // Audit Hooks (Phase 4)
+    workingDeflection?: number;
+    limits?: {
+        stressLimit: number;
+        maxDeflection: number;
+        warnRatio: number;
+        failRatio: number;
+        stressLimitType: "shear" | "bending";
+    };
+    stressAnalysis?: {
+        tauUncorrected: number;
+        tauCorrected: number;
+        correctionFactor: number; // Kw
+        sigmaPlate?: number;
+        fatigueSF?: number;
+    };
+    governingOverride?: {
+        status: "FAIL" | "WARN";
+        mode: string; // e.g. "Spring-to-Spring Interference"
+        modeZh?: string;
+        ratio: number;
+        sf: number;
+        zh?: string; // Legacy support
+        notes?: string[];
+    };
 }

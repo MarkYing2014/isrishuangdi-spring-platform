@@ -49,5 +49,9 @@ export const PLATFORM_AXIS_MAP: Record<PlatformSpringType, AxisDefinition> = {
     shock: {
         xLabelEn: "Stroke x", xLabelZh: "行程 x", xUnit: "mm",
         yLabelEn: "Load P", yLabelZh: "负荷 P", yUnit: "N"
+    },
+    axialPack: {
+        xLabelEn: "Stroke s", xLabelZh: "行程 s", xUnit: "mm",
+        yLabelEn: "Force F", yLabelZh: "弹力 F", yUnit: "N"
     }
 };
