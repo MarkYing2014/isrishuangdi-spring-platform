@@ -72,12 +72,12 @@ export function generateWireSeriesMetric(): number[] {
 
 /**
  * Filter wire series to practical range based on template's wire diameter.
- * For clutch/heavy-duty springs, we don't want 0.8mm wire if template uses 4mm.
+ * For clutch/heavy-duty springs, we keep close to template values.
  */
 function filterWireSeriesForTemplate(fullSeries: number[], templateD: number): number[] {
-    // Allow ±60% variation from template wire diameter
-    const minD = templateD * 0.4;
-    const maxD = templateD * 1.6;
+    // Allow ±30% variation from template wire diameter (practical engineering range)
+    const minD = templateD * 0.7;
+    const maxD = templateD * 1.3;
     const filtered = fullSeries.filter(d => d >= minD && d <= maxD);
     // If no wires in range, return at least the template value
     if (filtered.length === 0) {
@@ -90,14 +90,39 @@ function filterWireSeriesForTemplate(fullSeries: number[], templateD: number): n
 }
 
 /**
+ * Derive sensible parameter ranges from template
+ */
+function deriveRangesFromTemplate(template: AxialPackInput): {
+    NaRange: [number, number];
+    packNRange: [number, number];
+    indexRange: [number, number];
+} {
+    const baseNa = template.baseSpring.Na;
+    const baseN = template.pack.N;
+    const baseD = template.baseSpring.d;
+    const baseDm = template.baseSpring.Dm;
+    const baseC = baseDm / baseD;
+
+    return {
+        // ±40% variation in coils
+        NaRange: [Math.max(3, Math.round(baseNa * 0.6)), Math.round(baseNa * 1.4)],
+        // ±50% variation in spring count
+        packNRange: [Math.max(4, Math.round(baseN * 0.5)), Math.round(baseN * 1.5)],
+        // Spring index typically 4-12, keep practical range around template
+        indexRange: [Math.max(4, Math.round(baseC * 0.7)), Math.min(12, Math.round(baseC * 1.3))]
+    };
+}
+
+/**
  * Main optimizer entry
  * - Brute force discrete search
- * - Evaluate via AxialPackEngine + AuditEngine
- * - Filter hard constraints
+ * - Full engine calculations for accurate k_total
+ * - Validate against target within tolerance
  * - Rank by composite score & bucket
  */
 export function optimizeAxialPack(req: AxialOptimizerRequest): AxialOptimizerCandidate[] {
     const baseD = req.baseTemplate.baseSpring.d;
+    const templateRanges = deriveRangesFromTemplate(req.baseTemplate);
 
     // Filter wire series based on template for practical results
     const fullWireSeries = req.constraints?.wireSeries?.length
@@ -106,9 +131,14 @@ export function optimizeAxialPack(req: AxialOptimizerRequest): AxialOptimizerCan
     const practicalWireSeries = filterWireSeriesForTemplate(fullWireSeries, baseD);
 
     console.log(`[Optimizer] Template d=${baseD}mm, using wire range: ${practicalWireSeries.join(', ')}mm`);
+    console.log(`[Optimizer] Derived ranges: Na=${templateRanges.NaRange}, N=${templateRanges.packNRange}, C=${templateRanges.indexRange}`);
 
+    // Use template-derived ranges if not overridden
     const cfg: Required<AxialOptimizerConstraints> = {
         ...DEFAULTS,
+        NaRange: req.constraints?.NaRange ?? templateRanges.NaRange,
+        packNRange: req.constraints?.packNRange ?? templateRanges.packNRange,
+        indexRange: req.constraints?.indexRange ?? templateRanges.indexRange,
         ...req.constraints,
         wireSeries: practicalWireSeries,
     };
@@ -118,36 +148,57 @@ export function optimizeAxialPack(req: AxialOptimizerRequest): AxialOptimizerCan
     const [Nmin, Nmax] = cfg.packNRange;
     const [NaMin, NaMax] = cfg.NaRange;
 
+    // Get target for validation
+    const targetK = req.target.type === "k"
+        ? req.target.kReq
+        : req.target.pReq / req.target.stroke; // P = k * stroke => k = P/stroke
+    const tolerancePct = req.target.tolerancePct;
+
+    console.log(`[Optimizer] Target k=${targetK.toFixed(2)} N/mm, tolerance=${tolerancePct}%`);
+
     // Guardrails (anti-freeze)
-    const hardLoopCap = 12000; // hard safety cap; keep < 1s typical
+    const hardLoopCap = 5000; // Reduced since we do full calcs now
     let loops = 0;
 
     // DEBUG: Rejection counters
-    let dbg = { envelope: 0, noRawResult: 0, auditFail: 0, auditNotPass: 0, sfFail: 0, solidFail: 0, passed: 0 };
-
+    let dbg = { envelope: 0, noRawResult: 0, targetMiss: 0, auditFail: 0, auditNotPass: 0, sfFail: 0, solidFail: 0, passed: 0 };
 
     // Create engine instance
     const engine = generateAxialPackEngine();
 
+    // Get material properties from template
+    const matId = req.baseTemplate.baseSpring.materialId || "ferrous-carbon-music";
+
     for (const d of cfg.wireSeries) {
-        for (let Na = NaMin; Na <= NaMax; Na += 0.5) {
-            for (let N = Nmin; N <= Nmax; N++) {
-                for (let C = Cmin; C <= Cmax; C += 0.5) {
+        for (let Na = NaMin; Na <= NaMax; Na += 1) { // Step by 1 for faster search
+            for (let N = Nmin; N <= Nmax; N += 2) { // Step by 2 for faster search
+                for (let C = Cmin; C <= Cmax; C += 1) { // Step by 1 for faster search
                     loops++;
                     if (loops > hardLoopCap) break;
 
                     const input = buildCandidateInput(req.baseTemplate, { d, Na, N, C }, req.envelope);
                     if (!input) { dbg.envelope++; continue; }
 
-                    // Run engine
+                    // Run FULL engine calculation (not minimal)
                     const result = engine.calculate({
                         geometry: input,
-                        cases: { mode: "deflection", values: [0] },
-                        material: { id: input.baseSpring.materialId, G: 79000, E: 206000, tauAllow: 800 },
-                        modules: { basicGeometry: true } as any
+                        cases: { mode: "deflection", values: [10] }, // Use 10mm stroke for stress calc
+                        material: { id: matId, G: 79000, E: 206000, tauAllow: 800 },
+                        modules: { basicGeometry: true, stressAnalysis: true } as any
                     }) as AxialPackResult;
 
                     if (!result.rawResult) { dbg.noRawResult++; continue; }
+
+                    // Get k_total and validate against target
+                    const k_total = result.pack?.k_total ?? result.springRate ?? 0;
+                    if (k_total <= 0) { dbg.noRawResult++; continue; }
+
+                    // Check if within tolerance of target
+                    const errorPct = Math.abs(k_total - targetK) / targetK * 100;
+                    if (errorPct > tolerancePct * 2) { // Allow 2x tolerance for broader search, filter later
+                        dbg.targetMiss++;
+                        continue;
+                    }
 
                     const audit = AxialPackAudit.evaluate({
                         input: input,
@@ -178,7 +229,7 @@ export function optimizeAxialPack(req: AxialOptimizerRequest): AxialOptimizerCan
     }
 
     // Log debug info
-    console.log(`[Optimizer Debug] loops=${loops} | envelope=${dbg.envelope} | noRawResult=${dbg.noRawResult} | auditFail=${dbg.auditFail} | auditNotPass=${dbg.auditNotPass} | sfFail=${dbg.sfFail} | solidFail=${dbg.solidFail} | passed=${dbg.passed}`);
+    console.log(`[Optimizer Debug] loops=${loops} | envelope=${dbg.envelope} | noRawResult=${dbg.noRawResult} | targetMiss=${dbg.targetMiss} | auditFail=${dbg.auditFail} | auditNotPass=${dbg.auditNotPass} | sfFail=${dbg.sfFail} | solidFail=${dbg.solidFail} | passed=${dbg.passed}`);
 
     // Sort by composite, then take top K, but keep diversity buckets
     candidates.sort((a, b) => a.score.composite - b.score.composite);
