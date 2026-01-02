@@ -45,12 +45,14 @@ export function AxialOptimizerSection({ baseTemplate, onApply }: Props) {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasRun, setHasRun] = useState(false);
+  const [appliedMessage, setAppliedMessage] = useState<string | null>(null);
 
   const runSearch = async () => {
     setIsRunning(true);
     setError(null);
     setCandidates([]);
     setSelectedCandidate(null);
+    setAppliedMessage(null);
     
     await new Promise(r => setTimeout(r, 50));
 
@@ -73,7 +75,10 @@ export function AxialOptimizerSection({ baseTemplate, onApply }: Props) {
 
   const handleApply = () => {
     if (selectedCandidate) {
+      console.log("[Optimizer] Applying candidate:", selectedCandidate.input);
       onApply(selectedCandidate.input);
+      setAppliedMessage(`Applied: d=${selectedCandidate.input.baseSpring.d}mm, N=${selectedCandidate.input.pack.N}`);
+      setTimeout(() => setAppliedMessage(null), 3000);
     }
   };
 
@@ -207,6 +212,12 @@ export function AxialOptimizerSection({ baseTemplate, onApply }: Props) {
               {error && (
                 <div className="text-xs text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">
                   {error}
+                </div>
+              )}
+              
+              {appliedMessage && (
+                <div className="text-xs text-emerald-600 bg-emerald-50 p-3 rounded-lg border border-emerald-200 animate-pulse">
+                  ✓ {appliedMessage}
                 </div>
               )}
             </div>
