@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wand2, Loader2, RotateCcw, ChevronDown, ChevronUp, ArrowRight, Check } from "lucide-react";
+import { Wand2, Loader2, RotateCcw, ChevronDown, ChevronUp, ArrowRight, Check, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { 
@@ -18,6 +18,37 @@ import {
     type AxialPackInput
 } from "@/lib/optimizer/AxialParetoOptimizer";
 
+// Built-in templates for quick selection
+const OPTIMIZER_TEMPLATES: Record<string, { name: string; input: AxialPackInput }> = {
+    "hd-clutch": {
+        name: "HD Clutch Return (d=4mm)",
+        input: {
+            baseSpring: { d: 4.0, Dm: 28.0, Na: 5.5, Nt: 7.5, L0: 65.0, materialId: "chrome-silicon", endCondition: "closed" },
+            pack: { N: 12, Rbc: 160, plateThickness: 6, ringOD: 360, ringID: 100, guided: true },
+            loadcase: { stroke: 0 },
+            options: { units: "mm" }
+        }
+    },
+    "passenger-cushion": {
+        name: "Passenger Cushion (d=2.2mm)",
+        input: {
+            baseSpring: { d: 2.2, Dm: 18.0, Na: 7.0, Nt: 9.0, L0: 45.0, materialId: "ferrous-carbon-music", endCondition: "closed" },
+            pack: { N: 8, Rbc: 85, plateThickness: 4, ringOD: 200, ringID: 0, guided: false },
+            loadcase: { stroke: 0 },
+            options: { units: "mm" }
+        }
+    },
+    "ev-piston": {
+        name: "EV Piston Return (d=1.8mm)",
+        input: {
+            baseSpring: { d: 1.8, Dm: 14.0, Na: 12.0, Nt: 14.0, L0: 55.0, materialId: "stainless-302", endCondition: "closed" },
+            pack: { N: 16, Rbc: 110, plateThickness: 3, ringOD: 242, ringID: 0, guided: true },
+            loadcase: { stroke: 0 },
+            options: { units: "mm" }
+        }
+    }
+};
+
 interface Props {
   baseTemplate: AxialPackInput;
   onApply: (input: AxialPackInput) => void;
@@ -25,6 +56,21 @@ interface Props {
 
 export function AxialOptimizerSection({ baseTemplate, onApply }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState<string>("custom");
+  const [localTemplate, setLocalTemplate] = useState<AxialPackInput>(baseTemplate);
+  
+  // When template selection changes
+  const handleTemplateChange = (key: string) => {
+    setSelectedTemplateKey(key);
+    if (key === "custom") {
+      setLocalTemplate(baseTemplate);
+    } else {
+      const template = OPTIMIZER_TEMPLATES[key];
+      if (template) {
+        setLocalTemplate(template.input);
+      }
+    }
+  };
   
   // Only store user-configurable options, use baseTemplate directly from props
   const [target, setTarget] = useState({
@@ -59,9 +105,9 @@ export function AxialOptimizerSection({ baseTemplate, onApply }: Props) {
     
     await new Promise(r => setTimeout(r, 50));
 
-    // Build request with CURRENT baseTemplate from props (not stale state)
+    // Build request with selected template (local or from selector)
     const req: AxialOptimizerRequest = {
-      baseTemplate, // Always use latest from props
+      baseTemplate: localTemplate, // Use locally selected template
       target: target.type === "k" 
         ? { type: "k", kReq: target.kReq, tolerancePct: target.tolerancePct }
         : { type: "loadAtStroke", pReq: target.pReq, stroke: target.stroke, tolerancePct: target.tolerancePct },
@@ -73,7 +119,7 @@ export function AxialOptimizerSection({ baseTemplate, onApply }: Props) {
       }
     };
 
-    console.log("[Optimizer] Using template d =", baseTemplate.baseSpring.d, "mm");
+    console.log("[Optimizer] Using template d =", localTemplate.baseSpring.d, "mm");
 
     try {
       const res = optimizeAxialPack(req);
@@ -136,16 +182,27 @@ export function AxialOptimizerSection({ baseTemplate, onApply }: Props) {
       {/* Expandable Content */}
       {isExpanded && (
         <CardContent className="pt-0">
-          {/* Template Info Banner */}
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
-            <div className="text-xs">
-              <span className="text-blue-600 font-medium">Using Template:</span>
-              <span className="ml-2 font-mono font-bold text-blue-800">
-                d={baseTemplate.baseSpring.d}mm, Dm={baseTemplate.baseSpring.Dm}mm, N={baseTemplate.pack.N}
-              </span>
-            </div>
-            <div className="text-[10px] text-blue-500">
-              Select a different sample from the Case Library to change
+          {/* Template Selector Banner */}
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-blue-600" />
+                <Label className="text-xs font-medium text-blue-700">Base Template:</Label>
+              </div>
+              <Select value={selectedTemplateKey} onValueChange={handleTemplateChange}>
+                <SelectTrigger className="h-8 w-[260px] text-xs bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">Current Calculator Input (d={baseTemplate.baseSpring.d}mm)</SelectItem>
+                  <SelectItem value="hd-clutch">HD Clutch Return (d=4mm)</SelectItem>
+                  <SelectItem value="passenger-cushion">Passenger Cushion (d=2.2mm)</SelectItem>
+                  <SelectItem value="ev-piston">EV Piston Return (d=1.8mm)</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="text-xs font-mono text-blue-800 bg-blue-100 px-2 py-1 rounded">
+                d={localTemplate.baseSpring.d}mm, Dm={localTemplate.baseSpring.Dm}mm, N={localTemplate.pack.N}
+              </div>
             </div>
           </div>
           
