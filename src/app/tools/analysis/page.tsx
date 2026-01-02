@@ -142,6 +142,18 @@ function AnalysisContent() {
     );
   }
 
+  // Suspension Spring uses dedicated analysis panel
+  if (isSuspensionDesign(designGeometry)) {
+    return (
+      <SuspensionAnalysisPanel
+        isZh={isZh}
+        geometry={designGeometry}
+        material={designMaterial}
+        analysisResult={designAnalysis}
+      />
+    );
+  }
+
   // Wire spring (compression/extension/torsion/conical) uses original analysis panel
   return (
     <AnalysisReady

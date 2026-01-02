@@ -6,6 +6,9 @@ import { AlertTriangle, Cog, RefreshCw } from "lucide-react";
 import { LanguageText } from "@/components/language-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -14,10 +17,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Trash2 } from "lucide-react";
 
+import type { DashboardSummaryResponse, TimeRange, MachineState, MachineTile } from "@/lib/manufacturing/types";
+import { TIME_RANGE_OPTIONS } from "@/lib/manufacturing";
 import type { DashboardVM, LiveRiskStatus, MachineRiskCard, Alert } from "@/lib/liveRiskBrain/types";
-import type { DashboardSummaryResponse, TimeRange } from "@/lib/manufacturing/types";
-import { TIME_RANGE_OPTIONS, MOCK_PLANTS } from "@/lib/manufacturing";
 import {
   KpiStrip,
   MachineStatusGrid,
@@ -28,6 +33,27 @@ import {
   DowntimePareto,
 } from "@/components/manufacturing";
 import { CameraMonitorCard } from "@/components/production";
+import { loadFactoryConfig } from "@/lib/factory/storage";
+import { FactoryConfig, DeviceStatus } from "@/lib/factory/types";
+import { WorkOrder, SimRequest, SimResult, SimKPIs, DeviceSimState } from "@/lib/factory/simTypes";
+import { simulate } from "@/lib/factory/simulator";
+import { loadWorkOrders, saveWorkOrders } from "@/lib/factory/woStorage";
+import { RestPollingAdapter } from "@/lib/factory/live/adapters/RestPollingAdapter";
+import { LiveStore } from "@/lib/factory/live/liveStore";
+import { LiveSnapshot } from "@/lib/factory/live/liveTypes";
+import Link from "next/link";
+import { Settings, Play, Sliders, ListTodo, Plus, Clock, Save as SaveIcon } from "lucide-react";
+
+function mapDeviceStatusToMachineState(status: string): MachineState {
+  switch (status) {
+    case "RUNNING": return "RUN";
+    case "DOWN": return "STOP";
+    case "SETUP": return "SETUP";
+    case "IDLE": return "WAIT";
+    case "MAINT": return "OFF";
+    default: return "WAIT";
+  }
+}
 
 function riskBadgeColor(status: LiveRiskStatus): string {
   switch (status) {
@@ -236,6 +262,22 @@ export function ProductionDashboard() {
   const [mfgLoading, setMfgLoading] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>("1h");
   const [activeTab, setActiveTab] = useState<string>("risk");
+  const [factoryConfig, setFactoryConfig] = useState<FactoryConfig | null>(null);
+  const [mode, setMode] = useState<"LIVE" | "SIM">("LIVE");
+  
+  // Simulation Settings
+  const [simHorizon, setSimHorizon] = useState(480); // 8h
+  const [simStepSec, setSimStepSec] = useState(30);
+  const [simSeed, setSimSeed] = useState(1234);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simResult, setSimResult] = useState<SimResult | null>(null);
+  const [liveSnapshot, setLiveSnapshot] = useState<LiveSnapshot | null>(null);
+
+  useEffect(() => {
+    setFactoryConfig(loadFactoryConfig());
+    setWorkOrders(loadWorkOrders());
+  }, []);
 
   // Fetch Live Risk Brain data
   const fetchDashboard = useCallback(async () => {
@@ -272,11 +314,56 @@ export function ProductionDashboard() {
     }
   }, [riskPreset, timeRange]);
 
+  // Simulation Engine Call
+  const runSimulation = useCallback(() => {
+    if (!factoryConfig) return;
+    setIsSimulating(true);
+    
+    // Artificial slight delay for feel
+    setTimeout(() => {
+      const result = simulate({
+        startISO: new Date().toISOString(),
+        horizonMin: simHorizon,
+        stepSec: simStepSec,
+        factory: factoryConfig,
+        workOrders: workOrders,
+        seed: simSeed
+      });
+      setSimResult(result);
+      setIsSimulating(false);
+      setActiveTab("operations");
+    }, 100);
+  }, [factoryConfig, simHorizon, simStepSec, simSeed, workOrders]);
+
   // Fetch both on mount and when params change
   useEffect(() => {
-    fetchDashboard();
-    fetchMfgData();
-  }, [fetchDashboard, fetchMfgData]);
+    if (mode === "LIVE") {
+      fetchDashboard();
+      fetchMfgData();
+    } else {
+      runSimulation();
+    }
+  }, [fetchDashboard, fetchMfgData, runSimulation, mode]);
+
+  // LIVE Mode Subscription (P2)
+  useEffect(() => {
+    if (mode !== "LIVE" || !factoryConfig) return;
+
+    const store = new LiveStore(factoryConfig);
+    const adapter = new RestPollingAdapter();
+    
+    adapter.connect();
+    const unsubscribe = adapter.subscribe((evt) => {
+      store.processEvent(evt);
+      // Rate-limited UI update via throttle? For now just set state
+      setLiveSnapshot(store.getSnapshot());
+    });
+
+    return () => {
+      unsubscribe();
+      adapter.disconnect();
+    };
+  }, [mode, factoryConfig]);
 
   // Auto refresh
   useEffect(() => {
@@ -296,64 +383,132 @@ export function ProductionDashboard() {
         </p>
         <h1 className="text-3xl font-semibold tracking-tight">
           <LanguageText en="Production Monitoring" zh="生产监控" />
+          {mode === "SIM" && (
+            <Badge className="ml-3 bg-indigo-600 text-white border-0 py-1">
+              <Clock className="h-3 w-3 mr-1" /> SIMULATION
+            </Badge>
+          )}
         </h1>
         <p className="text-muted-foreground">
           <LanguageText
-            en="Real-time shopfloor status with Live Risk Brain integration. Demo mode generates realistic production data."
-            zh="实时车间状态与 Live Risk Brain 集成。演示模式生成逼真的生产数据。"
+            en={mode === "LIVE" ? "Real-time shopfloor status driven by Factory Configuration." : "Deterministic simulation mode. Run what-if scenarios based on your factory config."}
+            zh={mode === "LIVE" ? "由工厂配置驱动的实时车间状态。" : "确定性仿真模式。基于工厂配置运行假设分析假设方案。"}
           />
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Select value={riskPreset} onValueChange={(v) => setRiskPreset(v as "OK" | "WARN" | "HIGH")}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="OK">
-              <LanguageText en="Normal (OK)" zh="正常 (OK)" />
-            </SelectItem>
-            <SelectItem value="WARN">
-              <LanguageText en="Warning (WARN)" zh="警告 (WARN)" />
-            </SelectItem>
-            <SelectItem value="HIGH">
-              <LanguageText en="High Risk (HIGH)" zh="高风险 (HIGH)" />
-            </SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/20 p-4 rounded-xl border border-muted-foreground/10">
+        <Tabs value={mode} onValueChange={(v) => setMode(v as "LIVE" | "SIM")} className="w-64">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="LIVE"><LanguageText en="Live" zh="实时" /></TabsTrigger>
+            <TabsTrigger value="SIM"><LanguageText en="Sim" zh="仿真" /></TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-        <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
-          <SelectTrigger className="w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TIME_RANGE_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label.zh}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap items-center gap-3">
+          {mode === "LIVE" ? (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 border-r pr-4 border-muted-foreground/20">
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-bold">
+                  {liveSnapshot?.health.connected ? (
+                    <>
+                      <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      {liveSnapshot.health.degraded ? "DEGRADED" : "CONNECTED"}
+                    </>
+                  ) : (
+                    <>
+                      <div className="h-2 w-2 rounded-full bg-zinc-400" />
+                      OFFLINE
+                    </>
+                  )}
+                </div>
+                <div className="text-[10px] text-muted-foreground tabular-nums">
+                  Last: {liveSnapshot?.health.lastUpdateTs ? new Date(liveSnapshot.health.lastUpdateTs).toLocaleTimeString() : "—"}
+                </div>
+              </div>
 
-        <Button onClick={() => { fetchDashboard(); fetchMfgData(); }} disabled={loading || mfgLoading} variant="outline">
-          <RefreshCw className={`h-4 w-4 mr-1 ${loading || mfgLoading ? "animate-spin" : ""}`} />
-          <LanguageText en="Refresh" zh="刷新" />
-        </Button>
+              <Select value={riskPreset} onValueChange={(v) => setRiskPreset(v as "OK" | "WARN" | "HIGH")}>
+                <SelectTrigger className="w-40 bg-zinc-900/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="OK"><LanguageText en="Normal (OK)" zh="正常 (OK)" /></SelectItem>
+                  <SelectItem value="WARN"><LanguageText en="Warning (WARN)" zh="警告 (WARN)" /></SelectItem>
+                  <SelectItem value="HIGH"><LanguageText en="High Risk (HIGH)" zh="高风险 (HIGH)" /></SelectItem>
+                </SelectContent>
+              </Select>
 
-        <Button
-          onClick={() => {
-            // Demo Scenario Trigger
-            setRiskPreset("HIGH");
-            setAutoRefresh(true);
-            setActiveTab("operations");
-            fetchDashboard();
-            fetchMfgData();
-          }}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
-        >
-          <LanguageText en="▶ Start Live Demo" zh="▶ 启动现场演示" />
-        </Button>
+              <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
+                <SelectTrigger className="w-36 bg-zinc-900/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIME_RANGE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label.zh}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button onClick={() => { fetchDashboard(); fetchMfgData(); }} disabled={loading || mfgLoading} variant="outline" className="bg-zinc-900/50">
+                <RefreshCw className={`h-4 w-4 mr-1 ${loading || mfgLoading ? "animate-spin" : ""}`} />
+                <LanguageText en="Refresh" zh="刷新" />
+              </Button>
+
+              <Button
+                onClick={() => {
+                  setRiskPreset("HIGH");
+                  setAutoRefresh(true);
+                  setActiveTab("operations");
+                  fetchDashboard();
+                  fetchMfgData();
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <LanguageText en="▶ Start Live Demo" zh="▶ 启动现场演示" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 border-r pr-4 border-muted-foreground/20">
+                <Sliders className="h-4 w-4 text-muted-foreground" />
+                <Select value={simHorizon.toString()} onValueChange={(v) => setSimHorizon(parseInt(v))}>
+                  <SelectTrigger className="w-24 border-0 bg-transparent h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="60">1h</SelectItem>
+                    <SelectItem value="240">4h</SelectItem>
+                    <SelectItem value="480">8h</SelectItem>
+                    <SelectItem value="1440">24h</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="h-4 w-[1px] bg-muted-foreground/20" />
+                <Select value={simStepSec.toString()} onValueChange={(v) => setSimStepSec(parseInt(v))}>
+                  <SelectTrigger className="w-24 border-0 bg-transparent h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10s Step</SelectItem>
+                    <SelectItem value="30">30s Step</SelectItem>
+                    <SelectItem value="60">60s Step</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button onClick={runSimulation} disabled={isSimulating} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
+                <Play className={`h-4 w-4 ${isSimulating ? "animate-pulse" : ""}`} />
+                <LanguageText en="Start Simulation" zh="启动仿真" />
+              </Button>
+            </div>
+          )}
+</div>
+
+        <Link href="/tools/factory-config">
+          <Button variant="outline" className="gap-2">
+            <Settings className="h-4 w-4" />
+            <LanguageText en="Factory Settings" zh="工厂设置" />
+          </Button>
+        </Link>
       </div>
 
       {error && (
@@ -363,10 +518,10 @@ export function ProductionDashboard() {
       )}
 
       {/* Shift Badge + KPI Strip */}
-      {mfgData && (
+      {(mode === "LIVE" ? mfgData : simResult) && (
         <div className="space-y-4">
           {/* Current Shift Badge */}
-          {mfgData.shift && (
+          {mode === "LIVE" && mfgData?.shift && (
             <div className="flex items-center gap-3">
               <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium ${
                 mfgData.shift.id === "NIGHT" 
@@ -379,15 +534,32 @@ export function ProductionDashboard() {
                   ({mfgData.shift.startTime} - {mfgData.shift.endTime})
                 </span>
               </div>
-              <span className="text-xs text-muted-foreground">
-                <LanguageText 
-                  en={mfgData.shift.id === "NIGHT" ? "Night shift: slightly lower targets" : "Day shift: standard targets"} 
-                  zh={mfgData.shift.id === "NIGHT" ? "夜班：目标略低" : "白班：标准目标"} 
-                />
-              </span>
             </div>
           )}
-          <KpiStrip kpis={mfgData.kpis} />
+          
+          <KpiStrip kpis={
+            mode === "LIVE" 
+              ? (liveSnapshot 
+                  ? { 
+                      ...liveSnapshot.kpis, 
+                      actualQty: liveSnapshot.kpis.actualGoodQty,
+                      ctAvgSec: liveSnapshot.kpis.avgCtSec,
+                      activeAlarmsCount: liveSnapshot.kpis.alarms.length,
+                      availability: 0.92 
+                    } as any
+                  : mfgData?.kpis || {} as any)
+              : {
+                  planQty: simResult!.kpis.planQty,
+                  actualQty: simResult!.kpis.actualGoodQty,
+                  oee: simResult!.kpis.oee,
+                  fpy: simResult!.kpis.fpy,
+                  uph: simResult!.kpis.uph,
+                  ctAvgSec: simResult!.kpis.avgCtSec,
+                  activeAlarmsCount: simResult!.kpis.alarms.length,
+                  scrapRate: simResult!.kpis.totalScrap / (simResult!.kpis.actualGoodQty + simResult!.kpis.totalScrap || 1),
+                  availability: simResult!.kpis.oee / (0.95 * simResult!.kpis.fpy || 1)
+                } as any
+          } />
         </div>
       )}
 
@@ -468,9 +640,52 @@ export function ProductionDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                      {dashboard.machines.map((m) => (
-                        <MachineCardComponent key={m.machineId} machine={m} />
-                      ))}
+                      {factoryConfig && factoryConfig.devices.map((configDevice) => {
+                        let displayMachine: MachineRiskCard;
+                        
+                        if (mode === "LIVE") {
+                          const mRaw = dashboard?.machines.find(dm => dm.machineId === configDevice.id);
+                          const mLive = liveSnapshot?.devices[configDevice.id];
+                          
+                          if (!mRaw && !mLive && !configDevice.enabled) return null;
+
+                          displayMachine = {
+                            machineId: configDevice.id,
+                            status: mLive?.status || mRaw?.status || "IDLE",
+                            liveRiskStatus: mLive?.healthStatus === "DOWN" ? "HIGH_RISK" : (mRaw?.liveRiskStatus || "ENGINEERING_OK"),
+                            liveRiskScore: mRaw?.liveRiskScore || (mLive ? 50 : 0),
+                            topDrivers: [
+                              ...(mRaw?.topDrivers || []),
+                              ...(mLive?.isStale ? [{ dimension: "manufacturing", title: { en: "Data stale > 30s", zh: "数据延迟 > 30秒" } }] : [])
+                            ],
+                            cycleTimeMs: configDevice.ctSec * 1000,
+                            cycleTimeDeltaPct: mRaw?.cycleTimeDeltaPct || 0,
+                            lastCpk: mRaw?.lastCpk || 1.33,
+                            scrapRate: mLive?.scrapCount !== undefined && mLive.producedCount > 0 ? mLive.scrapCount / mLive.producedCount : (mRaw?.scrapRate || 0),
+                            lastNelsonViolations: mRaw?.lastNelsonViolations || 0,
+                            tempDrift: mRaw?.tempDrift || false
+                          } as any;
+                        } else if (mode === "SIM" && simResult) {
+                          const s = simResult.devices.find(ds => ds.deviceId === configDevice.id)!;
+                          displayMachine = {
+                            machineId: s.deviceId,
+                            status: s.status as any,
+                            liveRiskStatus: s.status === "DOWN" ? "HIGH_RISK" : "ENGINEERING_OK",
+                            liveRiskScore: s.utilization * 100,
+                            topDrivers: s.lastEvent ? [{ dimension: "manufacturing", title: { en: s.lastEvent, zh: s.lastEvent } }] : [],
+                            cycleTimeMs: configDevice.ctSec * 1000,
+                            cycleTimeDeltaPct: 0,
+                            lastCpk: 1.33,
+                            scrapRate: s.producedCount > 0 ? s.scrapCount / s.producedCount : 0,
+                            lastNelsonViolations: 0,
+                            tempDrift: false
+                          } as any;
+                        } else {
+                          return null;
+                        }
+
+                        return <MachineCardComponent key={configDevice.id} machine={displayMachine} />;
+                      })}
                     </div>
                   </CardContent>
                 </Card>
@@ -542,25 +757,90 @@ export function ProductionDashboard() {
                 <h3 className="text-lg font-semibold">
                   <LanguageText en="Machine Status" zh="设备状态" />
                 </h3>
-                <MachineStatusGrid machines={mfgData.machines} />
+                <MachineStatusGrid machines={
+                  mode === "LIVE" 
+                    ? (factoryConfig!.devices.filter(d => d.enabled).map(configDevice => {
+                        const mRaw = mfgData?.machines.find(dm => dm.machineId === configDevice.id);
+                        const mLive = liveSnapshot?.devices[configDevice.id];
+                        
+                        return {
+                          machineId: configDevice.id,
+                          name: configDevice.label,
+                          state: mapDeviceStatusToMachineState(mLive?.status || mRaw?.state || "IDLE"),
+                          lineId: "L1",
+                          ctSec: mLive ? (mLive.cycleTimeSec || configDevice.ctSec) : (mRaw?.ctSec || configDevice.ctSec),
+                          workOrderId: mLive?.activeWorkOrderId || mRaw?.workOrderId,
+                          lastEventAt: new Date().toISOString(),
+                          currentQty: mLive?.goodCount || mRaw?.currentQty || 0,
+                          targetQty: mRaw?.targetQty || 1000,
+                          designCode: mLive?.activeWorkOrderId ? "LIVE-PART" : mRaw?.designCode
+                        } as MachineTile;
+                      }))
+                    : (simResult ? simResult.devices.map(s => {
+                        const d = factoryConfig!.devices.find(fd => fd.id === s.deviceId)!;
+                        return {
+                          machineId: s.deviceId,
+                          name: d.label,
+                          state: mapDeviceStatusToMachineState(s.status),
+                          lineId: "L1",
+                          ctSec: d.ctSec,
+                          workOrderId: s.activeWorkOrderId,
+                          lastEventAt: new Date().toISOString(),
+                          currentQty: s.goodCount,
+                          targetQty: 1000,
+                          designCode: s.designCode
+                        } as MachineTile;
+                      }) : [])
+                } />
               </div>
 
               {/* Charts Row */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <CycleTimeTrend data={mfgData.ctTrend} targetCt={3.0} />
-                <ThroughputTrend data={mfgData.throughputTrend} />
-                <DowntimePareto data={mfgData.downtimePareto} />
-              </div>
+              {mode === "LIVE" && mfgData && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <CycleTimeTrend data={mfgData.ctTrend} targetCt={3.0} />
+                  <ThroughputTrend data={mfgData.throughputTrend} />
+                  <DowntimePareto data={mfgData.downtimePareto} />
+                </div>
+              )}
 
               {/* Andon & Work Orders Row */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <AndonFeed
-                  events={mfgData.andon}
+                  events={
+                    mode === "LIVE" 
+                      ? mfgData?.andon || []
+                      : simResult?.kpis.alarms.map((a, i) => ({
+                          id: a.id,
+                          type: a.severity === "FAIL" ? "STOP" : "QUALITY",
+                          severity: a.severity === "FAIL" ? "CRITICAL" : a.severity === "WARN" ? "MAJOR" : "MINOR",
+                          machineId: a.deviceId || "FACTORY",
+                          timestamp: new Date().toISOString(),
+                          message: { en: a.message, zh: a.message },
+                          status: "ACTIVE"
+                        } as any)) || []
+                  }
                   maxHeight="350px"
                   className="lg:col-span-1"
                 />
                 <WorkOrderTable
-                  workOrders={mfgData.workOrders}
+                  workOrders={
+                    mode === "LIVE"
+                      ? mfgData?.workOrders || []
+                      : workOrders.map(wo => {
+                          const batches = simResult?.devices.filter(d => d.activeWorkOrderId === wo.id);
+                          const progress = batches && batches.length > 0 ? Math.max(...batches.map(b => b.progress01)) * 100 : 0;
+                          return {
+                            workOrderId: wo.id,
+                            designCode: wo.designCode,
+                            customer: "SEOS Simulation",
+                            qty: wo.qty,
+                            completedQty: simResult?.devices.reduce((sum, d) => d.activeWorkOrderId === wo.id ? sum + d.goodCount : sum, 0) || 0,
+                            status: progress > 0 ? "IN_PROGRESS" : "PENDING",
+                            priority: wo.priority === 5 ? "URGENT" : "NORMAL",
+                            dueDate: wo.dueISO || "-"
+                          } as any;
+                        })
+                  }
                   className="lg:col-span-2"
                 />
               </div>
@@ -640,6 +920,130 @@ export function ProductionDashboard() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Simulation Tools Sheet (P1) */}
+      {mode === "SIM" && (
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="outline" className="fixed bottom-6 right-6 h-12 rounded-full shadow-lg gap-2 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100">
+              <ListTodo className="h-5 w-5 text-indigo-600" />
+              <LanguageText en="Sim Tools" zh="仿真工具" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="sm:max-w-md overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle><LanguageText en="Simulation Planner" zh="仿真计划器" /></SheetTitle>
+              <SheetDescription>
+                <LanguageText en="Manage work orders and simulation parameters." zh="管理工单和仿真参数。" />
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="py-6 space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <ListTodo className="h-4 w-4" />
+                    <LanguageText en="Work Orders" zh="生产工单" />
+                  </h4>
+                  <Button size="sm" variant="ghost" className="h-7 text-indigo-600" onClick={() => {
+                    const newWO: WorkOrder = {
+                      id: `WO-${workOrders.length + 101}`,
+                      designCode: "NEW-PART",
+                      qty: 1000,
+                      route: ["CNC_COILING", "INSPECTION"],
+                      priority: 3
+                    };
+                    setWorkOrders([...workOrders, newWO]);
+                  }}>
+                    <Plus className="h-3 w-3 mr-1" /> Add
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  {workOrders.map((wo, idx) => (
+                    <div key={idx} className="p-3 rounded-lg border bg-muted/30 relative group">
+                      <Button 
+                        variant="ghost" size="icon" 
+                        className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => setWorkOrders(workOrders.filter((_, i) => i !== idx))}
+                      >
+                        <Trash2 className="h-3 w-3 text-rose-500" />
+                      </Button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase">ID</Label>
+                          <Input value={wo.id} onChange={(e) => {
+                            const next = [...workOrders];
+                            next[idx] = { ...wo, id: e.target.value };
+                            setWorkOrders(next);
+                          }} className="h-7 text-xs" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase">Design Code</Label>
+                          <Input value={wo.designCode} onChange={(e) => {
+                            const next = [...workOrders];
+                            next[idx] = { ...wo, designCode: e.target.value };
+                            setWorkOrders(next);
+                          }} className="h-7 text-xs" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase">Qty</Label>
+                          <Input type="number" value={wo.qty} onChange={(e) => {
+                            const next = [...workOrders];
+                            next[idx] = { ...wo, qty: parseInt(e.target.value) };
+                            setWorkOrders(next);
+                          }} className="h-7 text-xs" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] uppercase">Priority</Label>
+                          <Select value={wo.priority?.toString()} onValueChange={(v) => {
+                            const next = [...workOrders];
+                            next[idx] = { ...wo, priority: parseInt(v) };
+                            setWorkOrders(next);
+                          }}>
+                            <SelectTrigger className="h-7 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[1, 2, 3, 4, 5].map(p => <SelectItem key={p} value={p.toString()}>{p}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-4 border-t space-y-4">
+                <h4 className="font-medium text-sm flex items-center gap-2">
+                  <Sliders className="h-4 w-4" />
+                  <LanguageText en="Sim Metadata" zh="仿真元数据" />
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase">Random Seed</Label>
+                    <Input type="number" value={simSeed} onChange={(e) => setSimSeed(parseInt(e.target.value))} className="h-8" />
+                  </div>
+                  <div className="space-y-1 pt-5">
+                    <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => saveWorkOrders(workOrders)}>
+                      <SaveIcon className="h-3 w-3" />
+                      Save WO List
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6">
+                <Button onClick={() => { runSimulation(); }} disabled={isSimulating} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
+                  <Play className={`h-4 w-4 ${isSimulating ? "animate-pulse" : ""}`} />
+                  <LanguageText en="Re-run Simulation" zh="重新运行仿真" />
+                </Button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
     </section>
   );
 }
