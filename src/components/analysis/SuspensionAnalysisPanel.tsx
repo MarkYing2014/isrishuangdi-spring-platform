@@ -1069,10 +1069,11 @@ export function SuspensionAnalysisPanel({
                   activeCoils={geometry.activeCoils}
                   totalCoils={geometry.totalCoils}
                   freeLength={geometry.freeLength}
-                  currentDeflection={0}
-                  stressRatio={0.5}
+                  currentDeflection={calcResult.rideDeflection_mm}
+                  // Normalize against Su * 0.5 (Standard Static Yield Limit)
+                  stressRatio={calcResult.stress.tauRide_MPa / ((material.tensileStrength || 1600) * 0.5)}
                   solidHeight={calcResult.derived.solidHeight_Hs_mm}
-                  currentLoad={0}
+                  currentLoad={calcResult.forces.ride_N}
                   springRate={calcResult.springRate_N_per_mm}
                   pitchProfile={geometry.pitchProfile}
                   diameterProfile={geometry.diameterProfile}
@@ -1080,6 +1081,7 @@ export function SuspensionAnalysisPanel({
                   showStressContour={(displayMode === "engineering") && (feaForce !== null || !!calcResult)}
                   isZh={isZh}
                   displayMode={displayMode}
+                  tensileStrength={material.tensileStrength}
                 />
               </div>
               <p className="text-xs text-muted-foreground text-center mt-2">

@@ -29,29 +29,10 @@ interface StressSpringModelProps {
   showCoilBind?: boolean;    // Toggle coil bind visualization (red highlight)
 }
 
+import { stressToRGB } from "@/lib/three/stressColor";
+
 // Color interpolation: blue (low) → green → yellow → red (high)
-function stressToColor(stress: number, minStress: number, maxStress: number): THREE.Color {
-  const t = Math.max(0, Math.min(1, (stress - minStress) / (maxStress - minStress)));
-  
-  // 4-color gradient: blue → cyan → yellow → red
-  if (t < 0.25) {
-    // Blue to Cyan
-    const u = t / 0.25;
-    return new THREE.Color(0, u, 1);
-  } else if (t < 0.5) {
-    // Cyan to Green
-    const u = (t - 0.25) / 0.25;
-    return new THREE.Color(0, 1, 1 - u);
-  } else if (t < 0.75) {
-    // Green to Yellow
-    const u = (t - 0.5) / 0.25;
-    return new THREE.Color(u, 1, 0);
-  } else {
-    // Yellow to Red
-    const u = (t - 0.75) / 0.25;
-    return new THREE.Color(1, 1 - u, 0);
-  }
-}
+// DELETED local stressToColor - using shared stressToRGB
 
 // Generate spring centerline with stress values per point
 function generateStressedCenterline(
@@ -178,6 +159,9 @@ export function StressSpringModel({
       // For each vertex, find the closest centerline point and get its stress
       const verticesPerRing = radialSegments + 1;
       
+      // Pre-allocate a color object for the loop to avoid GC pressure
+      const tmpColor = new THREE.Color();
+      
       for (let i = 0; i < position.count; i++) {
         // Which ring (axial segment) is this vertex on?
         const ringIndex = Math.floor(i / verticesPerRing);
@@ -187,15 +171,14 @@ export function StressSpringModel({
         let color: THREE.Color;
         
         // Detect coil bind: If current pitch <= wireDiameter, color red
-        const totalCoilsVal = activeCoils + (totalCoils ? (totalCoils - activeCoils) : 2);
-        const freeLength = pitch * activeCoils + wireDiameter * (totalCoils ?? activeCoils + 2);
-        const currentHeight = pitch * activeCoils; // simplified
         const isBindSegment = showCoilBind && (pitch <= wireDiameter * 1.05);
 
         if (isBindSegment) {
-          color = new THREE.Color(1, 0, 0); // Pure Red for bind
+          color = tmpColor.set(1, 0, 0); // Pure Red for bind
         } else {
-          color = stressToColor(stress, stressMin, stressMax);
+          // Normalize against stressMax (the engineering limit)
+          const ratio = stress / (stressMax || 1000);
+          color = stressToRGB(ratio, tmpColor);
         }
 
         colors[i * 3] = color.r;

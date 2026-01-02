@@ -2,14 +2,14 @@
  * Stress Color Mapping Utility
  * 
  * Implements a standard engineering 5-stop gradient for visualization.
- * Deterministic mapping from normalized stress ratio (tau / tauAllow) to RGB.
+ * Deterministic mapping from normalized stress ratio (tau / tauLimit) to RGB.
  * 
  * Gradient Stops:
  * 0.00 -> Blue   (Safe, Low Load)
  * 0.35 -> Cyan   (Moderate)
  * 0.70 -> Green  (Optimum)
  * 1.00 -> Yellow (Warning/Limit)
- * 1.20+ -> Red   (Overstress/Yield)
+ * 1.20 -> Red    (Overstress/Yield)
  */
 
 import * as THREE from 'three';
@@ -21,12 +21,16 @@ const C3 = new THREE.Color("#00ff00"); // Green
 const C4 = new THREE.Color("#ffff00"); // Yellow
 const C5 = new THREE.Color("#ff0000"); // Red
 
-// We use a temporary color object to avoid allocations if needed, 
-// but for the array builder we return raw [r,g,b].
+/**
+ * Maps a normalized stress ratio to a THREE.Color.
+ * @param ratio Normalized stress (stress / limit). Range 0 to 1.2+.
+ * @param out Optional color object to reuse to avoid allocations.
+ */
+export function stressToRGB(ratio: number, out?: THREE.Color): THREE.Color {
+    const color = out || new THREE.Color();
+    const t = Math.max(0, Math.min(1.2, ratio));
 
-export function stressToRGB(t: number): [number, number, number] {
-    const color = new THREE.Color();
-    // Piecewise linear interpolation
+    // Piecewise linear interpolation between stops
     if (t <= 0.0) {
         color.copy(C1);
     } else if (t < 0.35) {
@@ -38,12 +42,11 @@ export function stressToRGB(t: number): [number, number, number] {
     } else if (t < 1.00) {
         const u = (t - 0.70) / (1.00 - 0.70);
         color.lerpColors(C3, C4, u);
-    } else if (t < 1.20) {
-        const u = (t - 1.00) / (1.20 - 1.00);
-        color.lerpColors(C4, C5, u);
     } else {
-        color.copy(C5);
+        // Red is reached at 1.20. Range [1.0, 1.2]
+        const u = Math.min(1.0, (t - 1.00) / (1.20 - 1.00));
+        color.lerpColors(C4, C5, u);
     }
 
-    return [color.r, color.g, color.b];
+    return color;
 }

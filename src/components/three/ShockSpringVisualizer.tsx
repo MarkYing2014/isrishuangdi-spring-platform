@@ -39,6 +39,7 @@ interface ShockSpringVisualizerProps {
 // ============================================================================
 
 import { stressToRGB } from "@/lib/three/stressColor";
+import { StressColorLegend } from "@/components/ui/engineering/StressColorLegend";
 
 // ============================================================================
 // Constants & Presets
@@ -289,21 +290,23 @@ function ShockSpringMesh({
       const circleSegments = 32;
       const ringSize = circleSegments + 1;
 
+      // Pre-allocate color object for the loop
+      const tmpColor = new THREE.Color();
+
       if (showStress && stressResult) {
+          const tauAllow = stressResult.tauAllow || 1000;
           for (let i = 0; i < n; i++) {
               const tauCenter = stressResult.tau[i];
-              const tauAllow = stressResult.tauAllow;
               
-              // Simplest: one color per ring. 
-              // ID/OD gradient can be added if needed, but ring-based is safer for O(1) slider.
-              const stressNorm = Math.min(1.5, tauCenter / (tauAllow || 1));
-              const [r, g, b] = stressToRGB(stressNorm);
+              // Normalize against the engineering limit (tauAllow)
+              const ratio = tauCenter / tauAllow;
+              stressToRGB(ratio, tmpColor);
 
               for (let j = 0; j < ringSize; j++) {
                   const idx = (i * ringSize + j) * 3;
-                  colorAttr.array[idx] = r;
-                  colorAttr.array[idx+1] = g;
-                  colorAttr.array[idx+2] = b;
+                  colorAttr.array[idx] = tmpColor.r;
+                  colorAttr.array[idx+1] = tmpColor.g;
+                  colorAttr.array[idx+2] = tmpColor.b;
               }
           }
           console.log("ShockSpringVisualizer: Dynamic Colors Updated (Buffer Only)");
@@ -316,7 +319,7 @@ function ShockSpringMesh({
           }
           colorAttr.needsUpdate = true;
       }
-  }, [showStress, stressResult, geometry, result.derived.centerline.length]); // Added result.derived.centerline.length to dependencies for safety
+  }, [showStress, stressResult, geometry, result.derived.centerline.length]);
   
   return (
     <mesh ref={meshRef} geometry={geometry}>
@@ -535,11 +538,11 @@ export function ShockSpringVisualizer({
             {/* Basic Stats */}
             <div className="space-y-1 pb-2 border-b border-slate-200/60 mb-2">
             <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-semibold tracking-tight">STROKE</span>
+                <span className="text-slate-500 font-semibold tracking-tight uppercase">Stroke</span>
                 <span className="font-mono font-medium text-blue-600">{stats.Stroke.toFixed(2)} mm</span>
             </div>
             <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-semibold tracking-tight">LOAD (P)</span>
+                <span className="text-slate-500 font-semibold tracking-tight uppercase">Load (P)</span>
                 <span className="font-mono font-medium text-emerald-600">{stats.Load.toFixed(1)} N</span>
             </div>
             </div>
@@ -548,21 +551,21 @@ export function ShockSpringVisualizer({
             {stressStats && (
             <div className="space-y-1 pb-2 border-b border-slate-200/60 mb-2 animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center">
-                    <span className="text-slate-500 font-semibold tracking-tight">MAX τ</span>
-                    <span className={`font-mono font-medium ${stressStats.maxTau > stressStats.tauAllow ? 'text-red-600' : 'text-slate-700'}`}>
+                    <span className="text-slate-500 font-semibold tracking-tight uppercase">Max τ</span>
+                    <span className={`font-mono font-medium ${stressStats.maxTau > stressStats.tauAllow ? 'text-red-600' : 'text-slate-800'}`}>
                         {stressStats.maxTau.toFixed(0)} MPa
                     </span>
                 </div>
-                {/* DEBUG: Show Tau[0] */}
-                <div className="flex justify-between items-center text-[10px] text-slate-400">
-                    <span>τ[0]</span>
-                    <span className="font-mono">{stressStats.tau[0]?.toFixed(0)}</span>
-                </div>
                 <div className="flex justify-between items-center">
-                    <span className="text-slate-500 font-semibold tracking-tight">MIN SF</span>
+                    <span className="text-slate-500 font-semibold tracking-tight uppercase">Min SF</span>
                     <span className={`font-mono font-bold ${stressStats.minSF < 1.0 ? 'text-red-600' : stressStats.minSF < 1.2 ? 'text-amber-500' : 'text-emerald-600'}`}>
                         {stressStats.minSF > 10 ? ">10" : stressStats.minSF.toFixed(2)}
                     </span>
+                </div>
+                
+                {/* Unified Legend */}
+                <div className="pt-2 pointer-events-auto">
+                    <StressColorLegend className="!p-1 !bg-transparent !border-0 !shadow-none" />
                 </div>
             </div>
             )}

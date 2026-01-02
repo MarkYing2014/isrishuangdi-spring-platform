@@ -8,6 +8,7 @@ import {
 } from "@/lib/spring3d/suspensionSpringGeometry";
 import type { PitchProfile, DiameterProfile } from "@/lib/springTypes";
 import { previewTheme } from "@/lib/three/previewTheme";
+import { stressToRGB } from "@/lib/three/stressColor";
 
 export interface SuspensionSpringMeshProps {
   wireDiameter: number;
@@ -22,21 +23,7 @@ export interface SuspensionSpringMeshProps {
   diameterProfile?: DiameterProfile;
 }
 
-function getStressColor(ratio: number): THREE.Color {
-  if (ratio <= 0.6) {
-    return new THREE.Color(0x22c55e);
-  } else if (ratio <= 0.8) {
-    const t = (ratio - 0.6) / 0.2;
-    const color = new THREE.Color();
-    color.lerpColors(new THREE.Color(0x22c55e), new THREE.Color(0xeab308), t);
-    return color;
-  } else {
-    const t = Math.min(1, (ratio - 0.8) / 0.2);
-    const color = new THREE.Color();
-    color.lerpColors(new THREE.Color(0xeab308), new THREE.Color(0xef4444), t);
-    return color;
-  }
-}
+// DELETED local getStressColor - using shared stressToRGB
 
 export function SuspensionSpringMesh({
   wireDiameter,
@@ -87,7 +74,16 @@ export function SuspensionSpringMesh({
     };
   }, [wireDiameter, activeCoils, totalCoils, freeLength, currentDeflection, scale, pitchProfile, diameterProfile]);
 
-  const springColor = useMemo(() => getStressColor(stressRatio), [stressRatio]);
+  const springColor = useMemo(() => stressToRGB(stressRatio), [stressRatio]);
+
+  // Force material color update when stressRatio changes
+  React.useEffect(() => {
+    if (materialRef.current) {
+      const newColor = stressToRGB(stressRatio);
+      materialRef.current.color.copy(newColor);
+      materialRef.current.needsUpdate = true;
+    }
+  }, [stressRatio]);
 
   useFrame((state) => {
     if (materialRef.current && isNearSolid) {

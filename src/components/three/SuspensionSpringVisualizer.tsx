@@ -7,7 +7,9 @@ import { AutoFitControls } from "./AutoFitControls";
 import { Button } from "@/components/ui/button";
 import { RotateCcw } from "lucide-react";
 import { SuspensionSpringMesh } from "./SuspensionSpringMesh";
-import { StressSpringModel, StressColorLegend } from "./StressSpringModel";
+import { StressSpringModel } from "./StressSpringModel";
+import { StressColorLegend } from "@/components/ui/engineering/StressColorLegend";
+import { cn } from "@/lib/utils";
 import { previewTheme } from "@/lib/three/previewTheme";
 
 const VIEW_PRESETS = {
@@ -65,6 +67,7 @@ export interface SuspensionSpringVisualizerProps {
   showStressContour?: boolean; // Toggle stress contour display
   isZh?: boolean;             // Language for legend
   displayMode?: "geometry" | "engineering";
+  tensileStrength?: number; // Added Su for stress normalization
 }
 
 export function SuspensionSpringVisualizer({
@@ -84,6 +87,7 @@ export function SuspensionSpringVisualizer({
   showStressContour = false,
   isZh = false,
   displayMode = "geometry",
+  tensileStrength,
 }: SuspensionSpringVisualizerProps) {
   const controlsRef = useRef<any>(null);
   const springGroupRef = useRef<THREE.Group>(null);
@@ -98,17 +102,7 @@ export function SuspensionSpringVisualizer({
   const isNearSolid = compressedLength <= solidHeight * 1.1;
   const isAtSolid = compressedLength <= solidHeight * 1.01;
 
-  const getStatusColor = () => {
-    if (stressRatio >= 1.0) return "text-red-600";
-    if (stressRatio >= 0.8) return "text-amber-600";
-    return "text-green-600";
-  };
-
-  const getStressColorHex = () => {
-    if (stressRatio <= 0.6) return "#22c55e";
-    if (stressRatio <= 0.8) return "#eab308";
-    return "#ef4444";
-  };
+  const statusColor = stressRatio >= 1.0 ? "text-red-600" : stressRatio >= 0.8 ? "text-amber-600" : "text-green-600";
 
   return (
     <div className="relative h-full w-full">
@@ -141,8 +135,10 @@ export function SuspensionSpringVisualizer({
               activeCoils={activeCoils}
               pitch={(freeLength - wireDiameter * totalCoils) / activeCoils}
               totalCoils={totalCoils}
-              axialForce={feaForce}
+              axialForce={feaForce ?? 0}
               showStress={true}
+              // Consistent normalization limit
+              maxStress={(tensileStrength || 1600) * 0.5}
               scale={scale}
               showCoilBind={true}
             />
@@ -219,66 +215,45 @@ export function SuspensionSpringVisualizer({
         </Button>
       </div>
 
-      <div className="absolute bottom-2 left-2 rounded bg-white/90 px-2 py-1.5 text-xs shadow">
-        <div className="flex items-center gap-2">
-          <div
-            className="h-3 w-3 rounded-full"
-            style={{ backgroundColor: getStressColorHex() }}
-          />
-          <span>
-            应力比: <span className={getStatusColor()}>{(stressRatio * 100).toFixed(0)}%</span>
-          </span>
+      <div className="absolute bottom-2 left-2 pointer-events-auto">
+        <StressColorLegend isZh={isZh} className="w-[160px]" />
+        <div className="mt-1 bg-white/90 backdrop-blur-sm rounded px-2 py-1 text-[10px] border border-slate-200">
+           {isZh ? "当前应力比: " : "Current Ratio: "}
+           <span className={cn("font-bold", statusColor)}>{(stressRatio * 100).toFixed(0)}%</span>
         </div>
         {isNearSolid && (
-          <div className="mt-1 text-amber-600 font-medium">
-            ⚠ {isAtSolid ? "已达固体高度" : "接近固体高度"}
+          <div className="mt-1 bg-white/90 backdrop-blur-sm rounded px-2 py-1 text-[10px] text-amber-600 font-bold border border-amber-200">
+            ⚠ {isAtSolid ? (isZh ? "已达固体高度" : "Solid Height") : (isZh ? "接近固体高度" : "Near Solid")}
           </div>
         )}
       </div>
 
-      <div className="absolute top-2 right-2 rounded bg-white/90 px-2 py-1.5 text-xs shadow space-y-0.5">
+      <div className="absolute top-2 right-2 rounded bg-white/90 px-3 py-2 text-[11px] shadow-sm border border-slate-100 min-w-[130px] space-y-1">
         <div className="flex justify-between gap-4">
-          <span className="text-slate-500">Δx:</span>
-          <span className="font-medium">{currentDeflection.toFixed(2)} mm</span>
+          <span className="text-slate-500 font-semibold uppercase tracking-tighter">Δx:</span>
+          <span className="font-mono font-bold text-blue-600">{(currentDeflection || 0).toFixed(2)} mm</span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-slate-500">F:</span>
-          <span className="font-medium">{currentLoad.toFixed(1)} N</span>
+          <span className="text-slate-500 font-semibold uppercase tracking-tighter">F:</span>
+          <span className="font-mono font-bold text-emerald-600">{(currentLoad || 0).toFixed(1)} N</span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-slate-500">L:</span>
-          <span className="font-medium">{compressedLength.toFixed(2)} mm</span>
+          <span className="text-slate-500 font-semibold uppercase tracking-tighter">L:</span>
+          <span className="font-mono text-slate-700">{(compressedLength || freeLength).toFixed(2)} mm</span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-slate-500">k:</span>
-          <span className="font-medium">{springRate.toFixed(2)} N/mm</span>
+          <span className="text-slate-500 font-semibold uppercase tracking-tighter">k:</span>
+          <span className="font-mono text-slate-700">{(springRate || 0).toFixed(2)} N/mm</span>
         </div>
-        <div className="border-t border-slate-200 pt-1 mt-1">
+        <div className="border-t border-slate-200/60 pt-1 mt-1">
           <div className="flex justify-between gap-4">
-            <span className="text-slate-500">Hs:</span>
-            <span className="font-medium">{solidHeight.toFixed(1)} mm</span>
+            <span className="text-slate-500 font-semibold uppercase tracking-tighter">Hs:</span>
+            <span className="font-mono text-slate-500">{(solidHeight || 0).toFixed(1)} mm</span>
           </div>
         </div>
       </div>
 
-      {/* Stress Color Legend when contour is active */}
-      {showStressContour && feaForce && feaForce > 0 && (() => {
-        // Calculate stress range for legend
-        const c = meanDiameter / wireDiameter;
-        const K = (4 * c - 1) / (4 * c - 4) + 0.615 / c;
-        const tauMax = (8 * feaForce * K * meanDiameter) / (Math.PI * Math.pow(wireDiameter, 3));
-        const tauMin = tauMax * 0.2; // Dead coil minimum
-        
-        return (
-          <div className="absolute bottom-14 left-2 right-2 rounded bg-white/95 px-2 py-2 shadow">
-            <StressColorLegend
-              minStress={tauMin}
-              maxStress={tauMax}
-              isZh={isZh}
-            />
-          </div>
-        );
-      })()}
+      {/* Unified legend is now permanently displayed in bottom-left overlay */}
     </div>
   );
 }
