@@ -153,6 +153,7 @@ export function HomeRiskRadar() {
 
   const geometry = useSpringDesignStore((s) => s.geometry);
   const analysisResult = useSpringDesignStore((s) => s.analysisResult);
+  const material = useSpringDesignStore((s) => s.material);
   const eds = useSpringDesignStore((s) => s.eds);
   const resolved = useSpringDesignStore((s) => s.resolved);
 
@@ -220,11 +221,23 @@ export function HomeRiskRadar() {
     }
 
     if (geometry.type === "wave") {
-      return buildWaveRiskRadar({ input: geometry as any });
+      return buildWaveRiskRadar({ 
+        input: { 
+          geometry: geometry as any,
+          material: material ? { id: material.id, E_MPa: material.elasticModulus } : undefined
+        },
+        result: analysisResult as any
+      });
     }
-
+    
     if (geometry.type === "dieSpring") {
-      return buildDieSpringRiskRadar({ input: geometry as any });
+      return buildDieSpringRiskRadar({ 
+        input: { 
+          geometry: geometry as any,
+          material: (material?.id as any) || "CHROME_SILICON"
+        },
+        result: analysisResult as any 
+      });
     }
 
     if (geometry.type === "variablePitchCompression") {

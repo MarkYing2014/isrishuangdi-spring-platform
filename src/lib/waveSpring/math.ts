@@ -86,6 +86,14 @@ export function validateWaveSpringInput(input: WaveSpringInput): {
   const warnings: string[] = [];
   const g = input.geometry;
 
+  if (!g) {
+    return {
+      isValid: false,
+      errors: ["Missing geometry input"],
+      warnings: [],
+    };
+  }
+
   // Basic geometry checks
   if (g.od <= 0) errors.push("OD must be > 0");
   if (g.id <= 0) errors.push("ID must be > 0");
@@ -147,7 +155,7 @@ export function validateWaveSpringInput(input: WaveSpringInput): {
  */
 export function calculateWaveSpring(input: WaveSpringInput): WaveSpringResult {
   const validation = validateWaveSpringInput(input);
-  
+
   if (!validation.isValid) {
     return {
       isValid: false,
@@ -195,7 +203,7 @@ export function calculateWaveSpring(input: WaveSpringInput): WaveSpringResult {
 
   // Additional warnings based on results
   const warnings = [...validation.warnings];
-  
+
   if (travel > availableDeflection * 0.9) {
     warnings.push("Working deflection is near solid height - risk of coil clash");
   }

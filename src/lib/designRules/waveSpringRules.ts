@@ -24,7 +24,7 @@ const WAVE_SPRING_THRESHOLDS = {
   maxStressRatio: 0.8,
   minDeflectionRatio: 0.1,
   maxDeflectionRatio: 0.85,
-  
+
   // Manufacturing thresholds
   minWavesPerTurn: 2,
   maxWavesPerTurn: 8,
@@ -64,6 +64,21 @@ export function buildWaveSpringDesignRuleReport(params: {
   }
 
   const g = input.geometry;
+
+  if (!g) {
+    findings.push({
+      id: "WAVE_NO_GEOMETRY",
+      level: "error",
+      titleEn: "Missing wave spring geometry",
+      titleZh: "缺失波形弹簧几何参数",
+    });
+    return {
+      summary: { status: "FAIL" },
+      metrics,
+      findings,
+    };
+  }
+
   const result = providedResult ?? calculateWaveSpring(input);
 
   // Add errors from calculation
@@ -91,7 +106,7 @@ export function buildWaveSpringDesignRuleReport(params: {
   }
 
   // ========== Metrics ==========
-  
+
   const meanDiameter = (g.od + g.id) / 2;
   const radialSpace = (g.od - g.id) / 2;
   // Spring Index for wave spring: Dm/t (using thickness, not radial wall)
@@ -102,7 +117,7 @@ export function buildWaveSpringDesignRuleReport(params: {
   // Solid height estimate (conservative): Nt * t
   // Note: actual solid height depends on wave geometry/contact
   const solidHeight = g.turns_Nt * g.thickness_t;
-  
+
   // Check for invalid free height (must be > solid height)
   if (g.freeHeight_Hf <= solidHeight) {
     findings.push({
@@ -120,7 +135,7 @@ export function buildWaveSpringDesignRuleReport(params: {
       findings,
     };
   }
-  
+
   const deflectionRatio = result.travel_mm / (g.freeHeight_Hf - solidHeight);
   const yieldStrength = DEFAULT_WAVE_SPRING_MATERIAL.yieldStrength_MPa;
   const stressRatio = result.stressMax_MPa / yieldStrength;
