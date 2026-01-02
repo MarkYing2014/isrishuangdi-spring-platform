@@ -57,7 +57,7 @@ const DEFAULTS: Required<AxialOptimizerConstraints> = {
 };
 
 /**
- * Standard metric wire series (example). Replace with your platform’s material/wire table if you have one.
+ * Standard metric wire series (example). Replace with your platform's material/wire table if you have one.
  */
 export function generateWireSeriesMetric(): number[] {
     // keep discrete + manufacturable
@@ -71,6 +71,25 @@ export function generateWireSeriesMetric(): number[] {
 }
 
 /**
+ * Filter wire series to practical range based on template's wire diameter.
+ * For clutch/heavy-duty springs, we don't want 0.8mm wire if template uses 4mm.
+ */
+function filterWireSeriesForTemplate(fullSeries: number[], templateD: number): number[] {
+    // Allow ±60% variation from template wire diameter
+    const minD = templateD * 0.4;
+    const maxD = templateD * 1.6;
+    const filtered = fullSeries.filter(d => d >= minD && d <= maxD);
+    // If no wires in range, return at least the template value
+    if (filtered.length === 0) {
+        const closest = fullSeries.reduce((prev, curr) =>
+            Math.abs(curr - templateD) < Math.abs(prev - templateD) ? curr : prev
+        );
+        return [closest];
+    }
+    return filtered;
+}
+
+/**
  * Main optimizer entry
  * - Brute force discrete search
  * - Evaluate via AxialPackEngine + AuditEngine
@@ -78,12 +97,20 @@ export function generateWireSeriesMetric(): number[] {
  * - Rank by composite score & bucket
  */
 export function optimizeAxialPack(req: AxialOptimizerRequest): AxialOptimizerCandidate[] {
+    const baseD = req.baseTemplate.baseSpring.d;
+
+    // Filter wire series based on template for practical results
+    const fullWireSeries = req.constraints?.wireSeries?.length
+        ? req.constraints.wireSeries
+        : generateWireSeriesMetric();
+    const practicalWireSeries = filterWireSeriesForTemplate(fullWireSeries, baseD);
+
+    console.log(`[Optimizer] Template d=${baseD}mm, using wire range: ${practicalWireSeries.join(', ')}mm`);
+
     const cfg: Required<AxialOptimizerConstraints> = {
         ...DEFAULTS,
         ...req.constraints,
-        wireSeries: req.constraints?.wireSeries?.length
-            ? req.constraints.wireSeries
-            : generateWireSeriesMetric(),
+        wireSeries: practicalWireSeries,
     };
 
     const candidates: AxialOptimizerCandidate[] = [];
@@ -97,6 +124,7 @@ export function optimizeAxialPack(req: AxialOptimizerRequest): AxialOptimizerCan
 
     // DEBUG: Rejection counters
     let dbg = { envelope: 0, noRawResult: 0, auditFail: 0, auditNotPass: 0, sfFail: 0, solidFail: 0, passed: 0 };
+
 
     // Create engine instance
     const engine = generateAxialPackEngine();
