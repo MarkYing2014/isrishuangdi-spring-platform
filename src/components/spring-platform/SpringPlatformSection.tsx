@@ -371,6 +371,9 @@ export function SpringPlatformSection({
     toleranceGrade: engineeringRequirements.tolerances?.wireDiameter || "GRADE_2",
     partNo: "SPRING-" + (projectId?.substring(0, 6) || "TMP"),
     designVersion: projectId || "ARC-2024-TMP",
+    // Arc Spring Specific Geometry (for inspection)
+    arcAngle_deg: geometry?.arcSpanDeg ?? geometry?.arcAngle ?? geometry?.theta,
+    arcRadius_mm: geometry?.arcRadius ?? geometry?.R,
     performance: {
        maxLoad: result?.cases?.find((c: any) => c.id === "Lmax" || c.id === "L2")?.load || result?.cases[result.cases.length - 1]?.load,
        utilization: result?.tauAllow ? (result.maxStress / result.tauAllow) * 100 : undefined
@@ -379,6 +382,7 @@ export function SpringPlatformSection({
     reviewIssues: result?.designRules?.filter((r: any) => r.status !== "pass").map((r: any) => r.label) || [],
     deliverability: deliverabilityAudit
   }), [geometry, result, material, materialId, engineeringRequirements, projectId, auditResult, deliverabilityAudit]);
+
 
 
   // Phase 7: Sync result to parent

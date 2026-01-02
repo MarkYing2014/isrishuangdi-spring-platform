@@ -36,6 +36,18 @@ export function calculateGaugeDimensions(
             goVal = nominal + tolVal; // Max Length
             noGoVal = nominal - tolVal; // Min Length
             break;
+        case "ARC_ANGLE":
+            tolVal = tolerance.values.arcAngle ?? 3; // Default ±3°
+            goVal = nominal + tolVal; // Max Angle
+            noGoVal = nominal - tolVal; // Min Angle
+            break;
+        case "ARC_RADIUS":
+            // Arc radius tolerance is percentage-based
+            const radiusTolPercent = tolerance.values.arcRadius ?? 3; // Default ±3%
+            tolVal = nominal * (radiusTolPercent / 100);
+            goVal = nominal + tolVal; // Max Radius
+            noGoVal = nominal - tolVal; // Min Radius
+            break;
         default:
             throw new Error(`Unsupported gauge category: ${category}`);
     }
@@ -117,6 +129,29 @@ export function generateGaugeStrategy(
     if (designSummary.L0) {
         const lGauges = calculateGaugeDimensions("LENGTH", designSummary.L0, grade, partNo);
         gauges.push(lGauges.go, lGauges.noGo);
+    }
+
+    // Arc Spring Specific Gauges
+    if (designSummary.arcAngle_deg) {
+        requirements.push({
+            category: "Arc Geometry",
+            level: "MANDATORY",
+            reasonEn: "Arc angle is critical for proper spring function and assembly fit.",
+            reasonZh: "弧形角度对弹簧功能和装配配合至关重要。",
+        });
+        const angleGauges = calculateGaugeDimensions("ARC_ANGLE", designSummary.arcAngle_deg, grade, partNo);
+        gauges.push(angleGauges.go, angleGauges.noGo);
+    }
+
+    if (designSummary.arcRadius_mm) {
+        requirements.push({
+            category: "Arc Radius",
+            level: "MANDATORY",
+            reasonEn: "Arc radius determines curvature and must match mating geometry.",
+            reasonZh: "弧形半径决定曲率，必须与配合几何体匹配。",
+        });
+        const radiusGauges = calculateGaugeDimensions("ARC_RADIUS", designSummary.arcRadius_mm, grade, partNo);
+        gauges.push(radiusGauges.go, radiusGauges.noGo);
     }
 
     return {

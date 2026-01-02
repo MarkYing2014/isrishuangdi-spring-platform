@@ -4,7 +4,7 @@
  */
 
 export type GaugeType = "GO" | "NO-GO";
-export type GaugeCategory = "OD" | "ID" | "LENGTH";
+export type GaugeCategory = "OD" | "ID" | "LENGTH" | "ARC_ANGLE" | "ARC_RADIUS";
 export type InspectionLevel = "OPTIONAL" | "RECOMMENDED" | "MANDATORY";
 
 export interface GaugeSpec {
@@ -38,5 +38,7 @@ export interface ToleranceMapping {
         diameter: number; // ± mm
         length: number;   // ± mm
         load: number;     // ± %
+        arcAngle?: number;  // ± degrees (for arc springs)
+        arcRadius?: number; // ± % of nominal (for arc springs)
     };
 }
