@@ -80,13 +80,15 @@ export function buildDieSpringDesignRuleReport(
 
   if (!result.ok) {
     // Add errors from calculation
-    for (const err of result.errors) {
-      findings.push({
-        id: "DIE_E0_CALC_ERROR",
-        level: "error",
-        titleEn: err,
-        titleZh: err,
-      });
+    if (result && 'errors' in result && Array.isArray(result.errors)) {
+      for (const err of result.errors) {
+        findings.push({
+          id: "DIE_E0_CALC_ERROR",
+          level: "error",
+          titleEn: err,
+          titleZh: err,
+        });
+      }
     }
     return {
       summary: { status: summarizeRuleStatus(findings) },
@@ -468,13 +470,15 @@ export function buildDieSpringDesignRuleReport(
   }
 
   // Add warnings from calculation
-  for (const warn of result.warnings) {
-    findings.push({
-      id: "DIE_CALC_WARNING",
-      level: "warning",
-      titleEn: warn,
-      titleZh: warn,
-    });
+  if (result && 'warnings' in result && Array.isArray(result.warnings)) {
+    for (const warn of result.warnings) {
+      findings.push({
+        id: "DIE_CALC_WARNING",
+        level: "warning",
+        titleEn: warn,
+        titleZh: warn,
+      });
+    }
   }
 
   return {

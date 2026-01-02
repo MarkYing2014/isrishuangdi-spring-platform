@@ -81,28 +81,40 @@ export function buildWaveSpringDesignRuleReport(params: {
 
   const result = providedResult ?? calculateWaveSpring(input);
 
+  if (!result) {
+    return {
+      summary: { status: "OK" },
+      metrics,
+      findings,
+    };
+  }
+
   // Add errors from calculation
-  for (const err of result.errors) {
-    findings.push({
-      id: "WAVE_E1_GEOM_INVALID",
-      level: "error",
-      titleEn: "Invalid geometry",
-      titleZh: "几何无效",
-      detailEn: err,
-      detailZh: err,
-    });
+  if (result && 'errors' in result && Array.isArray(result.errors)) {
+    for (const err of result.errors) {
+      findings.push({
+        id: "WAVE_E1_GEOM_INVALID",
+        level: "error",
+        titleEn: "Invalid geometry",
+        titleZh: "几何无效",
+        detailEn: err,
+        detailZh: err,
+      });
+    }
   }
 
   // Add warnings from calculation
-  for (const warn of result.warnings) {
-    findings.push({
-      id: "WAVE_M1_CALC_WARNING",
-      level: "warning",
-      titleEn: "Calculation warning",
-      titleZh: "计算警告",
-      detailEn: warn,
-      detailZh: warn,
-    });
+  if (result && 'warnings' in result && Array.isArray(result.warnings)) {
+    for (const warn of result.warnings) {
+      findings.push({
+        id: "WAVE_M1_CALC_WARNING",
+        level: "warning",
+        titleEn: "Calculation warning",
+        titleZh: "计算警告",
+        detailEn: warn,
+        detailZh: warn,
+      });
+    }
   }
 
   // ========== Metrics ==========

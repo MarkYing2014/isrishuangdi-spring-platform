@@ -225,8 +225,7 @@ export function HomeRiskRadar() {
         input: { 
           geometry: geometry as any,
           material: material ? { id: material.id, E_MPa: material.elasticModulus } : undefined
-        },
-        result: analysisResult as any
+        }
       });
     }
     
@@ -235,8 +234,7 @@ export function HomeRiskRadar() {
         input: { 
           geometry: geometry as any,
           material: (material?.id as any) || "CHROME_SILICON"
-        },
-        result: analysisResult as any 
+        }
       });
     }
 
