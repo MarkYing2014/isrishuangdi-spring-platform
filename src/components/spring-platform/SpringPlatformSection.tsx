@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, FileText, Download, Clock } from "lucide-react";
+import { ChevronDown, FileText, Download, Clock, AlertTriangle, CheckCircle } from "lucide-react";
 
 import { LoadPointList } from "@/components/ui/LoadPointCard";
 import { ModuleSelector, DEFAULT_PLATFORM_MODULES } from "@/components/ui/ModuleSelector";
@@ -528,6 +528,49 @@ export function SpringPlatformSection({
               if (rulesElement) rulesElement.scrollIntoView({ behavior: "smooth" });
             }}
           />
+
+          {/* Design Rules Panel - Scroll target for "查看失效项" */}
+          {result.designRules && result.designRules.filter((r: any) => r.status !== 'pass').length > 0 && (
+            <div 
+              id="design-rules-panel"
+              className="p-4 rounded-lg border border-amber-200 bg-amber-50/50 space-y-3"
+            >
+              <div className="flex items-center gap-2 text-sm font-bold text-amber-800">
+                <AlertTriangle className="w-4 h-4" />
+                <span>设计规则详情 / Design Rule Findings</span>
+              </div>
+              <div className="divide-y divide-amber-200/50">
+                {result.designRules.filter((r: any) => r.status !== 'pass').map((rule: any, i: number) => (
+                  <div key={i} className="py-2 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      {rule.status === 'fail' ? (
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                      ) : (
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      )}
+                      <span className="font-medium text-slate-700">{rule.label}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-slate-500">{rule.value}</span>
+                      <Badge 
+                        variant="outline" 
+                        className={`text-[9px] h-5 px-1.5 ${
+                          rule.status === 'fail' 
+                            ? 'bg-red-100 text-red-700 border-red-200' 
+                            : 'bg-amber-100 text-amber-700 border-amber-200'
+                        }`}
+                      >
+                        {rule.status === 'fail' ? 'FAIL' : 'WARN'}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-amber-600 italic">
+                请调整设计参数以解决上述问题。/ Please adjust design parameters to resolve these issues.
+              </p>
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-4 items-end">
             {/* Point Count Selector */}

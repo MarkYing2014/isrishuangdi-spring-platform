@@ -163,7 +163,7 @@ function AnalysisCharts({ result, input }: { result: ShockSpringResult, input: S
            
            {/* Engineering Review Tab */}
             <TabsContent value="review" className="h-[300px] overflow-y-auto pr-2">
-                 <div className="space-y-3 pt-1">
+                 <div id="design-rules-panel" className="space-y-3 pt-1">
                     <div className="flex items-center gap-2 mb-4 p-2 bg-blue-50 border border-blue-100 rounded text-sm text-blue-800">
                         <Info className="h-4 w-4" />
                         <span>All design rules must pass for certified production.</span>
@@ -549,11 +549,16 @@ export function ShockSpringCalculator() {
         <GlobalEngineeringStatus 
           result={platformResult} 
           onJumpToRules={() => {
+            // First click the review tab to show it
             const reviewTrigger = document.querySelector('[value="review"]');
             if (reviewTrigger) {
               (reviewTrigger as any).click();
-              reviewTrigger.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
+            // Then scroll to the design rules panel
+            setTimeout(() => {
+              const rulesElement = document.getElementById("design-rules-panel");
+              if (rulesElement) rulesElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
           }}
         />
       )}
