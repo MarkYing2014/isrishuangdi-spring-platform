@@ -543,6 +543,12 @@ export interface ReportBuilderInput {
     options?: Partial<ReportOptions>;
     /** Phase 15: Evolution State */
     evolutionState?: EvolutionState;
+    /** Phase 6: Engineering Requirements */
+    engineeringRequirements?: any;
+    /** Phase 6: Deliverability Audit */
+    deliverabilityAudit?: any;
+    /** P2: Deliverability Waiver */
+    deliverabilityWaiver?: { approvedBy: string; reason: string; date: string };
 }
 
 /**
@@ -710,6 +716,51 @@ export function buildSpringDesignReport(input: ReportBuilderInput): SpringDesign
                 finalId: sorted.find(s => s.meta.pinned === "final")?.meta.id
             };
         }
+    }
+
+    // Build Deliverability (Phase 6)
+    if (input.deliverabilityAudit) {
+        const audit = input.deliverabilityAudit;
+        const requirements = input.engineeringRequirements;
+
+        report.deliverability = {
+            status: audit.status,
+            level: audit.level,
+            requirements: requirements ? {
+                tolerances: requirements.tolerances ? {
+                    grade: requirements.tolerances.wireDiameter || "STANDARD",
+                    loadTolerance: requirements.tolerances.loadTolerance
+                } : undefined,
+                assembly: requirements.assembly ? {
+                    guideType: requirements.assembly.guideType || "NONE",
+                    clearanceClass: requirements.assembly.clearanceClass
+                } : undefined,
+                surface: requirements.surface ? {
+                    finish: requirements.surface.finish || "NONE",
+                    corrosionClass: requirements.surface.corrosionClass
+                } : undefined,
+                environment: requirements.environment ? {
+                    tempRange: requirements.environment.operatingTempRange || "AMBIENT",
+                    humidity: requirements.environment.humidity
+                } : undefined,
+                lifespan: requirements.lifespan ? {
+                    cycleClass: requirements.lifespan.cycleClass || "MODERATE",
+                    targetCycles: requirements.lifespan.targetCycles
+                } : undefined,
+            } : undefined,
+            findings: (audit.findings || []).map((f: any) => ({
+                severity: f.severity,
+                category: f.category,
+                labelEn: f.labelEn,
+                labelZh: f.labelZh,
+                messageEn: f.messageEn,
+                messageZh: f.messageZh,
+                impact: f.impact
+            })),
+            primaryImpacts: audit.summary?.primaryImpacts,
+            recommendation: audit.overallRecommendation,
+            waiver: input.deliverabilityWaiver
+        };
     }
 
     return report;

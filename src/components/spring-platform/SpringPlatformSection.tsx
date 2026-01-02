@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect } from "react";
+import { useLanguage } from "@/components/language-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,9 @@ import { CandidateSolution } from "@/lib/spring-platform/candidate-solution";
 import { DesignSpace } from "@/lib/spring-platform/design-space-types";
 import { PLATFORM_AXIS_MAP } from "@/lib/spring-platform/axis-definition";
 import { EngineeringAssumptionsPanel } from "@/components/ui/engineering/EngineeringAssumptionsPanel";
+import { EngineeringRequirementsPanel } from "@/components/ui/engineering/EngineeringRequirementsPanel";
+import { EngineeringRequirements, DEFAULT_ENGINEERING_REQUIREMENTS } from "@/lib/audit/engineeringRequirements";
+import { AuditEngine } from "@/lib/audit/AuditEngine";
 
 // Phase 9 Report Imports
 import {
@@ -121,6 +125,9 @@ export function SpringPlatformSection({
   onResultChange,
   onApplyParameters,
 }: SpringPlatformSectionProps) {
+  // Language context
+  const { language } = useLanguage();
+  
   // State
   const [loadPointCount, setLoadPointCount] = useState<number>(3);
   const [modules, setModules] = useState<PlatformModules>(DEFAULT_PLATFORM_MODULES);
@@ -159,6 +166,11 @@ export function SpringPlatformSection({
   const [optSolutions, setOptSolutions] = useState<CandidateSolution[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
+  
+  // Phase 6 Deliverability: Engineering Requirements (does NOT affect calculations)
+  const [engineeringRequirements, setEngineeringRequirements] = useState<EngineeringRequirements>(
+    DEFAULT_ENGINEERING_REQUIREMENTS
+  );
 
   // ==========================================================================
   // Canonical Value Persistence
@@ -329,6 +341,20 @@ export function SpringPlatformSection({
     }
   }, [springType, debouncedGeometry, propsMaterial, materialId, material, debouncedCanonical, modules]);
 
+  // Phase 6 Deliverability: Compute full audit with engineering requirements
+  const auditResult = useMemo(() => {
+    if (!result) return undefined;
+    
+    return AuditEngine.evaluate({
+      springType,
+      geometry: debouncedGeometry,
+      results: result,
+      engineeringRequirements,
+    });
+  }, [result, springType, debouncedGeometry, engineeringRequirements]);
+
+  const deliverabilityAudit = useMemo(() => auditResult?.audits.deliverability, [auditResult]);
+
 
   // Phase 7: Sync result to parent
   useEffect(() => {
@@ -431,6 +457,8 @@ export function SpringPlatformSection({
         includeVersionHash: type === "engineering",
       },
       evolutionState: evolution,
+      engineeringRequirements,
+      deliverabilityAudit,
     });
 
     if (method === "print") {
@@ -475,7 +503,8 @@ export function SpringPlatformSection({
             springType,
             input: { ...geometry, materialId },
             modules: modules as unknown as Record<string, boolean>,
-            axisMode: inputMode
+            axisMode: inputMode,
+            engineeringRequirements // Phase 6 Deliverability: persist requirements
         },
         summary: {
             status: result.isValid ? "pass" : "fail",
@@ -500,7 +529,7 @@ export function SpringPlatformSection({
         snapshots: [newSnapshot, ...prev.snapshots],
         selectedSnapshotId: newSnapshot.meta.id
     }));
-  }, [result, geometry, materialId, modules, inputMode, springType, evolution.snapshots, baselineMetrics]);
+  }, [result, geometry, materialId, modules, inputMode, springType, evolution.snapshots, baselineMetrics, engineeringRequirements]);
 
   if (!result) return null;
 
@@ -523,6 +552,8 @@ export function SpringPlatformSection({
         <CardContent className="px-4 pb-4 pt-4 space-y-4">
           <GlobalEngineeringStatusPanel 
             result={result} 
+            deliverabilityAudit={deliverabilityAudit}
+            safetyStatus={auditResult?.safetyStatus}
             onJumpToRules={() => {
               const rulesElement = document.getElementById("design-rules-panel");
               if (rulesElement) rulesElement.scrollIntoView({ behavior: "smooth" });
@@ -870,6 +901,16 @@ export function SpringPlatformSection({
           {/* Phase 14.2: Assumption Panel */}
           <div className="pt-4 border-t border-dashed">
             <EngineeringAssumptionsPanel springType={springType} />
+          </div>
+
+          {/* Phase 6 Deliverability: Engineering Requirements Panel */}
+          <div className="pt-4">
+            <EngineeringRequirementsPanel
+              language={language}
+              value={engineeringRequirements}
+              onChange={setEngineeringRequirements}
+              deliverabilityAudit={deliverabilityAudit}
+            />
           </div>
         </CardContent>
       )}

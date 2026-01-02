@@ -3,7 +3,8 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PlatformResult } from "@/lib/spring-platform/types";
-import { AlertCircle, ArrowRight } from "lucide-react";
+import { AuditStatus, DeliverabilityAudit } from "@/lib/audit/types";
+import { AlertCircle, ArrowRight, ShieldCheck, Factory } from "lucide-react";
 import { StatusPill } from "./StatusPill";
 import { KpiCard } from "./KpiCard";
 import { WorkflowBadge } from "./WorkflowBadge";
@@ -11,46 +12,66 @@ import { useLanguage } from "@/components/language-context";
 
 interface GlobalEngineeringStatusPanelProps {
   result: PlatformResult;
+  deliverabilityAudit?: DeliverabilityAudit;
+  safetyStatus?: AuditStatus;
   title?: string;
   onJumpToRules?: () => void;
 }
 
-export function GlobalEngineeringStatusPanel({ result, title, onJumpToRules }: GlobalEngineeringStatusPanelProps) {
+export function GlobalEngineeringStatusPanel({ 
+  result, 
+  deliverabilityAudit,
+  safetyStatus = "PASS",
+  title, 
+  onJumpToRules 
+}: GlobalEngineeringStatusPanelProps) {
   const { language } = useLanguage();
-  const rules = result.designRules || [];
-  const designRuleFail = rules.some(r => r.status === "fail");
-  const engineeringFail = !result.isValid;
-  
-  const hasFail = designRuleFail || engineeringFail;
-  const hasWarning = rules.some(r => r.status === "warning");
-  
-  let status: "pass" | "risk" | "fail" = "pass";
-  if (hasFail) status = "fail";
-  else if (hasWarning) status = "risk";
+  const isZh = language === "zh";
 
-  const statusConfig = {
-    pass: {
-      text: { en: "Design Viable", zh: "设计方案可行" },
-      subtext: { en: "All checks passed.", zh: "所有检查均通过。" },
-    },
-    risk: {
-      text: { en: "Engineering Review Required", zh: "需进行工程评审" },
-      subtext: { en: "Non-critical parameters near limits.", zh: "非核心参数接近极限。" },
-    },
-    fail: {
-      text: { en: "Redesign Required", zh: "需要重新设计" },
-      subtext: { 
-          en: designRuleFail 
-              ? "Critical design rules failed." 
-              : "Engineering limits exceeded (Stress/Load). Geometry is valid but unsafe.", 
-          zh: designRuleFail 
-              ? "核心设计规则未通过。" 
-              : "工程条件未满足（应力/载荷超限）。几何设计合理但当前工况不可用。" 
-      },
-    }
+  // Safety Track Logic
+  const safetyStatusConfig = {
+    PASS: { color: "bg-green-500", text: isZh ? "安全" : "SAFETY PASS" },
+    WARN: { color: "bg-yellow-500", text: isZh ? "风险" : "SAFETY RISK" },
+    FAIL: { color: "bg-red-500", text: isZh ? "危险" : "SAFETY FAIL" },
+    INFO: { color: "bg-blue-500", text: isZh ? "提示" : "INFO" },
   };
 
-  const current = statusConfig[status];
+  // Deliverability Track Logic
+  const deliverabilityStatus = deliverabilityAudit?.status || "PASS";
+  const deliverabilityConfig = {
+    PASS: { color: "bg-green-500", text: isZh ? "标品" : "DELIVERABLE" },
+    WARN: { color: "bg-yellow-500", text: isZh ? "挑战" : "CHALLENGING" },
+    FAIL: { color: "bg-red-500", text: isZh ? "难交付" : "HIGH RISK" },
+    INFO: { color: "bg-blue-500", text: isZh ? "提示" : "INFO" },
+  };
+
+  // Overall Semantic Logic (P0)
+  let statusTitle = isZh ? "设计方案可行" : "Design Viable";
+  let statusSubtext = isZh ? "所有工程检查均通过。" : "All checks passed.";
+  let overallStatusTag: "pass" | "risk" | "fail" = "pass";
+
+  if (safetyStatus === "FAIL") {
+    overallStatusTag = "fail";
+    statusTitle = isZh ? "需要重新设计" : "Redesign Required";
+    statusSubtext = isZh 
+      ? "工程条件未满足（应力/载荷超限）。物理方案不可行。" 
+      : "Engineering limits exceeded. Physical design is unsafe.";
+  } else if (safetyStatus === "PASS" && deliverabilityStatus === "FAIL") {
+    overallStatusTag = "risk"; 
+    statusTitle = isZh ? "物理可行但不可交付" : "Designable but not Deliverable";
+    statusSubtext = isZh 
+      ? "设计方案满足安全标准，但制造约束无法满足。需要调整工艺或放宽要求。" 
+      : "Safety margins met, but manufacturing constraints failed. Requires process adjustment or requirement relaxation.";
+  } else if (safetyStatus === "WARN" || deliverabilityStatus === "WARN") {
+    overallStatusTag = "risk";
+    statusTitle = isZh ? "需进行工程评审" : "Engineering Review Required";
+    statusSubtext = isZh ? "部分参数接近极限或存在制造挑战。" : "Non-critical parameters near limits or manufacturing challenges detected.";
+  }
+
+  const current = {
+    text: { en: statusTitle, zh: statusTitle }, // Simplified for this implementation
+    subtext: { en: statusSubtext, zh: statusSubtext }
+  };
 
   // Derive KPIs
   const springIndex = result.springIndex?.toFixed(1) || "-";
@@ -68,28 +89,28 @@ export function GlobalEngineeringStatusPanel({ result, title, onJumpToRules }: G
           
           {/* Status Section */}
           <div className="flex-1 p-5 flex flex-col justify-center space-y-3">
-             <div className="flex items-center gap-3">
-                <StatusPill 
-                  status={status === "pass" ? "pass" : status === "risk" ? "risk" : "fail"} 
-                  size="lg"
-                  label={
-                    language === "en" 
-                      ? (status === "pass" ? "PASS" : status === "risk" ? "RISK" : "FAIL")
-                      : (status === "pass" ? "合格" : status === "risk" ? "风险" : "不合格")
-                  }
-                />
+             <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200">
+                  <ShieldCheck className={`w-4 h-4 ${safetyStatus === 'PASS' ? 'text-green-500' : safetyStatus === 'FAIL' ? 'text-red-500' : 'text-yellow-500'}`} />
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{isZh ? "物理安全" : "SAFETY"}</span>
+                  <div className={`w-2 h-2 rounded-full ${safetyStatus === 'PASS' ? 'bg-green-500' : safetyStatus === 'FAIL' ? 'bg-red-500' : 'bg-yellow-500'} shadow-[0_0_8px_rgba(34,197,94,0.4)]`} />
+                </div>
+
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200">
+                  <Factory className={`w-4 h-4 ${deliverabilityStatus === 'PASS' ? 'text-green-500' : deliverabilityStatus === 'FAIL' ? 'text-red-500' : 'text-yellow-500'}`} />
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{isZh ? "制造交付" : "DELIVERABILITY"}</span>
+                  <div className={`w-2 h-2 rounded-full ${deliverabilityStatus === 'PASS' ? 'bg-green-500' : deliverabilityStatus === 'FAIL' ? 'bg-red-500' : 'bg-yellow-500'} shadow-[0_0_8px_rgba(34,197,94,0.4)]`} />
+                </div>
+
                 {result.workflowStatus && (
                    <WorkflowBadge 
                      state={result.workflowStatus.toLowerCase() as any} 
-                     label={
-                       language === "en" 
-                         ? result.workflowStatus
-                         : (
-                            result.workflowStatus === "CONCEPT" ? "草图" : 
-                            result.workflowStatus === "REVIEW" ? "评审中" :
-                            result.workflowStatus === "APPROVED" ? "已批准" :
-                            result.workflowStatus === "RFQ" ? "询价" : result.workflowStatus
-                         )
+                     label={isZh 
+                        ? (result.workflowStatus === "CONCEPT" ? "草图" : 
+                           result.workflowStatus === "REVIEW" ? "评审中" :
+                           result.workflowStatus === "APPROVED" ? "已批准" :
+                           result.workflowStatus === "RFQ" ? "询价" : result.workflowStatus)
+                        : result.workflowStatus
                      }
                    />
                 )}
@@ -100,7 +121,7 @@ export function GlobalEngineeringStatusPanel({ result, title, onJumpToRules }: G
                  <p className="text-sm text-slate-500 max-w-lg mt-1">{language === "en" ? current.subtext.en : current.subtext.zh}</p>
              </div>
 
-             {status !== "pass" && onJumpToRules && (
+             {(safetyStatus !== "PASS" || deliverabilityStatus === "FAIL") && onJumpToRules && (
                  <button 
                    onClick={onJumpToRules}
                    className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-slate-900 uppercase tracking-widest mt-2 group"

@@ -3,7 +3,8 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { WorkOrder, WorkOrderStatus } from "@/lib/manufacturing/workOrderTypes";
 import type { SpringType } from "@/lib/springTypes";
 import type { SpringGeometry, MaterialInfo, AnalysisResult } from "@/lib/stores/springDesignStore";
-import type { SpringAuditResult } from "@/lib/audit/types";
+import type { SpringAuditResult, DeliverabilityAudit } from "@/lib/audit/types";
+import type { EngineeringRequirements } from "@/lib/audit/engineeringRequirements";
 import { ManufacturingPlanner } from "@/lib/manufacturing/ManufacturingPlanner";
 import { QCGenerator } from "@/lib/manufacturing/QCGenerator";
 import { ManufacturingAuditEngine } from "@/lib/manufacturing/ManufacturingAuditEngine";
@@ -22,6 +23,10 @@ export interface WorkOrderStore {
         priority?: "normal" | "rush";
         createdBy: string;
         notes?: string;
+        /** Phase 6 Deliverability: Engineering Requirements */
+        engineeringRequirements?: EngineeringRequirements;
+        /** Phase 6 Deliverability: Deliverability audit result */
+        deliverabilityAudit?: DeliverabilityAudit;
     }) => WorkOrder;
 
     updateStatus: (workOrderId: string, status: WorkOrderStatus) => void;
@@ -30,6 +35,16 @@ export interface WorkOrderStore {
     getByDesignCode: (designCode: string) => WorkOrder[];
     getByStatus: (status: WorkOrderStatus) => WorkOrder[];
     clear: () => void;
+
+    /**
+     * P2: Apply a deliverability waiver to a blocked work order
+     * This allows work orders blocked by Deliverability FAIL to proceed with explicit approval
+     * Status changes from "blocked" to "created" after waiver is applied
+     */
+    applyDeliverabilityWaiver: (
+        workOrderId: string,
+        waiver: { approvedBy: string; reason: string }
+    ) => void;
 }
 
 
@@ -51,6 +66,8 @@ export const useWorkOrderStore = create<WorkOrderStore>()(
                     priority = "normal",
                     createdBy,
                     notes,
+                    engineeringRequirements,
+                    deliverabilityAudit,
                 } = params;
 
                 // Generate manufacturing plan
@@ -79,8 +96,14 @@ export const useWorkOrderStore = create<WorkOrderStore>()(
                 );
 
                 // Determine initial status based on manufacturing audit
-                const initialStatus: WorkOrderStatus =
+                // Phase 6: Also consider deliverability audit status
+                let initialStatus: WorkOrderStatus =
                     manufacturingAudit.overallStatus === "FAIL" ? "blocked" : "created";
+
+                // If deliverability has FAIL issues, also mark as blocked
+                if (deliverabilityAudit?.status === "FAIL") {
+                    initialStatus = "blocked";
+                }
 
                 // Generate WorkOrder ID
                 // Generate WorkOrder ID based on existing orders to prevent duplicates on reload
@@ -107,6 +130,8 @@ export const useWorkOrderStore = create<WorkOrderStore>()(
                         material,
                         analysis,
                         audit,
+                        engineeringRequirements,
+                        deliverabilityAudit,
                     },
                     manufacturingPlan,
                     qcPlan,
@@ -155,6 +180,24 @@ export const useWorkOrderStore = create<WorkOrderStore>()(
 
             clear: () => {
                 set({ workOrders: [] });
+            },
+
+            applyDeliverabilityWaiver: (workOrderId, waiver) => {
+                set((state) => ({
+                    workOrders: state.workOrders.map((wo) =>
+                        wo.workOrderId === workOrderId
+                            ? {
+                                ...wo,
+                                deliverabilityWaiver: {
+                                    ...waiver,
+                                    date: new Date().toISOString(),
+                                },
+                                status: "created", // Move from blocked to created after waiver
+                                updatedAt: new Date().toISOString(),
+                            }
+                            : wo
+                    ),
+                }));
             },
         }),
         {

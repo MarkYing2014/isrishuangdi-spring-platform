@@ -230,6 +230,42 @@ export interface SpringDesignReport {
         baselineId?: string;
         finalId?: string;
     };
+
+    /** Deliverability Assessment (Phase 6) */
+    deliverability?: {
+        /** Overall deliverability status */
+        status: "PASS" | "WARN" | "FAIL";
+        /** Business-friendly level */
+        level: "STANDARD" | "CHALLENGING" | "HIGH_RISK";
+        /** Engineering requirements summary */
+        requirements?: {
+            tolerances?: { grade: string; loadTolerance?: string };
+            assembly?: { guideType: string; clearanceClass?: string };
+            surface?: { finish: string; corrosionClass?: string };
+            environment?: { tempRange: string; humidity?: string };
+            lifespan?: { cycleClass: string; targetCycles?: number };
+        };
+        /** Deliverability findings */
+        findings: Array<{
+            severity: "PASS" | "WARN" | "FAIL" | "INFO";
+            category: string;
+            labelEn: string;
+            labelZh: string;
+            messageEn: string;
+            messageZh: string;
+            impact?: string;
+        }>;
+        /** Primary impact drivers */
+        primaryImpacts?: string[];
+        /** Recommendation */
+        recommendation?: string;
+        /** P2 Waiver: Approved deviation / engineering waiver */
+        waiver?: {
+            approvedBy: string;
+            reason: string;
+            date: string;
+        };
+    };
 }
 
 // =============================================================================

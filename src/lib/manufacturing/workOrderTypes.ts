@@ -4,7 +4,8 @@ import type {
     MaterialInfo,
     AnalysisResult
 } from "@/lib/stores/springDesignStore";
-import type { SpringAuditResult } from "@/lib/audit/types";
+import type { SpringAuditResult, DeliverabilityAudit } from "@/lib/audit/types";
+import type { EngineeringRequirements } from "@/lib/audit/engineeringRequirements";
 
 // ============================================================================
 // WORK ORDER CORE MODEL
@@ -33,11 +34,29 @@ export interface WorkOrder {
         material: MaterialInfo;
         analysis: AnalysisResult;
         audit: SpringAuditResult;
+        /** Phase 6 Deliverability: Engineering Requirements */
+        engineeringRequirements?: EngineeringRequirements;
+        /** Phase 6 Deliverability: Deliverability audit result */
+        deliverabilityAudit?: DeliverabilityAudit;
     };
 
     manufacturingPlan: ManufacturingPlan;
     qcPlan: QCChecklist;
     manufacturingAudit: ManufacturingAudit;
+
+    /** 
+     * P2: Deliverability Waiver Mechanism
+     * Work orders blocked by Deliverability FAIL may be overridden ONLY via explicit waiver approval.
+     * Reports should display "Approved Deviation / Engineering Waiver" when waived.
+     */
+    deliverabilityWaiver?: {
+        /** Who approved the waiver */
+        approvedBy: string;
+        /** Reason for the waiver */
+        reason: string;
+        /** Date of approval (ISO format) */
+        date: string;
+    };
 
     status: WorkOrderStatus;
 

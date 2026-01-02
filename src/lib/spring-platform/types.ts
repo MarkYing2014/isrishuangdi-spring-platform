@@ -50,6 +50,8 @@ export interface SnapshotPayload {
     input: any;                 // engine input (geometry + material params)
     modules: Record<string, boolean>;  // platform module toggles at time of capture
     axisMode?: string;          // height/deflection/angle etc
+    /** Engineering Requirements for deliverability (Phase 6) */
+    engineeringRequirements?: any;
 }
 
 export interface SnapshotSummary {

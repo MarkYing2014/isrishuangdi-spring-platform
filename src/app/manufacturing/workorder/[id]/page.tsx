@@ -11,10 +11,12 @@ import {
   PlayCircle,
   CheckCircle2,
   AlertOctagon,
-  PackageCheck
+  PackageCheck,
+  ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useWorkOrderStore } from "@/lib/stores/workOrderStore";
 import { ManufacturingPlanCard } from "@/components/manufacturing/ManufacturingPlanCard";
@@ -28,7 +30,7 @@ export default function WorkOrderDetailPage() {
   const router = useRouter();
   const { language } = useLanguage();
   const isZh = language === "zh";
-  const { getById, updateStatus } = useWorkOrderStore();
+  const { getById, updateStatus, applyDeliverabilityWaiver } = useWorkOrderStore();
   const [isMounted, setIsMounted] = useState(false);
   const [workOrder, setWorkOrder] = useState<WorkOrder | undefined>(undefined);
 
@@ -66,6 +68,17 @@ export default function WorkOrderDetailPage() {
   const handleStatusChange = (newStatus: any) => {
     updateStatus(workOrder.workOrderId, newStatus);
     setWorkOrder(prev => prev ? { ...prev, status: newStatus } : undefined);
+  };
+
+  const handleApplyWaiver = () => {
+    const approver = window.prompt(isZh ? "输入批准人姓名:" : "Enter approver name:");
+    if (!approver) return;
+    const reason = window.prompt(isZh ? "输入批准原因/特采说明:" : "Enter waiver reason / deviation rationale:");
+    if (!reason) return;
+
+    applyDeliverabilityWaiver(workOrder.workOrderId, { approvedBy: approver, reason });
+    // Refresh local state
+    setWorkOrder(getById(workOrder.workOrderId));
   };
 
   return (
@@ -136,6 +149,13 @@ export default function WorkOrderDetailPage() {
             </Button>
           )}
 
+          {workOrder.status === "blocked" && workOrder.engineeringSnapshot.deliverabilityAudit?.status === "FAIL" && !workOrder.deliverabilityWaiver && (
+            <Button size="sm" variant="destructive" onClick={handleApplyWaiver}>
+              <AlertOctagon className="w-4 h-4 mr-2" />
+              {isZh ? "申请工程特采" : "Request Engineering Waiver"}
+            </Button>
+          )}
+
           <div className="h-6 w-px bg-slate-200 mx-2" />
           
           <Button size="sm" variant="outline">
@@ -159,6 +179,22 @@ export default function WorkOrderDetailPage() {
 
         {/* Right Col: Audit & Snapshot */}
         <div className="space-y-6">
+          {workOrder.deliverabilityWaiver && (
+            <Card className="border-amber-200 bg-amber-50">
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center gap-2 text-amber-700 font-bold text-sm">
+                  <ShieldCheck className="w-4 h-4" />
+                  {isZh ? "已批准工程特采" : "Approved Engineering Waiver"}
+                </div>
+                <div className="text-xs text-amber-800 space-y-1">
+                  <p><strong>{isZh ? "批准人:" : "Approved By:"}</strong> {workOrder.deliverabilityWaiver.approvedBy}</p>
+                  <p><strong>{isZh ? "日期:" : "Date:"}</strong> {new Date(workOrder.deliverabilityWaiver.date).toLocaleString()}</p>
+                  <p className="mt-2 text-amber-900 italic">"{workOrder.deliverabilityWaiver.reason}"</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <ManufacturingAuditCard audit={workOrder.manufacturingAudit} />
           
           {/* Detailed Engineering Snapshot Card could go here or specialized component */}
