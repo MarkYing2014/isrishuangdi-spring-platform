@@ -84,14 +84,19 @@ export default function CncTrainingPage() {
   const coursesWithSession = React.useMemo(() => {
     return modules.map((m) => {
       const sess = sessionByModuleId.get(m.id);
+      const currentStepIndex = (sess?.currentStep || 1) - 1;
+      const step = m.steps?.[currentStepIndex];
+      const currentStepLabel = step ? (isZh ? step.titleZh : step.titleEn) : null;
+      
       return {
         ...m,
         status: sess?.status ?? "NOT_STARTED" as CourseStatus,
         progressPercent: sess?.progressPercent ?? 0,
         sessionId: sess?.id,
+        currentStepLabel,
       };
     });
-  }, [modules, sessionByModuleId]);
+  }, [modules, sessionByModuleId, isZh]);
 
   // Filter and sort
   const courses = React.useMemo(() => {
@@ -247,7 +252,11 @@ export default function CncTrainingPage() {
                   <Progress value={c.progressPercent} />
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{t("Progress", "进度")} {c.progressPercent}%</span>
-                    <span>{t("Updated", "更新")} {new Date(c.updatedAt).toLocaleDateString()}</span>
+                    {c.status === "IN_PROGRESS" && c.currentStepLabel ? (
+                         <span className="text-primary font-medium">{t("Current", "当前")}: {c.currentStepLabel}</span>
+                    ) : (
+                         <span>{t("Updated", "更新")} {new Date(c.updatedAt).toLocaleDateString()}</span>
+                    )}
                   </div>
                 </div>
               </CardHeader>

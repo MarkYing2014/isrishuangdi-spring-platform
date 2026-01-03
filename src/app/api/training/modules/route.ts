@@ -1,6 +1,6 @@
 /**
  * Training Modules API
- * GET: List all training modules
+ * GET: List all training modules (including full steps content)
  */
 
 import { NextResponse } from "next/server";

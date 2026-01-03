@@ -6,6 +6,38 @@ export type CourseStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
 export type Level = "Beginner" | "Intermediate" | "Advanced";
 export type MachineType = "8-claw";
 
+export type DemoActionType = "CONTINUE" | "MARK_DONE" | "RESTART_STEP" | "SIMULATE_ERROR" | "SET_STEP";
+
+export type DemoAction = {
+    labelEn: string;
+    labelZh: string;
+    action: DemoActionType;
+    // optional payload for SET_STEP or future use
+    step?: number;
+};
+
+export type TrainingStep = {
+    key: string; // "s0" | "s1" ... stable key
+    titleEn: string;
+    titleZh: string;
+
+    descriptionEn?: string;
+    descriptionZh?: string;
+
+    bulletsEn?: string[];
+    bulletsZh?: string[];
+
+    // checklist shown as interactive tickboxes in UI
+    checklistEn?: string[];
+    checklistZh?: string[];
+
+    // controls what buttons to render in demo mode
+    demoActions: DemoAction[];
+
+    // optional gate: require checklist fully checked before allowing "CONTINUE"/"MARK_DONE"
+    requireChecklistComplete?: boolean;
+};
+
 export interface TrainingModule {
     id: string;
     titleEn: string;
@@ -17,6 +49,7 @@ export interface TrainingModule {
     goalsZh: string[];
     stepsCount: number;
     updatedAt: string;
+    steps: TrainingStep[];
 }
 
 export interface TrainingSession {
