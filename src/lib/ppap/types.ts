@@ -67,8 +67,28 @@ export interface PpapPackage {
     status: PpapStatus;
     checklist: PpapChecklistItem[];
     pswId?: string;
+    // Snapshot & locking
+    locked: boolean;
+    submittedAt?: string;
+    snapshotId?: string;
     createdAt: string;
     updatedAt: string;
+}
+
+// ============ Submission Snapshot ============
+// Immutable record of checklist state at submission time
+export interface PpapSnapshot {
+    id: string;
+    ppapId: string;
+    createdAt: string;
+    // Frozen checklist state
+    checklist: PpapChecklistItem[];
+    // Digest for integrity verification
+    checklistDigest: string;
+    // Submission metadata
+    submissionLevel: number;
+    pswId?: string;
+    submittedBy?: string;
 }
 
 export interface PpapPackageCreateInput {

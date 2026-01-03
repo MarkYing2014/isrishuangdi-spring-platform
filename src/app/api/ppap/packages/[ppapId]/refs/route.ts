@@ -33,6 +33,8 @@ interface RefsPatchItem {
  * 1. { refs: RefUpdate[] }  - Original array format
  * 2. { checklistPatch: { designRecord: "READY", ... } }  - Quick status updates
  * 3. { refsPatch: { engineeringApproval: { sourceType, sourceId, sourceUrl } }, checklistPatch: {...} }
+ * 
+ * Returns 423 Locked if PPAP is locked for submission
  */
 export async function PATCH(
     request: Request,
@@ -53,6 +55,20 @@ export async function PATCH(
                     },
                 },
                 { status: 404 }
+            );
+        }
+
+        // Check if package is locked
+        if (ppap.locked) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: {
+                        code: "LOCKED",
+                        message: "PPAP package is locked and cannot be modified. Create a new revision to make changes.",
+                    },
+                },
+                { status: 423 }
             );
         }
 

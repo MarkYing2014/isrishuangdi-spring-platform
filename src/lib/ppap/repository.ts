@@ -5,20 +5,24 @@
  * TODO: Replace with Prisma when database is configured
  */
 
+import crypto from "crypto";
 import type {
     PpapPackage,
     PpapPackageCreateInput,
     PswDocument,
     PpapChecklistItem,
     PpapChecklistKey,
+    PpapSnapshot,
 } from "./types";
 import { createDefaultChecklist } from "./checklist";
 
 // ============ In-Memory Storage ============
 const ppapPackages: Map<string, PpapPackage> = new Map();
 const pswDocuments: Map<string, PswDocument> = new Map();
+const ppapSnapshots: Map<string, PpapSnapshot> = new Map();
 let packageCounter = 1;
 let pswCounter = 1;
+let snapshotCounter = 1;
 
 // ============ ID Generation ============
 function generatePpapId(): string {
@@ -31,6 +35,23 @@ function generatePswId(): string {
     const year = new Date().getFullYear();
     const num = String(pswCounter++).padStart(6, "0");
     return `PSW-${year}-${num}`;
+}
+
+function generateSnapshotId(): string {
+    const year = new Date().getFullYear();
+    const num = String(snapshotCounter++).padStart(6, "0");
+    return `SNAP-${year}-${num}`;
+}
+
+// Generate SHA256 digest of checklist for integrity verification
+function generateChecklistDigest(checklist: PpapChecklistItem[]): string {
+    const data = JSON.stringify(checklist.map(item => ({
+        key: item.key,
+        status: item.status,
+        sourceId: item.sourceId,
+        sourceUrl: item.sourceUrl,
+    })));
+    return crypto.createHash("sha256").update(data).digest("hex").slice(0, 16);
 }
 
 // ============ PPAP Package Repository ============
@@ -50,6 +71,7 @@ export const PpapRepository = {
             submissionLevel: input.submissionLevel ?? 3,
             status: "DRAFT",
             checklist: createDefaultChecklist(),
+            locked: false,
             createdAt: now,
             updatedAt: now,
         };
@@ -187,6 +209,75 @@ export const PswRepository = {
     },
 };
 
+// ============ Snapshot Repository ============
+export const SnapshotRepository = {
+    /**
+     * Create a snapshot of PPAP checklist state
+     */
+    async create(ppap: PpapPackage, pswId?: string): Promise<PpapSnapshot> {
+        const now = new Date().toISOString();
+        const snapshot: PpapSnapshot = {
+            id: generateSnapshotId(),
+            ppapId: ppap.id,
+            createdAt: now,
+            checklist: JSON.parse(JSON.stringify(ppap.checklist)), // Deep copy
+            checklistDigest: generateChecklistDigest(ppap.checklist),
+            submissionLevel: ppap.submissionLevel,
+            pswId,
+        };
+        ppapSnapshots.set(snapshot.id, snapshot);
+        return snapshot;
+    },
+
+    /**
+     * Get snapshot by ID
+     */
+    async findById(id: string): Promise<PpapSnapshot | null> {
+        return ppapSnapshots.get(id) ?? null;
+    },
+
+    /**
+     * Get all snapshots for a PPAP package
+     */
+    async findByPpapId(ppapId: string): Promise<PpapSnapshot[]> {
+        const results: PpapSnapshot[] = [];
+        for (const snap of ppapSnapshots.values()) {
+            if (snap.ppapId === ppapId) results.push(snap);
+        }
+        return results.sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+    },
+};
+
+/**
+ * Lock a PPAP package for submission
+ * Creates a snapshot and prevents further modifications
+ */
+export async function lockPackageForSubmission(
+    ppapId: string,
+    pswId?: string
+): Promise<{ ppap: PpapPackage; snapshot: PpapSnapshot } | null> {
+    const ppap = await PpapRepository.findById(ppapId);
+    if (!ppap) return null;
+
+    // Create snapshot first
+    const snapshot = await SnapshotRepository.create(ppap, pswId);
+
+    // Lock the package
+    const now = new Date().toISOString();
+    const updated = await PpapRepository.update(ppapId, {
+        locked: true,
+        submittedAt: now,
+        snapshotId: snapshot.id,
+        status: "SUBMITTED",
+    });
+
+    if (!updated) return null;
+
+    return { ppap: updated, snapshot };
+}
+
 // ============ Seed Demo Data ============
 export async function seedDemoData(): Promise<void> {
     // Only seed if no packages exist yet
@@ -218,4 +309,5 @@ export async function seedDemoData(): Promise<void> {
         notes: "Pending final review",
     });
 }
+
 

@@ -10,7 +10,13 @@ export * from "./types";
 export { createDefaultChecklist, getChecklistTemplate } from "./checklist";
 
 // Repository
-export { PpapRepository, PswRepository, seedDemoData } from "./repository";
+export {
+    PpapRepository,
+    PswRepository,
+    SnapshotRepository,
+    lockPackageForSubmission,
+    seedDemoData
+} from "./repository";
 
 // State Machine
 export { computePpapReadiness, canTransition, STATUS_LABELS } from "./stateMachine";
