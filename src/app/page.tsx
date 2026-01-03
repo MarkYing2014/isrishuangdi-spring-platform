@@ -94,6 +94,15 @@ const features = [
     href: "/quality",
     icon: ClipboardCheck,
   },
+  {
+    title: { en: "PPAP", zh: "PPAP 管理" },
+    description: {
+      en: "Aggregate engineering, manufacturing, and quality data into submission-ready PSW packages for OEM approval.",
+      zh: "汇总工程、制造和质量数据，生成可提交的 PSW 包，供 OEM 审批。",
+    },
+    href: "/ppap",
+    icon: Shield,
+  },
 ];
 
 type HomeFeature = {

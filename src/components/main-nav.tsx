@@ -27,6 +27,7 @@ const navItems = [
   { href: "/tools/analysis", label: { en: "Engineering Analysis", zh: "工程分析" } },
   { href: "/production", label: { en: "Production", zh: "生产监控" } },
   { href: "/quality", label: { en: "Quality Management", zh: "质量管理" } },
+  { href: "/ppap", label: { en: "PPAP", zh: "PPAP" } },
   { href: "/tools/cad-export", label: { en: "CAD Export", zh: "CAD 导出" } },
   { href: "/about", label: { en: "About", zh: "关于" } },
   { href: "/engineering", label: { en: "Shock Spring Design", zh: "减震弹簧参数化设计" } },
