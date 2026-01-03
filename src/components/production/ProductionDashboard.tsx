@@ -466,6 +466,14 @@ export function ProductionDashboard() {
               >
                 <LanguageText en="▶ Start Live Demo" zh="▶ 启动现场演示" />
               </Button>
+
+              <Button
+                onClick={() => window.location.href = "/production/workshop"}
+                variant="outline"
+                className="border-sky-500/50 text-sky-400 bg-sky-500/10 hover:bg-sky-500/20"
+              >
+                <LanguageText en="📊 Workshop Dashboard" zh="📊 数字车间看板" />
+              </Button>
             </div>
           ) : (
             <div className="flex items-center gap-4">
